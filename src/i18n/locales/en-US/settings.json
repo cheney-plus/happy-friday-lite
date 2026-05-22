@@ -1,0 +1,8 @@
+{
+  "title": "Settings",
+  "placeholder": "This is placeholder for settings",
+  "theme": "Theme",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "language": "Language"
+}

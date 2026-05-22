@@ -1,0 +1,8 @@
+{
+  "action": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete"
+  }
+}

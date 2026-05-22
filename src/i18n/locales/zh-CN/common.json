@@ -1,0 +1,8 @@
+{
+  "action": {
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "title": "Note Module",
+  "placeholder": "This is placeholder for note",
+  "back": "Back",
+  "undo": "Undo",
+  "redo": "Redo",
+  "untitled": "Untitled Note",
+  "saved": "Saved",
+  "unsaved": "Unsaved",
+  "export": "Export",
+  "more": "More",
+  "editMode": "Edit Mode",
+  "readonlyMode": "Read Only",
+  "copyMarkdown": "Copy Markdown",
+  "delete": "Delete Note",
+  "words": "words",
+  "characters": "chars",
+  "lastSaved": "Last saved",
+  "editorPlaceholder": "Start writing...",
+  "selectToEdit": "Select a note to start editing"
+}
