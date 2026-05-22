@@ -50,6 +50,9 @@ export const useNoteStore = defineStore('note', {
         knowledgeBaseId: knowledgeBaseId ?? null,
         title: title ?? null
       })
+      if (!note) {
+        return null
+      }
       this.notes.unshift(note)
       this.currentNoteId = note.id
       return note

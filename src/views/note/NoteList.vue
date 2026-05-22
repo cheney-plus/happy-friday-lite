@@ -259,7 +259,11 @@ const selectNote = (id) => {
 };
 
 const createNewNote = async () => {
-  await noteStore.createNote();
+  const note = await noteStore.createNote();
+  if (!note) {
+    console.error('Failed to create note: Electron API not available or create_note returned null');
+    return;
+  }
 };
 
 const onEditorChange = (content) => {
