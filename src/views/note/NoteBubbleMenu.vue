@@ -30,15 +30,6 @@
           </svg>
           <span>{{ getActionHint() }}</span>
         </div>
-
-        <div v-if="!isStreaming && currentAction === 'polish' && aiOutputContent" class="polish-suggestions">
-          <div class="suggestion-item">
-            <strong>补足语法成分：</strong>补上介词「将」，符合现代汉语语法规范，语句更通顺。
-          </div>
-          <div class="suggestion-item">
-            <strong>统一用词习惯：</strong>把「结束」替换为「完成」，更契合技术文档的专业表达习惯。
-          </div>
-        </div>
       </div>
 
       <div class="ai-output-footer">
@@ -276,12 +267,14 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { BubbleMenu } from '@tiptap/vue-3/menus';
 import { marked } from 'marked';
+import { electronService } from '../../services/electron.js';
 
 marked.setOptions({ breaks: true, gfm: true });
 
 const props = defineProps({
   editor: Object,
-  isDark: Boolean
+  isDark: Boolean,
+  noteContent: String
 });
 
 const emit = defineEmits(['aiWrite', 'interpret', 'refine', 'polish', 'expand', 'openInChat', 'replaceText', 'insertText']);
@@ -290,6 +283,7 @@ const showAIPanel = ref(false);
 const showCommandMenu = ref(false);
 const inputText = ref('');
 const selectedText = ref('');
+const savedSelectedText = ref('');
 const inputRef = ref(null);
 const currentCommand = ref('');
 const commandMenuDirection = ref('down');
@@ -346,9 +340,15 @@ const getActionTitle = () => {
     'interpret': '快速解读',
     'refine': '精炼内容',
     'polish': '快速润色',
-    'expand': '智能扩写'
+    'expand': '智能扩写',
+    'translate': '翻译',
+    'summarize': '总结',
+    'continue_write': '续写',
+    'fix_grammar': '语法修正',
+    'generate_plan': '生成任务计划',
+    'generate_table': '生成表格'
   };
-  return titleMap[currentAction.value] || 'AI 处理';
+  return titleMap[currentAction.value] || COMMAND_TITLE_MAP[currentAction.value] || 'AI 处理';
 };
 
 const getActionHint = () => {
@@ -356,7 +356,13 @@ const getActionHint = () => {
     'interpret': '解读思路',
     'refine': '精炼思路',
     'polish': '润色思路',
-    'expand': '扩写思路'
+    'expand': '扩写思路',
+    'translate': '翻译思路',
+    'summarize': '总结思路',
+    'continue_write': '续写思路',
+    'fix_grammar': '修正思路',
+    'generate_plan': '规划思路',
+    'generate_table': '整理思路'
   };
   return hintMap[currentAction.value] || '处理思路';
 };
@@ -365,45 +371,56 @@ const getCharCount = () => {
   return aiOutputContent.value.replace(/\s/g, '').length;
 };
 
-const mockResponses = {
-  interpret: `◆ **收敛完成后**，将推荐版本清单写入《技术选型白名单》，作为 Code Review 和架构评审的**强制检查项**。
+let activeNoteAIRequestId = '';
+let savedSelectionFrom = 0;
+let savedSelectionTo = 0;
+let pendingAIChange = null;
+let unlistenNoteAIChunk = null;
+let unlistenNoteAIDone = null;
+let unlistenNoteAIError = null;
 
-**核心要点：**
-- 建立技术选型的标准化流程
-- 确保代码质量和架构一致性
-- 提供明确的审查标准`,
+function loadModelConfig() {
+  try {
+    const raw = localStorage.getItem('happy-friday-custom-models');
+    if (raw) {
+      const models = JSON.parse(raw);
+      let model = null;
+      const selectedId = localStorage.getItem('happy-friday-selected-model');
+      model = selectedId ? models.find(m => m.id === selectedId) : models[0];
+      if (!model && models.length > 0) model = models[0];
+      return model || null;
+    }
+  } catch (e) {
+    console.error('Failed to load model config:', e);
+  }
+  return null;
+}
 
-  refine: `将推荐版本清单写入《技术选型白名单》：
+function setupNoteAIListeners() {
+  unlistenNoteAIChunk = electronService.listen('note-ai-chunk', (event) => {
+    if (event.payload.requestId !== activeNoteAIRequestId) return;
+    aiOutputContent.value += event.payload.content;
+  });
 
-- 作为 Code Review 强制检查项
-- 纳入架构评审流程
-- 定期更新和维护`,
+  unlistenNoteAIDone = electronService.listen('note-ai-done', (event) => {
+    if (event.payload.requestId !== activeNoteAIRequestId) return;
+    isStreaming.value = false;
+  });
 
-  polish: `◆ 收敛完成后，将推荐版本清单写入《技术选型白名单》，作为 Code Review 和架构评审的强制检查项。`,
+  unlistenNoteAIError = electronService.listen('note-ai-error', (event) => {
+    if (event.payload.requestId !== activeNoteAIRequestId) return;
+    isStreaming.value = false;
+    aiOutputContent.value += `\n\n❌ 错误：${event.payload.error}`;
+  });
+}
 
-  expand: `◆ **收敛完成后**，团队需要将经过充分验证的推荐版本清单正式写入《技术选型白名单》文档中。这一文档将成为后续所有 Code Review 和架构评审过程中的**强制性检查依据**。
+function cleanupNoteAIListeners() {
+  unlistenNoteAIChunk?.();
+  unlistenNoteAIDone?.();
+  unlistenNoteAIError?.();
+}
 
-**具体实施步骤：**
-
-1. **版本验证阶段**
-   - 对候选版本进行全面的功能测试
-   - 评估性能指标和兼容性
-   - 记录测试结果和发现的问题
-
-2. **文档更新流程**
-   - 将验证通过的版本信息录入白名单
-   - 标注每个版本的适用场景和限制条件
-   - 设定版本的有效期和复审时间
-
-3. **执行监督机制**
-   - 在 Code Review 中强制检查版本合规性
-   - 架构评审时核对技术选型是否符合规范
-   - 定期审计和更新白名单内容
-
-通过这一机制，可以确保技术选型的一致性和可控性。`
-};
-
-const startStreaming = (action) => {
+const startStreaming = async (action) => {
   if (streamingTimer.value) {
     clearTimeout(streamingTimer.value);
     streamingTimer.value = null;
@@ -412,6 +429,8 @@ const startStreaming = (action) => {
   closeAIPanel();
   
   const { from, to } = props.editor.state.selection;
+  savedSelectionFrom = from;
+  savedSelectionTo = to;
   try {
     const startCoords = props.editor.view.coordsAtPos(from);
     const endCoords = props.editor.view.coordsAtPos(to);
@@ -449,36 +468,51 @@ const startStreaming = (action) => {
   isStreaming.value = true;
   aiOutputContent.value = '';
 
-  const fullText = mockResponses[action] || '';
-  let currentIndex = 0;
+  const model = loadModelConfig();
+  if (!model) {
+    isStreaming.value = false;
+    aiOutputContent.value = '❌ 未找到模型配置，请先在设置中配置模型。';
+    return;
+  }
 
-  const stream = () => {
-    if (currentIndex < fullText.length) {
-      const chunkSize = Math.floor(Math.random() * 3) + 1;
-      aiOutputContent.value += fullText.slice(currentIndex, currentIndex + chunkSize);
-      currentIndex += chunkSize;
-      streamingTimer.value = window.setTimeout(stream, 20 + Math.random() * 30);
-    } else {
-      isStreaming.value = false;
-      streamingTimer.value = null;
-    }
-  };
+  const text = getSelectedText() || savedSelectedText.value || '';
+  const noteContent = props.noteContent || props.editor.getText() || '';
 
-  setTimeout(stream, 300);
+  activeNoteAIRequestId = `note_ai_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  try {
+    await electronService.invoke('note_ai_action', {
+      requestId: activeNoteAIRequestId,
+      action,
+      noteContent,
+      selectedText: text,
+      model
+    });
+  } catch (err) {
+    console.error('Note AI action error:', err);
+    isStreaming.value = false;
+    aiOutputContent.value += `\n\n❌ 请求失败：${err.message || '未知错误'}`;
+  }
 };
 
-const closeAIOutput = () => {
+const closeAIOutput = async () => {
   if (streamingTimer.value) {
     clearTimeout(streamingTimer.value);
     streamingTimer.value = null;
   }
+  if (isStreaming.value && activeNoteAIRequestId) {
+    try {
+      await electronService.invoke('stop_note_ai', { requestId: activeNoteAIRequestId });
+    } catch (_e) {}
+  }
+  activeNoteAIRequestId = '';
   showAIOutput.value = false;
   aiOutputContent.value = '';
   currentAction.value = '';
   isStreaming.value = false;
 };
 
-const resetAIPanel = () => {
+const resetAIPanel = async () => {
   if (showAIPanel.value) {
     showAIPanel.value = false;
     showCommandMenu.value = false;
@@ -492,6 +526,12 @@ const resetAIPanel = () => {
       clearTimeout(streamingTimer.value);
       streamingTimer.value = null;
     }
+    if (isStreaming.value && activeNoteAIRequestId) {
+      try {
+        await electronService.invoke('stop_note_ai', { requestId: activeNoteAIRequestId });
+      } catch (_e) {}
+    }
+    activeNoteAIRequestId = '';
     showAIOutput.value = false;
     aiOutputContent.value = '';
     currentAction.value = '';
@@ -508,7 +548,9 @@ const closeAIPanel = () => {
 };
 
 const openAIPanel = async () => {
-  selectedText.value = getSelectedText();
+  const text = getSelectedText();
+  selectedText.value = text;
+  savedSelectedText.value = text;
   showAIPanel.value = true;
   await nextTick();
   inputRef.value?.focus();
@@ -558,28 +600,30 @@ const toggleCommandMenu = async (e) => {
   showCommandMenu.value = !showCommandMenu.value;
 };
 
+const COMMAND_ACTION_MAP = {
+  '翻译': 'translate',
+  '总结': 'summarize',
+  '续写': 'continue_write',
+  '语法修正': 'fix_grammar',
+  '生成任务计划': 'generate_plan',
+  '生成表格': 'generate_table'
+};
+
+const COMMAND_TITLE_MAP = {
+  'translate': '翻译',
+  'summarize': '总结',
+  'continue_write': '续写',
+  'fix_grammar': '语法修正',
+  'generate_plan': '生成任务计划',
+  'generate_table': '生成表格'
+};
+
 const selectCommand = (command) => {
-  currentCommand.value = command;
   showCommandMenu.value = false;
-  const prefixMap = {
-    '翻译': '请翻译以下内容：',
-    '总结': '请总结以下内容：',
-    '续写': '请续写以下内容：',
-    '语法修正': '请修正以下内容的语法错误：',
-    '生成任务计划': '请根据以下内容生成任务计划：',
-    '生成表格': '请根据以下内容生成表格：'
-  };
-  
-  if (selectedText.value) {
-    inputText.value = prefixMap[command] + '\n' + selectedText.value;
-  } else {
-    inputText.value = prefixMap[command] + '\n';
+  const action = COMMAND_ACTION_MAP[command];
+  if (action) {
+    startStreaming(action);
   }
-  
-  autoResize();
-  nextTick(() => {
-    inputRef.value?.focus();
-  });
 };
 
 const autoResize = () => {
@@ -604,24 +648,28 @@ const handleSend = () => {
 
 const handleInterpret = () => {
   const text = getSelectedText();
+  savedSelectedText.value = text;
   emit('interpret', text);
   startStreaming('interpret');
 };
 
 const handleRefine = () => {
   const text = getSelectedText();
+  savedSelectedText.value = text;
   emit('refine', text);
   startStreaming('refine');
 };
 
 const handlePolish = () => {
   const text = getSelectedText();
+  savedSelectedText.value = text;
   emit('polish', text);
   startStreaming('polish');
 };
 
 const handleExpand = () => {
   const text = getSelectedText();
+  savedSelectedText.value = text;
   emit('expand', text);
   startStreaming('expand');
 };
@@ -634,20 +682,69 @@ const handleDislike = () => {
   console.log('点踩');
 };
 
-const handleReInterpret = () => {
-  if (isStreaming.value || !aiOutputContent.value) return;
+const handleReInterpret = async () => {
+  if (isStreaming.value) {
+    if (activeNoteAIRequestId) {
+      try {
+        await electronService.invoke('stop_note_ai', { requestId: activeNoteAIRequestId });
+      } catch (_e) {}
+    }
+  }
+  if (!aiOutputContent.value && !isStreaming.value) return;
   aiOutputContent.value = '';
   startStreaming('interpret');
 };
 
-const handleInsert = () => {
-  if (!aiOutputContent.value || isStreaming.value) return;
-  emit('insertText', aiOutputContent.value);
-  closeAIOutput();
+const AI_HIGHLIGHT_COLOR = '#fef08a';
+
+const applyAIMark = (from, to, markType, attrs) => {
+  const { tr } = props.editor.state;
+  const mark = markType.create(attrs);
+  tr.addMark(from, to, mark);
+  props.editor.view.dispatch(tr);
 };
 
-const handleRewrite = () => {
-  if (isStreaming.value) return;
+const removeAIMark = (from, to, markType) => {
+  const { tr } = props.editor.state;
+  tr.removeMark(from, to, markType);
+  props.editor.view.dispatch(tr);
+};
+
+const handleInsert = () => {
+  if (!aiOutputContent.value || isStreaming.value) return;
+  const content = aiOutputContent.value;
+  closeAIOutput();
+
+  const insertPos = savedSelectionTo;
+  const docSizeBefore = props.editor.state.doc.content.size;
+
+  props.editor.chain().focus().insertContentAt(insertPos, content).run();
+
+  const docSizeAfter = props.editor.state.doc.content.size;
+  const insertedLength = docSizeAfter - docSizeBefore;
+  const highlightFrom = insertPos;
+  const highlightTo = insertPos + insertedLength;
+
+  const highlightMarkType = props.editor.state.schema.marks.highlight;
+  if (highlightMarkType) {
+    applyAIMark(highlightFrom, highlightTo, highlightMarkType, { color: AI_HIGHLIGHT_COLOR });
+  }
+
+  pendingAIChange = {
+    type: 'insert',
+    highlightFrom,
+    highlightTo
+  };
+};
+
+const handleRewrite = async () => {
+  if (isStreaming.value) {
+    if (activeNoteAIRequestId) {
+      try {
+        await electronService.invoke('stop_note_ai', { requestId: activeNoteAIRequestId });
+      } catch (_e) {}
+    }
+  }
   aiOutputContent.value = '';
   startStreaming(currentAction.value);
 };
@@ -658,8 +755,60 @@ const handleDiscard = () => {
 
 const handleReplace = () => {
   if (!aiOutputContent.value || isStreaming.value) return;
-  emit('replaceText', aiOutputContent.value);
+  const content = aiOutputContent.value;
   closeAIOutput();
+
+  const strikeFrom = savedSelectionFrom;
+  const strikeTo = savedSelectionTo;
+  const insertPos = savedSelectionTo;
+
+  const docSizeBefore = props.editor.state.doc.content.size;
+  props.editor.chain().focus().insertContentAt(insertPos, content).run();
+  const docSizeAfter = props.editor.state.doc.content.size;
+  const insertedLength = docSizeAfter - docSizeBefore;
+
+  const highlightFrom = insertPos;
+  const highlightTo = insertPos + insertedLength;
+  const highlightMarkType = props.editor.state.schema.marks.highlight;
+  if (highlightMarkType) {
+    applyAIMark(highlightFrom, highlightTo, highlightMarkType, { color: AI_HIGHLIGHT_COLOR });
+  }
+
+  const strikeMarkType = props.editor.state.schema.marks.strike;
+  if (strikeMarkType) {
+    applyAIMark(strikeFrom, strikeTo, strikeMarkType, {});
+  }
+
+  pendingAIChange = {
+    type: 'replace',
+    strikeFrom,
+    strikeTo,
+    highlightFrom,
+    highlightTo
+  };
+};
+
+const confirmAIChange = () => {
+  if (!pendingAIChange) return;
+
+  const { tr } = props.editor.state;
+  const highlightMarkType = props.editor.state.schema.marks.highlight;
+
+  if (pendingAIChange.type === 'replace') {
+    tr.delete(pendingAIChange.strikeFrom, pendingAIChange.strikeTo);
+    const mappedHighlightFrom = tr.mapping.map(pendingAIChange.highlightFrom);
+    const mappedHighlightTo = tr.mapping.map(pendingAIChange.highlightTo);
+    if (highlightMarkType) {
+      tr.removeMark(mappedHighlightFrom, mappedHighlightTo, highlightMarkType);
+    }
+  } else if (pendingAIChange.type === 'insert') {
+    if (highlightMarkType) {
+      tr.removeMark(pendingAIChange.highlightFrom, pendingAIChange.highlightTo, highlightMarkType);
+    }
+  }
+
+  props.editor.view.dispatch(tr);
+  pendingAIChange = null;
 };
 
 const handleOpenInChat = () => {
@@ -680,11 +829,20 @@ const handleClickOutside = (event) => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   props.editor.on('selectionUpdate', resetAIPanel);
+  setupNoteAIListeners();
+
+  const editorEl = props.editor.view.dom;
+  editorEl.addEventListener('mousedown', () => {
+    if (pendingAIChange) {
+      confirmAIChange();
+    }
+  });
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside);
   props.editor.off('selectionUpdate', resetAIPanel);
+  cleanupNoteAIListeners();
 });
 </script>
 

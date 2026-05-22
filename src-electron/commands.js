@@ -2,9 +2,9 @@ import { ipcMain, shell, dialog } from 'electron'
 import { CancellationTokens } from './cancellation.js'
 import { loadConfig, saveConfig } from './config.js'
 import * as db from './db.js'
-import { streamChat, generateTitle } from './llm.js'
+import { streamChat, generateTitle, streamNoteAI } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
-import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED } from './events.js'
+import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE } from './events.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -280,6 +280,49 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('open-external', (_event, url) => {
     shell.openExternal(url)
+    return true
+  })
+
+  ipcMain.handle('note_ai_action', async (_event, args) => {
+    const { requestId, action, noteContent, selectedText, model } = args
+
+    const validActions = ['interpret', 'refine', 'polish', 'expand', 'translate', 'summarize', 'continue_write', 'fix_grammar', 'generate_plan', 'generate_table']
+    if (!validActions.includes(action)) {
+      throw new Error(`Invalid note AI action: ${action}`)
+    }
+
+    const cancelToken = cancelTokens.insert(requestId)
+
+    let fullContent = ''
+
+    try {
+      const result = await streamNoteAI(
+        mainWindow,
+        action,
+        noteContent,
+        selectedText,
+        model,
+        requestId,
+        cancelToken
+      )
+      fullContent = result.fullContent
+    } catch (e) {
+      cancelTokens.remove(requestId)
+      throw e
+    }
+
+    cancelTokens.remove(requestId)
+
+    mainWindow.webContents.send(NOTE_AI_DONE, {
+      requestId,
+      fullContent
+    })
+
+    return {}
+  })
+
+  ipcMain.handle('stop_note_ai', (_event, args) => {
+    cancelTokens.cancel(args.requestId)
     return true
   })
 }

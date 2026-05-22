@@ -264,7 +264,7 @@
       </div>
     </div>
 
-    <NoteBubbleMenu v-if="editor" :editor="editor" :isDark="appStore.theme === 'dark'" @aiWrite="handleBubbleAIWrite" @interpret="handleBubbleInterpret" @refine="handleBubbleRefine" @polish="handleBubblePolish" @expand="handleBubbleExpand" @openInChat="handleOpenInChat" />
+    <NoteBubbleMenu v-if="editor" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @interpret="handleBubbleInterpret" @refine="handleBubbleRefine" @polish="handleBubblePolish" @expand="handleBubbleExpand" @openInChat="handleOpenInChat" />
     <EditorContent :editor="editor" class="editor-content" />
 
     <!-- 链接对话框 -->
