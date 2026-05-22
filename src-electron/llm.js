@@ -206,40 +206,42 @@ export async function generateTitle(model, userMessage) {
   }
 }
 
-const NOTE_AI_SYSTEM_PROMPTS = {
-  interpret: '你是 Friday，一个专业的文本分析助手。你擅长解读和分析文本内容，能够深入理解文本的含义、背景和逻辑，为用户提供清晰、准确的解读。',
-  refine: '你是 Friday，一个专业的文本编辑助手。你擅长精炼和压缩文本，能够在保留核心含义的前提下，去除冗余信息，使文本更加简洁有力。',
-  polish: '你是 Friday，一个专业的文本润色助手。你擅长优化文本的表达方式，改善用词和句式，使文本更加流畅、优美、专业，同时保持原意不变。',
-  expand: '你是 Friday，一个专业的文本创作助手。你擅长扩展和丰富文本内容，能够基于已有内容进行合理的延伸和补充，使文本更加详尽、充实。',
-  translate: '你是 Friday，一个专业的翻译助手。你擅长将文本翻译成不同的语言，翻译准确、自然、流畅，能够根据上下文选择最合适的表达方式。',
-  summarize: '你是 Friday，一个专业的文本总结助手。你擅长从文本中提取核心要点，生成简洁明了的总结，帮助用户快速理解文本的主要内容。',
-  continue_write: '你是 Friday，一个专业的文本续写助手。你擅长根据已有内容进行合理的续写，保持风格一致、逻辑连贯，使续写内容自然衔接。',
-  fix_grammar: '你是 Friday，一个专业的语法修正助手。你擅长发现和修正文本中的语法错误、拼写错误和标点问题，使文本更加规范和准确。',
-  generate_plan: '你是 Friday，一个专业的任务规划助手。你擅长根据文本内容生成结构化的任务计划，将复杂目标分解为可执行的步骤。',
-  generate_table: '你是 Friday，一个专业的数据整理助手。你擅长从文本中提取关键信息并生成结构化的表格，使信息呈现更加清晰有序。'
-}
+const NOTE_AI_SYSTEM_PROMPT = '你是 Friday，一个专业的智能写作助手。你具备文本解读、精炼、润色、扩写、翻译、总结、续写、语法修正、任务规划和数据整理等全方位写作能力。你能够深入理解文本含义，结合上下文背景对文本进行精准处理。你的输出直接给出结果，不添加任何多余的开场白、结束语或说明性文字。'
 
 const NOTE_AI_USER_PROMPTS = {
-  interpret: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请针对以下选中的文本进行解读：\n\n{{selectedText}}\n\n要求：\n1. 结合笔记的整体背景理解选中文本的含义\n2. 解释选中文本的核心概念和逻辑\n3. 如有必要，补充相关的背景知识\n4. 解读要清晰、准确、有条理',
-  refine: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请精炼以下选中的文本：\n\n{{selectedText}}\n\n要求：\n1. 保留核心含义和关键信息\n2. 去除冗余和重复表述\n3. 使表达更加简洁有力\n4. 只输出精炼后的文本，不要添加额外说明',
-  polish: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请润色以下选中的文本：\n\n{{selectedText}}\n\n要求：\n1. 改善用词和句式，使表达更加流畅优美\n2. 保持原意不变\n3. 统一文本风格和语气\n4. 只输出润色后的文本，不要添加额外说明',
-  expand: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请扩写以下选中的文本：\n\n{{selectedText}}\n\n要求：\n1. 基于选中文本的核心含义进行合理延伸\n2. 补充相关的细节、示例或论证\n3. 保持与笔记整体风格一致\n4. 只输出扩写后的文本，不要添加额外说明',
-  translate: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请将以下选中的文本翻译成英文：\n\n{{selectedText}}\n\n要求：\n1. 翻译准确、自然、流畅\n2. 根据上下文选择最合适的表达方式\n3. 保持原文的语气和风格\n4. 只输出翻译后的文本，不要添加额外说明',
-  summarize: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请总结以下选中的文本：\n\n{{selectedText}}\n\n要求：\n1. 提取核心要点和关键信息\n2. 总结简洁明了，避免冗余\n3. 保持逻辑清晰，层次分明\n4. 只输出总结内容，不要添加额外说明',
-  continue_write: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请续写以下选中的文本：\n\n{{selectedText}}\n\n要求：\n1. 根据选中文本的上下文和风格进行自然续写\n2. 保持逻辑连贯，内容衔接自然\n3. 续写内容与笔记整体风格一致\n4. 只输出续写的文本，不要添加额外说明',
-  fix_grammar: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请修正以下选中文本的语法错误：\n\n{{selectedText}}\n\n要求：\n1. 修正所有语法、拼写和标点错误\n2. 保持原文含义不变\n3. 使表达更加规范和准确\n4. 只输出修正后的文本，不要添加额外说明',
-  generate_plan: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请根据以下选中的文本生成任务计划：\n\n{{selectedText}}\n\n要求：\n1. 将内容分解为可执行的任务步骤\n2. 每个步骤明确具体，可操作\n3. 按优先级和逻辑顺序排列\n4. 使用 Markdown 格式输出',
-  generate_table: '以下是笔记的完整内容：\n\n{{noteContent}}\n\n请根据以下选中的文本生成表格：\n\n{{selectedText}}\n\n要求：\n1. 从文本中提取关键信息并组织成表格\n2. 表格结构清晰，列名明确\n3. 信息分类合理，便于阅读\n4. 使用 Markdown 表格格式输出'
+  interpret: '解读选中文本，结合笔记整体背景理解其含义、核心概念和逻辑，必要时补充相关背景知识，输出清晰有条理的解读内容。',
+  refine: '精炼选中文本，保留核心含义和关键信息，去除冗余和重复表述，使表达更加简洁有力。直接输出精炼后的文本。',
+  polish: '润色选中文本，改善用词和句式，使表达更加流畅优美，保持原意不变，统一文本风格和语气。直接输出润色后的文本。',
+  expand: '扩写选中文本，基于核心含义进行合理延伸，补充相关细节、示例或论证，保持与笔记整体风格一致。直接输出扩写后的文本。',
+  translate: '将选中文本翻译成英文，翻译准确、自然、流畅，根据上下文选择最合适的表达方式，保持原文的语气和风格。直接输出翻译后的文本。',
+  summarize: '总结选中文本，提取核心要点和关键信息，总结简洁明了，保持逻辑清晰层次分明。直接输出总结内容。',
+  continue_write: '续写选中文本，根据上下文和风格进行自然续写，保持逻辑连贯内容衔接自然，与笔记整体风格一致。直接输出续写的文本。',
+  fix_grammar: '修正选中文本的语法、拼写和标点错误，保持原文含义不变，使表达更加规范和准确。直接输出修正后的文本。',
+  generate_plan: '根据选中文本生成结构化的任务计划，将内容分解为可执行的具体步骤，按优先级和逻辑顺序排列。使用 Markdown 格式输出。',
+  generate_table: '根据选中文本生成表格，从文本中提取关键信息并组织成结构化表格，列名明确，信息分类合理。使用 Markdown 表格格式输出。',
+  custom: '{{userInstruction}}'
 }
 
-export function streamNoteAI(mainWindow, action, noteContent, selectedText, model, requestId, cancelToken) {
-  const systemPrompt = NOTE_AI_SYSTEM_PROMPTS[action] || NOTE_AI_SYSTEM_PROMPTS.interpret
-  const userPrompt = (NOTE_AI_USER_PROMPTS[action] || NOTE_AI_USER_PROMPTS.interpret)
-    .replace('{{noteContent}}', noteContent)
-    .replace('{{selectedText}}', selectedText)
+function buildNoteAIAssistantContent(noteContent, selectedText) {
+  let content = '下面将给出笔记全文，和用户选中的文本内容，你对全文仅作参考，仅仅需要对用户选中的文本按照用户要求回答！切记，全文只是我告诉你的，不是用户必须的！切记你的输出直接给出结果，不添加任何多余的开场白、结束语或说明性文字。'
+  if (noteContent) {
+    content += '笔记全文：\n\n' + noteContent
+  }
+  if (selectedText) {
+    if (content) content += '\n\n'
+    content += '用户选中的文本：\n\n' + selectedText
+  }
+  return content
+}
+
+export function streamNoteAI(mainWindow, action, noteContent, selectedText, model, requestId, cancelToken, userInstruction) {
+  const assistantContent = buildNoteAIAssistantContent(noteContent, selectedText)
+  const userPrompt = (NOTE_AI_USER_PROMPTS[action] || NOTE_AI_USER_PROMPTS.custom)
+    .replace('{{userInstruction}}', userInstruction || '')
 
   const messages = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: NOTE_AI_SYSTEM_PROMPT },
+    { role: 'assistant', content: assistantContent },
     { role: 'user', content: userPrompt }
   ]
 

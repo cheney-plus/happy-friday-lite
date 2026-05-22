@@ -346,7 +346,8 @@ const getActionTitle = () => {
     'continue_write': '续写',
     'fix_grammar': '语法修正',
     'generate_plan': '生成任务计划',
-    'generate_table': '生成表格'
+    'generate_table': '生成表格',
+    'custom': 'AI 帮写'
   };
   return titleMap[currentAction.value] || COMMAND_TITLE_MAP[currentAction.value] || 'AI 处理';
 };
@@ -362,7 +363,8 @@ const getActionHint = () => {
     'continue_write': '续写思路',
     'fix_grammar': '修正思路',
     'generate_plan': '规划思路',
-    'generate_table': '整理思路'
+    'generate_table': '整理思路',
+    'custom': '处理思路'
   };
   return hintMap[currentAction.value] || '处理思路';
 };
@@ -374,6 +376,7 @@ const getCharCount = () => {
 let activeNoteAIRequestId = '';
 let savedSelectionFrom = 0;
 let savedSelectionTo = 0;
+let savedUserInstruction = '';
 let pendingAIChange = null;
 let unlistenNoteAIChunk = null;
 let unlistenNoteAIDone = null;
@@ -420,12 +423,13 @@ function cleanupNoteAIListeners() {
   unlistenNoteAIError?.();
 }
 
-const startStreaming = async (action) => {
+const startStreaming = async (action, userInstruction) => {
   if (streamingTimer.value) {
     clearTimeout(streamingTimer.value);
     streamingTimer.value = null;
   }
-  
+
+  savedUserInstruction = userInstruction || '';
   closeAIPanel();
   
   const { from, to } = props.editor.state.selection;
@@ -486,7 +490,8 @@ const startStreaming = async (action) => {
       action,
       noteContent,
       selectedText: text,
-      model
+      model,
+      userInstruction: userInstruction || ''
     });
   } catch (err) {
     console.error('Note AI action error:', err);
@@ -641,9 +646,8 @@ const autoResize = () => {
 
 const handleSend = () => {
   if (!inputText.value.trim()) return;
-  
-  emit('aiWrite', inputText.value, currentCommand.value || undefined);
-  closeAIPanel();
+  const instruction = inputText.value.trim();
+  startStreaming('custom', instruction);
 };
 
 const handleInterpret = () => {
@@ -692,7 +696,7 @@ const handleReInterpret = async () => {
   }
   if (!aiOutputContent.value && !isStreaming.value) return;
   aiOutputContent.value = '';
-  startStreaming('interpret');
+  startStreaming('interpret', savedUserInstruction);
 };
 
 const AI_HIGHLIGHT_COLOR = '#fef08a';
@@ -746,7 +750,7 @@ const handleRewrite = async () => {
     }
   }
   aiOutputContent.value = '';
-  startStreaming(currentAction.value);
+  startStreaming(currentAction.value, savedUserInstruction);
 };
 
 const handleDiscard = () => {

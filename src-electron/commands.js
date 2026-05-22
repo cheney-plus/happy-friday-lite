@@ -284,9 +284,9 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('note_ai_action', async (_event, args) => {
-    const { requestId, action, noteContent, selectedText, model } = args
+    const { requestId, action, noteContent, selectedText, model, userInstruction } = args
 
-    const validActions = ['interpret', 'refine', 'polish', 'expand', 'translate', 'summarize', 'continue_write', 'fix_grammar', 'generate_plan', 'generate_table']
+    const validActions = ['interpret', 'refine', 'polish', 'expand', 'translate', 'summarize', 'continue_write', 'fix_grammar', 'generate_plan', 'generate_table', 'custom']
     if (!validActions.includes(action)) {
       throw new Error(`Invalid note AI action: ${action}`)
     }
@@ -303,7 +303,8 @@ export function registerCommands(mainWindow) {
         selectedText,
         model,
         requestId,
-        cancelToken
+        cancelToken,
+        userInstruction
       )
       fullContent = result.fullContent
     } catch (e) {
