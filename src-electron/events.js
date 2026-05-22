@@ -1,0 +1,6 @@
+export const CONFIG_CHANGED = 'config-changed'
+export const CHAT_CHUNK = 'chat-chunk'
+export const CHAT_REASONING_CHUNK = 'chat-reasoning-chunk'
+export const CHAT_DONE = 'chat-done'
+export const CHAT_ERROR = 'chat-error'
+export const SESSION_TITLE_UPDATED = 'session-title-updated'

@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'delete_note',
       'search_notes',
       'get_schedule_events',
+      'get_schedule_events_by_date_range',
+      'get_schedule_event',
       'create_schedule_event',
       'update_schedule_event',
       'delete_schedule_event',
