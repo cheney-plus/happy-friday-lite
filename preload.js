@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'chat_with_memory',
       'chat_without_memory',
       'stop_chat',
+      'export_html_to_pdf',
+      'export_markdown',
       'open-external'
     ]
     if (validChannels.includes(channel)) {

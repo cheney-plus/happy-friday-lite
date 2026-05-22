@@ -145,6 +145,7 @@ import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, onDeacti
 import { useI18n } from 'vue-i18n';
 import NoteEditor from './NoteEditor.vue';
 import { useNoteStore } from '@/store/modules/note';
+import { extractPlainText } from '@/utils/text';
 
 const { t } = useI18n();
 const noteStore = useNoteStore();
@@ -261,17 +262,6 @@ const createNewNote = async () => {
   await noteStore.createNote();
 };
 
-const extractPlainText = (text) => {
-  return text
-    .replace(/<\/?(p|div|h[1-6]|li|blockquote|br)[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^[# \t\-+>]+/gm, '')
-    .replace(/[*_~`]/g, '')
-    .trim();
-};
-
 const onEditorChange = (content) => {
   const note = noteStore.currentNote;
   if (!note) return;
@@ -333,6 +323,12 @@ const hideContextMenu = () => {
 const handleAction = async (action) => {
   if (action === 'delete' && contextMenu.targetNoteId) {
     await noteStore.deleteNote(contextMenu.targetNoteId);
+  } else if (action === 'addToKnowledge') {
+    console.log('Add to knowledge feature is not yet implemented');
+  } else if (action === 'moveToNotebook') {
+    console.log('Move to notebook feature is not yet implemented');
+  } else if (action === 'duplicate') {
+    console.log('Duplicate note feature is not yet implemented');
   }
   hideContextMenu();
 };

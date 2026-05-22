@@ -125,11 +125,17 @@ function goBack() {
   router.push('/friday');
 }
 
-function handleAddToKnowledge() {}
+function handleAddToKnowledge() {
+  console.log('Add to knowledge feature is not yet implemented');
+}
 
 function handleAction(action, index) {
   if (action === 'rollback') {
     handleRollback(index);
+  } else if (action === 'share') {
+    console.log('Share message feature is not yet implemented');
+  } else if (action === 'add') {
+    console.log('Save message to note feature is not yet implemented');
   }
 }
 

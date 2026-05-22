@@ -270,12 +270,12 @@ const confirmRename = async () => {
 };
 
 const handleSaveAsNote = () => {
-  console.log('保存为笔记:', activeMenuSessionId.value);
+  console.log('Save as note feature is not yet implemented:', activeMenuSessionId.value);
   closeMenu();
 };
 
 const handleLearn = () => {
-  console.log('学习对话:', activeMenuSessionId.value);
+  console.log('Learn conversation feature is not yet implemented:', activeMenuSessionId.value);
   closeMenu();
 };
 

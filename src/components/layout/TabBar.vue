@@ -77,6 +77,7 @@ import {
   Settings
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { electronService } from '@/services/electron';
 
 const tabStore = useTabStore();
 const appStore = useAppStore();
@@ -188,21 +189,15 @@ const onWheel = (e) => {
 };
 
 const handleMinimize = () => {
-  if (window.electronAPI) {
-    window.electronAPI.send('window-minimize');
-  }
+  electronService.send('window-minimize');
 };
 
 const handleToggleMaximize = () => {
-  if (window.electronAPI) {
-    window.electronAPI.send('window-maximize');
-  }
+  electronService.send('window-maximize');
 };
 
 const handleClose = () => {
-  if (window.electronAPI) {
-    window.electronAPI.send('window-close');
-  }
+  electronService.send('window-close');
 };
 </script>
 

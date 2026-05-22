@@ -27,20 +27,20 @@
         </div>
 
         <div class="action-right">
-          <button class="action-btn icon-only" title="联网搜索">
+          <button class="action-btn icon-only" title="联网搜索" @click="handleFeatureClick('webSearch')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="4"></circle>
               <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
             </svg>
           </button>
 
-          <button class="action-btn icon-only" title="附件">
+          <button class="action-btn icon-only" title="附件" @click="handleFeatureClick('attachment')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
             </svg>
           </button>
 
-          <button class="action-btn icon-only" title="图片">
+          <button class="action-btn icon-only" title="图片" @click="handleFeatureClick('image')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="6" cy="6" r="3"></circle>
               <circle cx="6" cy="18" r="3"></circle>
@@ -94,6 +94,10 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'send', 'stop', 'removeReference']);
 
 const textareaRef = ref(null);
+
+function handleFeatureClick(feature) {
+  console.log(`Feature "${feature}" is not yet implemented`);
+}
 
 function handleInput(e) {
   const target = e.target;

@@ -307,29 +307,23 @@ const handleSend = async () => {
 
   const selectedModel = customModels.value.find(m => m.id === modelSettings.value.modelId);
 
-  if (currentMode.value === 'chat' && selectedModel) {
-    router.push({
-      name: 'friday-chat',
-      params: { sessionId: `new-${Date.now()}` },
-      query: {
-        q: text,
-        mode: currentMode.value,
-        modelId: selectedModel.id,
-        thinkMode: modelSettings.value.thinkMode
-      }
-    });
-  } else if (currentMode.value === 'memoryless' && selectedModel) {
-    router.push({
-      name: 'friday-chat',
-      params: { sessionId: `new-${Date.now()}` },
-      query: {
-        q: text,
-        mode: currentMode.value,
-        modelId: selectedModel.id,
-        thinkMode: modelSettings.value.thinkMode
-      }
-    });
+  if (!selectedModel) return;
+
+  if (currentMode.value === 'agent') {
+    console.log('Agent mode is not yet implemented');
+    return;
   }
+
+  router.push({
+    name: 'friday-chat',
+    params: { sessionId: `new-${Date.now()}` },
+    query: {
+      q: text,
+      mode: currentMode.value,
+      modelId: selectedModel.id,
+      thinkMode: modelSettings.value.thinkMode
+    }
+  });
 };
 
 onMounted(() => {
@@ -397,7 +391,7 @@ const autoResize = () => {
 };
 
 const handleFeatureClick = (id) => {
-  console.log('Feature clicked:', id);
+  console.log(`Feature "${id}" is not yet implemented`);
 };
 </script>
 

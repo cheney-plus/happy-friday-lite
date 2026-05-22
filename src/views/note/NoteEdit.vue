@@ -70,6 +70,7 @@ import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/store';
 import { useNoteStore } from '@/store/modules/note';
 import NoteEditor from './NoteEditor.vue';
+import { extractPlainText } from '@/utils/text';
 
 const route = useRoute();
 const router = useRouter();
@@ -87,17 +88,6 @@ const charCount = ref(0);
 const lastSavedTime = ref('');
 const moreMenuVisible = ref(false);
 const moreMenuStyle = reactive({ left: '0px', top: '0px' });
-
-const extractPlainText = (text) => {
-  return text
-    .replace(/<\/?(p|div|h[1-6]|li|blockquote|br)[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^[# \t\-+>]+/gm, '')
-    .replace(/[*_~`]/g, '')
-    .trim();
-};
 
 const onEditorChange = (content) => {
   const plainText = extractPlainText(content);

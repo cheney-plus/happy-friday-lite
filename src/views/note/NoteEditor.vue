@@ -759,24 +759,24 @@ const closeAISidebar = () => {
 };
 
 const handleBubbleAIWrite = (text, command) => {
-  console.log('BubbleMenu - AI 帮写:', text, '指令:', command);
+  console.log('BubbleMenu - AI 帮写 is not yet implemented:', text, '指令:', command);
   openAIWrite();
 };
 
 const handleBubbleInterpret = (text) => {
-  console.log('BubbleMenu - 解读:', text);
+  console.log('BubbleMenu - 解读 is not yet implemented:', text);
 };
 
 const handleBubbleRefine = (text) => {
-  console.log('BubbleMenu - 精炼:', text);
+  console.log('BubbleMenu - 精炼 is not yet implemented:', text);
 };
 
 const handleBubblePolish = (text) => {
-  console.log('BubbleMenu - 润色:', text);
+  console.log('BubbleMenu - 润色 is not yet implemented:', text);
 };
 
 const handleBubbleExpand = (text) => {
-  console.log('BubbleMenu - 扩写:', text);
+  console.log('BubbleMenu - 扩写 is not yet implemented:', text);
 };
 
 const handleOpenInChat = (text, from, to) => {
@@ -827,7 +827,7 @@ let unlistenError = null;
 
 function loadModelConfig(modelId) {
   try {
-    const raw = localStorage.getItem('happy-friday-models');
+    const raw = localStorage.getItem('happy-friday-custom-models');
     if (raw) {
       const models = JSON.parse(raw);
       let model = models.find(m => m.id === modelId);
