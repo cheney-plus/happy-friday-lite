@@ -157,6 +157,118 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
   })
 }
 
+const FIM_SYSTEM_PROMPT = `你是一个文本笔记补全助手。根据光标前后的内容，预测光标位置应该插入的文本。
+
+规则：
+- 只输出补全内容，不要输出任何解释、说明或多余文字
+- 补全内容尽量简短，最长不超过一句话
+- 保持与上下文风格一致
+- 如果光标后有内容，确保补全能与后续内容自然衔接`
+
+export function fimCompletion(model, prefix, suffix, cancelToken) {
+  const url = buildApiUrl(model.baseUrl)
+
+  const userContent = prefix
+    ? (suffix
+        ? `## 光标前的内容：\n${prefix}\n\n## 光标后的内容：\n${suffix}\n\n## 补全：`
+        : `## 光标前的内容：\n${prefix}\n\n## 补全：`)
+    : (suffix
+        ? `## 光标后的内容：\n${suffix}\n\n## 补全：`
+        : '')
+
+  if (!userContent) {
+    return Promise.resolve({ completion: '' })
+  }
+
+  const body = {
+    model: model.modelName,
+    messages: [
+      { role: 'system', content: FIM_SYSTEM_PROMPT },
+      { role: 'user', content: userContent }
+    ],
+    stream: false,
+    max_tokens: 30
+  }
+
+  switch (model.provider) {
+    case 'qwen':
+      body.enable_thinking = false
+      break
+    case 'deepseek':
+    case 'zhipu':
+    case 'kimi':
+    case 'doubao':
+      body.thinking = { type: 'disabled' }
+      break
+  }
+
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController()
+
+    if (cancelToken) {
+      Object.defineProperty(cancelToken, '_abortController', {
+        value: controller,
+        configurable: true,
+        writable: true
+      })
+    }
+
+    const signal = controller.signal
+
+    if (cancelToken && cancelToken.cancelled) {
+      resolve({ completion: '' })
+      return
+    }
+
+    const checkCancel = () => {
+      if (cancelToken && cancelToken.cancelled) {
+        controller.abort()
+        resolve({ completion: '' })
+        return true
+      }
+      return false
+    }
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${model.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+      signal
+    })
+      .then(response => {
+        if (checkCancel()) return
+
+        if (!response.ok) {
+          response.text().then(text => {
+            reject(AppError.llm(`FIM API request failed (${response.status}): ${text}`))
+          }).catch(() => {
+            reject(AppError.llm(`FIM API request failed (${response.status})`))
+          })
+          return
+        }
+
+        return response.json()
+      })
+      .then(parsed => {
+        if (checkCancel()) return
+        if (!parsed) return
+
+        const completion = parsed.choices?.[0]?.message?.content?.trim() || ''
+        resolve({ completion })
+      })
+      .catch(err => {
+        if (err.name === 'AbortError' || (cancelToken && cancelToken.cancelled)) {
+          resolve({ completion: '' })
+          return
+        }
+        reject(AppError.llm(`FIM request error: ${err.message}`))
+      })
+  })
+}
+
 export async function generateTitle(model, userMessage) {
   const url = buildApiUrl(model.baseUrl)
 

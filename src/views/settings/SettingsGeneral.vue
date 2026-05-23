@@ -87,6 +87,13 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </span>
           </div>
+          <div class="setting-item">
+            <span class="item-label">开启笔记内容补全</span>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="settings.noteFimCompletion" @change="saveNoteFimCompletion" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -179,6 +186,7 @@ import { reactive, ref, computed, onMounted, onUnmounted, onDeactivated } from '
 import { useRouter } from 'vue-router';
 import { useAppStore } from '@/store';
 import { useTheme } from '@/utils/theme';
+import { electronService } from '@/services/electron';
 
 const router = useRouter();
 const appStore = useAppStore();
@@ -210,7 +218,8 @@ const settings = reactive({
   autoStart: true,
   messageNotify: false,
   restoreTabs: true,
-  showBookmarkBar: false
+  showBookmarkBar: false,
+  noteFimCompletion: appStore.noteFimCompletion
 });
 
 const toggleThemeDropdown = () => {
@@ -222,6 +231,17 @@ const selectTheme = (value) => {
   applyTheme(value);
   appStore.setTheme(value);
   showThemeDropdown.value = false;
+};
+
+const saveNoteFimCompletion = async () => {
+  appStore.setNoteFimCompletion(settings.noteFimCompletion);
+  try {
+    const config = await electronService.invoke('get-config');
+    if (config) {
+      config.noteFimCompletion = settings.noteFimCompletion;
+      await electronService.invoke('save-config', config);
+    }
+  } catch (_e) {}
 };
 
 const handleClickOutside = (event) => {

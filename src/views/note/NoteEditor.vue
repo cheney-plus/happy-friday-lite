@@ -273,6 +273,15 @@
 
     <EditorContent :editor="editor" class="editor-content" />
 
+    <div
+      v-if="fimCompletionVisible && fimCompletionText"
+      class="fim-completion-bubble"
+      :style="{ left: fimCompletionPos.left + 'px', top: fimCompletionPos.top + 'px' }"
+    >
+      <span class="fim-completion-text">{{ fimCompletionText }}</span>
+      <span class="fim-completion-hint">Tab</span>
+    </div>
+
     <!-- 链接对话框 -->
     <div v-if="showLinkDialog" class="dialog-overlay" @click.self="closeLinkDialog">
       <div class="dialog">
@@ -823,6 +832,146 @@ const removeNoteReference = (refId) => {
 
 const showAISidebar = ref(false);
 const showAIWriteBtn = ref(true);
+
+const fimCompletionText = ref('');
+const fimCompletionVisible = ref(false);
+const fimCompletionPos = ref({ left: 0, top: 0 });
+let fimDebounceTimer = null;
+let fimRequestId = '';
+let fimUnlistenResult = null;
+
+function clearFimDebounce() {
+  if (fimDebounceTimer) {
+    clearTimeout(fimDebounceTimer);
+    fimDebounceTimer = null;
+  }
+}
+
+function dismissFimCompletion() {
+  fimCompletionVisible.value = false;
+  fimCompletionText.value = '';
+}
+
+async function cancelFimRequest() {
+  if (fimRequestId) {
+    try {
+      await electronService.invoke('stop_note_fim_completion', { requestId: fimRequestId });
+    } catch (_e) {}
+    fimRequestId = '';
+  }
+}
+
+function triggerFimCompletion() {
+  if (!editor.value) return;
+  if (!appStore.noteFimCompletion) return;
+
+  const pos = editor.value.state.selection.from;
+  const docSize = editor.value.state.doc.content.size;
+
+  if (pos < 1 || pos >= docSize) return;
+
+  const prefixEnd = Math.min(pos, 800);
+  const suffixStart = pos;
+  const suffixEnd = Math.min(docSize, pos + 400);
+
+  let prefix = '';
+  try {
+    prefix = editor.value.state.doc.textBetween(Math.max(0, pos - prefixEnd), pos, '\n');
+  } catch (_e) {
+    prefix = '';
+  }
+
+  let suffix = '';
+  try {
+    suffix = editor.value.state.doc.textBetween(suffixStart, suffixEnd, '\n');
+  } catch (_e) {
+    suffix = '';
+  }
+
+  if (!prefix.trim() && !suffix.trim()) return;
+
+  const lastLine = prefix.split('\n').pop() || '';
+  if (lastLine.trim().length < 2) return;
+
+  const model = loadModelConfig();
+  if (!model) return;
+
+  cancelFimRequest();
+  dismissFimCompletion();
+
+  fimRequestId = `fim_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  let coords, wrapperRect;
+  try {
+    coords = editor.value.view.coordsAtPos(pos);
+    const wrapperEl = editor.value.view.dom.closest('.editor-wrapper');
+    wrapperRect = wrapperEl ? wrapperEl.getBoundingClientRect() : { left: 0, top: 0 };
+  } catch (_e) {
+    return;
+  }
+
+  fimCompletionPos.value = {
+    left: coords.left - wrapperRect.left,
+    top: coords.bottom - wrapperRect.top
+  };
+
+  electronService.invoke('note_fim_completion', {
+    requestId: fimRequestId,
+    model,
+    prefix: prefix.slice(-800),
+    suffix: suffix.slice(0, 400)
+  }).catch((_e) => {
+    fimRequestId = '';
+  });
+}
+
+function handleFimResult(data) {
+  if (data.requestId !== fimRequestId) return;
+  fimRequestId = '';
+
+  const completion = data.completion?.trim();
+  if (!completion) return;
+
+  fimCompletionText.value = completion;
+  fimCompletionVisible.value = true;
+}
+
+function acceptFimCompletion() {
+  if (!fimCompletionText.value || !editor.value) return;
+
+  const text = fimCompletionText.value;
+  dismissFimCompletion();
+
+  editor.value.chain().focus().insertContent(text).run();
+}
+
+function setupFimListener() {
+  fimUnlistenResult = electronService.listen('note-fim-result', (event) => {
+    handleFimResult(event.payload);
+  });
+
+  try {
+    const editorDom = editor.value?.view?.dom;
+    if (editorDom) {
+      editorDom.addEventListener('scroll', dismissFimCompletion);
+    }
+  } catch (_e) {}
+}
+
+function cleanupFim() {
+  clearFimDebounce();
+  cancelFimRequest();
+  dismissFimCompletion();
+  fimUnlistenResult?.();
+  fimUnlistenResult = null;
+
+  try {
+    const editorDom = editor.value?.view?.dom;
+    if (editorDom) {
+      editorDom.removeEventListener('scroll', dismissFimCompletion);
+    }
+  } catch (_e) {}
+}
 const sidebarWidth = ref(380);
 const isResizing = ref(false);
 const sidebarMessagesRef = ref(null);
@@ -1123,11 +1272,37 @@ const editor = useEditor({
     attributes: {
       class: 'prose-editor',
     },
+    handleKeyDown: (_view, event) => {
+      if (event.key === 'Tab' && fimCompletionVisible.value && fimCompletionText.value) {
+        event.preventDefault();
+        acceptFimCompletion();
+        return true;
+      }
+
+      if (fimCompletionVisible.value && event.key !== 'Tab') {
+        dismissFimCompletion();
+      }
+
+      return false;
+    },
   },
   onUpdate: ({ editor }) => {
     const html = editor.getHTML();
     emit('update:modelValue', html);
     emit('change', html);
+
+    clearFimDebounce();
+    cancelFimRequest();
+    dismissFimCompletion();
+
+    fimDebounceTimer = setTimeout(() => {
+      triggerFimCompletion();
+    }, 2000);
+  },
+  onSelectionUpdate: () => {
+    if (fimCompletionVisible.value) {
+      dismissFimCompletion();
+    }
   },
 });
 
@@ -1219,14 +1394,24 @@ watch(() => props.modelValue, (newValue) => {
   }
 });
 
+watch(() => appStore.noteFimCompletion, (enabled) => {
+  if (!enabled) {
+    clearFimDebounce();
+    cancelFimRequest();
+    dismissFimCompletion();
+  }
+});
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   setupChatListeners();
+  setupFimListener();
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside);
   cleanupChatListeners();
+  cleanupFim();
   if (editor.value) {
     editor.value.destroy();
   }
@@ -1255,6 +1440,49 @@ const handleClickOutside = (event) => {
   overflow: hidden;
   padding: 0 48px;
   position: relative;
+}
+
+.fim-completion-bubble {
+  position: absolute;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  max-width: 400px;
+  pointer-events: none;
+  animation: fim-fade-in 0.15s ease-out;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .fim-completion-bubble {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.fim-completion-text {
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fim-completion-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+  background-color: var(--bg-hover, #f3f4f6);
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+@keyframes fim-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .editor-toolbar {

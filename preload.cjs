@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'stop_chat',
       'note_ai_action',
       'stop_note_ai',
+      'note_fim_completion',
+      'stop_note_fim_completion',
       'export_html_to_pdf',
       'export_markdown',
       'open-external'
@@ -66,7 +68,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'config-changed',
       'note-ai-chunk',
       'note-ai-done',
-      'note-ai-error'
+      'note-ai-error',
+      'note-fim-result'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

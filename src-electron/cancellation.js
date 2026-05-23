@@ -22,6 +22,10 @@ export class CancellationTokens {
     this._tokens.delete(requestId)
   }
 
+  get(requestId) {
+    return this._tokens.get(requestId)
+  }
+
   isCancelled(token) {
     return token && token.cancelled
   }

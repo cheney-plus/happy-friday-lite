@@ -4,6 +4,7 @@ export function defaultConfig() {
   return {
     language: 'zh-CN',
     theme: 'light',
-    systemPrompt: DEFAULT_SYSTEM_PROMPT
+    systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    noteFimCompletion: true
   }
 }

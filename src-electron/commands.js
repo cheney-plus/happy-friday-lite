@@ -2,9 +2,9 @@ import { ipcMain, shell, dialog } from 'electron'
 import { CancellationTokens } from './cancellation.js'
 import { loadConfig, saveConfig } from './config.js'
 import * as db from './db.js'
-import { streamChat, generateTitle, streamNoteAI } from './llm.js'
+import { streamChat, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
-import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE } from './events.js'
+import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -324,6 +324,36 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('stop_note_ai', (_event, args) => {
+    cancelTokens.cancel(args.requestId)
+    return true
+  })
+
+  ipcMain.handle('note_fim_completion', async (_event, args) => {
+    const { requestId, model, prefix, suffix } = args
+
+    const cancelToken = cancelTokens.insert(requestId)
+
+    try {
+      const result = await fimCompletion(model, prefix, suffix, cancelToken)
+      cancelTokens.remove(requestId)
+
+      mainWindow.webContents.send(NOTE_FIM_RESULT, {
+        requestId,
+        completion: result.completion
+      })
+
+      return {}
+    } catch (e) {
+      cancelTokens.remove(requestId)
+      throw e
+    }
+  })
+
+  ipcMain.handle('stop_note_fim_completion', (_event, args) => {
+    const token = cancelTokens.get(args.requestId)
+    if (token && token._abortController) {
+      token._abortController.abort()
+    }
     cancelTokens.cancel(args.requestId)
     return true
   })

@@ -86,6 +86,9 @@ onMounted(async () => {
         if (config.theme) {
           appStore.setTheme(config.theme);
         }
+        if (config.noteFimCompletion !== undefined) {
+          appStore.setNoteFimCompletion(config.noteFimCompletion);
+        }
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -100,6 +103,9 @@ onMounted(async () => {
       if (data.theme) {
         appStore.setTheme(data.theme);
         applyThemeFromConfig(data.theme);
+      }
+      if (data.noteFimCompletion !== undefined) {
+        appStore.setNoteFimCompletion(data.noteFimCompletion);
       }
     });
   } else {

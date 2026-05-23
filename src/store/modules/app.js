@@ -5,7 +5,8 @@ export const useAppStore = defineStore('app', {
     sidebarVisible: true,
     language: 'zh-CN',
     theme: 'light',
-    loading: false
+    loading: false,
+    noteFimCompletion: true
   }),
   actions: {
     toggleSidebar() {
@@ -16,6 +17,9 @@ export const useAppStore = defineStore('app', {
     },
     setTheme(theme) {
       this.theme = theme
+    },
+    setNoteFimCompletion(value) {
+      this.noteFimCompletion = value
     }
   }
 })
