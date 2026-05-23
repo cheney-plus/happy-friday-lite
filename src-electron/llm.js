@@ -206,43 +206,53 @@ export async function generateTitle(model, userMessage) {
   }
 }
 
-const NOTE_AI_SYSTEM_PROMPT = '你是 Friday，一个专业的智能写作助手。你具备文本解读、精炼、润色、扩写、翻译、总结、续写、语法修正、任务规划和数据整理等全方位写作能力。你能够深入理解文本含义，结合上下文背景对文本进行精准处理。你的输出直接给出结果，不添加任何多余的开场白、结束语或说明性文字。'
+const NOTE_AI_SYSTEM_PROMPT = `你是 Friday，一个专业的智能写作助手。
 
-const NOTE_AI_USER_PROMPTS = {
-  interpret: '解读选中文本，结合笔记整体背景理解其含义、核心概念和逻辑，必要时补充相关背景知识，输出清晰有条理的解读内容。',
-  refine: '精炼选中文本，保留核心含义和关键信息，去除冗余和重复表述，使表达更加简洁有力。直接输出精炼后的文本。',
-  polish: '润色选中文本，改善用词和句式，使表达更加流畅优美，保持原意不变，统一文本风格和语气。直接输出润色后的文本。',
-  expand: '扩写选中文本，基于核心含义进行合理延伸，补充相关细节、示例或论证，保持与笔记整体风格一致。直接输出扩写后的文本。',
-  translate: '将选中文本翻译成英文，翻译准确、自然、流畅，根据上下文选择最合适的表达方式，保持原文的语气和风格。直接输出翻译后的文本。',
-  summarize: '总结选中文本，提取核心要点和关键信息，总结简洁明了，保持逻辑清晰层次分明。直接输出总结内容。',
-  continue_write: '续写选中文本，根据上下文和风格进行自然续写，保持逻辑连贯内容衔接自然，与笔记整体风格一致。直接输出续写的文本。',
-  fix_grammar: '修正选中文本的语法、拼写和标点错误，保持原文含义不变，使表达更加规范和准确。直接输出修正后的文本。',
-  generate_plan: '根据选中文本生成结构化的任务计划，将内容分解为可执行的具体步骤，按优先级和逻辑顺序排列。使用 Markdown 格式输出。',
-  generate_table: '根据选中文本生成表格，从文本中提取关键信息并组织成结构化表格，列名明确，信息分类合理。使用 Markdown 表格格式输出。',
+## 核心能力
+你具备文本解读、精炼、润色、扩写、翻译、总结、续写、语法修正、任务规划和数据整理等全方位写作能力。你能够深入理解文本含义，结合上下文背景对文本进行精准处理。
+
+## 输出规范
+- 你的输出直接给出结果，不添加任何多余的开场白、结束语或说明性文字
+- 保持与原文风格一致，确保输出内容自然流畅
+- 输出内容必须符合 Markdown 格式，保留所有原始的 Markdown 标签和格式。
+
+## 当前任务
+{{actionInstruction}}`
+
+const NOTE_AI_ACTION_PROMPTS = {
+  interpret: '解读用户选中的文本，结合笔记整体背景理解其含义、核心概念和逻辑，必要时补充相关背景知识，输出清晰有条理的解读内容。',
+  refine: '精炼用户选中的文本，保留核心含义和关键信息，去除冗余和重复表述，使表达更加简洁有力。',
+  polish: '润色用户选中的文本，改善用词和句式，使表达更加流畅优美，保持原意不变，统一文本风格和语气。',
+  expand: '扩写用户选中的文本，基于核心含义进行合理延伸，补充相关细节、示例或论证，保持与笔记整体风格一致。',
+  translate: '将用户选中的文本翻译成英文，翻译准确、自然、流畅，根据上下文选择最合适的表达方式，保持原文的语气和风格。',
+  summarize: '总结用户选中的文本，提取核心要点和关键信息，总结简洁明了，保持逻辑清晰层次分明。',
+  continue_write: '续写用户选中的文本，根据上下文和风格进行自然续写，保持逻辑连贯内容衔接自然，与笔记整体风格一致。',
+  fix_grammar: '修正用户选中文本的语法、拼写和标点错误，保持原文含义不变，使表达更加规范和准确。',
+  generate_plan: '根据用户选中的文本生成结构化的任务计划，将内容分解为可执行的具体步骤，按优先级和逻辑顺序排列。使用 Markdown 格式输出。',
+  generate_table: '根据用户选中的文本生成表格，从文本中提取关键信息并组织成结构化表格，列名明确，信息分类合理。使用 Markdown 表格格式输出。',
   custom: '{{userInstruction}}'
 }
 
-function buildNoteAIAssistantContent(noteContent, selectedText) {
-  let content = '下面将给出笔记全文，和用户选中的文本内容，你对全文仅作参考，仅仅需要对用户选中的文本按照用户要求回答！切记，全文只是我告诉你的，不是用户必须的！切记你的输出直接给出结果，不添加任何多余的开场白、结束语或说明性文字。'
+function buildNoteAIUserContent(noteContent, selectedText) {
+  let content = '## 笔记上下文\n\n'
   if (noteContent) {
-    content += '笔记全文：\n\n' + noteContent
+    content += '**笔记全文**（仅作参考）：\n' + noteContent + '\n\n'
   }
   if (selectedText) {
-    if (content) content += '\n\n'
-    content += '用户选中的文本：\n\n' + selectedText
+    content += '**需要处理的文本**：\n' + selectedText
   }
   return content
 }
 
 export function streamNoteAI(mainWindow, action, noteContent, selectedText, model, requestId, cancelToken, userInstruction) {
-  const assistantContent = buildNoteAIAssistantContent(noteContent, selectedText)
-  const userPrompt = (NOTE_AI_USER_PROMPTS[action] || NOTE_AI_USER_PROMPTS.custom)
+  const actionPrompt = (NOTE_AI_ACTION_PROMPTS[action] || NOTE_AI_ACTION_PROMPTS.custom)
     .replace('{{userInstruction}}', userInstruction || '')
+  const systemPrompt = NOTE_AI_SYSTEM_PROMPT.replace('{{actionInstruction}}', actionPrompt)
+  const userContent = buildNoteAIUserContent(noteContent, selectedText)
 
   const messages = [
-    { role: 'system', content: NOTE_AI_SYSTEM_PROMPT },
-    { role: 'assistant', content: assistantContent },
-    { role: 'user', content: userPrompt }
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userContent }
   ]
 
   const url = new URL(buildApiUrl(model.baseUrl))

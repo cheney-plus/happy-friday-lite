@@ -761,9 +761,6 @@ const openAIWrite = () => {
 const closeAISidebar = () => {
   showAISidebar.value = false;
   showAIWriteBtn.value = false;
-  currentSessionId.value = '';
-  chatMessages.value = [];
-  noteReferences.value = [];
   setTimeout(() => {
     showAIWriteBtn.value = true;
   }, 250);
@@ -1233,6 +1230,9 @@ onBeforeUnmount(() => {
   if (editor.value) {
     editor.value.destroy();
   }
+  chatMessages.value = [];
+  currentSessionId.value = '';
+  noteReferences.value = [];
 });
 
 const handleClickOutside = (event) => {
