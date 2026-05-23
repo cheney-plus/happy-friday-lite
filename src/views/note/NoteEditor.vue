@@ -1535,8 +1535,8 @@ const handleClickOutside = (event) => {
   outline: none;
   min-height: 100%;
   color: var(--text-primary);
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.6;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   padding-top: 4px;
   padding-bottom: 400px;
