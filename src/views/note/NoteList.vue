@@ -58,6 +58,7 @@
             </div>
           </div>
         </Teleport>
+
       </div>
 
       <div class="note-items" @contextmenu.prevent>
@@ -104,6 +105,34 @@
         </div>
       </Teleport>
       </div>
+
+      <div v-if="tocVisible" class="toc-overlay">
+        <div class="toc-header">
+          <span class="toc-title">目录</span>
+          <button class="toc-close-btn" @click="tocVisible = false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="toc-list">
+          <div
+            v-for="(heading, index) in tocHeadings"
+            :key="index"
+            class="toc-item"
+            :class="'toc-level-' + heading.level"
+            @click="scrollToHeading(index)"
+          >
+            <span class="toc-item-prefix" v-if="heading.level === 1">H1</span>
+            <span class="toc-item-prefix" v-else-if="heading.level === 2">H2</span>
+            <span class="toc-item-prefix" v-else>H3</span>
+            <span class="toc-item-text">{{ heading.text }}</span>
+          </div>
+          <div v-if="tocHeadings.length === 0" class="toc-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <p>暂无标题结构</p>
+            <p class="toc-empty-hint">添加标题后可在此查看目录</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div
@@ -127,7 +156,9 @@
           :key="selectedNoteId"
           v-model="selectedNote.content"
           :placeholder="t('note.editorPlaceholder')"
+          :toc-visible="tocVisible"
           @change="onEditorChange"
+          @toggle-toc="handleToggleToc"
         />
       </div>
       <div v-else class="editor-empty">
@@ -153,6 +184,7 @@ const noteStore = useNoteStore();
 const currentFolder = ref('all');
 const folderMenuVisible = ref(false);
 const folderTriggerRef = ref(null);
+const tocVisible = ref(false);
 
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 280;
@@ -229,6 +261,35 @@ const currentFolderName = computed(() => {
 const notes = computed(() => noteStore.notes);
 const selectedNoteId = computed(() => noteStore.currentNoteId);
 const selectedNote = computed(() => noteStore.currentNote);
+
+const tocHeadings = computed(() => {
+  const note = selectedNote.value;
+  if (!note?.content) return [];
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = note.content;
+  const headingElements = tempDiv.querySelectorAll('h1, h2, h3');
+  return Array.from(headingElements).map((el, index) => ({
+    level: parseInt(el.tagName[1]),
+    text: el.textContent.trim(),
+    index
+  })).filter(h => h.text);
+});
+
+const handleToggleToc = () => {
+  tocVisible.value = !tocVisible.value;
+};
+
+const scrollToHeading = (index) => {
+  const editorContent = document.querySelector('.editor-content');
+  if (!editorContent) return;
+  const headings = editorContent.querySelectorAll('h1, h2, h3');
+  if (!headings[index]) return;
+  const target = headings[index];
+  const containerRect = editorContent.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const offset = targetRect.top - containerRect.top + editorContent.scrollTop - containerRect.height / 3;
+  editorContent.scrollTo({ top: offset, behavior: 'smooth' });
+};
 
 const formatTime = (dateStr) => {
   try {
@@ -426,9 +487,14 @@ onDeactivated(() => {
 }
 
 .sidebar-resize-handle {
-  width: 6px;
+  width: 2px;
   cursor: col-resize;
   flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.sidebar-resize-handle:hover {
+  background-color: var(--bg-hover);
 }
 
 .sidebar-topbar {
@@ -653,6 +719,169 @@ onDeactivated(() => {
 
 .empty-hint p {
   font-size: 14px;
+}
+
+.toc-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-primary);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  animation: toc-slide-in 0.2s ease-out;
+}
+
+@keyframes toc-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.toc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.toc-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.toc-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.toc-close-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.toc-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.toc-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.toc-list::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+[data-theme='dark'] .toc-list {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+[data-theme='dark'] .toc-list::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toc-item:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toc-level-2 {
+  padding-left: 32px;
+}
+
+.toc-level-3 {
+  padding-left: 48px;
+}
+
+.toc-item-prefix {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background-color: var(--bg-hover);
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.toc-level-1 .toc-item-prefix {
+  color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.toc-level-2 .toc-item-prefix {
+  color: #8b5cf6;
+  background-color: rgba(139, 92, 246, 0.1);
+}
+
+.toc-level-3 .toc-item-prefix {
+  color: #6b7280;
+  background-color: rgba(107, 114, 128, 0.1);
+}
+
+.toc-item-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  color: var(--text-tertiary);
+  text-align: center;
+  gap: 8px;
+}
+
+.toc-empty svg {
+  opacity: 0.35;
+}
+
+.toc-empty p {
+  font-size: 13px;
+  margin: 0;
+}
+
+.toc-empty-hint {
+  font-size: 12px !important;
+  color: var(--text-tertiary);
+  opacity: 0.7;
 }
 </style>
 

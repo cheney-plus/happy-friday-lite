@@ -265,6 +265,12 @@
     </div>
 
     <NoteBubbleMenu v-if="editor" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @interpret="handleBubbleInterpret" @refine="handleBubbleRefine" @polish="handleBubblePolish" @expand="handleBubbleExpand" @openInChat="handleOpenInChat" />
+
+    <div class="toc-btn" :class="{ active: tocVisible }" @click="emit('toggle-toc')">
+      <span class="toc-char">目</span>
+      <span class="toc-char">录</span>
+    </div>
+
     <EditorContent :editor="editor" class="editor-content" />
 
     <!-- 链接对话框 -->
@@ -441,10 +447,11 @@ const lowlight = createLowlight(all);
 
 const props = defineProps({
   placeholder: { type: String, default: '开始写作...' },
-  modelValue: { type: String, default: '' }
+  modelValue: { type: String, default: '' },
+  tocVisible: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['update:modelValue', 'change']);
+const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc']);
 
 const showInsertMenu = ref(false);
 const showHighlightMenu = ref(false);
@@ -1190,6 +1197,7 @@ const handleClickOutside = (event) => {
   flex-direction: column;
   overflow: hidden;
   padding: 0 48px;
+  position: relative;
 }
 
 .editor-toolbar {
@@ -1200,6 +1208,58 @@ const handleClickOutside = (event) => {
   max-width: 9000px;
   margin: 0 auto;
   width: 100%;
+}
+
+.toc-btn {
+  position: absolute;
+  left: 0;
+  top: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  border-radius: 0 6px 6px 0;
+  background-color: #f3f4f6;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  z-index: 20;
+  border: 1px solid #e5e7eb;
+  border-left: none;
+}
+
+.toc-btn:hover {
+  background-color: #e5e7eb;
+  padding-right: 6px;
+}
+
+.toc-btn.active {
+  background-color: #d1d5db;
+}
+
+.toc-char {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.4;
+}
+
+[data-theme='dark'] .toc-btn {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+[data-theme='dark'] .toc-btn:hover {
+  background-color: #4b5563;
+}
+
+[data-theme='dark'] .toc-btn.active {
+  background-color: #6b7280;
+}
+
+[data-theme='dark'] .toc-char {
+  color: #d1d5db;
 }
 
 .toolbar-btn {
