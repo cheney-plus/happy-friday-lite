@@ -259,7 +259,7 @@
 
         <button v-if="showAIWriteBtn" class="toolbar-btn ai-write-btn" @click="openAIWrite">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
-          Friday 帮写
+          Friday 助理
         </button>
       </div>
     </div>
@@ -347,7 +347,7 @@
             <div class="sidebar-avatar">
               <span class="sidebar-avatar-icon">✦</span>
             </div>
-            <span class="sidebar-title">Friday 帮写</span>
+            <span class="sidebar-title">Friday 助理</span>
           </div>
           <button class="sidebar-close-btn" @click="closeAISidebar">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -377,6 +377,7 @@
                 v-else
                 :content="msg.content"
                 :reasoning="msg.reasoning"
+                :show-divider="false"
                 :show-rollback="false"
                 @action="(type) => handleChatAction(type, index)"
               />
@@ -387,6 +388,7 @@
                 :content="streamingContent"
                 :reasoning-streaming-content="streamingReasoning"
                 :is-streaming="true"
+                :show-divider="false"
                 :show-rollback="false"
               />
             </template>
@@ -1654,7 +1656,7 @@ const handleClickOutside = (event) => {
   line-height: 1.6;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   padding-top: 4px;
-  padding-bottom: 400px;
+  padding-bottom: 40px;
   max-width: 900px;
   margin: 0 auto;
 }
