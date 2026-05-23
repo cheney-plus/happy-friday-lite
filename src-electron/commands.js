@@ -79,7 +79,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_with_memory', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking } = args
+    const { requestId, sessionId, model, message, enableThinking, systemPrompt } = args
 
     let currentSessionId = sessionId
     let isNewSession = false
@@ -107,8 +107,9 @@ export function registerCommands(mainWindow) {
     }))
 
     const appConfig = loadConfig()
+    const effectiveSystemPrompt = systemPrompt || appConfig.systemPrompt
     const allMessages = [
-      { role: 'system', content: appConfig.systemPrompt },
+      { role: 'system', content: effectiveSystemPrompt },
       ...historyMessages
     ]
 

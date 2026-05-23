@@ -7,6 +7,7 @@
           :key="ref.id"
           :from="ref.from"
           :to="ref.to"
+          :text="ref.text"
           @remove="$emit('removeReference', ref.id)"
         />
       </div>
@@ -94,6 +95,14 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'send', 'stop', 'removeReference']);
 
 const textareaRef = ref(null);
+
+function focus() {
+  nextTick(() => {
+    textareaRef.value?.focus();
+  });
+}
+
+defineExpose({ focus });
 
 function handleFeatureClick(feature) {
   console.log(`Feature "${feature}" is not yet implemented`);

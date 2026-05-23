@@ -377,7 +377,6 @@
                 v-else
                 :content="msg.content"
                 :reasoning="msg.reasoning"
-                :show-divider="true"
                 :show-rollback="false"
                 @action="(type) => handleChatAction(type, index)"
               />
@@ -388,7 +387,6 @@
                 :content="streamingContent"
                 :reasoning-streaming-content="streamingReasoning"
                 :is-streaming="true"
-                :show-divider="false"
                 :show-rollback="false"
               />
             </template>
@@ -396,6 +394,7 @@
         </div>
 
         <ChatInputBox
+          ref="chatInputBoxRef"
           v-model="chatInputText"
           placeholder="输入消息..."
           :is-streaming="isStreaming"
@@ -760,6 +759,9 @@ const openAIWrite = () => {
 const closeAISidebar = () => {
   showAISidebar.value = false;
   showAIWriteBtn.value = false;
+  currentSessionId.value = '';
+  chatMessages.value = [];
+  noteReferences.value = [];
   setTimeout(() => {
     showAIWriteBtn.value = true;
   }, 250);
@@ -788,7 +790,15 @@ const handleBubbleExpand = (text) => {
 
 const handleOpenInChat = (text, from, to) => {
   console.log('BubbleMenu - 对话中打开:', text, from, to);
+  
+  if (!showAISidebar.value) {
+    currentSessionId.value = '';
+    chatMessages.value = [];
+    noteReferences.value = [];
+  }
+
   showAISidebar.value = true;
+  showAIWriteBtn.value = false;
   
   const isDuplicate = noteReferences.value.some(
     ref => ref.from === from && ref.to === to
@@ -799,7 +809,8 @@ const handleOpenInChat = (text, from, to) => {
     noteReferences.value.push({
       id: refId,
       from,
-      to
+      to,
+      text: text || ''
     });
   }
 };
@@ -824,6 +835,8 @@ const streamingContent = ref('');
 const streamingReasoning = ref('');
 
 const chatMessages = ref([]);
+const currentSessionId = ref('');
+const chatInputBoxRef = ref(null);
 
 let activeRequestId = '';
 let isDoneReceived = false;
@@ -859,12 +872,31 @@ async function sendChatMessage(text) {
     return;
   }
 
+  let fullMessage = text;
+
+  if (noteReferences.value.length > 0 && editor.value) {
+    const docSize = editor.value.state.doc.content.size;
+    const refTexts = noteReferences.value.map(ref => {
+      const from = Math.min(ref.from, docSize);
+      const to = Math.min(ref.to, docSize);
+      if (from < to) {
+        return editor.value.state.doc.textBetween(from, to, ' ');
+      }
+      return ref.text || '';
+    }).filter(t => t.trim());
+
+    if (refTexts.length > 0) {
+      fullMessage += '\n\n---\n引用笔记内容：\n' + refTexts.map((t, i) => `【引用${i + 1}】\n${t}`).join('\n\n');
+    }
+  }
+
   chatMessages.value.push({
     role: 'user',
     content: text
   });
 
   chatInputText.value = '';
+  noteReferences.value = [];
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -873,18 +905,33 @@ async function sendChatMessage(text) {
   activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   isDoneReceived = false;
 
+  const noteContent = editor.value ? editor.value.getText() : '';
+  const systemPrompt = `你是 Friday，一个定制化个人知识智能服务助手。你友好、专业，善于帮助用户解答问题和完成任务。
+
+当前用户正在编辑一篇笔记，以下是笔记的完整内容：
+
+${noteContent}
+
+请基于笔记内容来回答用户的问题。用户可能会引用笔记中的部分内容进行提问，请重点关注引用的内容，同时结合笔记全文上下文来给出准确、有价值的回答。`;
+
   try {
-    await electronService.invoke('chat_without_memory', {
+    await electronService.invoke('chat_with_memory', {
       requestId: activeRequestId,
+      sessionId: currentSessionId.value || '',
       model: model,
-      message: text,
-      enableThinking: false
+      message: fullMessage,
+      enableThinking: false,
+      systemPrompt
     });
   } catch (err) {
     console.error('Chat invoke error:', err);
     isStreaming.value = false;
     streamingContent.value = '';
   }
+
+  nextTick(() => {
+    chatInputBoxRef.value?.focus();
+  });
 }
 
 function handleChatSend() {
@@ -965,6 +1012,10 @@ async function setupChatListeners() {
       if (isDoneReceived) return;
       isDoneReceived = true;
 
+      if (event.payload.sessionId && !currentSessionId.value) {
+        currentSessionId.value = event.payload.sessionId;
+      }
+
       chatMessages.value.push({
         role: 'assistant',
         content: event.payload.fullContent,
@@ -975,6 +1026,10 @@ async function setupChatListeners() {
       streamingContent.value = '';
       streamingReasoning.value = '';
       scrollSidebarToBottom();
+
+      nextTick(() => {
+        chatInputBoxRef.value?.focus();
+      });
     }
   );
 

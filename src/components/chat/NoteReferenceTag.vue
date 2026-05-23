@@ -19,21 +19,29 @@
       </Transition>
     </div>
     
-    <span class="tag-text">{{ from }}-{{ to }}</span>
+    <span class="tag-text">{{ displayText }}</span>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
-defineProps({
+const props = defineProps({
   from: Number,
-  to: Number
+  to: Number,
+  text: { type: String, default: '' }
 });
 
 defineEmits(['remove']);
 
 const showClose = ref(false);
+
+const displayText = computed(() => {
+  if (props.text) {
+    return props.text.length > 20 ? props.text.slice(0, 20) + '...' : props.text;
+  }
+  return `引用 ${props.from}-${props.to}`;
+});
 </script>
 
 <style scoped>
