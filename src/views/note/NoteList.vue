@@ -45,10 +45,8 @@
             v-model="searchQuery"
             class="search-input"
             type="text"
-            placeholder="搜索笔记..."
-            @keydown.enter="onSearch"
+            placeholder="搜索(按ESC退出)..."
             @keydown.escape="exitSearchMode"
-            @blur="exitSearchMode"
           />
         </div>
 
@@ -367,7 +365,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, onDeactivated } from 'vue';
+import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, onDeactivated, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import NoteEditor from './NoteEditor.vue';
 import { useNoteStore } from '@/store/modules/note';
@@ -432,16 +430,25 @@ const enterSearchMode = () => {
 const exitSearchMode = async () => {
   searchMode.value = false;
   searchQuery.value = '';
+  currentFolder.value = 'all';
   await noteStore.fetchNotes();
 };
 
-const onSearch = async () => {
-  if (searchQuery.value.trim()) {
-    await noteStore.searchNotes(searchQuery.value.trim());
-  } else {
-    await noteStore.fetchNotes();
-  }
-};
+let searchDebounceTimer = null;
+
+watch(searchQuery, (query) => {
+  if (!searchMode.value) return;
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(async () => {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) {
+      currentFolder.value = 'all';
+      await noteStore.searchNotes(trimmedQuery);
+    } else {
+      await noteStore.fetchNotes();
+    }
+  }, 1000);
+});
 
 const onResizeStart = (e) => {
   e.preventDefault();
