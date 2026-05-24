@@ -42,19 +42,7 @@
       <div class="tabs-area-spacer"></div>
     </div>
 
-    <div v-if="isLinux" class="linux-window-controls">
-      <button class="window-ctrl-btn minimize-btn" @click="handleMinimize">
-        <Minus :size="15" :stroke-width="1.5" />
-      </button>
-      <button class="window-ctrl-btn maximize-btn" @click="handleToggleMaximize">
-        <Square :size="13" :stroke-width="1.5" />
-      </button>
-      <button class="window-ctrl-btn close-btn" @click="handleClose">
-        <X :size="15" :stroke-width="1.5" />
-      </button>
-    </div>
-
-    <div v-else class="tab-bar-right-spacer"></div>
+    <div class="tab-bar-right-spacer"></div>
   </div>
 </template>
 
@@ -65,8 +53,6 @@ import { useRouter } from 'vue-router';
 import {
   X,
   Plus,
-  Minus,
-  Square,
   PanelLeftClose,
   PanelLeftOpen,
   FolderKanban,
@@ -77,7 +63,6 @@ import {
   Settings
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { electronService } from '@/services/electron';
 
 const tabStore = useTabStore();
 const appStore = useAppStore();
@@ -186,18 +171,6 @@ const addFridayTab = () => {
 const onWheel = (e) => {
   if (!tabsScrollRef.value) return;
   tabsScrollRef.value.scrollBy({ left: e.deltaY, behavior: 'auto' });
-};
-
-const handleMinimize = () => {
-  electronService.send('window-minimize');
-};
-
-const handleToggleMaximize = () => {
-  electronService.send('window-maximize');
-};
-
-const handleClose = () => {
-  electronService.send('window-close');
 };
 </script>
 
@@ -395,38 +368,5 @@ const handleClose = () => {
   flex-shrink: 0;
   min-width: 50px;
   height: 100%;
-}
-
-.linux-window-controls {
-  display: flex;
-  align-items: center;
-  height: 100%;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-
-.window-ctrl-btn {
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  cursor: pointer;
-  width: 32px;
-  height: 28px;
-  margin: 0 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: background-color 0.15s;
-}
-
-.window-ctrl-btn:hover {
-  background-color: var(--bg-hover);
-}
-
-.close-btn:hover {
-  background-color: var(--window-close-hover);
-  color: var(--window-close-hover-text);
 }
 </style>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import fs from 'fs'
@@ -52,13 +52,15 @@ function createWindow() {
       sandbox: false,
       preload: path.join(__dirname, 'preload.cjs')
     },
-    titleBarStyle: 'hiddenInset',
+    frame: false,
     show: false
   })
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
   })
+
+  Menu.setApplicationMenu(null)
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
