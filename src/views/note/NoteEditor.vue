@@ -2230,10 +2230,11 @@ const handleClickOutside = (event) => {
 .ai-write-btn {
   background-color: #1f2937;
   color: #fff !important;
-  gap: 6px;
-  padding: 0 14px;
+  gap: 4px;
+  padding: 0 10px;
   border-radius: 6px;
   font-weight: 500;
+  font-size: 12px;
 }
 
 .ai-write-btn:hover:not(:disabled):not(.disabled) {

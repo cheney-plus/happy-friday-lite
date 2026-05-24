@@ -276,7 +276,12 @@ const tocHeadings = computed(() => {
 });
 
 const handleToggleToc = () => {
-  tocVisible.value = !tocVisible.value;
+  if (sidebarCollapsed.value) {
+    sidebarCollapsed.value = false;
+    setTimeout(() => { tocVisible.value = true; }, 280);
+  } else {
+    tocVisible.value = !tocVisible.value;
+  }
 };
 
 const scrollToHeading = (index) => {
