@@ -82,7 +82,8 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "identity": null
     },
     "win": {
       "target": [
