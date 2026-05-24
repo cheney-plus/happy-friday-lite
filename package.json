@@ -13,6 +13,9 @@
     "start": "electron ."
   },
   "dependencies": {
+    "sql.js": "^1.14.1"
+  },
+  "devDependencies": {
     "@schedule-x/calendar": "^4.5.0",
     "@schedule-x/event-modal": "^4.5.0",
     "@schedule-x/events-service": "^4.5.0",
@@ -40,26 +43,21 @@
     "@tiptap/pm": "^3.23.4",
     "@tiptap/starter-kit": "^3.23.4",
     "@tiptap/vue-3": "^3.23.4",
-    "highlight.js": "^11.11.1",
-    "html2pdf.js": "^0.14.0",
-    "lowlight": "^3.3.0",
-    "lucide-vue-next": "^1.0.0",
-    "marked": "^18.0.3",
-    "pinia": "^3.0.4",
-    "sql.js": "^1.14.1",
-    "temporal-polyfill": "0.3.0",
-    "turndown": "^7.2.4",
-    "vue": "^3.5.13",
-    "vue-i18n": "^11.4.0",
-    "vue-router": "^5.0.6"
-  },
-  "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
     "concurrently": "^9.1.2",
     "electron": "^42.2.0",
     "electron-builder": "^25.1.8",
+    "highlight.js": "^11.11.1",
+    "lowlight": "^3.3.0",
+    "lucide-vue-next": "^1.0.0",
+    "marked": "^18.0.3",
+    "pinia": "^3.0.4",
     "sass": "^1.99.0",
+    "turndown": "^7.2.4",
     "vite": "^6.0.3",
+    "vue": "^3.5.13",
+    "vue-i18n": "^11.4.0",
+    "vue-router": "^5.0.6",
     "wait-on": "^8.0.3"
   },
   "build": {
@@ -68,11 +66,16 @@
     "directories": {
       "output": "release"
     },
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/sql.js/dist/sql-wasm.wasm"
+    ],
     "files": [
       "dist/**/*",
       "main.js",
       "preload.cjs",
-      "src-electron/**/*"
+      "src-electron/**/*",
+      "node_modules/sql.js/**/*"
     ],
     "mac": {
       "target": [

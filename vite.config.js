@@ -25,5 +25,26 @@ export default defineConfig(() => ({
   base: "./",
   build: {
     outDir: "dist",
+    minify: true,
+    esbuild: {
+      drop: ["console", "debugger"],
+    },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@tiptap")) return "vendor-tiptap";
+            if (id.includes("@schedule-x")) return "vendor-schedule";
+            if (
+              id.includes("vue/") ||
+              id.includes("vue-router") ||
+              id.includes("pinia") ||
+              id.includes("vue-i18n")
+            )
+              return "vendor-vue";
+          }
+        },
+      },
+    },
   },
 }));
