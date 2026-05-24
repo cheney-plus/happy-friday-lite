@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 import fs from 'fs'
 import { setDataDir as setConfigDataDir } from './src-electron/config.js'
-import { setDataDir as setDbDataDir } from './src-electron/db.js'
+import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -20,7 +20,7 @@ if (isDev) {
 
 let mainWindow = null
 
-function ensureDataDir() {
+async function ensureDataDir() {
   const dataDir = isDev
     ? path.join(__dirname, 'app-data')
     : app.getPath('userData')
@@ -35,6 +35,7 @@ function ensureDataDir() {
 
   setConfigDataDir(dataDir)
   setDbDataDir(dataDir)
+  await initDb()
 
   return dataDir
 }
@@ -67,8 +68,8 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
-  ensureDataDir()
+app.whenReady().then(async () => {
+  await ensureDataDir()
   createWindow()
   registerCommands(mainWindow)
 
@@ -80,6 +81,7 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', function () {
+  closeDb()
   if (process.platform !== 'darwin') {
     app.quit()
   }
