@@ -9,6 +9,8 @@ import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FI
 const cancelTokens = new CancellationTokens()
 
 export function registerCommands(mainWindow) {
+  console.log('[Commands] Starting to register all IPC handlers...')
+
   ipcMain.handle('get-config', () => {
     return loadConfig()
   })
@@ -221,7 +223,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('get_notes', (_event, args) => {
-    return db.getNotes(args?.knowledgeBaseId)
+    return db.getNotes(args?.knowledgeBaseId, args?.notebookId)
   })
 
   ipcMain.handle('get_note', (_event, args) => {
@@ -229,11 +231,11 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('create_note', (_event, args) => {
-    return db.createNote(args?.knowledgeBaseId, args?.title)
+    return db.createNote(args?.knowledgeBaseId, args?.notebookId, args?.title)
   })
 
   ipcMain.handle('update_note', (_event, args) => {
-    return db.updateNote(args.noteId, args.title, args.content, args.contentText)
+    return db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId)
   })
 
   ipcMain.handle('delete_note', (_event, args) => {
@@ -267,6 +269,28 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('delete_schedule_event', (_event, args) => {
     db.deleteScheduleEvent(args.eventId)
     return true
+  })
+
+  ipcMain.handle('get_notebooks', () => {
+    console.log('[Commands] get_notebooks called')
+    return db.getNotebooks()
+  })
+
+  ipcMain.handle('get_notebook', (_event, args) => {
+    return db.getNotebook(args.notebookId)
+  })
+
+  ipcMain.handle('create_notebook', (_event, args) => {
+    console.log('[Commands] create_notebook called with:', args)
+    return db.createNotebook(args?.name, args?.description)
+  })
+
+  ipcMain.handle('update_notebook', (_event, args) => {
+    return db.updateNotebook(args.notebookId, args.name, args.description)
+  })
+
+  ipcMain.handle('delete_notebook', (_event, args) => {
+    return db.deleteNotebook(args.notebookId)
   })
 
   ipcMain.handle('export_html_to_pdf', async (_event, args) => {
@@ -357,4 +381,6 @@ export function registerCommands(mainWindow) {
     cancelTokens.cancel(args.requestId)
     return true
   })
+
+  console.log('[Commands] ✅ All IPC handlers registered successfully')
 }

@@ -20,11 +20,12 @@ export const useNoteStore = defineStore('note', {
   },
 
   actions: {
-    async fetchNotes(knowledgeBaseId) {
+    async fetchNotes(knowledgeBaseId, notebookId) {
       this.loading = true
       try {
         const notes = await electronService.invoke('get_notes', {
-          knowledgeBaseId: knowledgeBaseId ?? null
+          knowledgeBaseId: knowledgeBaseId ?? null,
+          notebookId: notebookId ?? null
         })
         this.notes = notes || []
       } finally {
@@ -45,9 +46,10 @@ export const useNoteStore = defineStore('note', {
       return note
     },
 
-    async createNote(knowledgeBaseId, title) {
+    async createNote(knowledgeBaseId, title, notebookId) {
       const note = await electronService.invoke('create_note', {
         knowledgeBaseId: knowledgeBaseId ?? null,
+        notebookId: notebookId ?? null,
         title: title ?? null
       })
       if (!note) {
@@ -110,14 +112,17 @@ export const useNoteStore = defineStore('note', {
       this._pendingSave = null
       this.saving = true
       try {
+        const note = this.notes.find(n => n.id === pending.noteId)
+        const notebookId = note?.notebookId ?? null
+
         await electronService.invoke('update_note', {
           noteId: pending.noteId,
           title: pending.title,
           content: pending.content,
-          contentText: pending.contentText
+          contentText: pending.contentText,
+          notebookId
         })
 
-        const note = this.notes.find(n => n.id === pending.noteId)
         if (note) {
           note.title = pending.title
           note.content = pending.content

@@ -209,16 +209,16 @@ const categories = reactive([
     ]
   },
   {
-    id: 'shared',
-    name: '共享知识库',
+    id: 'agent',
+    name: 'Agent知识库',
     expanded: true,
     items: [
       { id: 'rag-thinking', name: 'RAG 技术的思考' }
     ]
   },
   {
-    id: 'subscribed',
-    name: '订阅知识库',
+    id: 'shared',
+    name: '共享知识库',
     expanded: false,
     items: []
   }

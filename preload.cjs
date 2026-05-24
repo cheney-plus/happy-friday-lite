@@ -37,6 +37,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'stop_note_ai',
       'note_fim_completion',
       'stop_note_fim_completion',
+      'get_notebooks',
+      'get_notebook',
+      'create_notebook',
+      'update_notebook',
+      'delete_notebook',
       'export_html_to_pdf',
       'export_markdown',
       'open-external'

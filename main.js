@@ -71,7 +71,14 @@ function createWindow() {
 app.whenReady().then(async () => {
   await ensureDataDir()
   createWindow()
-  registerCommands(mainWindow)
+
+  console.log('[Main] Registering IPC commands...')
+  try {
+    registerCommands(mainWindow)
+    console.log('[Main] ✅ IPC commands registered successfully')
+  } catch (error) {
+    console.error('[Main] ❌ Failed to register IPC commands:', error)
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {

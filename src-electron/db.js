@@ -84,10 +84,21 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS notes (
       id TEXT PRIMARY KEY,
       knowledgeBaseId TEXT,
+      notebookId TEXT,
       title TEXT NOT NULL DEFAULT '新建笔记',
       content TEXT NOT NULL DEFAULT '',
       contentText TEXT NOT NULL DEFAULT '',
       isDeleted INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS notebooks (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '新建笔记本',
+      description TEXT NOT NULL DEFAULT '',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
@@ -113,6 +124,7 @@ async function initDatabase() {
 
   db.run('CREATE INDEX IF NOT EXISTS idx_messages_sessionId ON messages(sessionId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_notes_notebookId ON notes(notebookId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_isDeleted ON notes(isDeleted)')
   db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_start ON schedule_events(start)')
   db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_end ON schedule_events(end)')
@@ -158,8 +170,15 @@ async function migrateFromJson() {
 
   migrateArray('notes.json', (n) => {
     db.run(
-      'INSERT OR IGNORE INTO notes (id, knowledgeBaseId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [n.id, n.knowledgeBaseId || null, n.title, n.content, n.contentText, n.isDeleted ? 1 : 0, n.createdAt, n.updatedAt]
+      'INSERT OR IGNORE INTO notes (id, knowledgeBaseId, notebookId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [n.id, n.knowledgeBaseId || null, n.notebookId || null, n.title, n.content, n.contentText, n.isDeleted ? 1 : 0, n.createdAt, n.updatedAt]
+    )
+  })
+
+  migrateArray('notebooks.json', (nb) => {
+    db.run(
+      'INSERT OR IGNORE INTO notebooks (id, name, description, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
+      [nb.id, nb.name || '新建笔记本', nb.description || '', nb.createdAt, nb.updatedAt]
     )
   })
 
@@ -266,17 +285,18 @@ export function rollbackSession(sessionId, messageId) {
   updateSessionTimestamp(sessionId)
 }
 
-export function createNote(knowledgeBaseId, title) {
+export function createNote(knowledgeBaseId, notebookId, title) {
   const now = nowISO()
   const id = generateId()
   db.run(
-    'INSERT INTO notes (id, knowledgeBaseId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 0, ?, ?)',
-    [id, knowledgeBaseId || null, title || '新建笔记', '', '', now, now]
+    'INSERT INTO notes (id, knowledgeBaseId, notebookId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)',
+    [id, knowledgeBaseId || null, notebookId || null, title || '新建笔记', '', '', now, now]
   )
   saveDb()
   return {
     id,
     knowledgeBaseId: knowledgeBaseId || null,
+    notebookId: notebookId || null,
     title: title || '新建笔记',
     content: '',
     contentText: '',
@@ -286,11 +306,23 @@ export function createNote(knowledgeBaseId, title) {
   }
 }
 
-export function getNotes(knowledgeBaseId) {
+export function getNotes(knowledgeBaseId, notebookId) {
+  if (knowledgeBaseId && notebookId) {
+    return queryAll(
+      'SELECT * FROM notes WHERE isDeleted = 0 AND knowledgeBaseId = ? AND notebookId = ? ORDER BY updatedAt DESC',
+      [knowledgeBaseId, notebookId]
+    ).map(normalizeNote)
+  }
   if (knowledgeBaseId) {
     return queryAll(
       'SELECT * FROM notes WHERE isDeleted = 0 AND knowledgeBaseId = ? ORDER BY updatedAt DESC',
       [knowledgeBaseId]
+    ).map(normalizeNote)
+  }
+  if (notebookId) {
+    return queryAll(
+      'SELECT * FROM notes WHERE isDeleted = 0 AND notebookId = ? ORDER BY updatedAt DESC',
+      [notebookId]
     ).map(normalizeNote)
   }
   return queryAll(
@@ -305,12 +337,19 @@ export function getNote(noteId) {
   ))
 }
 
-export function updateNote(noteId, title, content, contentText) {
+export function updateNote(noteId, title, content, contentText, notebookId) {
   const now = nowISO()
-  db.run(
-    'UPDATE notes SET title = ?, content = ?, contentText = ?, updatedAt = ? WHERE id = ?',
-    [title, content, contentText, now, noteId]
-  )
+  if (notebookId !== undefined) {
+    db.run(
+      'UPDATE notes SET title = ?, content = ?, contentText = ?, notebookId = ?, updatedAt = ? WHERE id = ?',
+      [title, content, contentText, notebookId, now, noteId]
+    )
+  } else {
+    db.run(
+      'UPDATE notes SET title = ?, content = ?, contentText = ?, updatedAt = ? WHERE id = ?',
+      [title, content, contentText, now, noteId]
+    )
+  }
   const modified = db.getRowsModified()
   saveDb()
   if (modified > 0) {
@@ -422,4 +461,56 @@ export function updateScheduleEvent(eventId, args) {
 export function deleteScheduleEvent(eventId) {
   db.run('DELETE FROM schedule_events WHERE id = ?', [eventId])
   saveDb()
+}
+
+export function createNotebook(name, description) {
+  console.log('[DB] Creating notebook:', { name, description })
+  const now = nowISO()
+  const id = generateId()
+  db.run(
+    'INSERT INTO notebooks (id, name, description, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
+    [id, name || '新建笔记本', description || '', now, now]
+  )
+  saveDb()
+  const notebook = {
+    id,
+    name: name || '新建笔记本',
+    description: description || '',
+    createdAt: now,
+    updatedAt: now
+  }
+  console.log('[DB] Created notebook:', notebook)
+  return notebook
+}
+
+export function getNotebooks() {
+  const notebooks = queryAll('SELECT * FROM notebooks ORDER BY updatedAt DESC')
+  console.log('[DB] Fetched notebooks:', notebooks.length, 'items')
+  return notebooks
+}
+
+export function getNotebook(notebookId) {
+  return queryOne('SELECT * FROM notebooks WHERE id = ?', [notebookId])
+}
+
+export function updateNotebook(notebookId, name, description) {
+  console.log('[DB] Updating notebook:', { notebookId, name, description })
+  const now = nowISO()
+  db.run(
+    'UPDATE notebooks SET name = ?, description = ?, updatedAt = ? WHERE id = ?',
+    [name || '', description || '', now, notebookId]
+  )
+  const modified = db.getRowsModified()
+  saveDb()
+  if (modified > 0) {
+    return queryOne('SELECT * FROM notebooks WHERE id = ?', [notebookId])
+  }
+  return null
+}
+
+export function deleteNotebook(notebookId) {
+  db.run('DELETE FROM notebooks WHERE id = ?', [notebookId])
+  db.run('UPDATE notes SET notebookId = NULL WHERE notebookId = ?', [notebookId])
+  saveDb()
+  return db.getRowsModified() > 0
 }

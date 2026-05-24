@@ -12,9 +12,25 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
           </button>
           <div class="topbar-actions">
-            <div class="new-note-btn" @click="createNewNote">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            <div class="new-note-btn-group" ref="newNoteBtnRef">
+              <button class="new-note-main-btn" @click="createNewNote" title="新建笔记">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+              </button>
+              <button class="new-note-dropdown-btn" @click.stop="toggleNewNoteMenu" title="更多选项">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <Teleport to="body">
+                <div v-if="newNoteMenuVisible" class="new-note-dropdown-menu" :style="newNoteMenuStyle">
+                  <div class="dropdown-item" @click="createNewNote">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                    新建笔记
+                  </div>
+                  <div class="dropdown-item" @click="openImportDialog">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    导入笔记
+                  </div>
+                </div>
+              </Teleport>
             </div>
             <button class="topbar-btn" @click="enterSearchMode">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -50,13 +66,37 @@
               :class="['folder-item', { active: currentFolder === folder.id }]"
               @click="selectFolder(folder.id)"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
               <div class="folder-info">
                 <span class="folder-item-name">{{ folder.name }}</span>
                 <span class="folder-count">{{ folder.count }}篇笔记</span>
               </div>
+              <div
+                v-if="folder.id !== 'all'"
+                class="folder-more-btn"
+                @click.stop="toggleFolderItemMenu($event, folder)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+              </div>
             </div>
           </div>
+
+          <Teleport to="body">
+            <div
+              v-if="folderItemMenuVisible"
+              class="folder-item-menu"
+              :style="folderItemMenuStyle"
+            >
+              <div class="folder-item-menu-option" @click="handleRenameNotebook">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                重命名
+              </div>
+              <div class="folder-item-menu-option danger" @click="handleDeleteNotebook">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                删除
+              </div>
+            </div>
+          </Teleport>
         </Teleport>
 
       </div>
@@ -88,10 +128,43 @@
             添加到知识库
             <svg class="arrow-right" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
-          <div class="context-item" @click="handleAction('moveToNotebook')">
+          <div
+            class="context-item has-submenu"
+            @mouseenter="showNotebookSubmenu"
+            @mouseleave="hideNotebookSubmenuWithDelay"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
             移动到笔记本
             <svg class="arrow-right" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>
+          <div
+            v-if="notebookSubmenuVisible"
+            class="notebook-submenu"
+            :style="notebookSubmenuStyle"
+            @mouseenter="cancelHideNotebookSubmenu"
+            @mouseleave="hideNotebookSubmenu"
+          >
+            <div class="submenu-item" @click="handleAction('createNewNotebook')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              新建笔记本
+            </div>
+            <div class="submenu-divider"></div>
+            <div v-if="notebookStore.loading" class="submenu-item loading">
+              <svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+              加载中...
+            </div>
+            <template v-else-if="notebookStore.notebooks.length > 0">
+              <div
+                v-for="notebook in notebookStore.notebooks"
+                :key="notebook.id"
+                :class="['submenu-item', { active: contextMenu.targetNote?.notebookId === notebook.id }]"
+                @click="moveToNotebook(notebook.id)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                {{ notebook.name }}
+              </div>
+            </template>
+            <div v-else class="submenu-item empty-hint">暂无笔记本</div>
           </div>
           <div class="context-item" @click="handleAction('duplicate')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -168,6 +241,124 @@
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div v-if="importDialogVisible" class="import-dialog-overlay" @click.self="closeImportDialog">
+        <div class="import-dialog">
+          <div class="import-dialog-header">
+            <div class="import-dialog-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 18 15 15"></polyline></svg>
+              导入
+            </div>
+            <button class="import-dialog-close" @click="closeImportDialog">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+
+          <div class="import-dialog-content">
+            <div
+              class="upload-area"
+              :class="{ 'drag-over': isDragOver }"
+              @drop.prevent="handleDrop"
+              @dragover.prevent="isDragOver = true"
+              @dragleave.prevent="isDragOver = false"
+              @click="triggerFileInput"
+            >
+              <svg class="file-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <circle cx="16" cy="17" r="3" fill="currentColor"></circle>
+                <line x1="14.5" y1="17" x2="10" y2="17" stroke-width="2"></line>
+                <polyline points="11.5 15.5 13.5 17 11.5 18.5" stroke-width="1.5"></polyline>
+              </svg>
+              <div class="upload-text">MarkDown文件</div>
+              <div class="upload-hint">最多一次上传文件≤100个，单文件≤10MB 选择文件</div>
+              <input
+                ref="fileInputRef"
+                type="file"
+                multiple
+                accept=".md,.markdown,.txt"
+                style="display: none"
+                @change="handleFileSelect"
+              />
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="createNotebookDialogVisible" class="create-notebook-overlay" @click.self="closeCreateNotebookDialog">
+        <div class="create-notebook-dialog">
+          <div class="create-notebook-header">
+            <div class="create-notebook-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              创建笔记本
+            </div>
+            <button class="create-notebook-close" @click="closeCreateNotebookDialog">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+
+          <div class="create-notebook-content">
+            <input
+              ref="notebookNameInputRef"
+              v-model="newNotebookName"
+              type="text"
+              placeholder="请输入笔记本的名称"
+              class="notebook-name-input"
+              @keydown.enter="confirmCreateNotebook"
+            />
+          </div>
+
+          <div class="create-notebook-footer">
+            <button
+              class="create-notebook-btn"
+              :disabled="!newNotebookName.trim()"
+              @click="confirmCreateNotebook"
+            >
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="renameNotebookDialogVisible" class="create-notebook-overlay" @click.self="closeRenameNotebookDialog">
+        <div class="create-notebook-dialog">
+          <div class="create-notebook-header">
+            <div class="create-notebook-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              重命名笔记本
+            </div>
+            <button class="create-notebook-close" @click="closeRenameNotebookDialog">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+
+          <div class="create-notebook-content">
+            <input
+              ref="renameNotebookInputRef"
+              v-model="renameNotebookNewName"
+              type="text"
+              placeholder="请输入新的笔记本名称"
+              class="notebook-name-input"
+              @keydown.enter="confirmRenameNotebook"
+            />
+          </div>
+
+          <div class="create-notebook-footer">
+            <button
+              class="create-notebook-btn"
+              :disabled="!renameNotebookNewName.trim()"
+              @click="confirmRenameNotebook"
+            >
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -176,15 +367,37 @@ import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, onDeacti
 import { useI18n } from 'vue-i18n';
 import NoteEditor from './NoteEditor.vue';
 import { useNoteStore } from '@/store/modules/note';
+import { useNotebookStore } from '@/store/modules/notebook';
+import { electronService } from '@/services/electron';
 import { extractPlainText } from '@/utils/text';
 
 const { t } = useI18n();
 const noteStore = useNoteStore();
+const notebookStore = useNotebookStore();
 
 const currentFolder = ref('all');
 const folderMenuVisible = ref(false);
 const folderTriggerRef = ref(null);
 const tocVisible = ref(false);
+const newNoteMenuVisible = ref(false);
+const newNoteBtnRef = ref(null);
+const importDialogVisible = ref(false);
+const isDragOver = ref(false);
+const fileInputRef = ref(null);
+let newNoteMenuStyle = reactive({ left: '0px', top: '0px' });
+
+const notebookSubmenuVisible = ref(false);
+let notebookSubmenuStyle = reactive({ left: '0px', top: '0px' });
+const createNotebookDialogVisible = ref(false);
+const newNotebookName = ref('');
+const notebookNameInputRef = ref(null);
+const createNotebookTargetNoteId = ref(null);
+const folderItemMenuVisible = ref(false);
+const folderItemMenuStyle = reactive({ left: '0px', top: '0px' });
+const selectedFolderForAction = ref(null);
+const renameNotebookDialogVisible = ref(false);
+const renameNotebookNewName = ref('');
+const renameNotebookInputRef = ref(null);
 
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 280;
@@ -249,12 +462,19 @@ const onResizeStart = (e) => {
   document.addEventListener('mouseup', onResizeEnd);
 };
 
-const folders = reactive([
-  { id: 'all', name: '全部', count: 0 },
-]);
+const folders = computed(() => {
+  const allNotes = noteStore.notes;
+  const allCount = allNotes.length;
+  const list = [{ id: 'all', name: '全部', count: allCount }];
+  for (const nb of notebookStore.notebooks) {
+    const nbCount = allNotes.filter(n => n.notebookId === nb.id).length;
+    list.push({ id: nb.id, name: nb.name, count: nbCount });
+  }
+  return list;
+});
 
 const currentFolderName = computed(() => {
-  const f = folders.find(f => f.id === currentFolder.value);
+  const f = folders.value.find(f => f.id === currentFolder.value);
   return f ? f.name : '全部';
 });
 
@@ -325,11 +545,65 @@ const selectNote = (id) => {
 };
 
 const createNewNote = async () => {
+  newNoteMenuVisible.value = false;
   const note = await noteStore.createNote();
   if (!note) {
     console.error('Failed to create note: Electron API not available or create_note returned null');
     return;
   }
+};
+
+const toggleNewNoteMenu = async () => {
+  if (newNoteMenuVisible.value) {
+    newNoteMenuVisible.value = false;
+    return;
+  }
+  await nextTick();
+  if (newNoteBtnRef.value) {
+    const rect = newNoteBtnRef.value.getBoundingClientRect();
+    newNoteMenuStyle.left = `${rect.right - 140}px`;
+    newNoteMenuStyle.top = `${rect.bottom + 4}px`;
+  }
+  newNoteMenuVisible.value = true;
+};
+
+const openImportDialog = () => {
+  newNoteMenuVisible.value = false;
+  importDialogVisible.value = true;
+};
+
+const closeImportDialog = () => {
+  importDialogVisible.value = false;
+  isDragOver.value = false;
+};
+
+const triggerFileInput = () => {
+  if (fileInputRef.value) {
+    fileInputRef.value.click();
+  }
+};
+
+const handleFileSelect = (event) => {
+  const files = event.target.files;
+  if (files && files.length > 0) {
+    processFiles(files);
+  }
+};
+
+const handleDrop = (event) => {
+  isDragOver.value = false;
+  const files = event.dataTransfer.files;
+  if (files && files.length > 0) {
+    processFiles(files);
+  }
+};
+
+const processFiles = (files) => {
+  console.log('Processing files:', files);
+};
+
+const toggleImportOtherMenu = () => {
+  console.log('Toggle import other menu');
 };
 
 const onEditorChange = (content) => {
@@ -358,11 +632,93 @@ const toggleFolderMenu = async () => {
     folderMenuStyle.top = `${rect.bottom + 4}px`;
   }
   folderMenuVisible.value = true;
+
+  try {
+    await noteStore.fetchNotes();
+    await notebookStore.fetchNotebooks();
+  } catch (error) {
+    console.error('Failed to refresh data for folder menu:', error);
+  }
 };
 
-const selectFolder = (id) => {
+const selectFolder = async (id) => {
   currentFolder.value = id;
   folderMenuVisible.value = false;
+  if (id === 'all') {
+    await noteStore.fetchNotes();
+  } else {
+    await noteStore.fetchNotes(null, id);
+  }
+  if (noteStore.notes.length > 0) {
+    noteStore.selectNote(noteStore.notes[0].id);
+  } else {
+    noteStore.currentNoteId = null;
+  }
+};
+
+const toggleFolderItemMenu = (event, folder) => {
+  event.stopPropagation();
+  if (folderItemMenuVisible.value && selectedFolderForAction.value?.id === folder.id) {
+    folderItemMenuVisible.value = false;
+    return;
+  }
+
+  selectedFolderForAction.value = folder;
+  const rect = event.target.getBoundingClientRect();
+  folderItemMenuStyle.left = `${rect.right - 100}px`;
+  folderItemMenuStyle.top = `${rect.top}px`;
+  folderItemMenuVisible.value = true;
+};
+
+const handleRenameNotebook = () => {
+  if (!selectedFolderForAction.value) return;
+  renameNotebookNewName.value = selectedFolderForAction.value.name;
+  folderItemMenuVisible.value = false;
+  renameNotebookDialogVisible.value = true;
+  nextTick(() => {
+    if (renameNotebookInputRef.value) {
+      renameNotebookInputRef.value.focus();
+      renameNotebookInputRef.value.select();
+    }
+  });
+};
+
+const confirmRenameNotebook = async () => {
+  const name = renameNotebookNewName.value.trim();
+  if (!name || !selectedFolderForAction.value) return;
+
+  await notebookStore.updateNotebook(selectedFolderForAction.value.id, name);
+
+  closeRenameNotebookDialog();
+
+  await notebookStore.fetchNotebooks();
+};
+
+const closeRenameNotebookDialog = () => {
+  renameNotebookDialogVisible.value = false;
+  renameNotebookNewName.value = '';
+  selectedFolderForAction.value = null;
+};
+
+const handleDeleteNotebook = async () => {
+  if (!selectedFolderForAction.value) return;
+
+  const notebookName = selectedFolderForAction.value.name;
+  const notebookId = selectedFolderForAction.value.id;
+
+  folderItemMenuVisible.value = false;
+
+  const confirmed = window.confirm(`确定要删除笔记本"${notebookName}"吗？\n\n注意：笔记本中的笔记不会被删除，但会变为"未分类"状态。`);
+  if (!confirmed) return;
+
+  await notebookStore.deleteNotebook(notebookId);
+
+  if (currentFolder.value === notebookId) {
+    currentFolder.value = 'all';
+    await noteStore.fetchNotes();
+  }
+
+  selectedFolderForAction.value = null;
 };
 
 const contextMenu = reactive({
@@ -370,6 +726,7 @@ const contextMenu = reactive({
   x: 0,
   y: 0,
   targetNoteId: null,
+  targetNote: null,
   get style() {
     return {
       left: `${this.x}px`,
@@ -383,11 +740,170 @@ const showContextMenu = (e, note) => {
   contextMenu.x = e.clientX;
   contextMenu.y = e.clientY;
   contextMenu.targetNoteId = note.id;
+  contextMenu.targetNote = note;
+  notebookSubmenuVisible.value = false;
 };
 
 const hideContextMenu = () => {
   contextMenu.visible = false;
   contextMenu.targetNoteId = null;
+  contextMenu.targetNote = null;
+  notebookSubmenuVisible.value = false;
+  folderItemMenuVisible.value = false;
+};
+
+let notebookSubmenuHideTimer = null;
+
+const showNotebookSubmenu = async () => {
+  if (notebookSubmenuHideTimer) {
+    clearTimeout(notebookSubmenuHideTimer);
+    notebookSubmenuHideTimer = null;
+  }
+
+  await nextTick();
+  const menuEl = document.querySelector('.context-menu');
+  if (menuEl) {
+    const rect = menuEl.getBoundingClientRect();
+    const menuItemEl = menuEl.querySelector('.has-submenu');
+    if (menuItemEl) {
+      const itemRect = menuItemEl.getBoundingClientRect();
+      notebookSubmenuStyle.left = `${itemRect.right + 4}px`;
+      notebookSubmenuStyle.top = `${itemRect.top}px`;
+    }
+  }
+
+  notebookSubmenuVisible.value = true;
+
+  try {
+    await notebookStore.fetchNotebooks();
+  } catch (error) {
+    console.error('Failed to fetch notebooks:', error);
+  }
+};
+
+const hideNotebookSubmenuWithDelay = () => {
+  notebookSubmenuHideTimer = setTimeout(() => {
+    notebookSubmenuVisible.value = false;
+    notebookSubmenuHideTimer = null;
+  }, 200);
+};
+
+const cancelHideNotebookSubmenu = () => {
+  if (notebookSubmenuHideTimer) {
+    clearTimeout(notebookSubmenuHideTimer);
+    notebookSubmenuHideTimer = null;
+  }
+};
+
+const hideNotebookSubmenu = () => {
+  notebookSubmenuVisible.value = false;
+  if (notebookSubmenuHideTimer) {
+    clearTimeout(notebookSubmenuHideTimer);
+    notebookSubmenuHideTimer = null;
+  }
+};
+
+const openCreateNotebookDialog = () => {
+  createNotebookTargetNoteId.value = contextMenu.targetNoteId;
+  hideContextMenu();
+  createNotebookDialogVisible.value = true;
+  newNotebookName.value = '';
+  nextTick(() => {
+    if (notebookNameInputRef.value) {
+      notebookNameInputRef.value.focus();
+    }
+  });
+};
+
+const closeCreateNotebookDialog = () => {
+  createNotebookDialogVisible.value = false;
+  newNotebookName.value = '';
+};
+
+const confirmCreateNotebook = async () => {
+  const name = newNotebookName.value.trim();
+  if (!name) return;
+
+  console.log('[NoteList] Creating new notebook and binding note:', {
+    notebookName: name,
+    targetNoteId: createNotebookTargetNoteId.value
+  });
+
+  try {
+    const notebook = await notebookStore.createNotebook(name);
+    console.log('[NoteList] Notebook created:', notebook);
+
+    if (notebook) {
+      if (createNotebookTargetNoteId.value) {
+        console.log('[NoteList] Binding note to new notebook:', {
+          noteId: createNotebookTargetNoteId.value,
+          notebookId: notebook.id,
+          notebookName: notebook.name
+        });
+        await moveNoteToNotebook(createNotebookTargetNoteId.value, notebook.id);
+        console.log('[NoteList] ✅ Note successfully bound to new notebook');
+      } else {
+        console.warn('[NoteList] No target note to bind');
+      }
+    } else {
+      console.error('[NoteList] ❌ Failed to create notebook - returned null');
+    }
+  } catch (error) {
+    console.error('[NoteList] ❌ Error in confirmCreateNotebook:', error);
+  }
+
+  closeCreateNotebookDialog();
+};
+
+const moveToNotebook = async (notebookId) => {
+  if (contextMenu.targetNoteId) {
+    await moveNoteToNotebook(contextMenu.targetNoteId, notebookId);
+  }
+  hideContextMenu();
+};
+
+const moveNoteToNotebook = async (noteId, notebookId) => {
+  console.log('[NoteList] Moving note to notebook:', { noteId, notebookId })
+  const note = noteStore.notes.find(n => n.id === noteId);
+  if (note) {
+    await electronService.invoke('update_note', {
+      noteId: note.id,
+      title: note.title,
+      content: note.content,
+      contentText: note.contentText,
+      notebookId
+    });
+    note.notebookId = notebookId;
+    note.updatedAt = new Date().toISOString();
+    console.log('[NoteList] Note moved successfully:', { noteId, notebookId })
+  } else {
+    console.error('[NoteList] Note not found:', noteId)
+  }
+};
+
+const duplicateNote = async () => {
+  if (!contextMenu.targetNoteId) return;
+
+  const originalNote = noteStore.notes.find(n => n.id === contextMenu.targetNoteId);
+  if (!originalNote) return;
+
+  const newNote = await electronService.invoke('create_note', {
+    knowledgeBaseId: originalNote.knowledgeBaseId,
+    notebookId: originalNote.notebookId,
+    title: originalNote.title + '-副本'
+  });
+
+  if (newNote) {
+    await electronService.invoke('update_note', {
+      noteId: newNote.id,
+      title: newNote.title,
+      content: originalNote.content,
+      contentText: originalNote.contentText
+    });
+    newNote.content = originalNote.content;
+    newNote.contentText = originalNote.contentText;
+    noteStore.notes.unshift(newNote);
+  }
 };
 
 const handleAction = async (action) => {
@@ -395,24 +911,28 @@ const handleAction = async (action) => {
     await noteStore.deleteNote(contextMenu.targetNoteId);
   } else if (action === 'addToKnowledge') {
     console.log('Add to knowledge feature is not yet implemented');
-  } else if (action === 'moveToNotebook') {
-    console.log('Move to notebook feature is not yet implemented');
+  } else if (action === 'createNewNotebook') {
+    openCreateNotebookDialog();
   } else if (action === 'duplicate') {
-    console.log('Duplicate note feature is not yet implemented');
+    await duplicateNote();
   }
   hideContextMenu();
 };
 
 const handleClickOutside = () => {
-  if (contextMenu.visible || folderMenuVisible.value) {
+  if (contextMenu.visible || folderMenuVisible.value || newNoteMenuVisible.value || notebookSubmenuVisible.value || folderItemMenuVisible.value) {
     contextMenu.visible = false;
     folderMenuVisible.value = false;
+    newNoteMenuVisible.value = false;
+    notebookSubmenuVisible.value = false;
+    folderItemMenuVisible.value = false;
   }
 };
 
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside);
   await noteStore.fetchNotes();
+  await notebookStore.fetchNotebooks();
   if (noteStore.notes.length > 0 && !noteStore.currentNoteId) {
     noteStore.selectNote(noteStore.notes[0].id);
   }
@@ -426,6 +946,8 @@ onBeforeUnmount(async () => {
 onDeactivated(() => {
   folderMenuVisible.value = false;
   contextMenu.visible = false;
+  notebookSubmenuVisible.value = false;
+  createNotebookDialogVisible.value = false;
 });
 </script>
 
@@ -562,18 +1084,74 @@ onDeactivated(() => {
   gap: 4px;
 }
 
-.new-note-btn {
+.new-note-btn-group {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 5px 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.12s;
-  color: var(--text-primary);
+  position: relative;
 }
 
-.new-note-btn:hover {
+.new-note-main-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px 0 0 8px;
+  border: none;
+  background-color: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.12s;
+  padding: 0;
+}
+
+.new-note-main-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.new-note-dropdown-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 32px;
+  border-radius: 0 8px 8px 0;
+  border: none;
+  background-color: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.12s;
+  padding: 0;
+}
+
+.new-note-dropdown-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.new-note-dropdown-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 140px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.dropdown-item:hover {
   background-color: var(--bg-hover);
 }
 
@@ -893,13 +1471,13 @@ onDeactivated(() => {
 <style>
 .folder-dropdown {
   position: fixed;
-  z-index: 99999;
+  z-index: 100001;
   background-color: var(--bg-primary);
-  border-radius: 10px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.08);
-  padding: 6px 0;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 0 1px rgba(0, 0, 0, 0.08);
+  padding: 4px 0;
   min-width: 200px;
-  animation: dropdown-in 0.12s ease-out;
+  animation: dropdown-in 0.1s ease-out;
 }
 
 [data-theme='dark'] .folder-dropdown {
@@ -914,21 +1492,52 @@ onDeactivated(() => {
 .folder-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 16px;
-  font-size: 13px;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
   color: var(--text-primary);
   cursor: pointer;
   transition: background-color 0.1s;
   user-select: none;
+  position: relative;
+  border-radius: 6px;
 }
 
 .folder-item:hover {
+  background-color: transparent;
+}
+
+.folder-item:hover::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 3px;
+  bottom: 3px;
   background-color: var(--bg-hover);
+  border-radius: 5px;
+  z-index: 0;
 }
 
 .folder-item.active {
+  background-color: transparent;
+}
+
+.folder-item.active::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 3px;
+  bottom: 3px;
   background-color: var(--bg-active);
+  border-radius: 5px;
+  z-index: 0;
+}
+
+.folder-item.active > * {
+  position: relative;
+  z-index: 1;
 }
 
 .folder-item svg {
@@ -939,18 +1548,76 @@ onDeactivated(() => {
 .folder-info {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0px;
   min-width: 0;
 }
 
 .folder-item-name {
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.25;
+  font-size: 12px;
 }
 
 .folder-count {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
+}
+
+.folder-more-btn {
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.1s;
+  cursor: pointer;
+  color: var(--text-tertiary);
+}
+
+.folder-item:hover .folder-more-btn {
+  opacity: 1;
+}
+
+.folder-more-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.folder-item-menu {
+  position: fixed;
+  z-index: 100002;
+  background-color: var(--bg-primary);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+  padding: 2px 0;
+  min-width: 110px;
+  animation: dropdown-in 0.1s ease-out;
+}
+
+[data-theme='dark'] .folder-item-menu {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.folder-item-menu-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.folder-item-menu-option:hover {
+  background-color: var(--bg-hover);
+}
+
+.folder-item-menu-option.danger {
+  color: #ef4444;
+}
+
+.folder-item-menu-option.danger svg {
+  color: #ef4444;
 }
 
 .context-menu {
@@ -997,8 +1664,27 @@ onDeactivated(() => {
   color: var(--text-secondary);
 }
 
+.context-item.has-submenu {
+  position: relative;
+}
+
+.context-item.has-submenu:hover {
+  background-color: var(--bg-hover);
+}
+
 [data-theme='dark'] .context-item svg {
   color: var(--text-secondary);
+}
+
+.notebook-submenu {
+  position: fixed;
+  z-index: 100000;
+  background-color: var(--bg-primary);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.08);
+  padding: 6px 0;
+  min-width: 160px;
+  animation: dropdown-in 0.12s ease-out;
 }
 
 .context-item.danger {
@@ -1022,5 +1708,320 @@ onDeactivated(() => {
 
 [data-theme='dark'] .context-divider {
   background-color: var(--border-color);
+}
+
+.notebook-submenu {
+  position: fixed;
+  z-index: 100000;
+  background-color: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+  padding: 4px 0;
+  min-width: 140px;
+  animation: dropdown-in 0.1s ease-out;
+}
+
+[data-theme='dark'] .notebook-submenu {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: #1c1917;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  user-select: none;
+}
+
+[data-theme='dark'] .submenu-item {
+  color: var(--text-primary);
+}
+
+.submenu-item:hover {
+  background-color: var(--bg-hover);
+}
+
+[data-theme='dark'] .submenu-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.submenu-item.active {
+  background-color: var(--bg-active);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.submenu-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.submenu-item.loading {
+  color: var(--text-tertiary);
+  cursor: default;
+  pointer-events: none;
+}
+
+.submenu-item.loading:hover {
+  background-color: transparent;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.submenu-item.empty-hint {
+  color: var(--text-tertiary);
+  cursor: default;
+  justify-content: center;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.submenu-item.empty-hint:hover {
+  background-color: transparent;
+}
+
+.submenu-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 4px 12px;
+}
+
+.create-notebook-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100001;
+  animation: fade-in 0.15s ease-out;
+}
+
+.create-notebook-dialog {
+  background-color: var(--bg-primary);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+  animation: scale-in 0.2s ease-out;
+}
+
+[data-theme='dark'] .create-notebook-dialog {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.create-notebook-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.create-notebook-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.create-notebook-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.create-notebook-close:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.create-notebook-content {
+  padding: 24px 20px;
+}
+
+.notebook-name-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.notebook-name-input:focus {
+  border-color: var(--text-primary);
+}
+
+.notebook-name-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.create-notebook-footer {
+  padding: 14px 20px 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.create-notebook-btn {
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background-color: #6b7280;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-notebook-btn:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.create-notebook-btn:not(:disabled):hover {
+  background-color: #1d4ed8;
+}
+
+.create-notebook-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.import-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: dialog-fade-in 0.2s ease-out;
+}
+
+@keyframes dialog-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.import-dialog {
+  width: 400px;
+  max-width: 90vw;
+  background-color: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: dialog-scale-in 0.25s ease-out;
+}
+
+@keyframes dialog-scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.import-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+}
+
+.import-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.import-dialog-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.import-dialog-close:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.import-dialog-content {
+  padding: 0 20px 16px;
+}
+
+.upload-area {
+  border: 2px dashed var(--border-color);
+  border-radius: 10px;
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: #f0fdf4;
+}
+
+.upload-area:hover {
+  border-color: var(--color-primary, #4a9eff);
+  background-color: #dcfce7;
+}
+
+.upload-area.drag-over {
+  border-color: var(--color-primary, #4a9eff);
+  background-color: #bbf7d0;
+}
+
+.file-icon {
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.upload-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 </style>
