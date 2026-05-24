@@ -60,6 +60,21 @@ export const useNoteStore = defineStore('note', {
       return note
     },
 
+    async importNote(knowledgeBaseId, notebookId, title, content, contentText) {
+      const note = await electronService.invoke('import_note', {
+        knowledgeBaseId: knowledgeBaseId ?? null,
+        notebookId: notebookId ?? null,
+        title: title ?? null,
+        content: content ?? '',
+        contentText: contentText ?? ''
+      })
+      if (!note) {
+        return null
+      }
+      this.notes.unshift(note)
+      return note
+    },
+
     async deleteNote(noteId) {
       await electronService.invoke('delete_note', { noteId })
       this.notes = this.notes.filter(n => n.id !== noteId)

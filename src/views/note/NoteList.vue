@@ -20,7 +20,7 @@
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button>
               <Teleport to="body">
-                <div v-if="newNoteMenuVisible" class="new-note-dropdown-menu" :style="newNoteMenuStyle">
+                <div v-if="newNoteMenuVisible" class="new-note-dropdown-menu" :style="newNoteMenuStyle" @click.stop>
                   <div class="dropdown-item" @click="createNewNote">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                     新建笔记
@@ -59,7 +59,7 @@
         </div>
 
         <Teleport to="body">
-          <div v-if="folderMenuVisible" class="folder-dropdown" :style="folderMenuStyle">
+          <div v-if="folderMenuVisible" class="folder-dropdown" :style="folderMenuStyle" @click.stop>
             <div
               v-for="folder in folders"
               :key="folder.id"
@@ -86,6 +86,7 @@
               v-if="folderItemMenuVisible"
               class="folder-item-menu"
               :style="folderItemMenuStyle"
+              @click.stop
             >
               <div class="folder-item-menu-option" @click="handleRenameNotebook">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -112,7 +113,10 @@
           <div class="note-title">{{ note.title }}</div>
           <div class="note-meta">
             <span class="note-time">{{ formatTime(note.updatedAt) }}</span>
-            <span class="note-subtitle">{{ getContentPreview(note.contentText) }}</span>
+            <span class="note-subtitle">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              {{ getNotebookName(note.notebookId) }}
+            </span>
             <span v-if="note.knowledgeBaseId" class="note-extra">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
               {{ note.knowledgeBaseId }}
@@ -122,7 +126,7 @@
       </div>
 
       <Teleport to="body">
-        <div v-if="contextMenu.visible" class="context-menu" :style="contextMenu.style">
+        <div v-if="contextMenu.visible" class="context-menu" :style="contextMenu.style" @click.stop>
           <div class="context-item" @click="handleAction('addToKnowledge')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"></path></svg>
             添加到知识库
@@ -370,6 +374,9 @@ import { useNoteStore } from '@/store/modules/note';
 import { useNotebookStore } from '@/store/modules/notebook';
 import { electronService } from '@/services/electron';
 import { extractPlainText } from '@/utils/text';
+import { marked } from 'marked';
+
+marked.setOptions({ breaks: true, gfm: true });
 
 const { t } = useI18n();
 const noteStore = useNoteStore();
@@ -540,6 +547,12 @@ const getContentPreview = (contentText) => {
   return text.length > 30 ? text.slice(0, 30) + '...' : text;
 };
 
+const getNotebookName = (notebookId) => {
+  if (!notebookId) return '未分类';
+  const notebook = notebookStore.notebooks.find(nb => nb.id === notebookId);
+  return notebook ? notebook.name : '未知笔记本';
+};
+
 const selectNote = (id) => {
   noteStore.selectNote(id);
 };
@@ -558,6 +571,7 @@ const toggleNewNoteMenu = async () => {
     newNoteMenuVisible.value = false;
     return;
   }
+  folderMenuVisible.value = false;
   await nextTick();
   if (newNoteBtnRef.value) {
     const rect = newNoteBtnRef.value.getBoundingClientRect();
@@ -598,8 +612,89 @@ const handleDrop = (event) => {
   }
 };
 
-const processFiles = (files) => {
-  console.log('Processing files:', files);
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_COUNT = 100;
+
+const parseMarkdownTitle = (content) => {
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const headingMatch = trimmed.match(/^#{1,6}\s+(.+)$/);
+    if (headingMatch) {
+      return headingMatch[1].trim();
+    }
+    return trimmed.length > 50 ? trimmed.substring(0, 50) : trimmed;
+  }
+  return '新建笔记';
+};
+
+const readFileAsText = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+};
+
+const processFiles = async (files) => {
+  const fileArray = Array.from(files);
+
+  if (fileArray.length > MAX_FILE_COUNT) {
+    console.warn(`导入文件数量超过限制（最多${MAX_FILE_COUNT}个），仅导入前${MAX_FILE_COUNT}个`);
+    fileArray.splice(MAX_FILE_COUNT);
+  }
+
+  const validFiles = fileArray.filter(file => {
+    if (file.size > MAX_FILE_SIZE) {
+      console.warn(`文件 "${file.name}" 超过10MB限制，已跳过`);
+      return false;
+    }
+    const ext = file.name.toLowerCase();
+    if (!ext.endsWith('.md') && !ext.endsWith('.markdown') && !ext.endsWith('.txt')) {
+      console.warn(`文件 "${file.name}" 不是支持的格式，已跳过`);
+      return false;
+    }
+    return true;
+  });
+
+  if (validFiles.length === 0) {
+    closeImportDialog();
+    return;
+  }
+
+  const notebookId = currentFolder.value !== 'all' ? currentFolder.value : null;
+  let importedCount = 0;
+
+  for (const file of validFiles) {
+    try {
+      const markdownContent = await readFileAsText(file);
+      const title = parseMarkdownTitle(markdownContent);
+      const htmlContent = marked.parse(markdownContent);
+      const contentText = extractPlainText(htmlContent).replace(/\s+/g, ' ').trim();
+
+      const note = await noteStore.importNote(null, notebookId, title, htmlContent, contentText);
+      if (note) {
+        importedCount++;
+      }
+    } catch (err) {
+      console.error(`导入文件 "${file.name}" 失败:`, err);
+    }
+  }
+
+  if (importedCount > 0) {
+    await noteStore.fetchNotes(null, notebookId);
+    if (noteStore.notes.length > 0) {
+      noteStore.selectNote(noteStore.notes[0].id);
+    }
+  }
+
+  closeImportDialog();
+
+  if (fileInputRef.value) {
+    fileInputRef.value.value = '';
+  }
 };
 
 const toggleImportOtherMenu = () => {
@@ -625,6 +720,7 @@ const toggleFolderMenu = async () => {
     folderMenuVisible.value = false;
     return;
   }
+  newNoteMenuVisible.value = false;
   await nextTick();
   if (folderTriggerRef.value) {
     const rect = folderTriggerRef.value.getBoundingClientRect();

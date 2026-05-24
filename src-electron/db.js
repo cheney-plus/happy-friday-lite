@@ -306,6 +306,27 @@ export function createNote(knowledgeBaseId, notebookId, title) {
   }
 }
 
+export function importNote(knowledgeBaseId, notebookId, title, content, contentText) {
+  const now = nowISO()
+  const id = generateId()
+  db.run(
+    'INSERT INTO notes (id, knowledgeBaseId, notebookId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)',
+    [id, knowledgeBaseId || null, notebookId || null, title || '新建笔记', content || '', contentText || '', now, now]
+  )
+  saveDb()
+  return {
+    id,
+    knowledgeBaseId: knowledgeBaseId || null,
+    notebookId: notebookId || null,
+    title: title || '新建笔记',
+    content: content || '',
+    contentText: contentText || '',
+    isDeleted: false,
+    createdAt: now,
+    updatedAt: now
+  }
+}
+
 export function getNotes(knowledgeBaseId, notebookId) {
   if (knowledgeBaseId && notebookId) {
     return queryAll(

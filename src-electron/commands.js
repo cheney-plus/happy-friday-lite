@@ -234,6 +234,10 @@ export function registerCommands(mainWindow) {
     return db.createNote(args?.knowledgeBaseId, args?.notebookId, args?.title)
   })
 
+  ipcMain.handle('import_note', (_event, args) => {
+    return db.importNote(args?.knowledgeBaseId, args?.notebookId, args?.title, args?.content, args?.contentText)
+  })
+
   ipcMain.handle('update_note', (_event, args) => {
     return db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId)
   })

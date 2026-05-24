@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'get_notes',
       'get_note',
       'create_note',
+      'import_note',
       'update_note',
       'delete_note',
       'search_notes',
