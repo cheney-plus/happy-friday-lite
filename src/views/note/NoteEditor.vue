@@ -1594,7 +1594,7 @@ const fixEmptyTableCells = (html) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0 48px;
+  padding: 0 20px;
   position: relative;
 }
 

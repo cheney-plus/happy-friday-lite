@@ -63,6 +63,7 @@
   "build": {
     "appId": "com.happyfriday.lite",
     "productName": "Happy Friday Lite",
+    "icon": "build/icons/icon.png",
     "directories": {
       "output": "release"
     },
@@ -78,6 +79,7 @@
       "node_modules/sql.js/**/*"
     ],
     "mac": {
+      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "dmg",
@@ -89,6 +91,7 @@
       "identity": null
     },
     "win": {
+      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "nsis",
@@ -103,6 +106,7 @@
       "artifactName": "${productName}-${version}-win-${arch}-setup.${ext}"
     },
     "linux": {
+      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "AppImage",
