@@ -146,8 +146,15 @@ function stripMarkdown(text) {
 
 async function handleCopy() {
   try {
-    const textToCopy = stripMarkdown(props.content);
-    await navigator.clipboard.writeText(textToCopy);
+    const htmlContent = renderedContent.value;
+    const textContent = stripMarkdown(props.content);
+    
+    const clipboardItem = new ClipboardItem({
+      'text/html': new Blob([htmlContent], { type: 'text/html' }),
+      'text/plain': new Blob([textContent], { type: 'text/plain' })
+    });
+    
+    await navigator.clipboard.write([clipboardItem]);
     copied.value = true;
     setTimeout(() => {
       copied.value = false;

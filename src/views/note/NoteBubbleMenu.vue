@@ -717,12 +717,14 @@ const removeAIMark = (from, to, markType) => {
 const handleInsert = () => {
   if (!aiOutputContent.value || isStreaming.value) return;
   const content = aiOutputContent.value;
+  const actionType = currentAction.value;
   closeAIOutput();
 
   const insertPos = savedSelectionTo;
   const docSizeBefore = props.editor.state.doc.content.size;
 
-  props.editor.chain().focus().insertContentAt(insertPos, content).run();
+  const processedContent = prepareAIContentForInsertion(content, actionType);
+  props.editor.chain().focus().insertContentAt(insertPos, processedContent).run();
 
   const docSizeAfter = props.editor.state.doc.content.size;
   const insertedLength = docSizeAfter - docSizeBefore;
@@ -760,6 +762,7 @@ const handleDiscard = () => {
 const handleReplace = () => {
   if (!aiOutputContent.value || isStreaming.value) return;
   const content = aiOutputContent.value;
+  const actionType = currentAction.value;
   closeAIOutput();
 
   const strikeFrom = savedSelectionFrom;
@@ -767,7 +770,8 @@ const handleReplace = () => {
   const insertPos = savedSelectionTo;
 
   const docSizeBefore = props.editor.state.doc.content.size;
-  props.editor.chain().focus().insertContentAt(insertPos, content).run();
+  const processedContent = prepareAIContentForInsertion(content, actionType);
+  props.editor.chain().focus().insertContentAt(insertPos, processedContent).run();
   const docSizeAfter = props.editor.state.doc.content.size;
   const insertedLength = docSizeAfter - docSizeBefore;
 
@@ -825,10 +829,86 @@ const handleClickOutside = (event) => {
   if (isJustOpened.value) return;
   
   const target = event.target;
-  if (showCommandMenu.value && !target.closest('.command-dropdown')) {
+  if (showCommandMenu && !target.closest('.command-dropdown')) {
     showCommandMenu.value = false;
   }
 };
+
+const isCursorInTable = () => {
+  if (!props.editor) return false;
+  
+  const { state } = props.editor;
+  const { from, to } = state.selection;
+  
+  if (from === to) {
+    const $pos = state.doc.resolve(from);
+    for (let depth = $pos.depth; depth >= 0; depth--) {
+      const node = $pos.node(depth);
+      if (node.type.name === 'table' || node.type.name === 'tableRow') {
+        return true;
+      }
+    }
+  } else {
+    const $from = state.doc.resolve(from);
+    const $to = state.doc.resolve(to);
+    
+    for (let depth = $from.depth; depth >= 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === 'table' || node.type.name === 'tableRow') {
+        return true;
+      }
+    }
+    
+    for (let depth = $to.depth; depth >= 0; depth--) {
+      const node = $to.node(depth);
+      if (node.type.name === 'table' || node.type.name === 'tableRow') {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+};
+
+const parseMarkdownForTable = (markdownText) => {
+  if (!markdownText) return '';
+  
+  let html = marked.parse(markdownText);
+  
+  html = html
+    .replace(/<td\s*([^>]*)>\s*<\/td>/gi, '<td $1>&nbsp;</td>')
+    .replace(/<th\s*([^>]*)>\s*<\/th>/gi, '<th $1>&nbsp;</th>')
+    .replace(/<td><\/td>/gi, '<td>&nbsp;</td>')
+    .replace(/<th><\/th>/gi, '<th>&nbsp;</td>');
+  
+  return html;
+};
+
+const prepareAIContentForInsertion = (content, actionType) => {
+  if (!content) return content;
+
+  const htmlRenderActions = ['generate_plan', 'generate_table', 'custom'];
+
+  if (htmlRenderActions.includes(actionType)) {
+    console.log(`🤖 结构化 AI 内容 (${actionType})，将按 Markdown 渲染为 HTML`);
+
+    let html = marked.parse(content);
+
+    html = html
+      .replace(/<td\s*([^>]*)>\s*<\/td>/gi, '<td $1>&nbsp;</td>')
+      .replace(/<th\s*([^>]*)>\s*<\/th>/gi, '<th $1>&nbsp;</th>')
+      .replace(/<td><\/td>/gi, '<td>&nbsp;</td>')
+      .replace(/<th><\/th>/gi, '<th>&nbsp;</th>');
+
+    console.log('✅ Markdown 渲染结果:', html?.substring(0, 200));
+
+    return html;
+  }
+
+  console.log(`📝 文本处理 (${actionType})，保持原文`);
+  return content;
+};
+
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
