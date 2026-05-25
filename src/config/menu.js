@@ -8,9 +8,9 @@ import {
 } from 'lucide-vue-next'
 
 export const sidebarMenuConfig = [
-  { key: 'workspace', path: '/workspace', icon: 'FolderKanban', iconComponent: FolderKanban, i18nKey: 'workspace.title' },
   { key: 'note', path: '/note', icon: 'FileText', iconComponent: FileText, i18nKey: 'note.title' },
-  { key: 'schedule', path: '/schedule', icon: 'CalendarDays', iconComponent: CalendarDays, i18nKey: 'schedule.title' }
+  { key: 'schedule', path: '/schedule', icon: 'CalendarDays', iconComponent: CalendarDays, i18nKey: 'schedule.title' },
+  { key: 'workspace', path: '/workspace', icon: 'FolderKanban', iconComponent: FolderKanban, i18nKey: 'workspace.title' }
 ]
 
 export const sidebarBottomMenuConfig = [
