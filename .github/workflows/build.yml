@@ -18,9 +18,6 @@ jobs:
   build-linux:
     if: ${{ inputs.platform == 'all' || inputs.platform == 'linux' }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,36 +30,31 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libarchive-tools rpm dpkg
+          sudo apt-get install -y libarchive-tools
 
       - name: Install dependencies
-        run: |
-          rm -f package-lock.json
-          npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Build Electron app (Linux ${{ matrix.arch }})
-        run: npx electron-builder --linux --arch=${{ matrix.arch }}
+      - name: Build Electron app (Linux)
+        run: npx electron-builder --linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HappyFriday-Linux-${{ matrix.arch }}
+          name: HappyFriday-Linux
           path: release/*.AppImage
           if-no-files-found: error
 
   build-windows:
     if: ${{ inputs.platform == 'all' || inputs.platform == 'windows' }}
     runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,33 +65,28 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: |
-          Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
-          npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Build Electron app (Windows ${{ matrix.arch }})
-        run: npx electron-builder --win --arch=${{ matrix.arch }}
+      - name: Build Electron app (Windows)
+        run: npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HappyFriday-Windows-${{ matrix.arch }}
+          name: HappyFriday-Windows
           path: release/*.exe
           if-no-files-found: error
 
   build-macos:
     if: ${{ inputs.platform == 'all' || inputs.platform == 'macos' }}
     runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -110,23 +97,21 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: |
-          rm -f package-lock.json
-          npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Build Electron app (macOS ${{ matrix.arch }})
-        run: npx electron-builder --mac --arch=${{ matrix.arch }}
+      - name: Build Electron app (macOS)
+        run: npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HappyFriday-macOS-${{ matrix.arch }}
+          name: HappyFriday-macOS
           path: release/*.dmg
           if-no-files-found: error
