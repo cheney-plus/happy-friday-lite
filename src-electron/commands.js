@@ -102,6 +102,23 @@ export function registerCommands(mainWindow) {
     userMessageId = userMsg.id
     db.updateSessionTimestamp(currentSessionId)
 
+    if (isNewSession) {
+      const modelClone = { ...model }
+      const sessionIdClone = currentSessionId
+      const userMsgClone = message
+      setImmediate(async () => {
+        try {
+          const title = await generateTitle(modelClone, userMsgClone)
+          db.updateSessionTitle(sessionIdClone, title)
+          mainWindow.webContents.send(SESSION_TITLE_UPDATED, {
+            sessionId: sessionIdClone,
+            title
+          })
+        } catch (_e) {
+        }
+      })
+    }
+
     const dbMessages = db.getMessages(currentSessionId)
     const historyMessages = dbMessages.map(m => ({
       role: m.role,
@@ -150,24 +167,6 @@ export function registerCommands(mainWindow) {
       messageId: assistantMsg.id,
       userMessageId
     })
-
-    if (isNewSession) {
-      const modelClone = { ...model }
-      const sessionIdClone = currentSessionId
-      const userMsgClone = message
-      setImmediate(async () => {
-        try {
-          const title = await generateTitle(modelClone, userMsgClone)
-          db.updateSessionTitle(sessionIdClone, title)
-          mainWindow.webContents.send(SESSION_TITLE_UPDATED, {
-            sessionId: sessionIdClone,
-            title
-          })
-        } catch (_e) {
-          // ignore title generation errors
-        }
-      })
-    }
 
     return { sessionId: currentSessionId }
   })

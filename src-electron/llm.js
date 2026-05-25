@@ -282,18 +282,22 @@ export async function generateTitle(model, userMessage) {
     max_tokens: 50
   }
 
-  switch (model.provider) {
-    case 'qwen':
-      body.enable_thinking = false
-      break
-    case 'minimax':
-      break
-    case 'deepseek':
-    case 'zhipu':
-    case 'kimi':
-    case 'doubao':
-      body.thinking = { type: 'disabled' }
-      break
+  const knownProviders = ['qwen', 'minimax', 'deepseek', 'zhipu', 'kimi', 'doubao']
+
+  if (knownProviders.includes(model.provider)) {
+    switch (model.provider) {
+      case 'qwen':
+        body.enable_thinking = false
+        break
+      case 'minimax':
+        break
+      case 'deepseek':
+      case 'zhipu':
+      case 'kimi':
+      case 'doubao':
+        body.thinking = { type: 'disabled' }
+        break
+    }
   }
 
   try {
