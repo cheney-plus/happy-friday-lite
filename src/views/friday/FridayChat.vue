@@ -4,8 +4,7 @@
       <div class="logo-section">
         <div class="logo-badge">定制化个人知识智能服务助手</div>
         <div class="logo-main">
-          <span class="logo-icon">✦</span>
-          <h1 class="logo-text">Friday</h1>
+          <img src="@/assets/images/friday.png" alt="Friday" class="logo-image" />
         </div>
         <p class="logo-subtitle">Hello，我是周五！</p>
       </div>
@@ -449,13 +448,11 @@ const handleFeatureClick = (id) => {
   color: var(--text-primary);
 }
 
-.logo-text {
-  font-size: 56px;
-  font-weight: 700;
-  letter-spacing: -2px;
-  color: var(--text-primary);
+.logo-image {
+  height: 100px;
+  width: auto;
+  object-fit: contain;
   margin: 0;
-  line-height: 1;
 }
 
 .logo-subtitle {
