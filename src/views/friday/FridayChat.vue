@@ -4,7 +4,7 @@
       <div class="logo-section">
         <div class="logo-badge">定制化个人知识智能服务助手</div>
         <div class="logo-main">
-          <img src="@/assets/images/friday.png" alt="Friday" class="logo-image" />
+          <img :src="logoImage" alt="Friday" class="logo-image" />
         </div>
         <p class="logo-subtitle">Hello，我是周五！</p>
       </div>
@@ -172,12 +172,21 @@ import { ref, computed, onMounted, onUnmounted, onDeactivated, onActivated } fro
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { electronService } from '@/services/electron';
+import { useAppStore } from '@/store';
 import ChatHistoryDrawer from '@/components/chat/ChatHistoryDrawer.vue';
 
 const router = useRouter();
 const { t } = useI18n();
+const appStore = useAppStore();
 const inputText = ref('');
 const textareaRef = ref(null);
+
+const isDark = computed(() => appStore.theme === 'dark');
+const logoImage = computed(() => {
+  return isDark.value
+    ? new URL('@/assets/images/friday-b.png', import.meta.url).href
+    : new URL('@/assets/images/friday-w.png', import.meta.url).href;
+});
 
 const showModeDropdown = ref(false);
 const showModelDropdown = ref(false);
