@@ -41,6 +41,7 @@ async function ensureDataDir() {
 }
 
 function createWindow() {
+  const isMac = process.platform === 'darwin'
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -53,7 +54,7 @@ function createWindow() {
       sandbox: false,
       preload: path.join(__dirname, 'preload.cjs')
     },
-    frame: false,
+    ...(isMac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 12, y: 12 } } : { frame: false }),
     show: false
   })
 
