@@ -450,6 +450,12 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3';
 import CodeBlockComponent from './CodeBlockComponent.vue';
 import NoteBubbleMenu from './NoteBubbleMenu.vue';
 import { useAppStore } from '@/store';
+import { marked } from 'marked';
+
+marked.setOptions({
+  gfm: true,
+  breaks: false,
+});
 
 const appStore = useAppStore();
 
@@ -1285,6 +1291,45 @@ const editor = useEditor({
 
       return false;
     },
+    handlePaste: (view, event, _slice) => {
+      const text = event.clipboardData.getData('text/plain');
+      const html = event.clipboardData.getData('text/html');
+      
+      console.log('📋 粘贴事件触发:', { 
+        text: text?.substring(0, 100), 
+        hasHtml: !!html,
+        htmlPreview: html?.substring(0, 200)
+      });
+
+      if (!text) return false;
+
+      if (html && isRichHtml(html)) {
+        console.log('🌐 检测到富文本 HTML，使用默认处理');
+        return false;
+      }
+
+      try {
+        console.log('📝 开始 Markdown 解析...');
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const processedText = preprocessMarkdownTables(text);
+        let parsedHtml = marked.parse(processedText);
+        
+        parsedHtml = fixEmptyTableCells(parsedHtml);
+        console.log('✅ Markdown 解析结果:', parsedHtml?.substring(0, 300));
+        
+        if (editor.value) {
+          editor.value.chain().focus().insertContent(parsedHtml).run();
+          console.log('✅ 内容已插入编辑器');
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('❌ Markdown 解析失败:', error);
+        return false;
+      }
+    },
   },
   onUpdate: ({ editor }) => {
     const html = editor.getHTML();
@@ -1425,6 +1470,80 @@ const handleClickOutside = (event) => {
   if (!target.closest('.dropdown-wrapper')) {
     closeAllMenus();
   }
+};
+
+const isRichHtml = (html) => {
+  if (!html) return false;
+
+  const richHtmlPatterns = [
+    /<strong\b|<b\b|<em\b|<i\b|<u\b|<s\b|<strike\b/i,
+    /<h[1-6]\b[^>]*>/i,
+    /<a\s+href=/i,
+    /<img\s+src=/i,
+    /<table\b/i,
+    /<blockquote\b/i,
+    /<pre\b|<code\b/i,
+    /<ol\b|<ul\b/i,
+    /style\s*=\s*["'][^"']*(?:color|font-weight|font-style|text-decoration|background)/i,
+    /class\s*=\s*["'][^"']*(?:bold|italic|underline|highlight)/i,
+  ];
+
+  const hasRichContent = richHtmlPatterns.some(pattern => pattern.test(html));
+  
+  if (hasRichContent) return true;
+
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  const textContent = tempDiv.textContent || '';
+  
+  return false;
+};
+
+const preprocessMarkdownTables = (text) => {
+  if (!text) return '';
+
+  const lines = text.split('\n');
+  const processedLines = [];
+  let inTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isTableLine = line.trim().startsWith('|');
+
+    if (isTableLine) {
+      if (!inTable && i > 0 && processedLines.length > 0) {
+        const lastLine = processedLines[processedLines.length - 1];
+        if (lastLine.trim() === '') {
+          processedLines.pop();
+        }
+      }
+      inTable = true;
+      processedLines.push(line);
+    } else {
+      if (inTable) {
+        if (line.trim() === '') {
+          inTable = false;
+          processedLines.push('');
+        } else {
+          processedLines.push(line);
+        }
+      } else {
+        processedLines.push(line);
+      }
+    }
+  }
+
+  return processedLines.join('\n');
+};
+
+const fixEmptyTableCells = (html) => {
+  if (!html) return '';
+  
+  return html
+    .replace(/<td\s*([^>]*)>\s*<\/td>/gi, '<td $1>&nbsp;</td>')
+    .replace(/<th\s*([^>]*)>\s*<\/th>/gi, '<th $1>&nbsp;</th>')
+    .replace(/<td><\/td>/gi, '<td>&nbsp;</td>')
+    .replace(/<th><\/th>/gi, '<th>&nbsp;</th>');
 };
 </script>
 
