@@ -414,6 +414,12 @@
           @stop="handleChatStop"
           @remove-reference="removeNoteReference"
         />
+
+        <Transition name="chat-toast-fade">
+          <div v-if="chatSaveToastVisible" class="chat-save-toast">
+            {{ chatSaveToastMessage }}
+          </div>
+        </Transition>
       </div>
     </Transition>
   </div>
@@ -1138,8 +1144,39 @@ async function handleChatStop() {
   }
 }
 
+const chatSaveToastVisible = ref(false);
+const chatSaveToastMessage = ref('');
+
+function showChatSaveToast(message) {
+  chatSaveToastMessage.value = message;
+  chatSaveToastVisible.value = true;
+  setTimeout(() => {
+    chatSaveToastVisible.value = false;
+  }, 2500);
+}
+
 function handleChatAction(type, index) {
   if (type === 'copy') return;
+  if (type === 'add') {
+    const msg = chatMessages.value[index];
+    if (!msg || msg.role !== 'assistant') return;
+
+    const content = msg.content || '';
+    if (!content.trim()) {
+      showChatSaveToast('消息内容为空，无法保存');
+      return;
+    }
+
+    if (editor.value) {
+      const endPos = editor.value.state.doc.content.size;
+      const htmlContent = marked.parse(content);
+      editor.value.chain().focus().insertContentAt(endPos - 1, htmlContent).run();
+      showChatSaveToast('已追加到笔记末尾');
+    } else {
+      showChatSaveToast('保存失败');
+    }
+    return;
+  }
   console.log('Chat action:', type, index);
 }
 
@@ -2730,5 +2767,40 @@ const fixEmptyTableCells = (html) => {
 
 [data-theme='dark'] .sidebar-empty-icon {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.chat-save-toast {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.chat-toast-fade-enter-active {
+  transition: all 0.25s ease-out;
+}
+
+.chat-toast-fade-leave-active {
+  transition: all 0.2s ease-in;
+}
+
+.chat-toast-fade-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}
+
+.chat-toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-4px);
 }
 </style>

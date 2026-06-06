@@ -71,6 +71,12 @@
       @confirm="executeRollback"
       @cancel="rollbackDialogVisible = false"
     />
+
+    <Transition name="toast-fade">
+      <div v-if="saveToastVisible" class="save-toast">
+        {{ saveToastMessage }}
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -78,6 +84,8 @@
 import { ref, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { electronService } from '@/services/electron';
+import { useNoteStore } from '@/store/modules/note';
+import { marked } from 'marked';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
@@ -85,6 +93,7 @@ import RollbackConfirmDialog from '@/components/chat/RollbackConfirmDialog.vue';
 
 const router = useRouter();
 const route = useRoute();
+const noteStore = useNoteStore();
 
 const inputText = ref('');
 const messagesContainer = ref(null);
@@ -135,7 +144,51 @@ function handleAction(action, index) {
   } else if (action === 'share') {
     console.log('Share message feature is not yet implemented');
   } else if (action === 'add') {
-    console.log('Save message to note feature is not yet implemented');
+    saveMessageToNote(index);
+  }
+}
+
+const saveToastVisible = ref(false);
+const saveToastMessage = ref('');
+
+function showSaveToast(message) {
+  saveToastMessage.value = message;
+  saveToastVisible.value = true;
+  setTimeout(() => {
+    saveToastVisible.value = false;
+  }, 2500);
+}
+
+async function saveMessageToNote(index) {
+  const msg = messages.value[index];
+  if (!msg || msg.role !== 'assistant') return;
+
+  const content = msg.content || '';
+  if (!content.trim()) {
+    showSaveToast('消息内容为空，无法保存');
+    return;
+  }
+
+  const dateStr = new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).replace(/\//g, '-');
+
+  const title = `${chatTitle.value} ${dateStr}`;
+
+  try {
+    const htmlContent = marked.parse(content);
+    const plainText = content.replace(/<[^>]*>/g, '').replace(/[#*`>\[\]()!_~|-]/g, '').trim();
+    const note = await noteStore.importNote(null, null, title, htmlContent, plainText);
+    if (note) {
+      showSaveToast('已保存为笔记');
+    } else {
+      showSaveToast('保存失败');
+    }
+  } catch (err) {
+    console.error('Failed to save message to note:', err);
+    showSaveToast('保存失败');
   }
 }
 
@@ -633,5 +686,39 @@ onDeactivated(() => {
 .scroll-btn-leave-to {
   opacity: 0;
   transform: translateY(-4px) scale(0.9);
+}
+
+.save-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast-fade-enter-active {
+  transition: all 0.25s ease-out;
+}
+
+.toast-fade-leave-active {
+  transition: all 0.2s ease-in;
+}
+
+.toast-fade-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}
+
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-4px);
 }
 </style>
