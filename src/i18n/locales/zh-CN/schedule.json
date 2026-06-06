@@ -56,5 +56,14 @@
   "september": "9月",
   "october": "10月",
   "november": "11月",
-  "december": "12月"
+  "december": "12月",
+  "list": "列表",
+  "filterAll": "全部",
+  "filterWeek": "本周",
+  "filterMonth": "本月",
+  "sortByTime": "按时间排序",
+  "sortByStatus": "按状态排序",
+  "totalTasks": "全部任务",
+  "completionRate": "完成率",
+  "noTasks": "暂无任务"
 }

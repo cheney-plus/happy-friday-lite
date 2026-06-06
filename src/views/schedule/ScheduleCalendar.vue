@@ -186,6 +186,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Task List View -->
+      <ScheduleTaskList v-else-if="currentView === 'list'" />
     </div>
 
     <Teleport to="body">
@@ -302,6 +305,7 @@ import { ref, computed, reactive, nextTick, onMounted, onUnmounted, watch, onDea
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useScheduleStore, EVENT_COLORS } from '@/store/modules/schedule';
+import ScheduleTaskList from './ScheduleTaskList.vue';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -512,6 +516,7 @@ const views = computed(() => [
   { key: 'month', label: t('schedule.month') },
   { key: 'week', label: t('schedule.week') },
   { key: 'year', label: t('schedule.year') },
+  { key: 'list', label: t('schedule.list') },
 ]);
 
 const weekDayLabels = computed(() => {
@@ -1219,17 +1224,22 @@ onDeactivated(() => {
   align-items: baseline;
   gap: 4px;
   margin-bottom: 2px;
+  position: relative;
 }
 
 .cell-holiday {
-  font-size: 11px;
+  position: absolute;
+  top: -2px;
+  right: 0;
+  font-size: 10px;
   color: #f59e0b;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 70px;
+  max-width: 60px;
   line-height: 1.2;
+  text-align: right;
 }
 
 .cell-holiday.lunar-holiday {
