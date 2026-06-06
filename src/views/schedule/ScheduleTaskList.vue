@@ -348,6 +348,8 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  max-width: 820px;
+  margin: 0 auto;
 }
 
 /* ========== Filter Bar ========== */
@@ -503,35 +505,41 @@ onUnmounted(() => {
 .task-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 14px;
   flex-shrink: 0;
 }
 
 .stat-card {
-  background: var(--bg-secondary);
-  border-radius: 14px;
-  padding: 16px;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .stat-card:hover {
-  border-color: var(--border-color);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
+  transform: translateY(-1px);
 }
 
 .stat-icon-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.stat-icon-wrap svg {
+  width: 16px;
+  height: 16px;
 }
 
 .stat-icon-wrap.total {
@@ -557,12 +565,12 @@ onUnmounted(() => {
 .stat-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
 .stat-number {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.1;
@@ -582,13 +590,13 @@ onUnmounted(() => {
 }
 
 .stat-percent {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   margin-left: 1px;
 }
 
 .stat-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-tertiary);
   font-weight: 500;
   line-height: 1;
