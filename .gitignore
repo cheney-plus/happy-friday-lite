@@ -5,7 +5,6 @@ node_modules/
 
 # Build output
 dist/
-build/
 out/
 
 # Tauri specific
@@ -20,7 +19,6 @@ src-tauri/Cargo.lock
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 *~
