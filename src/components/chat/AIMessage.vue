@@ -374,13 +374,6 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.04);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-[data-theme='dark'] .markdown-body :deep(.code-block-header) {
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .markdown-body :deep(.code-block-lang) {
@@ -423,6 +416,30 @@ onUnmounted(() => {
   padding: 14px;
   background: transparent;
   border-radius: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+[data-theme='dark'] .markdown-body :deep(.code-block-wrapper pre) {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar) {
+  height: 4px;
+}
+
+.markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+.markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb) {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+[data-theme='dark'] .markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb) {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .markdown-body :deep(pre) {
