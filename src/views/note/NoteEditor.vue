@@ -366,7 +366,7 @@
           </button>
         </div>
 
-        <div class="sidebar-messages" ref="sidebarMessagesRef">
+        <div class="sidebar-messages" ref="sidebarMessagesRef" @scroll="checkSidebarScrollPosition">
           <div class="sidebar-messages-inner">
             <div v-if="chatMessages.length === 0 && !isStreaming" class="sidebar-empty">
               <div class="sidebar-empty-icon">
@@ -1025,6 +1025,7 @@ function cleanupFim() {
 const sidebarWidth = ref(380);
 const isResizing = ref(false);
 const sidebarMessagesRef = ref(null);
+const isSidebarAtBottom = ref(true);
 
 const chatInputText = ref('');
 const noteReferences = ref([]);
@@ -1098,6 +1099,7 @@ async function sendChatMessage(text) {
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
+  isSidebarAtBottom.value = true;
   scrollSidebarToBottom();
 
   activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1181,8 +1183,17 @@ function handleChatAction(type, index) {
   console.log('Chat action:', type, index);
 }
 
+function checkSidebarScrollPosition() {
+  const container = sidebarMessagesRef.value;
+  if (!container) return;
+  const threshold = 80;
+  const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+  isSidebarAtBottom.value = distanceFromBottom < threshold;
+}
+
 function scrollSidebarToBottom() {
   nextTick(() => {
+    if (!isSidebarAtBottom.value) return;
     const container = sidebarMessagesRef.value;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
@@ -2681,6 +2692,7 @@ const fixEmptyTableCells = (html) => {
 
 .sidebar-messages::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 
 .sidebar-messages::-webkit-scrollbar-track {
