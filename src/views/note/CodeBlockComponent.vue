@@ -140,7 +140,7 @@ const handleDelete = () => {
 }
 
 .language-select {
-  background-color: #e0e0e0;
+  background-color: #f0f0f0;
   color: #555;
   border: none;
   border-radius: 4px;
