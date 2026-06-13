@@ -1643,7 +1643,7 @@ const fixEmptyTableCells = (html) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0 40px;
+  padding-left: 40px;
   position: relative;
 }
 
@@ -1698,7 +1698,7 @@ const fixEmptyTableCells = (html) => {
   display: flex;
   align-items: flex-start;
   gap: 2px;
-  padding: 6px 0;
+  padding: 6px 40px 6px 0;
   max-width: 9000px;
   margin: 0 auto;
   width: 100%;
@@ -2065,6 +2065,7 @@ const fixEmptyTableCells = (html) => {
   overflow-y: auto;
   margin-top: 4px;
   padding-bottom: 40px;
+  padding-right: 40px;
 }
 
 .editor-content::-webkit-scrollbar {
