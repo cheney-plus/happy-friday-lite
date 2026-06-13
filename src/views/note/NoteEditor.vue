@@ -1364,7 +1364,7 @@ const editor = useEditor({
     attributes: {
       class: 'prose-editor',
     },
-    handleKeyDown: (_view, event) => {
+    handleKeyDown: (view, event) => {
       if (event.key === 'Tab' && fimCompletionVisible.value && fimCompletionText.value) {
         event.preventDefault();
         acceptFimCompletion();
@@ -1373,6 +1373,26 @@ const editor = useEditor({
 
       if (fimCompletionVisible.value && event.key !== 'Tab') {
         dismissFimCompletion();
+      }
+
+      // Ctrl+A / Cmd+A in code block: select only code block content
+      if (event.key === 'a' && (event.ctrlKey || event.metaKey)) {
+        const { state } = view;
+        const { selection } = state;
+        const $head = selection.$head;
+        for (let d = $head.depth; d > 0; d--) {
+          if ($head.node(d).type.name === 'codeBlock') {
+            const pos = $head.before(d) + 1;
+            const end = $head.after(d) - 1;
+            if (pos < end) {
+              event.preventDefault();
+              view.dispatch(state.tr.setSelection(
+                state.selection.constructor.create(state.doc, pos, end)
+              ));
+              return true;
+            }
+          }
+        }
       }
 
       return false;
@@ -2163,6 +2183,32 @@ const fixEmptyTableCells = (html) => {
   border-radius: 3px;
   font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
   font-size: 0.9em;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+:deep(.prose-editor pre code) {
+  background: none;
+  padding: 0;
+  text-shadow: none;
+  box-shadow: none;
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+}
+
+:deep(.prose-editor pre) {
+  overflow-x: auto !important;
+  white-space: pre !important;
+  word-wrap: normal !important;
+}
+
+:deep(.prose-editor pre p) {
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+  margin: 0;
+  padding: 0;
 }
 
 :deep(.pre-editor pre) {
