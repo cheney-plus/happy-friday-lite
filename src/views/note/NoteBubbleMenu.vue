@@ -22,14 +22,7 @@
         <div class="markdown-body" v-html="renderedOutput"></div>
         <span v-if="isStreaming" class="streaming-cursor"></span>
 
-        <div v-if="!isStreaming && aiOutputContent" class="thinking-hint">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-          </svg>
-          <span>{{ getActionHint() }}</span>
-        </div>
+
       </div>
 
       <div class="ai-output-footer">
@@ -45,21 +38,20 @@
         </div>
 
         <div class="footer-right">
-          <button class="footer-action-btn" @click="handleLike" title="点赞">
+          <button class="footer-action-btn" :class="{ liked: isLiked }" @click="handleLike" title="点赞">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
             </svg>
           </button>
-          <button class="footer-action-btn" @click="handleDislike" title="点踩">
+          <button class="footer-action-btn" :class="{ disliked: isDisliked }" @click="handleDislike" title="点踩">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
             </svg>
           </button>
-          <button class="footer-action-btn more-btn" title="更多">
+          <button class="footer-action-btn" :class="{ copied: isCopied }" @click="handleCopyOutput" title="复制">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="1"></circle>
-              <circle cx="19" cy="12" r="1"></circle>
-              <circle cx="5" cy="12" r="1"></circle>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
         </div>
@@ -515,6 +507,9 @@ const closeAIOutput = async () => {
   aiOutputContent.value = '';
   currentAction.value = '';
   isStreaming.value = false;
+  isLiked.value = false;
+  isDisliked.value = false;
+  isCopied.value = false;
 };
 
 const resetAIPanel = async () => {
@@ -678,12 +673,34 @@ const handleExpand = () => {
   startStreaming('expand');
 };
 
+const isLiked = ref(false);
+const isDisliked = ref(false);
+const isCopied = ref(false);
+
 const handleLike = () => {
-  console.log('点赞');
+  isLiked.value = !isLiked.value;
+  if (isLiked.value) isDisliked.value = false;
 };
 
 const handleDislike = () => {
-  console.log('点踩');
+  isDisliked.value = !isDisliked.value;
+  if (isDisliked.value) isLiked.value = false;
+};
+
+const handleCopyOutput = async () => {
+  if (!aiOutputContent.value) return;
+  try {
+    await navigator.clipboard.writeText(aiOutputContent.value);
+  } catch (_e) {
+    const textarea = document.createElement('textarea');
+    textarea.value = aiOutputContent.value;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
+  isCopied.value = true;
+  setTimeout(() => { isCopied.value = false; }, 1000);
 };
 
 const handleReInterpret = async () => {
@@ -1581,6 +1598,21 @@ onBeforeUnmount(() => {
 
 .more-btn {
   margin-left: 4px;
+}
+
+.footer-action-btn.liked {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.footer-action-btn.disliked {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.footer-action-btn.copied {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
 }
 
 .ai-output-actions {
