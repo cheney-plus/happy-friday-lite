@@ -349,6 +349,10 @@ onDeactivated(() => {
 });
 
 onActivated(() => {
+  inputText.value = '';
+  if (textareaRef.value) {
+    textareaRef.value.style.height = 'auto';
+  }
   loadCustomModels();
 });
 

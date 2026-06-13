@@ -566,7 +566,8 @@ const selectNote = (id) => {
 
 const createNewNote = async () => {
   newNoteMenuVisible.value = false;
-  const note = await noteStore.createNote();
+  const notebookId = currentFolder.value !== 'all' ? currentFolder.value : null;
+  const note = await noteStore.createNote(null, null, notebookId);
   if (!note) {
     console.error('Failed to create note: Electron API not available or create_note returned null');
     return;
