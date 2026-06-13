@@ -30,6 +30,15 @@
         <option value="shell">Shell</option>
         <option value="plaintext">Plain Text</option>
       </select>
+      <div class="header-actions">
+        <button class="action-btn" :title="copied ? '已复制' : '复制代码'" @click="handleCopy">
+          <svg v-if="!copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </button>
+        <button class="action-btn danger" title="删除代码块" @click="handleDelete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>
     </div>
     <div class="code-block-content">
       <div class="line-numbers" contenteditable="false" aria-hidden="true">
@@ -46,10 +55,12 @@ import { NodeViewWrapper, NodeViewContent } from '@tiptap/vue-3';
 
 const props = defineProps({
   node: Object,
-  updateAttributes: Function
+  updateAttributes: Function,
+  deleteNode: Function
 });
 
 const selectedLanguage = ref('');
+const copied = ref(false);
 
 const lineCount = computed(() => {
   const text = props.node.textContent || '';
@@ -67,6 +78,17 @@ const updateLanguage = (event) => {
   const language = target.value;
   props.updateAttributes({ language: language || null });
 };
+
+const handleCopy = () => {
+  const text = props.node.textContent || '';
+  navigator.clipboard.writeText(text);
+  copied.value = true;
+  setTimeout(() => { copied.value = false; }, 2000);
+};
+
+const handleDelete = () => {
+  props.deleteNode();
+};
 </script>
 
 <style scoped>
@@ -82,9 +104,39 @@ const updateLanguage = (event) => {
 .code-block-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   padding: 6px 12px;
   background-color: transparent;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background-color: transparent;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.action-btn.danger:hover {
+  background-color: #fee2e2;
+  color: #ef4444;
 }
 
 .language-select {

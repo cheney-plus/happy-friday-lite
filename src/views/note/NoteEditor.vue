@@ -1398,6 +1398,16 @@ const editor = useEditor({
       return false;
     },
     handlePaste: (view, event, _slice) => {
+      // 在代码块内粘贴时，使用默认纯文本粘贴
+      const { state } = view;
+      const { selection } = state;
+      const $head = selection.$head;
+      for (let d = $head.depth; d > 0; d--) {
+        if ($head.node(d).type.name === 'codeBlock') {
+          return false;
+        }
+      }
+
       const text = event.clipboardData.getData('text/plain');
       const html = event.clipboardData.getData('text/html');
       

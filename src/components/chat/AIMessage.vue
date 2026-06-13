@@ -85,10 +85,20 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { marked } from 'marked';
 
-marked.setOptions({ breaks: true, gfm: true });
+const renderer = new marked.Renderer();
+renderer.code = function ({ text, lang }) {
+  const language = lang || '';
+  const escapedText = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-block-lang">${language}</span><button class="code-copy-btn" data-code="${encodeURIComponent(text)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div><pre><code class="language-${language}">${escapedText}</code></pre></div>`;
+};
+
+marked.setOptions({ breaks: true, gfm: true, renderer });
 
 const props = defineProps({
   content: { type: String, default: '' },
@@ -148,12 +158,12 @@ async function handleCopy() {
   try {
     const htmlContent = renderedContent.value;
     const textContent = stripMarkdown(props.content);
-    
+
     const clipboardItem = new ClipboardItem({
       'text/html': new Blob([htmlContent], { type: 'text/html' }),
       'text/plain': new Blob([textContent], { type: 'text/plain' })
     });
-    
+
     await navigator.clipboard.write([clipboardItem]);
     copied.value = true;
     setTimeout(() => {
@@ -163,6 +173,33 @@ async function handleCopy() {
     console.error('Failed to copy:', err);
   }
 }
+
+async function handleCodeBlockCopy(event) {
+  const btn = event.target.closest('.code-copy-btn');
+  if (!btn) return;
+
+  const code = decodeURIComponent(btn.dataset.code);
+  try {
+    await navigator.clipboard.writeText(code);
+    btn.classList.add('copied');
+    const svg = btn.innerHTML;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = svg;
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy code:', err);
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleCodeBlockCopy);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleCodeBlockCopy);
+});
 </script>
 
 <style scoped>
@@ -319,6 +356,73 @@ async function handleCopy() {
 
 [data-theme='dark'] .markdown-body :deep(code) {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.markdown-body :deep(.code-block-wrapper) {
+  margin: 10px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='dark'] .markdown-body :deep(.code-block-wrapper) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-body :deep(.code-block-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='dark'] .markdown-body :deep(.code-block-header) {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-body :deep(.code-block-lang) {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  text-transform: lowercase;
+}
+
+.markdown-body :deep(.code-copy-btn) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.markdown-body :deep(.code-copy-btn:hover) {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .markdown-body :deep(.code-copy-btn:hover) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.markdown-body :deep(.code-copy-btn.copied) {
+  color: #10b981;
+}
+
+.markdown-body :deep(.code-block-wrapper pre) {
+  margin: 0;
+  padding: 14px;
+  background: transparent;
+  border-radius: 0;
 }
 
 .markdown-body :deep(pre) {
