@@ -232,6 +232,7 @@
           v-model="selectedNote.content"
           :placeholder="t('note.editorPlaceholder')"
           :toc-visible="tocVisible"
+          :sidebar-collapsed="sidebarCollapsed"
           @change="onEditorChange"
           @toggle-toc="handleToggleToc"
         />
@@ -1060,6 +1061,7 @@ onDeactivated(() => {
   display: flex;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 .note-sidebar {
@@ -1109,8 +1111,10 @@ onDeactivated(() => {
   color: var(--text-primary);
   cursor: pointer;
   transition: background-color 0.12s;
-  flex-shrink: 0;
-  margin: 12px 0 0 12px;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 30;
 }
 
 .sidebar-expand-btn:hover {

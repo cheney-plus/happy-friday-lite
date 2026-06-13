@@ -1,6 +1,6 @@
 <template>
   <div class="editor-page">
-    <div class="editor-wrapper" :style="{ flex: '1 1 auto', minWidth: 0 }">
+    <div class="editor-wrapper" :class="{ 'sidebar-collapsed': sidebarCollapsed }" :style="{ flex: '1 1 auto', minWidth: 0 }">
       <div class="editor-toolbar" v-if="editor">
       <div class="toolbar-left-group">
       <!-- 第一组：撤销/重做、清除格式 -->
@@ -266,7 +266,7 @@
 
     <NoteBubbleMenu v-if="editor" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @interpret="handleBubbleInterpret" @refine="handleBubbleRefine" @polish="handleBubblePolish" @expand="handleBubbleExpand" @openInChat="handleOpenInChat" />
 
-    <div class="toc-btn" :class="{ active: tocVisible }" @click="emit('toggle-toc')">
+    <div v-if="!tocVisible" class="toc-btn" @click="emit('toggle-toc')">
       <span class="toc-char">目</span>
       <span class="toc-char">录</span>
     </div>
@@ -507,7 +507,8 @@ lowlight.register('diff', diff);
 const props = defineProps({
   placeholder: { type: String, default: '开始写作...' },
   modelValue: { type: String, default: '' },
-  tocVisible: { type: Boolean, default: false }
+  tocVisible: { type: Boolean, default: false },
+  sidebarCollapsed: { type: Boolean, default: false }
 });
 
 const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc']);
@@ -1631,8 +1632,12 @@ const fixEmptyTableCells = (html) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0 20px;
+  padding: 0 40px;
   position: relative;
+}
+
+.editor-wrapper.sidebar-collapsed {
+  padding-left: 60px;
 }
 
 .fim-completion-bubble {
@@ -1691,7 +1696,7 @@ const fixEmptyTableCells = (html) => {
 .toc-btn {
   position: absolute;
   left: 0;
-  top: 40px;
+  top: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
