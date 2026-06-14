@@ -228,8 +228,10 @@
     <div class="note-editor-area">
       <div v-if="selectedNote" class="editor-container">
         <NoteEditor
+          ref="noteEditorRef"
           :key="selectedNoteId"
           v-model="selectedNote.content"
+          :note-id="selectedNoteId"
           :placeholder="t('note.editorPlaceholder')"
           :toc-visible="tocVisible"
           :sidebar-collapsed="sidebarCollapsed"
@@ -373,6 +375,8 @@ import { useNoteStore } from '@/store/modules/note';
 import { useNotebookStore } from '@/store/modules/notebook';
 import { electronService } from '@/services/electron';
 import { extractPlainText } from '@/utils/text';
+import { clearAllChatSessions } from '@/utils/chatSessionCache';
+import { useTabStore } from '@/store/modules/tabs';
 import { marked } from 'marked';
 
 marked.setOptions({ breaks: true, gfm: true });
@@ -380,7 +384,9 @@ marked.setOptions({ breaks: true, gfm: true });
 const { t } = useI18n();
 const noteStore = useNoteStore();
 const notebookStore = useNotebookStore();
+const tabStore = useTabStore();
 
+const noteEditorRef = ref(null);
 const currentFolder = ref('all');
 const folderMenuVisible = ref(false);
 const folderTriggerRef = ref(null);
@@ -1046,6 +1052,16 @@ onMounted(async () => {
 onBeforeUnmount(async () => {
   document.removeEventListener('click', handleClickOutside);
   await noteStore.flushPendingSave();
+  clearAllChatSessions();
+});
+
+const hasNoteTab = computed(() => tabStore.openedTabs.some(tab => tab.path === '/note' || tab.path.startsWith('/note')));
+
+watch(hasNoteTab, (newVal, oldVal) => {
+  if (oldVal && !newVal) {
+    clearAllChatSessions();
+    noteEditorRef.value?.resetChatSession();
+  }
 });
 
 onDeactivated(() => {

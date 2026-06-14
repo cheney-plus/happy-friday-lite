@@ -1,7 +1,7 @@
 <template>
-  <div class="note-reference-tag" @mouseenter="showClose = true" @mouseleave="showClose = false">
+  <div class="note-reference-tag" :class="{ readonly }" @mouseenter="!readonly && (showClose = true)" @mouseleave="showClose = false">
     <div class="icon-wrapper">
-      <svg v-if="!showClose" class="note-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg v-if="!showClose || readonly" class="note-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
         <polyline points="14 2 14 8 20 8"></polyline>
         <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -10,7 +10,7 @@
       </svg>
       
       <Transition name="fade">
-        <button v-if="showClose" class="close-btn" @click.stop="$emit('remove')" title="移除引用">
+        <button v-if="showClose && !readonly" class="close-btn" @click.stop="$emit('remove')" title="移除引用">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -29,7 +29,8 @@ import { ref, computed } from 'vue';
 const props = defineProps({
   from: Number,
   to: Number,
-  text: { type: String, default: '' }
+  text: { type: String, default: '' },
+  readonly: { type: Boolean, default: false }
 });
 
 defineEmits(['remove']);
@@ -38,7 +39,7 @@ const showClose = ref(false);
 
 const displayText = computed(() => {
   if (props.text) {
-    return props.text.length > 20 ? props.text.slice(0, 20) + '...' : props.text;
+    return props.text;
   }
   return `引用 ${props.from}-${props.to}`;
 });
@@ -126,6 +127,9 @@ const displayText = computed(() => {
 .tag-text {
   font-weight: 500;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
 }
 
 .fade-enter-active,

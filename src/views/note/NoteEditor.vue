@@ -381,7 +381,7 @@
             </div>
 
             <template v-for="(msg, index) in chatMessages" :key="index">
-              <UserMessage v-if="msg.role === 'user'" :content="msg.content" />
+              <UserMessage v-if="msg.role === 'user'" :content="msg.content" :references="msg.references" />
               <AIMessage
                 v-else
                 :content="msg.content"
@@ -432,6 +432,7 @@ import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import { electronService } from '@/services/electron';
+import { getChatSession, setChatSession } from '@/utils/chatSessionCache';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
@@ -507,6 +508,7 @@ lowlight.register('diff', diff);
 const props = defineProps({
   placeholder: { type: String, default: '开始写作...' },
   modelValue: { type: String, default: '' },
+  noteId: { type: String, default: '' },
   tocVisible: { type: Boolean, default: false },
   sidebarCollapsed: { type: Boolean, default: false }
 });
@@ -1037,6 +1039,44 @@ const chatMessages = ref([]);
 const currentSessionId = ref('');
 const chatInputBoxRef = ref(null);
 
+function saveChatSession() {
+  const id = props.noteId;
+  if (!id) return;
+  setChatSession(id, {
+    chatMessages: chatMessages.value,
+    currentSessionId: currentSessionId.value,
+    showAISidebar: showAISidebar.value
+  });
+}
+
+function restoreChatSession() {
+  const id = props.noteId;
+  if (!id) return;
+  const cached = getChatSession(id);
+  if (cached) {
+    chatMessages.value = cached.chatMessages;
+    currentSessionId.value = cached.currentSessionId;
+    showAISidebar.value = cached.showAISidebar;
+  } else {
+    chatMessages.value = [];
+    currentSessionId.value = '';
+    showAISidebar.value = false;
+  }
+}
+
+function resetChatSession() {
+  chatMessages.value = [];
+  currentSessionId.value = '';
+  noteReferences.value = [];
+  chatInputText.value = '';
+  isStreaming.value = false;
+  streamingContent.value = '';
+  streamingReasoning.value = '';
+  closeAISidebar();
+}
+
+defineExpose({ resetChatSession });
+
 let activeRequestId = '';
 let isDoneReceived = false;
 let unlistenChunk = null;
@@ -1091,7 +1131,8 @@ async function sendChatMessage(text) {
 
   chatMessages.value.push({
     role: 'user',
-    content: text
+    content: text,
+    references: noteReferences.value.map(ref => ({ ...ref }))
   });
 
   chatInputText.value = '';
@@ -1567,18 +1608,17 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   setupChatListeners();
   setupFimListener();
+  restoreChatSession();
 });
 
 onBeforeUnmount(() => {
+  saveChatSession();
   document.removeEventListener('click', handleClickOutside);
   cleanupChatListeners();
   cleanupFim();
   if (editor.value) {
     editor.value.destroy();
   }
-  chatMessages.value = [];
-  currentSessionId.value = '';
-  noteReferences.value = [];
 });
 
 const handleClickOutside = (event) => {
