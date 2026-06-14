@@ -389,6 +389,8 @@ const handleClose = () => {
   flex: 1;
   min-width: 0;
   height: 100%;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .tab-bar-right-spacer {
