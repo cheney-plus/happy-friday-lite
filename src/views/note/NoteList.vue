@@ -237,6 +237,8 @@
           :sidebar-collapsed="sidebarCollapsed"
           @change="onEditorChange"
           @toggle-toc="handleToggleToc"
+          @close-sidebar="handleCloseSidebar"
+          @close-toc="handleCloseToc"
         />
       </div>
       <div v-else class="editor-empty">
@@ -523,6 +525,14 @@ const handleToggleToc = () => {
   } else {
     tocVisible.value = !tocVisible.value;
   }
+};
+
+const handleCloseSidebar = () => {
+  sidebarCollapsed.value = true;
+};
+
+const handleCloseToc = () => {
+  tocVisible.value = false;
 };
 
 const scrollToHeading = (index) => {

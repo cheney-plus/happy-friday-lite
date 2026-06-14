@@ -513,7 +513,7 @@ const props = defineProps({
   sidebarCollapsed: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc']);
+const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc', 'close-sidebar', 'close-toc']);
 
 const showInsertMenu = ref(false);
 const showHighlightMenu = ref(false);
@@ -1024,7 +1024,7 @@ function cleanupFim() {
     }
   } catch (_e) {}
 }
-const sidebarWidth = ref(380);
+const sidebarWidth = ref(440);
 const isResizing = ref(false);
 const sidebarMessagesRef = ref(null);
 const isSidebarAtBottom = ref(true);
@@ -1249,8 +1249,12 @@ function startResize(e) {
 
   function onMouseMove(ev) {
     const delta = startX - ev.clientX;
-    const newWidth = Math.min(Math.max(startWidth + delta, 300), 600);
+    const newWidth = Math.min(Math.max(startWidth + delta, 360), 800);
     sidebarWidth.value = newWidth;
+    if (newWidth > 500) {
+      if (!props.sidebarCollapsed) emit('close-sidebar');
+      if (props.tocVisible) emit('close-toc');
+    }
   }
 
   function onMouseUp() {
