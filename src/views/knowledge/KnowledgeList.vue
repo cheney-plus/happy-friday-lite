@@ -3,72 +3,61 @@
     <div
       class="kb-sidebar"
       :class="{ collapsed: sidebarCollapsed, 'is-resizing': isResizing }"
-      :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }"
+      :style="{ '--sidebar-width': sidebarWidth + 'px' }"
     >
-      <div class="sidebar-inner" v-show="!sidebarCollapsed">
-        <div class="sidebar-topbar" v-if="!searchMode">
-          <button class="topbar-btn" @click="toggleSidebar" title="收起侧边栏">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-              <line x1="9" y1="3" x2="9" y2="21"></line>
-            </svg>
-          </button>
-          <div class="topbar-actions">
-            <button class="topbar-btn" @click="enterSearchMode" title="搜索">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
+      <div class="sidebar-inner">
+        <div class="sidebar-top-area">
+          <div class="sidebar-topbar" v-show="!searchMode">
+            <button class="topbar-btn" @click="toggleSidebar" title="收起侧边栏">
+              <SidebarIcon />
             </button>
+            <div class="topbar-actions">
+              <button class="topbar-btn" @click="enterSearchMode" title="搜索">
+                <SearchIcon />
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div class="sidebar-search" v-else>
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input
-            ref="searchInputRef"
-            v-model="searchQuery"
-            class="search-input"
-            type="text"
-            placeholder="搜索(按ESC退出)..."
-            @keydown.escape="exitSearchMode"
-          />
+          <div class="sidebar-search" v-show="searchMode">
+            <SearchIcon :size="16" class="search-icon" />
+            <input
+              ref="searchInputRef"
+              v-model="searchQuery"
+              class="search-input"
+              type="text"
+              placeholder="搜索(按ESC退出)..."
+              @keydown.escape="exitSearchMode"
+            />
+          </div>
         </div>
 
         <div class="sidebar-content">
-          <div class="category-group" v-for="category in categories" :key="category.id">
-            <div class="category-header" @click="toggleCategory(category.id)">
-              <svg class="expand-icon" :class="{ expanded: category.expanded }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-              <span class="category-name">{{ category.name }}</span>
-              <button class="add-btn" @click.stop="addKnowledgeBase(category.id)" title="添加知识库">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-              </button>
-            </div>
-            <div class="category-items" v-show="category.expanded">
-              <div
-                v-for="item in category.items"
-                :key="item.id"
-                :class="['kb-item', { active: selectedKB === item.id }]"
-                @click="selectKnowledgeBase(item.id, item.name)"
-                @contextmenu.prevent="showContextMenu($event, category.id, item)"
-              >
-                <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="item-icon" :src="coverOptions[item.coverIndex]" alt="" />
-                <svg v-else class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                </svg>
-                <span class="item-name">{{ item.name }}</span>
+          <template v-for="category in filteredCategories" :key="category.id">
+            <div class="category-group" v-if="category._matched || !searchQuery">
+              <div class="category-header" @click="toggleCategory(category.id)">
+                <ChevronIcon :class="{ expanded: category.expanded }" />
+                <span class="category-name">{{ category.name }}</span>
+                <button v-if="!searchQuery" class="add-btn" @click.stop="addKnowledgeBase(category.id)" title="添加知识库">
+                  <PlusIcon :size="14" />
+                </button>
               </div>
+              <Transition name="slide">
+                <div class="category-items" v-if="category.expanded">
+                  <div
+                    v-for="item in category.items"
+                    :key="item.id"
+                    :class="['kb-item', { active: selectedKB === item.id }]"
+                    @click="selectKnowledgeBase(item.id, item.name)"
+                    @contextmenu.prevent="showContextMenu($event, category.id, item)"
+                  >
+                    <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="item-icon" :src="coverOptions[item.coverIndex]" alt="" />
+                    <BookIcon v-else :size="16" class="item-icon-fallback" />
+                    <span class="item-name">{{ item.name }}</span>
+                  </div>
+                </div>
+              </Transition>
             </div>
-          </div>
+          </template>
           <div class="sidebar-footer">
             <p class="footer-text">本地知识库中可添加多种类型文档</p>
           </div>
@@ -88,10 +77,7 @@
       @click="toggleSidebar"
       title="展开侧边栏"
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-        <line x1="9" y1="3" x2="9" y2="21"></line>
-      </svg>
+      <SidebarIcon />
     </button>
 
     <div class="kb-main">
@@ -366,10 +352,30 @@
 </template>
 
 <script setup>
-import { ref, reactive, nextTick } from 'vue';
+import { ref, reactive, computed, nextTick, defineComponent, h } from 'vue';
 import folderIcon from '@/assets/images/文件夹.svg';
 import documentIcon from '@/assets/images/文档.svg';
 
+// --- 可复用图标组件 ---
+const IconWrapper = (pathData, defaultSize = 18) => defineComponent({
+  props: { size: { type: Number, default: defaultSize } },
+  render() {
+    return h('svg', {
+      width: this.size, height: this.size,
+      viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', 'stroke-width': 2,
+      innerHTML: pathData
+    });
+  }
+});
+
+const SidebarIcon = IconWrapper('<rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.8"/><line x1="9" y1="3" x2="9" y2="21" stroke-width="1.8"/>');
+const SearchIcon = IconWrapper('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>');
+const ChevronIcon = IconWrapper('<polyline points="9 18 15 12 9 6"/>', 12);
+const PlusIcon = IconWrapper('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 14);
+const BookIcon = IconWrapper('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', 16);
+
+// --- 状态 ---
 const selectedKB = ref('cheney-kb');
 const currentTitle = ref('Cheney的知识库');
 const question = ref('');
@@ -384,7 +390,6 @@ const searchMode = ref(false);
 const searchQuery = ref('');
 const searchInputRef = ref(null);
 
-// 创建知识库弹窗
 const showCreateDialog = ref(false);
 const currentCategoryId = ref('');
 const currentCategoryName = ref('');
@@ -396,10 +401,8 @@ const newKB = reactive({
   coverIndex: 0
 });
 
-// 编辑模式：记录正在编辑的知识库 ID，null 表示新建
 const editingKBId = ref(null);
 
-// 右键菜单状态
 const contextMenu = reactive({
   visible: false,
   x: 0,
@@ -408,7 +411,6 @@ const contextMenu = reactive({
   item: null
 });
 
-// 封面选项（使用内联 SVG data URI 模拟设计图中的图标）
 const coverOptions = [
   'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#B8E6D5"/><rect x="20" y="18" width="40" height="44" rx="4" fill="#fff" opacity="0.8"/><line x1="28" y1="30" x2="52" y2="30" stroke="#7BC9A8" stroke-width="3" stroke-linecap="round"/><line x1="28" y1="40" x2="48" y2="40" stroke="#7BC9A8" stroke-width="3" stroke-linecap="round"/><line x1="28" y1="50" x2="44" y2="50" stroke="#7BC9A8" stroke-width="3" stroke-linecap="round"/></svg>'),
   'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#A8C8F8"/><rect x="14" y="12" width="52" height="56" rx="8" fill="#fff" opacity="0.85"/><path d="M24 48 L36 58 L60 30" stroke="#6B9FE8" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'),
@@ -416,7 +418,7 @@ const coverOptions = [
   'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#E6D2B5"/><ellipse cx="40" cy="46" rx="22" ry="18" fill="#D4A574"/><path d="M25 38 Q32 34 40 38 Q48 42 55 38" stroke="#8B6914" stroke-width="2.5" fill="none" opacity="0.4"/></svg>'),
   'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#E8A598"/><circle cx="40" cy="40" r="24" fill="#333" opacity="0.85"/><circle cx="40" cy="40" r="8" fill="#E8A598"/></svg>'),
   'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#CE93D8"/><circle cx="32" cy="32" r="16" fill="#FFB74D" opacity="0.8"/><path d="M16 64 L40 40 L64 64 Z" fill="#F8BBD9" opacity="0.7"/></svg>')
-]; // index -1 表示上传
+];
 
 const categories = reactive([
   {
@@ -444,6 +446,18 @@ const categories = reactive([
   }
 ]);
 
+// --- 搜索过滤 ---
+const filteredCategories = computed(() => {
+  if (!searchQuery.value) return categories;
+  const q = searchQuery.value.toLowerCase();
+  return categories.map(cat => ({
+    ...cat,
+    _matched: cat.items.some(item => item.name.toLowerCase().includes(q)) || cat.name.toLowerCase().includes(q),
+    items: cat.items.filter(item => item.name.toLowerCase().includes(q)),
+    expanded: true
+  }));
+});
+
 const files = ref([
   { id: '1', name: '我的笔记', type: 'folder', count: '0项', time: '22:43创建' },
   { id: '2', name: '我的叔叔于勒', type: 'note', count: '', time: '22:44更新' },
@@ -460,14 +474,19 @@ function onResizeStart(e) {
   isResizing.value = true;
   const startX = e.clientX;
   const startWidth = sidebarWidth.value;
+  let rafId = null;
 
   const onResizeMove = (moveEvent) => {
-    const delta = moveEvent.clientX - startX;
-    const newWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta));
-    sidebarWidth.value = newWidth;
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      const delta = moveEvent.clientX - startX;
+      sidebarWidth.value = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta));
+      rafId = null;
+    });
   };
 
   const onResizeEnd = () => {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     isResizing.value = false;
     document.removeEventListener('mousemove', onResizeMove);
     document.removeEventListener('mouseup', onResizeEnd);
@@ -477,7 +496,7 @@ function onResizeStart(e) {
 
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
-  document.addEventListener('mousemove', onResizeMove);
+  document.addEventListener('mousemove', onResizeMove, { passive: true });
   document.addEventListener('mouseup', onResizeEnd);
 }
 
@@ -627,7 +646,7 @@ function goForward() {
   console.log('Go forward');
 }
 
-function openFile(file) {
+function openFile() {
   showModal.value = true;
 }
 
@@ -679,13 +698,15 @@ function getTypeLabel(type) {
 }
 
 .kb-sidebar {
+  width: var(--sidebar-width, 240px);
   min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
   border-right: 1px solid var(--border-color);
   overflow: hidden;
-  transition: width 0.2s ease;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  will-change: width;
 
   &.is-resizing {
     transition: none;
@@ -693,6 +714,8 @@ function getTypeLabel(type) {
 
   &.collapsed {
     width: 0 !important;
+    border-right: none;
+    opacity: 0;
   }
 
   .sidebar-inner {
@@ -702,14 +725,19 @@ function getTypeLabel(type) {
     height: 100%;
   }
 
+  .sidebar-top-area {
+    height: 56px;
+    flex-shrink: 0;
+    position: relative;
+  }
+
   .sidebar-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 12px 12px 8px;
-    height: 56px;
+    height: 100%;
     box-sizing: border-box;
-    flex-shrink: 0;
 
     .topbar-btn {
       display: flex;
@@ -722,10 +750,15 @@ function getTypeLabel(type) {
       background-color: transparent;
       color: var(--text-primary);
       cursor: pointer;
+      transition: background 0.15s, color 0.15s;
 
       &:hover {
         background: var(--bg-hover);
         color: var(--text-primary);
+      }
+
+      &:active {
+        transform: scale(0.92);
       }
     }
 
@@ -736,12 +769,17 @@ function getTypeLabel(type) {
     }
   }
 
+  .sidebar-topbar,
+  .sidebar-search {
+    position: absolute;
+    inset: 0;
+  }
+
   .sidebar-search {
     display: flex;
     align-items: center;
-    padding: 10px 12px 8px;
+    padding: 0 12px;
     gap: 6px;
-    flex-shrink: 0;
 
     .search-icon {
       color: var(--text-tertiary);
@@ -768,10 +806,10 @@ function getTypeLabel(type) {
     overflow-y: auto;
     padding: 2px 0 16px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
 
     &::-webkit-scrollbar {
-      width: 5px;
+      width: 4px;
     }
 
     &::-webkit-scrollbar-track {
@@ -779,16 +817,16 @@ function getTypeLabel(type) {
     }
 
     &::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.15);
+      background-color: rgba(0, 0, 0, 0.12);
       border-radius: 10px;
     }
 
     &::-webkit-scrollbar-thumb:hover {
-      background-color: rgba(0, 0, 0, 0.25);
+      background-color: rgba(0, 0, 0, 0.22);
     }
 
     .category-group {
-      margin-bottom: 4px;
+      margin-bottom: 2px;
 
       .category-header {
         display: flex;
@@ -796,7 +834,9 @@ function getTypeLabel(type) {
         padding: 8px 12px;
         cursor: pointer;
         user-select: none;
-        transition: background 0.2s;
+        border-radius: 6px;
+        margin: 0 6px;
+        transition: background 0.15s;
 
         &:hover {
           background: var(--bg-hover);
@@ -804,7 +844,7 @@ function getTypeLabel(type) {
 
         .expand-icon {
           margin-right: 6px;
-          transition: transform 0.2s;
+          transition: transform 0.2s ease;
           color: var(--text-secondary);
           flex-shrink: 0;
 
@@ -827,7 +867,7 @@ function getTypeLabel(type) {
           cursor: pointer;
           border-radius: 4px;
           opacity: 0;
-          transition: all 0.2s;
+          transition: opacity 0.15s, background 0.15s;
           color: var(--text-secondary);
           display: flex;
           align-items: center;
@@ -848,9 +888,11 @@ function getTypeLabel(type) {
         .kb-item {
           display: flex;
           align-items: center;
-          padding: 7px 12px 7px 30px;
+          padding: 6px 12px 6px 30px;
+          margin: 0 6px;
+          border-radius: 6px;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: background 0.15s;
 
           &:hover {
             background: var(--bg-hover);
@@ -860,7 +902,8 @@ function getTypeLabel(type) {
             background: var(--accent-light);
             color: var(--accent-color);
 
-            .item-icon {
+            .item-icon,
+            .item-icon-fallback {
               color: var(--accent-color);
             }
           }
@@ -873,6 +916,12 @@ function getTypeLabel(type) {
             height: 16px;
             border-radius: 3px;
             object-fit: cover;
+          }
+
+          .item-icon-fallback {
+            margin-right: 8px;
+            color: var(--text-tertiary);
+            flex-shrink: 0;
           }
 
           .item-name {
@@ -899,6 +948,25 @@ function getTypeLabel(type) {
   }
 }
 
+// 展开/折叠过渡动画
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+
+.slide-enter-to,
+.slide-leave-from {
+  opacity: 1;
+  max-height: 500px;
+}
+
 .sidebar-expand-btn {
   position: absolute;
   left: 8px;
@@ -908,9 +976,9 @@ function getTypeLabel(type) {
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-secondary);
-  transition: all 0.2s;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -919,16 +987,22 @@ function getTypeLabel(type) {
     background: var(--bg-hover);
     color: var(--text-primary);
   }
+
+  &:active {
+    transform: scale(0.92);
+  }
 }
 
 .sidebar-resize-handle {
-  width: 2px;
+  width: 3px;
   cursor: col-resize;
   flex-shrink: 0;
   transition: background-color 0.15s;
+  border-radius: 2px;
 
   &:hover {
-    background-color: var(--bg-hover);
+    background-color: var(--accent-color);
+    opacity: 0.4;
   }
 }
 
@@ -1061,6 +1135,7 @@ function getTypeLabel(type) {
           text-overflow: ellipsis;
           display: -webkit-box;
           -webkit-line-clamp: 2;
+          line-clamp: 2;
           -webkit-box-orient: vertical;
           line-height: 1.4;
           text-align: center;
@@ -1604,14 +1679,14 @@ function getTypeLabel(type) {
 
 // 暗色主题滚动条
 [data-theme='dark'] .kb-sidebar .sidebar-content {
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
 [data-theme='dark'] .kb-sidebar .sidebar-content::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme='dark'] .kb-sidebar .sidebar-content::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.22);
 }
 </style>
