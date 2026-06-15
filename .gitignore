@@ -40,8 +40,13 @@ coverage/
 # App data
 app-data/
 
+# Python runtime (downloaded via download-python.js)
+python/python-*/
+
 # Temporary files
 *.tmp
 *.temp
 node_modules
 release/
+
+python/

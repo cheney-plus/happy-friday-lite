@@ -4,6 +4,7 @@ import { loadConfig, saveConfig } from './config.js'
 import * as db from './db.js'
 import { streamChat, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
+import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
 import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
 
 const cancelTokens = new CancellationTokens()
@@ -383,6 +384,36 @@ export function registerCommands(mainWindow) {
     }
     cancelTokens.cancel(args.requestId)
     return true
+  })
+
+  // ========== Python 相关命令 ==========
+
+  ipcMain.handle('python-check', async () => {
+    return await checkPython()
+  })
+
+  ipcMain.handle('python-run', async (_event, args) => {
+    const { scriptPath, scriptArgs, env, cwd } = args
+    return await runPython(scriptPath, scriptArgs || [], env || {}, cwd)
+  })
+
+  ipcMain.handle('python-run-streaming', async (_event, args) => {
+    const { scriptPath, scriptArgs, env, cwd } = args
+    const result = await runPythonStreaming(scriptPath, scriptArgs || [], {
+      env: env || {},
+      cwd,
+      onStdout: (data) => {
+        mainWindow.webContents.send('python-stdout', data)
+      },
+      onStderr: (data) => {
+        mainWindow.webContents.send('python-stderr', data)
+      }
+    })
+    return result
+  })
+
+  ipcMain.handle('python-get-path', () => {
+    return getPythonPath()
   })
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')

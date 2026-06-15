@@ -45,7 +45,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'delete_notebook',
       'export_html_to_pdf',
       'export_markdown',
-      'open-external'
+      'open-external',
+      'python-check',
+      'python-run',
+      'python-run-streaming',
+      'python-get-path'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -75,7 +79,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'note-ai-chunk',
       'note-ai-done',
       'note-ai-error',
-      'note-fim-result'
+      'note-fim-result',
+      'python-stdout',
+      'python-stderr'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)
