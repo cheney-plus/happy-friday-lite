@@ -1,7 +1,7 @@
 <template>
-  <div class="workspace-detail">
-    <h1>{{ t('workspace.title') }}</h1>
-    <p>{{ t('workspace.placeholder') }}</p>
+  <div class="knowledge-detail">
+    <h1>{{ t('knowledge.title') }}</h1>
+    <p>{{ t('knowledge.placeholder') }}</p>
     <p v-if="$route.params.id">ID: {{ $route.params.id }}</p>
   </div>
 </template>
@@ -12,7 +12,7 @@ const { t } = useI18n();
 </script>
 
 <style scoped>
-.workspace-detail {
+.knowledge-detail {
   padding: 24px;
 }
 </style>

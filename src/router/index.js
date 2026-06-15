@@ -6,14 +6,14 @@ export const routes = [
     redirect: '/friday'
   },
   {
-    path: '/workspace',
-    name: 'workspace',
-    component: () => import('@/views/workspace/WorkspaceList.vue')
+    path: '/knowledge',
+    name: 'knowledge',
+    component: () => import('@/views/knowledge/KnowledgeList.vue')
   },
   {
-    path: '/workspace/:id',
-    name: 'workspace-detail',
-    component: () => import('@/views/workspace/WorkspaceDetail.vue')
+    path: '/knowledge/:id',
+    name: 'knowledge-detail',
+    component: () => import('@/views/knowledge/KnowledgeDetail.vue')
   },
   {
     path: '/note',
@@ -67,7 +67,7 @@ export const routes = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/workspace'
+    redirect: '/knowledge'
   }
 ]
 
