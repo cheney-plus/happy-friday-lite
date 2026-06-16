@@ -1,6 +1,8 @@
 import { ipcMain, shell, dialog } from 'electron'
+import fs from 'fs'
+import path from 'path'
 import { CancellationTokens } from './cancellation.js'
-import { loadConfig, saveConfig } from './config.js'
+import { loadConfig, saveConfig, getDataDir } from './config.js'
 import * as db from './db.js'
 import { streamChat, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
@@ -384,6 +386,75 @@ export function registerCommands(mainWindow) {
     }
     cancelTokens.cancel(args.requestId)
     return true
+  })
+
+  // ========== 知识库文件系统命令 ==========
+
+  ipcMain.handle('kb-get-data-dir', () => {
+    return getDataDir()
+  })
+
+  ipcMain.handle('kb-read-dir', async (_event, args) => {
+    const dirPath = args.dirPath
+    if (!dirPath || !fs.existsSync(dirPath)) {
+      return []
+    }
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+      return entries
+        .filter(entry => !entry.name.startsWith('.'))
+        .map(entry => {
+          const fullPath = path.join(dirPath, entry.name)
+          const stat = fs.statSync(fullPath)
+          return {
+            name: entry.name,
+            path: fullPath,
+            isDirectory: entry.isDirectory(),
+            size: stat.size,
+            modifiedTime: stat.mtime.toISOString()
+          }
+        })
+        .sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1
+          if (!a.isDirectory && b.isDirectory) return 1
+          return a.name.localeCompare(b.name, 'zh-CN')
+        })
+    } catch (e) {
+      console.error('[Commands] kb-read-dir error:', e)
+      return []
+    }
+  })
+
+  ipcMain.handle('kb-create-dir', async (_event, args) => {
+    const dirPath = args.dirPath
+    if (!dirPath) return { success: false, error: 'No path provided' }
+    try {
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true })
+      }
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('kb-mkdir', async (_event, args) => {
+    const parentPath = args.parentPath
+    const dirName = args.dirName
+    if (!parentPath || !dirName) return { success: false, error: 'Missing parameters' }
+    try {
+      const fullPath = path.join(parentPath, dirName)
+      if (!fs.existsSync(fullPath)) {
+        fs.mkdirSync(fullPath, { recursive: true })
+      }
+      return { success: true, path: fullPath }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('kb-path-exists', async (_event, args) => {
+    return fs.existsSync(args.path)
   })
 
   // ========== Python 相关命令 ==========

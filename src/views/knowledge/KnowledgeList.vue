@@ -47,7 +47,7 @@
                     v-for="item in category.items"
                     :key="item.id"
                     :class="['kb-item', { active: selectedKB === item.id }]"
-                    @click="selectKnowledgeBase(item.id, item.name)"
+                    @click="selectKnowledgeBase(item.id, item.name, category.id)"
                     @contextmenu.prevent="showContextMenu($event, category.id, item)"
                   >
                     <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="item-icon" :src="coverOptions[item.coverIndex]" alt="" />
@@ -83,17 +83,29 @@
     <div class="kb-main">
       <div class="main-header">
         <div class="header-left">
-          <button class="nav-btn" @click="goBack">
+          <button class="nav-btn" @click="goBack" :disabled="!canGoBack">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
           </button>
-          <button class="nav-btn" @click="goForward">
+          <button class="nav-btn" @click="goForward" :disabled="!canGoForward">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
-          <h1 class="page-title">{{ currentTitle }}</h1>
+          <div class="breadcrumb" v-if="selectedKB">
+            <template v-for="(segment, index) in pathSegments" :key="index">
+              <span
+                class="breadcrumb-item"
+                :class="{ active: index === pathSegments.length - 1 }"
+                @click="navigateToSegment(index)"
+              >{{ segment.name }}</span>
+              <svg v-if="index < pathSegments.length - 1" class="breadcrumb-sep" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </template>
+          </div>
+          <h1 v-else class="page-title">{{ currentTitle }}</h1>
         </div>
         <div class="header-right">
           <button class="icon-btn" title="搜索">
@@ -119,7 +131,7 @@
               <circle cx="5" cy="12" r="1"></circle>
             </svg>
           </button>
-          <button class="icon-btn" title="刷新">
+          <button class="icon-btn" title="刷新" @click="refreshCurrentDir">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="23 4 23 10 17 10"></polyline>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -128,30 +140,46 @@
         </div>
       </div>
 
-      <div class="file-grid">
+      <div class="file-grid" v-if="selectedKB" @contextmenu.prevent="showFileContextMenu($event)">
         <div
           v-for="file in files"
-          :key="file.id"
+          :key="file.path"
           class="file-card"
           @click="openFile(file)"
+          @dblclick="openFile(file)"
         >
           <div class="file-preview">
-            <img :src="getFileIcon(file.type)" class="preview-icon" alt="" />
+            <div class="file-type-icon" :class="file.type">
+              <component :is="getFileIconComponent(file.type)" />
+            </div>
           </div>
           <div class="file-info">
             <h3 class="file-name">{{ file.name }}</h3>
             <div class="file-meta">
               <div class="meta-left">
                 <span class="meta-type" :class="file.type">{{ getTypeLabel(file.type) }}</span>
-                <span v-if="file.count" class="meta-count">{{ file.count }}</span>
+                <span v-if="file.isDirectory && file.count" class="meta-count">{{ file.count }}</span>
               </div>
               <div class="meta-right">
-                <span v-if="file.date" class="meta-date">{{ file.date }}</span>
-                <span v-if="file.time" class="meta-time">{{ file.time }}</span>
+                <span v-if="file.modifiedTime" class="meta-date">{{ formatDate(file.modifiedTime) }}</span>
               </div>
             </div>
           </div>
         </div>
+        <div v-if="files.length === 0" class="empty-folder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <p>此文件夹为空</p>
+        </div>
+      </div>
+      <div class="empty-state" v-else>
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+        <h2>选择一个知识库</h2>
+        <p>从左侧选择或创建一个知识库开始</p>
       </div>
 
       <div class="question-box">
@@ -261,6 +289,52 @@
       </div>
     </Teleport>
 
+    <!-- 文件区域右键菜单 -->
+    <Teleport to="body">
+      <div
+        v-if="fileContextMenu.visible"
+        class="context-menu-overlay" @mousedown="hideFileContextMenu"
+      >
+        <div
+          class="context-menu"
+          :style="{ left: fileContextMenu.x + 'px', top: fileContextMenu.y + 'px' }"
+          @click.stop
+        >
+          <div class="context-menu-item" @mousedown="openNewFolderDialog">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              <line x1="12" y1="11" x2="12" y2="17"></line>
+              <line x1="9" y1="14" x2="15" y2="14"></line>
+            </svg>
+            <span>新建文件夹</span>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 新建文件夹对话框 -->
+    <Teleport to="body">
+      <div v-if="showNewFolderDialog" class="modal-overlay" @click="closeNewFolderDialog">
+        <div class="modal-content new-folder-dialog" @click.stop>
+          <h2 class="modal-title">新建文件夹</h2>
+          <div class="new-folder-input-row">
+            <input
+              ref="newFolderInputRef"
+              v-model="newFolderName"
+              class="new-folder-input"
+              placeholder="请输入文件夹名称"
+              @keydown.enter="confirmNewFolder"
+              autofocus
+            />
+          </div>
+          <div class="create-kb-footer">
+            <button class="kb-btn kb-btn-cancel" @click="closeNewFolderDialog">取消</button>
+            <button class="kb-btn kb-btn-confirm" :disabled="!newFolderName.trim()" @click="confirmNewFolder">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <Teleport to="body">
       <!-- 创建知识库弹窗 -->
       <div v-if="showCreateDialog" class="create-kb-overlay" @click.self="closeCreateDialog">
@@ -352,9 +426,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, defineComponent, h } from 'vue';
-import folderIcon from '@/assets/images/文件夹.svg';
-import documentIcon from '@/assets/images/文档.svg';
+import { ref, reactive, computed, nextTick, defineComponent, h, onMounted } from 'vue';
 
 // --- 可复用图标组件 ---
 const IconWrapper = (pathData, defaultSize = 18) => defineComponent({
@@ -375,9 +447,79 @@ const ChevronIcon = IconWrapper('<polyline points="9 18 15 12 9 6"/>', 12);
 const PlusIcon = IconWrapper('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 14);
 const BookIcon = IconWrapper('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', 16);
 
+// 文件类型图标组件
+const FolderIcon = IconWrapper('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>', 36);
+const MarkdownIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#E8F5E9', stroke: '#4CAF50', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#388E3C', 'font-size': '7', 'font-weight': 'bold', 'font-family': 'monospace' }, 'MD')
+    ]);
+  }
+});
+const PdfIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#FFEBEE', stroke: '#F44336', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#D32F2F', 'font-size': '7', 'font-weight': 'bold', 'font-family': 'sans-serif' }, 'PDF')
+    ]);
+  }
+});
+const TxtIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#F5F5F5', stroke: '#9E9E9E', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#616161', 'font-size': '7', 'font-weight': 'bold', 'font-family': 'sans-serif' }, 'TXT')
+    ]);
+  }
+});
+const ExcelIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#E8F5E9', stroke: '#4CAF50', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#2E7D32', 'font-size': '6', 'font-weight': 'bold', 'font-family': 'sans-serif' }, 'XLS')
+    ]);
+  }
+});
+const WordIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#E3F2FD', stroke: '#2196F3', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#1565C0', 'font-size': '6', 'font-weight': 'bold', 'font-family': 'sans-serif' }, 'DOC')
+    ]);
+  }
+});
+const NoteIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#FFF8E1', stroke: '#FFC107', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#F57F17', 'font-size': '6', 'font-weight': 'bold', 'font-family': 'sans-serif' }, 'NOTE')
+    ]);
+  }
+});
+const PptIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#FFF3E0', stroke: '#FF9800', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#E65100', 'font-size': '6', 'font-weight': 'bold', 'font-family': 'sans-serif' }, 'PPT')
+    ]);
+  }
+});
+const UnknownFileIcon = defineComponent({
+  render() {
+    return h('svg', { width: 36, height: 36, viewBox: '0 0 24 24', fill: 'none' }, [
+      h('rect', { x: '2', y: '3', width: '20', height: '18', rx: '3', fill: '#ECEFF1', stroke: '#90A4AE', 'stroke-width': '1.2' }),
+      h('text', { x: '12', y: '16', 'text-anchor': 'middle', fill: '#546E7A', 'font-size': '6', 'font-weight': 'bold', 'font-family': 'sans-serif' }, 'FILE')
+    ]);
+  }
+});
+
+// --- Electron API ---
+const api = window.electronAPI;
+
 // --- 状态 ---
-const selectedKB = ref('cheney-kb');
-const currentTitle = ref('Cheney的知识库');
+const selectedKB = ref('');
+const currentTitle = ref('知识库');
 const question = ref('');
 const textareaRef = ref(null);
 const showModal = ref(false);
@@ -410,6 +552,17 @@ const contextMenu = reactive({
   categoryId: '',
   item: null
 });
+
+// 文件区域右键菜单
+const fileContextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0
+});
+
+const showNewFolderDialog = ref(false);
+const newFolderName = ref('');
+const newFolderInputRef = ref(null);
 
 const coverOptions = [
   'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#B8E6D5"/><rect x="20" y="18" width="40" height="44" rx="4" fill="#fff" opacity="0.8"/><line x1="28" y1="30" x2="52" y2="30" stroke="#7BC9A8" stroke-width="3" stroke-linecap="round"/><line x1="28" y1="40" x2="48" y2="40" stroke="#7BC9A8" stroke-width="3" stroke-linecap="round"/><line x1="28" y1="50" x2="44" y2="50" stroke="#7BC9A8" stroke-width="3" stroke-linecap="round"/></svg>'),
@@ -446,6 +599,31 @@ const categories = reactive([
   }
 ]);
 
+// --- 文件系统导航状态 ---
+const dataDir = ref('');
+const currentPath = ref('');
+const kbRootPath = ref(''); // 当前选中知识库的根目录路径
+const files = ref([]);
+const navigationHistory = ref([]);
+const historyIndex = ref(-1);
+
+const canGoBack = computed(() => historyIndex.value > 0);
+const canGoForward = computed(() => historyIndex.value < navigationHistory.value.length - 1);
+
+// 面包屑路径段（从知识库名开始显示）
+const pathSegments = computed(() => {
+  if (!currentPath.value || !kbRootPath.value) return [];
+  // 以 kbRootPath 的父目录为基准，让知识库名作为第一段
+  const basePath = kbRootPath.value.substring(0, kbRootPath.value.lastIndexOf('/'));
+  const relativePath = currentPath.value.slice(basePath.length).replace(/^\//, '');
+  const segments = relativePath.split('/').filter(Boolean);
+  let accumulated = basePath;
+  return segments.map(name => {
+    accumulated = accumulated + '/' + name;
+    return { name, path: accumulated };
+  });
+});
+
 // --- 搜索过滤 ---
 const filteredCategories = computed(() => {
   if (!searchQuery.value) return categories;
@@ -458,12 +636,215 @@ const filteredCategories = computed(() => {
   }));
 });
 
-const files = ref([
-  { id: '1', name: '我的笔记', type: 'folder', count: '0项', time: '22:43创建' },
-  { id: '2', name: '我的叔叔于勒', type: 'note', count: '', time: '22:44更新' },
-  { id: '3', name: '计算机网路：自顶向下方法（原书第8版）(...', type: 'pdf', date: '4/19', time: '' },
-  { id: '4', name: 'Fraday知识库使用指南.docx', type: 'word', date: '4/4', time: '' }
-]);
+// --- 文件类型检测 ---
+function getFileType(fileName) {
+  const ext = fileName.split('.').pop().toLowerCase();
+  const typeMap = {
+    folder: [],
+    markdown: ['md', 'markdown', 'mdx'],
+    pdf: ['pdf'],
+    txt: ['txt', 'text', 'log'],
+    excel: ['xls', 'xlsx', 'csv'],
+    word: ['doc', 'docx'],
+    note: ['note'],
+    ppt: ['ppt', 'pptx']
+  };
+  for (const [type, exts] of Object.entries(typeMap)) {
+    if (exts.includes(ext)) return type;
+  }
+  return 'unknown';
+}
+
+function getFileIconComponent(type) {
+  const iconMap = {
+    folder: FolderIcon,
+    markdown: MarkdownIcon,
+    pdf: PdfIcon,
+    txt: TxtIcon,
+    excel: ExcelIcon,
+    word: WordIcon,
+    note: NoteIcon,
+    ppt: PptIcon,
+    unknown: UnknownFileIcon
+  };
+  return iconMap[type] || UnknownFileIcon;
+}
+
+function getTypeLabel(type) {
+  const labels = {
+    folder: '文件夹',
+    markdown: 'Markdown',
+    pdf: 'PDF',
+    txt: 'TXT',
+    excel: 'Excel',
+    word: 'Word',
+    note: '笔记',
+    ppt: 'PPT',
+    unknown: '文件'
+  };
+  return labels[type] || '文件';
+}
+
+function formatDate(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) {
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  }
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
+
+// --- 文件系统操作 ---
+async function loadDataDir() {
+  if (!api) return;
+  try {
+    dataDir.value = await api.invoke('kb-get-data-dir');
+  } catch (e) {
+    console.error('Failed to get data dir:', e);
+  }
+}
+
+async function readDirectory(dirPath) {
+  if (!api) return;
+  try {
+    const entries = await api.invoke('kb-read-dir', { dirPath });
+    files.value = entries.map(entry => ({
+      name: entry.name,
+      path: entry.path,
+      isDirectory: entry.isDirectory,
+      type: entry.isDirectory ? 'folder' : getFileType(entry.name),
+      size: entry.size,
+      modifiedTime: entry.modifiedTime,
+      count: entry.isDirectory ? '' : ''
+    }));
+    // 为文件夹计算子项数量
+    for (const file of files.value) {
+      if (file.isDirectory) {
+        try {
+          const subEntries = await api.invoke('kb-read-dir', { dirPath: file.path });
+          file.count = subEntries.length + '项';
+        } catch {
+          file.count = '0项';
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to read directory:', e);
+    files.value = [];
+  }
+}
+
+async function navigateTo(dirPath, addToHistory = true) {
+  currentPath.value = dirPath;
+  await readDirectory(dirPath);
+  if (addToHistory) {
+    // 如果当前不在历史末尾，截断后面的记录
+    if (historyIndex.value < navigationHistory.value.length - 1) {
+      navigationHistory.value = navigationHistory.value.slice(0, historyIndex.value + 1);
+    }
+    navigationHistory.value.push(dirPath);
+    historyIndex.value = navigationHistory.value.length - 1;
+  }
+}
+
+async function selectKnowledgeBase(id, name, categoryId) {
+  selectedKB.value = id;
+  currentTitle.value = name;
+  if (!api || !dataDir.value) return;
+
+  // 在分类子目录下创建知识库目录
+  const kbDir = dataDir.value + '/knowledge/' + categoryId + '/' + name;
+  kbRootPath.value = kbDir;
+  try {
+    await api.invoke('kb-create-dir', { dirPath: kbDir });
+  } catch (e) {
+    console.error('Failed to create kb dir:', e);
+  }
+  await navigateTo(kbDir);
+}
+
+function goBack() {
+  if (!canGoBack.value) return;
+  historyIndex.value--;
+  const targetPath = navigationHistory.value[historyIndex.value];
+  currentPath.value = targetPath;
+  readDirectory(targetPath);
+}
+
+function goForward() {
+  if (!canGoForward.value) return;
+  historyIndex.value++;
+  const targetPath = navigationHistory.value[historyIndex.value];
+  currentPath.value = targetPath;
+  readDirectory(targetPath);
+}
+
+async function navigateToSegment(index) {
+  const segment = pathSegments.value[index];
+  if (segment && segment.path !== currentPath.value) {
+    await navigateTo(segment.path);
+  }
+}
+
+async function openFile(file) {
+  if (file.isDirectory) {
+    await navigateTo(file.path);
+  }
+  // 文件类型暂不处理
+}
+
+async function refreshCurrentDir() {
+  if (currentPath.value) {
+    await readDirectory(currentPath.value);
+  }
+}
+
+// --- 文件区域右键菜单 ---
+function showFileContextMenu(event) {
+  fileContextMenu.visible = true;
+  fileContextMenu.x = event.clientX;
+  fileContextMenu.y = event.clientY;
+}
+
+function hideFileContextMenu() {
+  fileContextMenu.visible = false;
+}
+
+function openNewFolderDialog() {
+  hideFileContextMenu();
+  newFolderName.value = '';
+  showNewFolderDialog.value = true;
+  nextTick(() => {
+    newFolderInputRef.value?.focus();
+  });
+}
+
+function closeNewFolderDialog() {
+  showNewFolderDialog.value = false;
+  newFolderName.value = '';
+}
+
+async function confirmNewFolder() {
+  const folderName = newFolderName.value.trim();
+  if (!folderName || !currentPath.value || !api) return;
+
+  try {
+    const result = await api.invoke('kb-mkdir', {
+      parentPath: currentPath.value,
+      dirName: folderName
+    });
+    if (result.success) {
+      closeNewFolderDialog();
+      await refreshCurrentDir();
+    } else {
+      console.error('Failed to create folder:', result.error);
+    }
+  } catch (e) {
+    console.error('Failed to create folder:', e);
+  }
+}
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value;
@@ -519,11 +900,6 @@ function toggleCategory(id) {
   }
 }
 
-function selectKnowledgeBase(id, name) {
-  selectedKB.value = id;
-  currentTitle.value = name;
-}
-
 function addKnowledgeBase(categoryId) {
   const category = categories.find(c => c.id === categoryId);
   if (category) {
@@ -548,14 +924,13 @@ function closeCreateDialog() {
   editingKBId.value = null;
 }
 
-function confirmCreateKB() {
+async function confirmCreateKB() {
   if (!newKB.name.trim()) return;
 
   const category = categories.find(c => c.id === currentCategoryId.value);
   if (!category) return;
 
   if (editingKBId.value) {
-    // 编辑模式：更新已有知识库
     const item = category.items.find(i => i.id === editingKBId.value);
     if (item) {
       item.name = newKB.name.trim();
@@ -566,16 +941,28 @@ function confirmCreateKB() {
       }
     }
   } else {
-    // 新建模式
     const newId = `kb-${Date.now()}`;
-    category.items.push({
+    const newItem = {
       id: newId,
       name: newKB.name.trim(),
       description: newKB.description.trim(),
       coverIndex: newKB.coverIndex
-    });
+    };
+    category.items.push(newItem);
     selectedKB.value = newId;
     currentTitle.value = newKB.name.trim();
+
+    // 创建知识库目录
+    if (api && dataDir.value) {
+      const kbDir = dataDir.value + '/knowledge/' + currentCategoryId.value + '/' + newItem.name;
+      kbRootPath.value = kbDir;
+      try {
+        await api.invoke('kb-create-dir', { dirPath: kbDir });
+      } catch (e) {
+        console.error('Failed to create kb dir:', e);
+      }
+      await navigateTo(kbDir);
+    }
   }
   closeCreateDialog();
 }
@@ -634,20 +1021,13 @@ function deleteKnowledgeBase() {
     if (selectedKB.value === itemId) {
       selectedKB.value = '';
       currentTitle.value = '知识库';
+      files.value = [];
+      currentPath.value = '';
+      kbRootPath.value = '';
+      navigationHistory.value = [];
+      historyIndex.value = -1;
     }
   }
-}
-
-function goBack() {
-  console.log('Go back');
-}
-
-function goForward() {
-  console.log('Go forward');
-}
-
-function openFile() {
-  showModal.value = true;
 }
 
 function closeModal() {
@@ -668,25 +1048,10 @@ function autoResize() {
   }
 }
 
-function getFileIcon(type) {
-  const icons = {
-    folder: folderIcon,
-    note: documentIcon,
-    pdf: documentIcon,
-    word: documentIcon
-  };
-  return icons[type] || folderIcon;
-}
-
-function getTypeLabel(type) {
-  const labels = {
-    folder: '',
-    note: '笔记',
-    pdf: 'PDF',
-    word: 'WORD'
-  };
-  return labels[type] || '';
-}
+// 初始化
+onMounted(async () => {
+  await loadDataDir();
+});
 </script>
 
 <style scoped lang="scss">
@@ -1051,6 +1416,44 @@ function getTypeLabel(type) {
         color: var(--text-primary);
         margin: 0;
       }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 14px;
+        min-width: 0;
+        overflow: hidden;
+
+        .breadcrumb-item {
+          color: var(--text-secondary);
+          cursor: pointer;
+          padding: 2px 4px;
+          border-radius: 4px;
+          white-space: nowrap;
+          transition: all 0.15s;
+
+          &:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+          }
+
+          &.active {
+            color: var(--text-primary);
+            font-weight: 600;
+            cursor: default;
+
+            &:hover {
+              background: transparent;
+            }
+          }
+        }
+
+        .breadcrumb-sep {
+          color: var(--text-tertiary);
+          flex-shrink: 0;
+        }
+      }
     }
 
     .header-right {
@@ -1107,18 +1510,63 @@ function getTypeLabel(type) {
         height: 80px;
         margin-bottom: 8px;
 
-        .preview-icon {
+        .file-type-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
           width: 56px;
           height: 56px;
-          object-fit: contain;
-          opacity: 0.9;
+          border-radius: 12px;
           transition: all 0.25s ease;
+
+          &.folder {
+            color: #1560F7;
+          }
+
+          &.markdown {
+            background: #E8F5E9;
+            color: #4CAF50;
+          }
+
+          &.pdf {
+            background: #FFEBEE;
+            color: #F44336;
+          }
+
+          &.txt {
+            background: #F5F5F5;
+            color: #9E9E9E;
+          }
+
+          &.excel {
+            background: #E8F5E9;
+            color: #4CAF50;
+          }
+
+          &.word {
+            background: #E3F2FD;
+            color: #2196F3;
+          }
+
+          &.note {
+            background: #FFF8E1;
+            color: #FFC107;
+          }
+
+          &.ppt {
+            background: #FFF3E0;
+            color: #FF9800;
+          }
+
+          &.unknown {
+            background: #ECEFF1;
+            color: #90A4AE;
+          }
         }
       }
 
-      &:hover .preview-icon {
-        transform: scale(1.05);
-        opacity: 1;
+      &:hover .file-type-icon {
+        transform: scale(1.08);
       }
 
       .file-info {
@@ -1168,20 +1616,91 @@ function getTypeLabel(type) {
           }
 
           .meta-type {
-            &.note {
-              color: #52c41a;
+            &.folder {
+              color: #1560F7;
+            }
+
+            &.markdown {
+              color: #4CAF50;
             }
 
             &.pdf {
-              color: #fa8c16;
+              color: #F44336;
+            }
+
+            &.txt {
+              color: #9E9E9E;
+            }
+
+            &.excel {
+              color: #4CAF50;
             }
 
             &.word {
-              color: #1890ff;
+              color: #2196F3;
+            }
+
+            &.note {
+              color: #FFC107;
+            }
+
+            &.ppt {
+              color: #FF9800;
+            }
+
+            &.unknown {
+              color: #90A4AE;
             }
           }
         }
       }
+    }
+
+    .empty-folder {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--text-tertiary);
+
+      svg {
+        margin-bottom: 12px;
+        opacity: 0.4;
+      }
+
+      p {
+        font-size: 14px;
+        margin: 0;
+      }
+    }
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-tertiary);
+
+    svg {
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin: 0 0 8px;
+    }
+
+    p {
+      font-size: 14px;
+      margin: 0;
     }
   }
 
@@ -1390,6 +1909,44 @@ function getTypeLabel(type) {
   background: var(--accent-hover, var(--accent-color));
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.new-folder-dialog {
+  width: 380px;
+  padding: 24px;
+  text-align: left;
+
+  .modal-title {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .new-folder-input-row {
+    margin-bottom: 20px;
+  }
+
+  .new-folder-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--bg-primary, #fff);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+
+    &:focus {
+      border-color: var(--accent-color, #1560F7);
+      box-shadow: 0 0 0 2px rgba(21, 96, 247, 0.15);
+    }
+
+    &::placeholder {
+      color: var(--text-tertiary, #bbb);
+    }
+  }
 }
 
 @keyframes fadeIn {

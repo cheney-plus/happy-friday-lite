@@ -49,7 +49,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'python-check',
       'python-run',
       'python-run-streaming',
-      'python-get-path'
+      'python-get-path',
+      'kb-get-data-dir',
+      'kb-read-dir',
+      'kb-create-dir',
+      'kb-mkdir',
+      'kb-path-exists'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

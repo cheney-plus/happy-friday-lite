@@ -9,6 +9,10 @@ export function setDataDir(dir) {
   dataDir = dir
 }
 
+export function getDataDir() {
+  return dataDir
+}
+
 function getConfigPath() {
   if (!dataDir) {
     throw AppError.config('Data directory not initialized')
