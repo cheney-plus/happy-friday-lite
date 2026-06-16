@@ -147,6 +147,7 @@ onUnmounted(() => {
 
 .content-wrapper {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   background-color: var(--bg-primary);
   border-radius: var(--content-radius);
