@@ -54,7 +54,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-read-dir',
       'kb-create-dir',
       'kb-mkdir',
-      'kb-path-exists'
+      'kb-path-exists',
+      'kb-copy-file',
+      'kb-copy-folder'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

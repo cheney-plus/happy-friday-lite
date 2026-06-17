@@ -37,11 +37,13 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('open-file-dialog', async (_event, options) => {
+    const properties = options?.properties || ['openFile']
     const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile'],
+      properties,
       filters: options?.filters || []
     })
-    return result.filePaths.length > 0 ? result.filePaths[0] : null
+    if (result.canceled) return null
+    return properties.includes('multiSelections') ? result.filePaths : result.filePaths[0]
   })
 
   ipcMain.handle('get_sessions', () => {
@@ -455,6 +457,47 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('kb-path-exists', async (_event, args) => {
     return fs.existsSync(args.path)
+  })
+
+  ipcMain.handle('kb-copy-file', async (_event, args) => {
+    const { srcPath, destDir } = args
+    if (!srcPath || !destDir) return { success: false, error: 'Missing parameters' }
+    try {
+      const fileName = path.basename(srcPath)
+      const destPath = path.join(destDir, fileName)
+      fs.copyFileSync(srcPath, destPath)
+      return { success: true, path: destPath }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  function copyDirectoryRecursive(src, dest) {
+    fs.mkdirSync(dest, { recursive: true })
+    const entries = fs.readdirSync(src, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const srcPath = path.join(src, entry.name)
+      const destPath = path.join(dest, entry.name)
+      if (entry.isDirectory()) {
+        copyDirectoryRecursive(srcPath, destPath)
+      } else {
+        fs.copyFileSync(srcPath, destPath)
+      }
+    }
+  }
+
+  ipcMain.handle('kb-copy-folder', async (_event, args) => {
+    const { srcPath, destDir } = args
+    if (!srcPath || !destDir) return { success: false, error: 'Missing parameters' }
+    try {
+      const folderName = path.basename(srcPath)
+      const destPath = path.join(destDir, folderName)
+      copyDirectoryRecursive(srcPath, destPath)
+      return { success: true, path: destPath }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
   })
 
   // ========== Python 相关命令 ==========

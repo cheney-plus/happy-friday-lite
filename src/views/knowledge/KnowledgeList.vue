@@ -41,6 +41,7 @@
       :can-go-forward="canGoForward"
       :path-segments="pathSegments"
       :files="files"
+      :current-path="currentPath"
       @go-back="goBack"
       @go-forward="goForward"
       @navigate-to-segment="navigateToSegment"
@@ -120,7 +121,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { SidebarIcon } from './components/icons';
 import KbSidebar from './components/KbSidebar.vue';
 import KbMainContent from './components/KbMainContent.vue';
@@ -170,6 +171,8 @@ const {
   closeNewFolderDialog,
   confirmNewFolder
 } = fileSystem;
+
+const currentPath = computed(() => fileSystem.currentPath.value);
 
 const {
   selectedKB,
