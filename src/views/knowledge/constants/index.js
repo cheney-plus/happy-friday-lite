@@ -6,8 +6,36 @@ export const FILE_TYPE_MAP = {
   excel: ['xls', 'xlsx', 'csv'],
   word: ['doc', 'docx'],
   note: ['note'],
-  ppt: ['ppt', 'pptx']
+  ppt: ['ppt', 'pptx'],
+  html: ['html', 'htm'],
+  epub: ['epub'],
+  json: ['json'],
+  xml: ['xml']
 };
+
+// 知识库允许的文件扩展名白名单
+export const ALLOWED_EXTENSIONS = [
+  // PDF
+  'pdf',
+  // PowerPoint
+  'ppt', 'pptx',
+  // Word
+  'doc', 'docx',
+  // Excel
+  'xls', 'xlsx',
+  // HTML
+  'html', 'htm',
+  // Text-based
+  'txt', 'text', 'log', 'csv', 'json', 'xml', 'md', 'markdown', 'mdx',
+  // EPub
+  'epub'
+];
+
+export function isAllowedFile(fileName) {
+  if (!fileName || !fileName.includes('.')) return false;
+  const ext = fileName.split('.').pop().toLowerCase();
+  return ALLOWED_EXTENSIONS.includes(ext);
+}
 
 export const FILE_TYPE_LABELS = {
   folder: '文件夹',

@@ -108,7 +108,29 @@ export function useKnowledgeBase(fileSystem, sidebar) {
     if (editingKBId.value) {
       const item = category.items.find(i => i.id === editingKBId.value);
       if (item) {
-        item.name = newKB.name.trim();
+        const oldName = item.name;
+        const newName = newKB.name.trim();
+
+        // 重命名本地文件夹
+        if (oldName !== newName && api && fileSystem.dataDir.value) {
+          const oldPath = fileSystem.dataDir.value + '/knowledge/' + currentCategoryId.value + '/' + oldName;
+          const newPath = fileSystem.dataDir.value + '/knowledge/' + currentCategoryId.value + '/' + newName;
+          try {
+            await api.invoke('kb-rename-dir', { oldPath, newPath });
+            // 如果当前正在浏览该知识库，更新路径
+            if (selectedKB.value === item.id) {
+              const newKbDir = newPath;
+              fileSystem.kbRootPath.value = newKbDir;
+              if (fileSystem.currentPath.value.startsWith(oldPath)) {
+                fileSystem.currentPath.value = fileSystem.currentPath.value.replace(oldPath, newPath);
+              }
+            }
+          } catch (e) {
+            console.error('Failed to rename kb dir:', e);
+          }
+        }
+
+        item.name = newName;
         item.description = newKB.description.trim();
         item.coverIndex = newKB.coverIndex;
         if (selectedKB.value === item.id) {
@@ -164,7 +186,7 @@ export function useKnowledgeBase(fileSystem, sidebar) {
     });
   }
 
-  function deleteKnowledgeBase(contextMenu) {
+  async function deleteKnowledgeBase(contextMenu) {
     if (!contextMenu.item) return;
     const categoryId = contextMenu.categoryId;
     const itemId = contextMenu.item.id;
@@ -174,6 +196,16 @@ export function useKnowledgeBase(fileSystem, sidebar) {
 
     const index = category.items.findIndex(i => i.id === itemId);
     if (index !== -1) {
+      // 删除本地文件夹
+      if (api && fileSystem.dataDir.value) {
+        const kbDir = fileSystem.dataDir.value + '/knowledge/' + categoryId + '/' + contextMenu.item.name;
+        try {
+          await api.invoke('kb-delete-dir', { dirPath: kbDir });
+        } catch (e) {
+          console.error('Failed to delete kb dir:', e);
+        }
+      }
+
       category.items.splice(index, 1);
       if (selectedKB.value === itemId) {
         selectedKB.value = '';

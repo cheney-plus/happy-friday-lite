@@ -121,6 +121,14 @@
       @select-cover="selectCover"
     />
 
+    <!-- 删除确认对话框 -->
+    <ConfirmDialog
+      :visible="showDeleteConfirm"
+      :message="deleteConfirmMessage"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
+
     <!-- 功能开发中提示 -->
     <FeatureModal :visible="showModal" @close="showModal = false" />
   </div>
@@ -134,6 +142,7 @@ import KbMainContent from './components/KbMainContent.vue';
 import KbContextMenu from './components/KbContextMenu.vue';
 import NewFolderDialog from './components/NewFolderDialog.vue';
 import CreateKbDialog from './components/CreateKbDialog.vue';
+import ConfirmDialog from './components/ConfirmDialog.vue';
 import FeatureModal from './components/FeatureModal.vue';
 import { electronService } from '@/services/electron';
 import { useSidebar } from './composables/useSidebar';
@@ -142,6 +151,10 @@ import { useKnowledgeBase } from './composables/useKnowledgeBase';
 import { useContextMenu } from './composables/useContextMenu';
 
 const showModal = ref(false);
+const showDeleteConfirm = ref(false);
+const deleteConfirmMessage = ref('');
+const pendingDeleteItem = ref(null);
+const pendingDeleteCategoryId = ref('');
 
 const sidebar = useSidebar();
 
@@ -211,13 +224,33 @@ const {
 } = useContextMenu();
 
 function handleEditKB() {
+  const item = contextMenu.item;
+  const categoryId = contextMenu.categoryId;
   hideContextMenu();
-  editKnowledgeBase(contextMenu);
+  editKnowledgeBase({ item, categoryId });
 }
 
 function handleDeleteKB() {
+  const item = contextMenu.item;
+  const categoryId = contextMenu.categoryId;
   hideContextMenu();
-  deleteKnowledgeBase(contextMenu);
+  pendingDeleteItem.value = item;
+  pendingDeleteCategoryId.value = categoryId;
+  deleteConfirmMessage.value = `删除「${item?.name}」会导致该知识库下所有文件被删除，是否确认删除？`;
+  showDeleteConfirm.value = true;
+}
+
+function confirmDelete() {
+  showDeleteConfirm.value = false;
+  deleteKnowledgeBase({ item: pendingDeleteItem.value, categoryId: pendingDeleteCategoryId.value });
+  pendingDeleteItem.value = null;
+  pendingDeleteCategoryId.value = '';
+}
+
+function cancelDelete() {
+  showDeleteConfirm.value = false;
+  pendingDeleteItem.value = null;
+  pendingDeleteCategoryId.value = '';
 }
 
 function openInFinder() {

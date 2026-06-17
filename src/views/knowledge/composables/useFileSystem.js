@@ -1,5 +1,5 @@
 import { ref, computed, nextTick } from 'vue';
-import { FILE_TYPE_MAP, FILE_TYPE_LABELS } from '../constants';
+import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile } from '../constants';
 import { FILE_ICON_MAP, UnknownFileIcon } from '../components/icons';
 
 export function useFileSystem() {
@@ -71,15 +71,17 @@ export function useFileSystem() {
     if (!api) return;
     try {
       const entries = await api.invoke('kb-read-dir', { dirPath });
-      files.value = entries.map(entry => ({
-        ...entry,
-        type: entry.isDirectory ? 'folder' : getFileType(entry.name)
-      }));
+      files.value = entries
+        .filter(entry => entry.isDirectory || isAllowedFile(entry.name))
+        .map(entry => ({
+          ...entry,
+          type: entry.isDirectory ? 'folder' : getFileType(entry.name)
+        }));
       for (const file of files.value) {
         if (file.isDirectory) {
           try {
             const subEntries = await api.invoke('kb-read-dir', { dirPath: file.path });
-            file.count = subEntries.length + '项';
+            file.count = subEntries.filter(e => e.isDirectory || isAllowedFile(e.name)).length + '项';
           } catch {
             file.count = '0项';
           }

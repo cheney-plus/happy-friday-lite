@@ -222,6 +222,30 @@
     </div>
 
     <KbQuestionBox />
+
+    <!-- 上传格式错误提示 -->
+    <Teleport to="body">
+      <Transition name="dialog-fade">
+        <div v-if="showUploadError" class="dialog-overlay" @click.self="showUploadError = false">
+          <Transition name="dialog-scale">
+            <div v-if="showUploadError" class="dialog-card">
+              <div class="dialog-icon-wrap warn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              </div>
+              <h3 class="dialog-title">不支持的文件格式</h3>
+              <p class="dialog-desc" style="white-space: pre-line;">{{ uploadErrorMsg }}</p>
+              <div class="dialog-actions">
+                <button class="dialog-btn confirm-btn" @click="showUploadError = false">我知道了</button>
+              </div>
+            </div>
+          </Transition>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -230,7 +254,7 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import FileCard from './FileCard.vue';
 import KbQuestionBox from './KbQuestionBox.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
-import { FILE_TYPE_LABELS } from '../constants';
+import { FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
 
 const props = defineProps({
   selectedKB: String,
@@ -288,6 +312,8 @@ function closeSortMenu(e) {
 
 const showUploadMenu = ref(false);
 const uploadWrapperRef = ref(null);
+const showUploadError = ref(false);
+const uploadErrorMsg = ref('');
 
 function toggleUploadMenu() {
   showUploadMenu.value = !showUploadMenu.value;
@@ -312,8 +338,17 @@ async function handleUpload(type) {
       const filePaths = await api.invoke('open-file-dialog', {
         properties: ['openFile', 'multiSelections']
       });
-      console.log('[Upload] selected files:', filePaths);
       if (!filePaths || !filePaths.length) return;
+
+      // 校验文件格式
+      const invalidFiles = filePaths.filter(f => !isAllowedFile(f));
+      if (invalidFiles.length > 0) {
+        const names = invalidFiles.map(f => f.split('/').pop() || f.split('\\').pop());
+        uploadErrorMsg.value = `以下文件格式不支持：${names.join('、')}\n\n仅允许上传：PDF、PPT/PPTX、DOC/DOCX、XLS/XLSX、HTML、TXT/CSV/JSON/XML、EPUB 等文本类文件`;
+        showUploadError.value = true;
+        return;
+      }
+
       for (const src of filePaths) {
         const result = await api.invoke('kb-copy-file', { srcPath: String(src), destDir });
         console.log('[Upload] copy file result:', result);
@@ -323,9 +358,13 @@ async function handleUpload(type) {
       const folderPath = await api.invoke('open-file-dialog', {
         properties: ['openDirectory']
       });
-      console.log('[Upload] selected folder:', folderPath);
       if (!folderPath) return;
-      const result = await api.invoke('kb-copy-folder', { srcPath: String(folderPath), destDir });
+      // 文件夹上传时过滤非法格式文件
+      const result = await api.invoke('kb-copy-folder', {
+        srcPath: String(folderPath),
+        destDir,
+        allowedExtensions: ALLOWED_EXTENSIONS
+      });
       console.log('[Upload] copy folder result:', result);
       emit('refresh');
     } else if (type === 'note' || type === 'webpage') {
@@ -882,5 +921,120 @@ onBeforeUnmount(() => {
       margin: 0;
     }
   }
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.dialog-card {
+  background: var(--bg-primary);
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  width: 400px;
+  max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.dialog-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.warn {
+    background: rgba(250, 173, 20, 0.1);
+    color: #faad14;
+  }
+}
+
+[data-theme='dark'] .dialog-icon-wrap.warn {
+  background: rgba(250, 173, 20, 0.15);
+}
+
+.dialog-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.dialog-desc {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.dialog-btn {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.confirm-btn {
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+.confirm-btn:hover {
+  opacity: 0.9;
+}
+
+.dialog-fade-enter-active,
+.dialog-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
+}
+
+.dialog-scale-enter-active {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dialog-scale-leave-active {
+  transition: all 0.15s ease;
+}
+
+.dialog-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+.dialog-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
 }
 </style>

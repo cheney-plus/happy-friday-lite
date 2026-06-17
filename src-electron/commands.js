@@ -472,7 +472,7 @@ export function registerCommands(mainWindow) {
     }
   })
 
-  function copyDirectoryRecursive(src, dest) {
+  function copyDirectoryRecursive(src, dest, allowedExtensions) {
     fs.mkdirSync(dest, { recursive: true })
     const entries = fs.readdirSync(src, { withFileTypes: true })
     for (const entry of entries) {
@@ -480,21 +480,52 @@ export function registerCommands(mainWindow) {
       const srcPath = path.join(src, entry.name)
       const destPath = path.join(dest, entry.name)
       if (entry.isDirectory()) {
-        copyDirectoryRecursive(srcPath, destPath)
+        copyDirectoryRecursive(srcPath, destPath, allowedExtensions)
       } else {
+        // 过滤非法格式文件
+        if (allowedExtensions && allowedExtensions.length > 0) {
+          const ext = entry.name.split('.').pop().toLowerCase()
+          if (!allowedExtensions.includes(ext)) continue
+        }
         fs.copyFileSync(srcPath, destPath)
       }
     }
   }
 
   ipcMain.handle('kb-copy-folder', async (_event, args) => {
-    const { srcPath, destDir } = args
+    const { srcPath, destDir, allowedExtensions } = args
     if (!srcPath || !destDir) return { success: false, error: 'Missing parameters' }
     try {
       const folderName = path.basename(srcPath)
       const destPath = path.join(destDir, folderName)
-      copyDirectoryRecursive(srcPath, destPath)
+      copyDirectoryRecursive(srcPath, destPath, allowedExtensions)
       return { success: true, path: destPath }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('kb-delete-dir', async (_event, args) => {
+    const dirPath = args.dirPath
+    if (!dirPath) return { success: false, error: 'No path provided' }
+    try {
+      if (fs.existsSync(dirPath)) {
+        fs.rmSync(dirPath, { recursive: true, force: true })
+      }
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('kb-rename-dir', async (_event, args) => {
+    const { oldPath, newPath } = args
+    if (!oldPath || !newPath) return { success: false, error: 'Missing parameters' }
+    try {
+      if (fs.existsSync(oldPath)) {
+        fs.renameSync(oldPath, newPath)
+      }
+      return { success: true }
     } catch (e) {
       return { success: false, error: e.message }
     }
