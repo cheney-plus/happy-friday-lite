@@ -35,6 +35,7 @@
               class="search-input"
               placeholder="搜索文件..."
               @keydown.escape="closeSearch"
+              @blur="closeSearch"
             />
             <button class="search-close" @click="closeSearch">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -162,6 +163,7 @@
           :key="file.path"
           class="list-row"
           @click="$emit('open-file', file)"
+          @contextmenu.stop
         >
           <div class="col-name">
             <component :is="getFileIconComponent(file.type)" class="row-icon" :class="file.type" />
@@ -193,6 +195,7 @@
           :key="file.path"
           :file="file"
           @open="$emit('open-file', $event)"
+          @contextmenu.stop
         />
         <div v-if="filteredFiles.length === 0 && files.length > 0" class="empty-folder">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">

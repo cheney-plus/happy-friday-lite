@@ -500,6 +500,12 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  ipcMain.handle('kb-open-in-explorer', async (_event, args) => {
+    if (args.path) {
+      await shell.openPath(args.path)
+    }
+  })
+
   // ========== Python 相关命令 ==========
 
   ipcMain.handle('python-check', async () => {

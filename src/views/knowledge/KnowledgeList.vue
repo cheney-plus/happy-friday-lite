@@ -90,6 +90,12 @@
         </svg>
         <span>新建文件夹</span>
       </div>
+      <div class="context-menu-item" @mousedown="openInFinder">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <span>打开本地文件夹</span>
+      </div>
     </KbContextMenu>
 
     <!-- 新建文件夹对话框 -->
@@ -129,6 +135,7 @@ import KbContextMenu from './components/KbContextMenu.vue';
 import NewFolderDialog from './components/NewFolderDialog.vue';
 import CreateKbDialog from './components/CreateKbDialog.vue';
 import FeatureModal from './components/FeatureModal.vue';
+import { electronService } from '@/services/electron';
 import { useSidebar } from './composables/useSidebar';
 import { useFileSystem } from './composables/useFileSystem';
 import { useKnowledgeBase } from './composables/useKnowledgeBase';
@@ -211,6 +218,14 @@ function handleEditKB() {
 function handleDeleteKB() {
   hideContextMenu();
   deleteKnowledgeBase(contextMenu);
+}
+
+function openInFinder() {
+  hideFileContextMenu();
+  const dirPath = fileSystem.currentPath.value;
+  if (dirPath) {
+    electronService.invoke('kb-open-in-explorer', { path: dirPath });
+  }
 }
 
 onMounted(async () => {
