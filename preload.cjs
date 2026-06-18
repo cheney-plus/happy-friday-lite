@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-path-exists',
       'kb-copy-file',
       'kb-copy-folder',
+      'kb-save-webpage',
       'kb-delete-dir',
       'kb-rename-dir',
       'kb-open-in-explorer',

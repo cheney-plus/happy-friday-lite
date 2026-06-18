@@ -259,6 +259,18 @@
 
     <KbQuestionBox :is-folder="isFolderView" />
 
+    <!-- 网页上传对话框 -->
+    <NewFolderDialog
+      :visible="showWebpageDialog"
+      :folder-name="webpageUrl"
+      :input-ref="webpageInputRef"
+      title="上传网页"
+      placeholder="请输入网页地址，如 https://example.com"
+      @close="closeWebpageDialog"
+      @confirm="confirmWebpageUpload"
+      @update:folder-name="webpageUrl = $event"
+    />
+
     <!-- 上传格式错误提示 -->
     <Teleport to="body">
       <Transition name="dialog-fade">
@@ -289,6 +301,7 @@
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import FileCard from './FileCard.vue';
 import KbQuestionBox from './KbQuestionBox.vue';
+import NewFolderDialog from './NewFolderDialog.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
 import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
 
@@ -358,6 +371,12 @@ const uploadWrapperRef = ref(null);
 const showUploadError = ref(false);
 const uploadErrorMsg = ref('');
 
+// 网页上传对话框
+const showWebpageDialog = ref(false);
+const webpageUrl = ref('');
+const webpageInputRef = ref(null);
+const isSavingWebpage = ref(false);
+
 function toggleUploadMenu() {
   showUploadMenu.value = !showUploadMenu.value;
   showSortMenu.value = false;
@@ -410,11 +429,49 @@ async function handleUpload(type) {
       });
       console.log('[Upload] copy folder result:', result);
       emit('refresh');
-    } else if (type === 'note' || type === 'webpage') {
+    } else if (type === 'note') {
       // TODO: 待实现
+    } else if (type === 'webpage') {
+      webpageUrl.value = '';
+      showWebpageDialog.value = true;
+      nextTick(() => {
+        webpageInputRef.value?.focus();
+      });
     }
   } catch (e) {
     console.error('[Upload] error:', e);
+  }
+}
+
+function closeWebpageDialog() {
+  showWebpageDialog.value = false;
+  webpageUrl.value = '';
+  isSavingWebpage.value = false;
+}
+
+async function confirmWebpageUpload() {
+  const url = webpageUrl.value.trim();
+  if (!url) return;
+  const api = window.electronAPI;
+  const destDir = String(props.currentPath || '');
+  if (!api || !destDir) return;
+
+  isSavingWebpage.value = true;
+  try {
+    const result = await api.invoke('kb-save-webpage', { url, destDir });
+    if (result.success) {
+      closeWebpageDialog();
+      emit('refresh');
+    } else {
+      uploadErrorMsg.value = `网页保存失败：${result.error}`;
+      showUploadError.value = true;
+      closeWebpageDialog();
+    }
+  } catch (e) {
+    console.error('[Upload webpage] error:', e);
+    uploadErrorMsg.value = `网页保存失败：${e.message}`;
+    showUploadError.value = true;
+    closeWebpageDialog();
   }
 }
 
