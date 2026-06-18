@@ -35,7 +35,7 @@
               class="search-input"
               placeholder="搜索文件..."
               @keydown.escape="closeSearch"
-              @blur="closeSearch"
+              @blur="handleSearchBlur"
             />
             <button class="search-close" @click="closeSearch">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -149,7 +149,43 @@
       </div>
     </div>
 
-    <div class="file-grid" :class="[viewMode, { 'is-empty': filteredFiles.length === 0 }]" v-if="selectedKB" @contextmenu.prevent="$emit('show-file-context-menu', $event)">
+    <!-- 搜索结果列表 -->
+    <div class="file-grid list search-results" v-if="selectedKB && isSearching" @contextmenu.prevent="$emit('show-file-context-menu', $event)">
+      <div class="list-header">
+        <span class="col-name">名称</span>
+        <span class="col-type">类型</span>
+        <span class="col-size">大小</span>
+        <span class="col-time">更新时间</span>
+      </div>
+      <div
+        v-for="file in searchResults"
+        :key="file.path"
+        class="list-row search-row"
+        @click="handleSearchResultClick(file)"
+        @contextmenu.stop.prevent="$emit('show-file-item-context-menu', $event, file)"
+      >
+        <div class="col-name">
+          <component :is="getFileIconComponent(file.type)" class="row-icon" :class="file.type" />
+          <div class="row-name-wrap">
+            <span class="row-name">{{ file.name }}</span>
+            <span class="row-path" v-if="file.relativePath && file.relativePath !== file.name">{{ file.relativePath }}</span>
+          </div>
+        </div>
+        <span class="col-type">{{ getTypeLabel(file.type) }}</span>
+        <span class="col-size">{{ formatSize(file) }}</span>
+        <span class="col-time">{{ formatTime(file.modifiedTime) }}</span>
+      </div>
+      <div v-if="searchResults.length === 0" class="empty-folder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <p>未找到匹配的文件</p>
+      </div>
+    </div>
+
+    <!-- 正常文件视图 -->
+    <div class="file-grid" :class="[viewMode, { 'is-empty': filteredFiles.length === 0 }]" v-else-if="selectedKB" @contextmenu.prevent="$emit('show-file-context-menu', $event)">
       <!-- 列表视图 -->
       <template v-if="viewMode === 'list'">
         <div class="list-header">
@@ -250,11 +286,11 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import FileCard from './FileCard.vue';
 import KbQuestionBox from './KbQuestionBox.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
-import { FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
+import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
 
 const props = defineProps({
   selectedKB: String,
@@ -273,12 +309,16 @@ const emit = defineEmits([
   'refresh',
   'show-file-context-menu',
   'show-file-item-context-menu',
-  'open-file'
+  'open-file',
+  'open-search-result'
 ]);
 
 const searchVisible = ref(false);
 const searchQuery = ref('');
 const searchInputRef = ref(null);
+const searchResults = ref([]);
+const isSearching = computed(() => searchQuery.value.trim().length > 0);
+let searchTimer = null;
 const viewMode = ref('grid');
 const showSortMenu = ref(false);
 const sortWrapperRef = ref(null);
@@ -431,6 +471,59 @@ function toggleSearch() {
 function closeSearch() {
   searchVisible.value = false;
   searchQuery.value = '';
+  searchResults.value = [];
+}
+
+// 延迟关闭搜索，避免点击搜索结果时 blur 先触发导致结果消失
+function handleSearchBlur() {
+  setTimeout(closeSearch, 200);
+}
+
+// 根据文件名获取文件类型
+function getFileType(fileName) {
+  const ext = fileName.split('.').pop().toLowerCase();
+  for (const [type, exts] of Object.entries(FILE_TYPE_MAP)) {
+    if (exts.includes(ext)) return type;
+  }
+  return 'unknown';
+}
+
+// 防抖递归搜索
+function performSearch() {
+  const query = searchQuery.value.trim();
+  if (!query) {
+    searchResults.value = [];
+    return;
+  }
+  const api = window.electronAPI;
+  if (!api || !props.currentPath) {
+    searchResults.value = [];
+    return;
+  }
+  api.invoke('kb-search-files', {
+    dirPath: props.currentPath,
+    query,
+    allowedExtensions: ALLOWED_EXTENSIONS
+  }).then(results => {
+    // 为搜索结果补充 type 字段
+    searchResults.value = (results || []).map(item => ({
+      ...item,
+      type: item.isDirectory ? 'folder' : getFileType(item.name)
+    }));
+  }).catch(e => {
+    console.error('[Search] error:', e);
+    searchResults.value = [];
+  });
+}
+
+watch(searchQuery, () => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(performSearch, 250);
+});
+
+function handleSearchResultClick(file) {
+  closeSearch();
+  emit('open-search-result', file);
 }
 
 function getFileIconComponent(type) {
@@ -850,6 +943,22 @@ onBeforeUnmount(() => {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+          }
+
+          .row-name-wrap {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+          }
+
+          .row-path {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 1px;
           }
         }
 

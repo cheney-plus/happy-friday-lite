@@ -171,6 +171,17 @@ export function useFileSystem() {
     router.push(tab.fullPath);
   }
 
+  // 搜索结果点击：文件夹则进入，文件则跳转到所在目录
+  async function openSearchResult(file) {
+    if (file.isDirectory) {
+      await navigateTo(file.path);
+    } else {
+      const lastSep = Math.max(file.path.lastIndexOf('/'), file.path.lastIndexOf('\\'));
+      const parentPath = lastSep > 0 ? file.path.substring(0, lastSep) : currentPath.value;
+      await navigateTo(parentPath);
+    }
+  }
+
   async function refreshCurrentDir() {
     if (currentPath.value) {
       await readDirectory(currentPath.value);
@@ -343,6 +354,7 @@ export function useFileSystem() {
     goForward,
     navigateToSegment,
     openFile,
+    openSearchResult,
     refreshCurrentDir,
     openNewFolderDialog,
     closeNewFolderDialog,

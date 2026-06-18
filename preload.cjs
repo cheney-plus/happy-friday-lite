@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-get-data-dir',
       'kb-read-dir',
       'kb-create-dir',
+      'kb-search-files',
       'kb-mkdir',
       'kb-path-exists',
       'kb-copy-file',

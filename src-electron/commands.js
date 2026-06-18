@@ -440,6 +440,67 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  // 递归搜索目录下匹配的文件和文件夹
+  ipcMain.handle('kb-search-files', async (_event, args) => {
+    const { dirPath, query, allowedExtensions } = args
+    if (!dirPath || !query) return []
+    const lowerQuery = String(query).toLowerCase()
+    const results = []
+
+    function walk(currentPath, relativePath) {
+      if (!fs.existsSync(currentPath)) return
+      let entries
+      try {
+        entries = fs.readdirSync(currentPath, { withFileTypes: true })
+      } catch (e) {
+        return
+      }
+      for (const entry of entries) {
+        if (entry.name.startsWith('.')) continue
+        const fullPath = path.join(currentPath, entry.name)
+        const relPath = relativePath ? relativePath + '/' + entry.name : entry.name
+        const nameLower = entry.name.toLowerCase()
+
+        if (nameLower.includes(lowerQuery)) {
+          let stat
+          try { stat = fs.statSync(fullPath) } catch (e) { continue }
+          // 对文件进行扩展名过滤
+          if (!entry.isDirectory()) {
+            const ext = entry.name.split('.').pop().toLowerCase()
+            if (allowedExtensions && allowedExtensions.length > 0 && !allowedExtensions.includes(ext)) {
+              // 不匹配白名单，跳过
+            } else {
+              results.push({
+                name: entry.name,
+                path: fullPath,
+                relativePath: relPath,
+                isDirectory: false,
+                size: stat.size,
+                modifiedTime: stat.mtime.toISOString()
+              })
+            }
+          } else {
+            results.push({
+              name: entry.name,
+              path: fullPath,
+              relativePath: relPath,
+              isDirectory: true,
+              size: 0,
+              modifiedTime: stat.mtime.toISOString()
+            })
+          }
+        }
+
+        if (entry.isDirectory()) {
+          walk(fullPath, relPath)
+        }
+      }
+    }
+
+    walk(dirPath, '')
+    return results
+  })
+
   ipcMain.handle('kb-mkdir', async (_event, args) => {
     const parentPath = args.parentPath
     const dirName = args.dirName

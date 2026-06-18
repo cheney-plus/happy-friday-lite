@@ -49,6 +49,7 @@
       @show-file-context-menu="showFileContextMenu"
       @show-file-item-context-menu="showFileItemContextMenu"
       @open-file="openFile"
+      @open-search-result="handleOpenSearchResult"
     />
 
     <!-- 知识库右键菜单 -->
@@ -228,6 +229,7 @@ const {
   goForward,
   navigateToSegment,
   openFile,
+  openSearchResult,
   refreshCurrentDir,
   openNewFolderDialog,
   closeNewFolderDialog,
@@ -329,6 +331,10 @@ function handleDeleteFile() {
     deleteConfirmMessage.value = `确认删除「${item.name}」？此操作不可撤销。`;
   }
   showDeleteConfirm.value = true;
+}
+
+function handleOpenSearchResult(file) {
+  openSearchResult(file);
 }
 
 function openInFinder() {
