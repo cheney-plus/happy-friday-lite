@@ -46,6 +46,10 @@ export const FILE_TYPE_LABELS = {
   word: 'Word',
   note: '笔记',
   ppt: 'PPT',
+  epub: 'EPUB',
+  html: 'HTML',
+  xml: 'XML',
+  json: 'JSON',
   unknown: '文件'
 };
 

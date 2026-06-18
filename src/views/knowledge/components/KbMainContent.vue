@@ -149,7 +149,7 @@
       </div>
     </div>
 
-    <div class="file-grid" :class="viewMode" v-if="selectedKB" @contextmenu.prevent="$emit('show-file-context-menu', $event)">
+    <div class="file-grid" :class="[viewMode, { 'is-empty': filteredFiles.length === 0 }]" v-if="selectedKB" @contextmenu.prevent="$emit('show-file-context-menu', $event)">
       <!-- 列表视图 -->
       <template v-if="viewMode === 'list'">
         <div class="list-header">
@@ -776,9 +776,13 @@ onBeforeUnmount(() => {
     min-height: 0;
     padding: 20px 40px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fill, 140px);
     gap: 16px 24px;
     align-content: start;
+
+    &.is-empty:not(.list) {
+      align-content: center;
+    }
 
     &.list {
       display: flex;
@@ -835,6 +839,10 @@ onBeforeUnmount(() => {
             &.word { color: #2196F3; }
             &.note { color: #FFC107; }
             &.ppt { color: #FF9800; }
+            &.epub { color: #9C27B0; }
+            &.html { color: #00BCD4; }
+            &.xml { color: #607D8B; }
+            &.json { color: #FF9800; }
           }
 
           .row-name {

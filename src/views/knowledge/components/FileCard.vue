@@ -52,6 +52,7 @@ defineEmits(['open']);
 
 <style scoped lang="scss">
 .file-card {
+  width: 140px;
   border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 12px;
@@ -71,8 +72,8 @@ defineEmits(['open']);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 80px;
-    margin-bottom: 8px;
+    height: 60px;
+    margin-bottom: 6px;
 
     .file-type-icon {
       display: flex;
@@ -83,7 +84,7 @@ defineEmits(['open']);
       border-radius: 12px;
       transition: all 0.25s ease;
 
-      &.folder { color: #1560F7; }
+      &.folder { background: #E3F2FD; color: #1560F7; }
       &.markdown { background: #E8F5E9; color: #4CAF50; }
       &.pdf { background: #FFEBEE; color: #F44336; }
       &.txt { background: #F5F5F5; color: #9E9E9E; }
@@ -91,6 +92,10 @@ defineEmits(['open']);
       &.word { background: #E3F2FD; color: #2196F3; }
       &.note { background: #FFF8E1; color: #FFC107; }
       &.ppt { background: #FFF3E0; color: #FF9800; }
+      &.epub { background: #F3E5F5; color: #9C27B0; }
+      &.html { background: #E0F7FA; color: #00BCD4; }
+      &.xml { background: #ECEFF1; color: #607D8B; }
+      &.json { background: #FFF3E0; color: #FF9800; }
       &.unknown { background: #ECEFF1; color: #90A4AE; }
     }
   }
@@ -108,7 +113,7 @@ defineEmits(['open']);
       font-size: 12.5px;
       font-weight: 500;
       color: var(--text-primary);
-      margin: 0 0 auto 6px;
+      margin: 0 0 6px 0;
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
@@ -117,9 +122,12 @@ defineEmits(['open']);
       -webkit-box-orient: vertical;
       line-height: 1.4;
       text-align: center;
+      word-break: break-all;
+      min-height: 35px;
     }
 
     .file-meta {
+      margin-top: auto;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -152,6 +160,10 @@ defineEmits(['open']);
         &.word { color: #2196F3; }
         &.note { color: #FFC107; }
         &.ppt { color: #FF9800; }
+        &.epub { color: #9C27B0; }
+        &.html { color: #00BCD4; }
+        &.xml { color: #607D8B; }
+        &.json { color: #FF9800; }
         &.unknown { color: #90A4AE; }
       }
     }
