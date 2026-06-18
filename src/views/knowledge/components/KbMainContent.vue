@@ -221,7 +221,7 @@
       <p>从左侧选择或创建一个知识库开始</p>
     </div>
 
-    <KbQuestionBox />
+    <KbQuestionBox :is-folder="isFolderView" />
 
     <!-- 上传格式错误提示 -->
     <Teleport to="body">
@@ -283,6 +283,8 @@ const showSortMenu = ref(false);
 const sortWrapperRef = ref(null);
 const sortBy = ref('name');
 const sortOrder = ref('asc');
+
+const isFolderView = computed(() => props.pathSegments && props.pathSegments.length > 1);
 
 const sortOptions = [
   { key: 'modifiedTime', label: '更新时间' },

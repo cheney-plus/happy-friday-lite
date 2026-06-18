@@ -4,7 +4,7 @@
       <textarea
         :value="question"
         class="main-input"
-        placeholder="基于知识库提问"
+        :placeholder="isFolder ? '基于文件夹提问' : '基于知识库提问'"
         rows="1"
         @input="$emit('update:question', $event.target.value); autoResize($event)"
         ref="textareaRef"
@@ -77,7 +77,8 @@
 
 <script setup>
 defineProps({
-  question: { type: String, default: '' }
+  question: { type: String, default: '' },
+  isFolder: { type: Boolean, default: false }
 });
 
 defineEmits(['update:question', 'ask']);

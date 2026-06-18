@@ -16,6 +16,11 @@ export const routes = [
     component: () => import('@/views/knowledge/KnowledgeDetail.vue')
   },
   {
+    path: '/file-viewer',
+    name: 'file-viewer',
+    component: () => import('@/views/knowledge/FileViewerPage.vue')
+  },
+  {
     path: '/note',
     name: 'note',
     component: () => import('@/views/note/NoteList.vue')

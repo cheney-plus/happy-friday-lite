@@ -1,9 +1,16 @@
 import { ref, computed, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
+import { useTabStore } from '@/store';
 import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile } from '../constants';
 import { FILE_ICON_MAP, UnknownFileIcon } from '../components/icons';
 
+// 需要调用系统默认应用打开的文件类型
+const SYSTEM_APP_TYPES = ['word', 'excel', 'ppt'];
+
 export function useFileSystem() {
   const api = window.electronAPI;
+  const router = useRouter();
+  const tabStore = useTabStore();
 
   const dataDir = ref('');
   const currentPath = ref('');
@@ -143,7 +150,19 @@ export function useFileSystem() {
   async function openFile(file) {
     if (file.isDirectory) {
       await navigateTo(file.path);
+      return;
     }
+    // Word/Excel/PPT/CSV 使用系统默认应用打开
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (SYSTEM_APP_TYPES.includes(file.type) || ext === 'csv') {
+      if (api) {
+        await api.invoke('kb-open-file-external', { filePath: file.path });
+      }
+      return;
+    }
+    // 其他文件在新标签页中打开
+    const tab = tabStore.addFileTab(file);
+    router.push(tab.fullPath);
   }
 
   async function refreshCurrentDir() {

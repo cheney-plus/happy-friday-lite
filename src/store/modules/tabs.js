@@ -28,6 +28,22 @@ export const useTabStore = defineStore('tabs', {
       this.activeTabId = tab.id
       return tab
     },
+    addFileTab(file) {
+      const id = `file-${file.path}`
+      const existingTabIndex = this.openedTabs.findIndex(t => t.id === id)
+      if (existingTabIndex === -1) {
+        const tab = {
+          id,
+          path: '/file-viewer',
+          fullPath: `/file-viewer?path=${encodeURIComponent(file.path)}&name=${encodeURIComponent(file.name)}&type=${file.type || 'unknown'}`,
+          title: file.name,
+          icon: 'FileText'
+        }
+        this.openedTabs.push(tab)
+      }
+      this.activeTabId = id
+      return this.openedTabs.find(t => t.id === id)
+    },
     removeTab(id) {
       const index = this.openedTabs.findIndex(t => t.id === id)
       if (index !== -1) {

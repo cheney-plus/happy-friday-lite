@@ -16,6 +16,8 @@
     "start": "electron ."
   },
   "dependencies": {
+    "@somecat/epub-reader": "^0.1.11",
+    "pdfjs-dist": "^6.0.227",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
@@ -86,7 +88,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "category": "public.app-category.productivity",
@@ -96,7 +101,9 @@
         {
           "from": "python/python-darwin-${arch}/",
           "to": "python/python-darwin-${arch}",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },
@@ -105,7 +112,10 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-win-${arch}.${ext}",
@@ -113,7 +123,9 @@
         {
           "from": "python/python-win32-${arch}/",
           "to": "python/python-win32-${arch}",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },
@@ -127,7 +139,10 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "category": "Utility",
@@ -136,7 +151,9 @@
         {
           "from": "python/python-linux-${arch}/",
           "to": "python/python-linux-${arch}",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     }

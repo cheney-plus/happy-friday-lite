@@ -59,7 +59,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-copy-folder',
       'kb-delete-dir',
       'kb-rename-dir',
-      'kb-open-in-explorer'
+      'kb-open-in-explorer',
+      'kb-read-file',
+      'kb-read-file-buffer',
+      'kb-open-file-external'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

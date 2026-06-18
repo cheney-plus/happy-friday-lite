@@ -35,6 +35,8 @@ export default defineConfig(() => ({
           if (id.includes("node_modules")) {
             if (id.includes("@tiptap")) return "vendor-tiptap";
             if (id.includes("@schedule-x")) return "vendor-schedule";
+            if (id.includes("pdfjs-dist")) return "vendor-pdfjs";
+            if (id.includes("@somecat/epub-reader") || id.includes("foliate-js")) return "vendor-epub";
             if (
               id.includes("vue/") ||
               id.includes("vue-router") ||

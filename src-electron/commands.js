@@ -537,6 +537,41 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  ipcMain.handle('kb-read-file', async (_event, args) => {
+    const filePath = args.filePath
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { success: false, error: 'File not found' }
+    }
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8')
+      return { success: true, content }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('kb-read-file-buffer', async (_event, args) => {
+    const filePath = args.filePath
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { success: false, error: 'File not found' }
+    }
+    try {
+      const buffer = fs.readFileSync(filePath)
+      // 转为 ArrayBuffer 以确保 IPC 序列化正确
+      const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+      return { success: true, data: arrayBuffer }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('kb-open-file-external', async (_event, args) => {
+    if (args.filePath) {
+      await shell.openPath(args.filePath)
+    }
+    return true
+  })
+
   // ========== Python 相关命令 ==========
 
   ipcMain.handle('python-check', async () => {

@@ -42,7 +42,23 @@ watch(
 
     const rootPath = '/' + newPath.split('/')[1];
     const menu = allMenuConfigs.find(m => m.path === rootPath);
-    if (!menu) return;
+    if (!menu) {
+      // 处理文件查看器路由
+      if (rootPath === '/file-viewer') {
+        const params = new URLSearchParams(newPath.split('?')[1] || '');
+        const filePath = params.get('path') || '';
+        const fileName = params.get('name') || '文件';
+        const fileType = params.get('type') || 'unknown';
+        const existingTab = tabStore.openedTabs.find(t => t.id === `file-${filePath}`);
+        if (!existingTab) {
+          tabStore.addFileTab({ path: filePath, name: fileName, type: fileType });
+        } else {
+          tabStore.setActiveTab(existingTab.id);
+          tabStore.updateTabFullPath(existingTab.id, newPath);
+        }
+      }
+      return;
+    }
 
     const activeTab = tabStore.openedTabs.find(t => t.id === tabStore.activeTabId);
     if (activeTab) {
