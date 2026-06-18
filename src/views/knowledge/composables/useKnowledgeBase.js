@@ -27,6 +27,13 @@ export function useKnowledgeBase(fileSystem, sidebar) {
       const catDir = baseDir + '/' + category.id;
       try {
         await api.invoke('kb-create-dir', { dirPath: catDir });
+
+        // 确保默认知识库文件夹存在于磁盘上
+        for (const item of category.items) {
+          const kbDir = catDir + '/' + item.name;
+          await api.invoke('kb-create-dir', { dirPath: kbDir });
+        }
+
         const entries = await api.invoke('kb-read-dir', { dirPath: catDir });
         // 只添加磁盘上存在但列表中没有的文件夹
         for (const entry of entries) {

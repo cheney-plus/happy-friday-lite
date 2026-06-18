@@ -71,8 +71,7 @@ export const DEFAULT_CATEGORIES = [
     name: '个人知识库',
     expanded: true,
     items: [
-      { id: 'cheney-kb', name: 'Cheney的知识库' },
-      { id: '2342342', name: '工作知识库' }
+      { id: 'personal-notes', name: '我的笔记' }
     ]
   },
   {
@@ -87,6 +86,8 @@ export const DEFAULT_CATEGORIES = [
     id: 'local',
     name: '本地知识库',
     expanded: false,
-    items: []
+    items: [
+      { id: 'local-books', name: '我的书籍' }
+    ]
   }
 ];
