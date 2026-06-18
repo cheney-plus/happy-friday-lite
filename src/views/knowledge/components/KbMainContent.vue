@@ -271,6 +271,14 @@
       @update:folder-name="webpageUrl = $event"
     />
 
+    <!-- 上传笔记选择对话框 -->
+    <SelectNoteDialog
+      :visible="showNoteDialog"
+      :saving="isSavingNote"
+      @close="closeNoteDialog"
+      @confirm="confirmNoteUpload"
+    />
+
     <!-- 上传格式错误提示 -->
     <Teleport to="body">
       <Transition name="dialog-fade">
@@ -302,6 +310,7 @@ import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import FileCard from './FileCard.vue';
 import KbQuestionBox from './KbQuestionBox.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
+import SelectNoteDialog from './SelectNoteDialog.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
 import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
 
@@ -377,6 +386,10 @@ const webpageUrl = ref('');
 const webpageInputRef = ref(null);
 const isSavingWebpage = ref(false);
 
+// 笔记上传对话框
+const showNoteDialog = ref(false);
+const isSavingNote = ref(false);
+
 function toggleUploadMenu() {
   showUploadMenu.value = !showUploadMenu.value;
   showSortMenu.value = false;
@@ -430,7 +443,7 @@ async function handleUpload(type) {
       console.log('[Upload] copy folder result:', result);
       emit('refresh');
     } else if (type === 'note') {
-      // TODO: 待实现
+      showNoteDialog.value = true;
     } else if (type === 'webpage') {
       webpageUrl.value = '';
       showWebpageDialog.value = true;
@@ -447,6 +460,43 @@ function closeWebpageDialog() {
   showWebpageDialog.value = false;
   webpageUrl.value = '';
   isSavingWebpage.value = false;
+}
+
+function closeNoteDialog() {
+  showNoteDialog.value = false;
+  isSavingNote.value = false;
+}
+
+async function confirmNoteUpload(selectedNotes) {
+  const api = window.electronAPI;
+  const destDir = String(props.currentPath || '');
+  if (!api || !destDir || !selectedNotes || selectedNotes.length === 0) return;
+
+  isSavingNote.value = true;
+  let failedNotes = [];
+  try {
+    for (const note of selectedNotes) {
+      const result = await api.invoke('kb-save-note', {
+        title: note.title || '未命名笔记',
+        content: note.content || '',
+        destDir
+      });
+      if (!result || !result.success) {
+        failedNotes.push(note.title || '未命名笔记');
+      }
+    }
+    if (failedNotes.length > 0) {
+      uploadErrorMsg.value = `以下笔记保存失败：${failedNotes.join('、')}`;
+      showUploadError.value = true;
+    }
+    closeNoteDialog();
+    emit('refresh');
+  } catch (e) {
+    console.error('[Upload note] error:', e);
+    uploadErrorMsg.value = `笔记保存失败：${e.message}`;
+    showUploadError.value = true;
+    closeNoteDialog();
+  }
 }
 
 async function confirmWebpageUpload() {

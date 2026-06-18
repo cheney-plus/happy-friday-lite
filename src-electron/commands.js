@@ -633,6 +633,37 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  // 将笔记内容保存为 Markdown 文件到指定目录
+  ipcMain.handle('kb-save-note', async (_event, args) => {
+    const { title, content, destDir } = args
+    if (!destDir) return { success: false, error: 'Missing destDir' }
+    try {
+      // 清理标题中的非法文件名字符
+      let baseName = (title || '未命名笔记').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
+      if (!baseName) baseName = '未命名笔记'
+      // 限制文件名长度
+      if (baseName.length > 80) baseName = baseName.substring(0, 80)
+
+      let fileName = baseName + '.md'
+      let filePath = path.join(destDir, fileName)
+
+      // 处理文件名冲突
+      if (fs.existsSync(filePath)) {
+        let counter = 1
+        while (fs.existsSync(filePath)) {
+          fileName = `${baseName} 副本${counter > 1 ? ' ' + counter : ''}.md`
+          filePath = path.join(destDir, fileName)
+          counter++
+        }
+      }
+
+      fs.writeFileSync(filePath, content || '', 'utf-8')
+      return { success: true, path: filePath, fileName }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
   ipcMain.handle('kb-delete-dir', async (_event, args) => {
     const dirPath = args.dirPath
     if (!dirPath) return { success: false, error: 'No path provided' }

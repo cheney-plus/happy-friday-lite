@@ -422,6 +422,20 @@
         </Transition>
       </div>
     </Transition>
+
+    <!-- 知识库目录选择弹窗 -->
+    <KbDirSelectDialog
+      :visible="showKbDirDialog"
+      @close="showKbDirDialog = false"
+      @confirm="handleKbDirConfirm"
+    />
+
+    <!-- 笔记保存到知识库的提示 -->
+    <Transition name="chat-toast-fade">
+      <div v-if="kbSaveToastVisible" class="kb-save-toast">
+        {{ kbSaveToastMessage }}
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -474,6 +488,7 @@ import diff from 'highlight.js/lib/languages/diff';
 import { VueNodeViewRenderer } from '@tiptap/vue-3';
 import CodeBlockComponent from './CodeBlockComponent.vue';
 import NoteBubbleMenu from './NoteBubbleMenu.vue';
+import KbDirSelectDialog from '@/views/knowledge/components/KbDirSelectDialog.vue';
 import { useAppStore } from '@/store';
 import { marked } from 'marked';
 
@@ -689,8 +704,60 @@ const closeMoreMenu = () => {
   showShareSubmenu.value = false;
 };
 
+const showKbDirDialog = ref(false);
+const kbSaveToastVisible = ref(false);
+const kbSaveToastMessage = ref('');
+
 const handleAddContent = () => {
-  editor.value?.chain().focus().run();
+  showKbDirDialog.value = true;
+};
+
+const handleKbDirConfirm = async ({ path: destDir, name: kbName }) => {
+  if (!editor.value) return;
+  try {
+    const html = editor.value.getHTML();
+    const title = extractTitleFromContent(html);
+
+    const TurndownService = (await import('turndown')).default;
+    const turndown = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      bulletListMarker: '-',
+    });
+    turndown.addRule('taskListItems', {
+      filter: (node) => {
+        return node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem';
+      },
+      replacement: (content, node) => {
+        const checkbox = node.querySelector('input[type="checkbox"]');
+        const checked = checkbox?.hasAttribute('checked') ? 'x' : ' ';
+        return `- [${checked}] ${content.trim()}\n`;
+      }
+    });
+    const markdown = turndown.turndown(html);
+
+    const result = await electronService.invoke('kb-save-note', {
+      title,
+      content: markdown,
+      destDir
+    });
+
+    showKbDirDialog.value = false;
+
+    if (result.success) {
+      kbSaveToastMessage.value = `已保存到「${kbName}」知识库`;
+      kbSaveToastVisible.value = true;
+      setTimeout(() => {
+        kbSaveToastVisible.value = false;
+      }, 2500);
+    } else {
+      alert(`保存失败: ${result.error}`);
+    }
+  } catch (error) {
+    console.error('保存到知识库失败:', error);
+    showKbDirDialog.value = false;
+    alert(`保存失败: ${error}`);
+  }
 };
 
 const shareLink = () => {
@@ -2900,6 +2967,23 @@ const fixEmptyTableCells = (html) => {
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   z-index: 9999;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.kb-save-toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  background: var(--text-primary, #1a1a1a);
+  color: var(--bg-primary, #fff);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 10001;
   pointer-events: none;
   white-space: nowrap;
 }

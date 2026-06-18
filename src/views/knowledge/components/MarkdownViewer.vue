@@ -73,6 +73,13 @@ onMounted(() => {
   color: var(--text-primary);
   font-size: 15px;
   line-height: 1.8;
+  -webkit-user-select: text;
+  user-select: text;
+
+  :deep(*) {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 
   :deep(h1) {
     font-size: 26px;
