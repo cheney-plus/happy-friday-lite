@@ -23,6 +23,12 @@ export function useFileSystem() {
   const newFolderName = ref('');
   const newFolderInputRef = ref(null);
 
+  // 重命名对话框状态
+  const showRenameDialog = ref(false);
+  const renameItem = ref(null);
+  const renameName = ref('');
+  const renameInputRef = ref(null);
+
   const canGoBack = computed(() => historyIndex.value > 0);
   const canGoForward = computed(() => historyIndex.value < navigationHistory.value.length - 1);
 
@@ -203,6 +209,103 @@ export function useFileSystem() {
     }
   }
 
+  // ===== 重命名功能 =====
+  function openRenameDialog(file) {
+    renameItem.value = file;
+    renameName.value = file.name;
+    showRenameDialog.value = true;
+    nextTick(() => {
+      renameInputRef.value?.focus();
+      renameInputRef.value?.select();
+    });
+  }
+
+  function closeRenameDialog() {
+    showRenameDialog.value = false;
+    renameItem.value = null;
+    renameName.value = '';
+  }
+
+  // 获取不含扩展名的文件名和扩展名
+  function splitNameAndExt(name) {
+    const lastDot = name.lastIndexOf('.');
+    // 隐藏文件(如 .gitignore)或无扩展名
+    if (lastDot <= 0) return { base: name, ext: '' };
+    return { base: name.substring(0, lastDot), ext: name.substring(lastDot) };
+  }
+
+  // 检查路径冲突并自动添加"副本"后缀
+  async function resolveNameConflict(parentPath, newName, originalPath) {
+    let candidateName = newName;
+    let candidatePath = parentPath + '/' + candidateName;
+
+    if (candidatePath === originalPath) {
+      return { name: candidateName, path: candidatePath };
+    }
+
+    let exists = await api.invoke('kb-path-exists', { path: candidatePath });
+    if (!exists) {
+      return { name: candidateName, path: candidatePath };
+    }
+
+    const { base, ext } = splitNameAndExt(newName);
+    let counter = 1;
+    while (exists) {
+      candidateName = base + ' 副本' + (counter > 1 ? ' ' + counter : '') + ext;
+      candidatePath = parentPath + '/' + candidateName;
+      exists = await api.invoke('kb-path-exists', { path: candidatePath });
+      counter++;
+    }
+    return { name: candidateName, path: candidatePath };
+  }
+
+  async function confirmRename() {
+    const newName = renameName.value.trim();
+    if (!newName || !renameItem.value || !api) {
+      closeRenameDialog();
+      return;
+    }
+
+    const file = renameItem.value;
+    if (newName === file.name) {
+      closeRenameDialog();
+      return;
+    }
+
+    try {
+      const lastSep = Math.max(file.path.lastIndexOf('/'), file.path.lastIndexOf('\\'));
+      const parentPath = file.path.substring(0, lastSep);
+      const { path: newPath } = await resolveNameConflict(parentPath, newName, file.path);
+
+      const result = await api.invoke('kb-rename-dir', { oldPath: file.path, newPath });
+      if (result.success) {
+        closeRenameDialog();
+        await refreshCurrentDir();
+      } else {
+        console.error('Failed to rename:', result.error);
+      }
+    } catch (e) {
+      console.error('Failed to rename:', e);
+    }
+  }
+
+  // ===== 删除文件/文件夹功能 =====
+  async function deleteFileOrFolder(file) {
+    if (!api || !file || !file.path) return false;
+    try {
+      const result = await api.invoke('kb-delete-dir', { dirPath: file.path });
+      if (result.success) {
+        await refreshCurrentDir();
+        return true;
+      }
+      console.error('Failed to delete:', result.error);
+      return false;
+    } catch (e) {
+      console.error('Failed to delete:', e);
+      return false;
+    }
+  }
+
   function resetNavigation() {
     files.value = [];
     currentPath.value = '';
@@ -221,6 +324,10 @@ export function useFileSystem() {
     showNewFolderDialog,
     newFolderName,
     newFolderInputRef,
+    showRenameDialog,
+    renameItem,
+    renameName,
+    renameInputRef,
     canGoBack,
     canGoForward,
     pathSegments,
@@ -240,6 +347,10 @@ export function useFileSystem() {
     openNewFolderDialog,
     closeNewFolderDialog,
     confirmNewFolder,
+    openRenameDialog,
+    closeRenameDialog,
+    confirmRename,
+    deleteFileOrFolder,
     resetNavigation
   };
 }

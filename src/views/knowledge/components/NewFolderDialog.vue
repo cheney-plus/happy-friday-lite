@@ -2,13 +2,13 @@
   <Teleport to="body">
     <div v-if="visible" class="modal-overlay" @click="$emit('close')">
       <div class="modal-content new-folder-dialog" @click.stop>
-        <h2 class="modal-title">新建文件夹</h2>
+        <h2 class="modal-title">{{ title }}</h2>
         <div class="new-folder-input-row">
           <input
             ref="inputRef"
             :value="folderName"
             class="new-folder-input"
-            placeholder="请输入文件夹名称"
+            :placeholder="placeholder"
             @input="$emit('update:folderName', $event.target.value)"
             @keydown.enter="$emit('confirm')"
             autofocus
@@ -27,7 +27,9 @@
 defineProps({
   visible: Boolean,
   folderName: { type: String, default: '' },
-  inputRef: Object
+  inputRef: Object,
+  title: { type: String, default: '新建文件夹' },
+  placeholder: { type: String, default: '请输入文件夹名称' }
 });
 
 defineEmits(['close', 'confirm', 'update:folderName']);

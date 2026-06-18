@@ -47,6 +47,7 @@
       @navigate-to-segment="navigateToSegment"
       @refresh="refreshCurrentDir"
       @show-file-context-menu="showFileContextMenu"
+      @show-file-item-context-menu="showFileItemContextMenu"
       @open-file="openFile"
     />
 
@@ -98,6 +99,31 @@
       </div>
     </KbContextMenu>
 
+    <!-- 文件/文件夹右键菜单 -->
+    <KbContextMenu
+      :visible="fileItemContextMenu.visible"
+      :x="fileItemContextMenu.x"
+      :y="fileItemContextMenu.y"
+      @close="hideFileItemContextMenu"
+    >
+      <div class="context-menu-item" @mousedown="handleRenameFile">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+        <span>重命名</span>
+      </div>
+      <div class="context-menu-item danger" @mousedown="handleDeleteFile">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          <line x1="10" y1="11" x2="10" y2="17"></line>
+          <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+        <span>删除</span>
+      </div>
+    </KbContextMenu>
+
     <!-- 新建文件夹对话框 -->
     <NewFolderDialog
       :visible="showNewFolderDialog"
@@ -106,6 +132,18 @@
       @close="closeNewFolderDialog"
       @confirm="confirmNewFolder"
       @update:folder-name="newFolderName = $event"
+    />
+
+    <!-- 重命名对话框 -->
+    <NewFolderDialog
+      :visible="showRenameDialog"
+      :folder-name="renameName"
+      :input-ref="renameInputRef"
+      title="重命名"
+      placeholder="请输入新名称"
+      @close="closeRenameDialog"
+      @confirm="confirmRename"
+      @update:folder-name="renameName = $event"
     />
 
     <!-- 创建/编辑知识库对话框 -->
@@ -155,6 +193,7 @@ const showDeleteConfirm = ref(false);
 const deleteConfirmMessage = ref('');
 const pendingDeleteItem = ref(null);
 const pendingDeleteCategoryId = ref('');
+const pendingDeleteFile = ref(null);
 
 const sidebar = useSidebar();
 
@@ -178,6 +217,9 @@ const {
   showNewFolderDialog,
   newFolderName,
   newFolderInputRef,
+  showRenameDialog,
+  renameName,
+  renameInputRef,
   canGoBack,
   canGoForward,
   pathSegments,
@@ -189,7 +231,11 @@ const {
   refreshCurrentDir,
   openNewFolderDialog,
   closeNewFolderDialog,
-  confirmNewFolder
+  confirmNewFolder,
+  openRenameDialog,
+  closeRenameDialog,
+  confirmRename,
+  deleteFileOrFolder
 } = fileSystem;
 
 const currentPath = computed(() => fileSystem.currentPath.value);
@@ -217,10 +263,13 @@ const {
 const {
   contextMenu,
   fileContextMenu,
+  fileItemContextMenu,
   showContextMenu,
   hideContextMenu,
   showFileContextMenu,
-  hideFileContextMenu
+  hideFileContextMenu,
+  showFileItemContextMenu,
+  hideFileItemContextMenu
 } = useContextMenu();
 
 function handleEditKB() {
@@ -242,6 +291,13 @@ function handleDeleteKB() {
 
 function confirmDelete() {
   showDeleteConfirm.value = false;
+
+  if (pendingDeleteFile.value) {
+    deleteFileOrFolder(pendingDeleteFile.value);
+    pendingDeleteFile.value = null;
+    return;
+  }
+
   deleteKnowledgeBase({ item: pendingDeleteItem.value, categoryId: pendingDeleteCategoryId.value });
   pendingDeleteItem.value = null;
   pendingDeleteCategoryId.value = '';
@@ -251,6 +307,28 @@ function cancelDelete() {
   showDeleteConfirm.value = false;
   pendingDeleteItem.value = null;
   pendingDeleteCategoryId.value = '';
+  pendingDeleteFile.value = null;
+}
+
+function handleRenameFile() {
+  const item = fileItemContextMenu.item;
+  hideFileItemContextMenu();
+  if (item) {
+    openRenameDialog(item);
+  }
+}
+
+function handleDeleteFile() {
+  const item = fileItemContextMenu.item;
+  hideFileItemContextMenu();
+  if (!item) return;
+  pendingDeleteFile.value = item;
+  if (item.isDirectory) {
+    deleteConfirmMessage.value = `删除「${item.name}」会导致该文件夹下所有文件被删除，是否确认删除？`;
+  } else {
+    deleteConfirmMessage.value = `确认删除「${item.name}」？此操作不可撤销。`;
+  }
+  showDeleteConfirm.value = true;
 }
 
 function openInFinder() {

@@ -15,6 +15,14 @@ export function useContextMenu() {
     y: 0
   });
 
+  // 文件/文件夹右键菜单
+  const fileItemContextMenu = reactive({
+    visible: false,
+    x: 0,
+    y: 0,
+    item: null
+  });
+
   function showContextMenu(event, categoryId, item) {
     contextMenu.visible = true;
     contextMenu.x = event.clientX;
@@ -38,12 +46,27 @@ export function useContextMenu() {
     fileContextMenu.visible = false;
   }
 
+  function showFileItemContextMenu(event, item) {
+    fileItemContextMenu.visible = true;
+    fileItemContextMenu.x = event.clientX;
+    fileItemContextMenu.y = event.clientY;
+    fileItemContextMenu.item = item;
+  }
+
+  function hideFileItemContextMenu() {
+    fileItemContextMenu.visible = false;
+    fileItemContextMenu.item = null;
+  }
+
   return {
     contextMenu,
     fileContextMenu,
+    fileItemContextMenu,
     showContextMenu,
     hideContextMenu,
     showFileContextMenu,
-    hideFileContextMenu
+    hideFileContextMenu,
+    showFileItemContextMenu,
+    hideFileItemContextMenu
   };
 }

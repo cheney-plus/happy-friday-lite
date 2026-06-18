@@ -163,7 +163,7 @@
           :key="file.path"
           class="list-row"
           @click="$emit('open-file', file)"
-          @contextmenu.stop
+          @contextmenu.stop.prevent="$emit('show-file-item-context-menu', $event, file)"
         >
           <div class="col-name">
             <component :is="getFileIconComponent(file.type)" class="row-icon" :class="file.type" />
@@ -195,7 +195,7 @@
           :key="file.path"
           :file="file"
           @open="$emit('open-file', $event)"
-          @contextmenu.stop
+          @contextmenu="$emit('show-file-item-context-menu', $event, file)"
         />
         <div v-if="filteredFiles.length === 0 && files.length > 0" class="empty-folder">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -272,6 +272,7 @@ const emit = defineEmits([
   'navigate-to-segment',
   'refresh',
   'show-file-context-menu',
+  'show-file-item-context-menu',
   'open-file'
 ]);
 

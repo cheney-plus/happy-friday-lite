@@ -1,5 +1,5 @@
 <template>
-  <div class="file-card" @click="$emit('open', file)" @dblclick="$emit('open', file)">
+  <div class="file-card" @click="$emit('open', file)" @dblclick="$emit('open', file)" @contextmenu.prevent.stop="$emit('contextmenu', $event)">
     <div class="file-preview">
       <div class="file-type-icon" :class="file.type">
         <component :is="getFileIconComponent(file.type)" />
@@ -47,7 +47,7 @@ defineProps({
   file: { type: Object, required: true }
 });
 
-defineEmits(['open']);
+defineEmits(['open', 'contextmenu']);
 </script>
 
 <style scoped lang="scss">
