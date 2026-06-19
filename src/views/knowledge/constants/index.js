@@ -28,7 +28,9 @@ export const ALLOWED_EXTENSIONS = [
   // Text-based
   'txt', 'text', 'log', 'csv', 'json', 'xml', 'md', 'markdown', 'mdx',
   // EPub
-  'epub'
+  'epub',
+  // 笔记引用
+  'note'
 ];
 
 export function isAllowedFile(fileName) {

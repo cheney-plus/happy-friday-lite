@@ -477,8 +477,8 @@ async function confirmNoteUpload(selectedNotes) {
   try {
     for (const note of selectedNotes) {
       const result = await api.invoke('kb-save-note', {
+        noteId: note.id,
         title: note.title || '未命名笔记',
-        content: note.content || '',
         destDir
       });
       if (!result || !result.success) {

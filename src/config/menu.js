@@ -9,8 +9,8 @@ import {
 
 export const sidebarMenuConfig = [
   { key: 'note', path: '/note', icon: 'FileText', iconComponent: FileText, i18nKey: 'note.title' },
-  { key: 'schedule', path: '/schedule', icon: 'CalendarDays', iconComponent: CalendarDays, i18nKey: 'schedule.title' },
-  { key: 'knowledge', path: '/knowledge', icon: 'FolderKanban', iconComponent: FolderKanban, i18nKey: 'knowledge.title' }
+  { key: 'knowledge', path: '/knowledge', icon: 'FolderKanban', iconComponent: FolderKanban, i18nKey: 'knowledge.title' },
+  { key: 'schedule', path: '/schedule', icon: 'CalendarDays', iconComponent: CalendarDays, i18nKey: 'schedule.title' }
 ]
 
 export const sidebarBottomMenuConfig = [

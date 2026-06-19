@@ -46,6 +46,10 @@
         v-else-if="file.type === 'markdown'"
         :file-path="file.path"
       />
+      <NoteViewer
+        v-else-if="file.type === 'note'"
+        :file-path="file.path"
+      />
       <HtmlViewer
         v-else-if="file.type === 'html'"
         :file-path="file.path"
@@ -63,6 +67,7 @@ import { ref, computed } from 'vue';
 import PdfViewer from './PdfViewer.vue';
 import EpubViewer from './EpubViewer.vue';
 import MarkdownViewer from './MarkdownViewer.vue';
+import NoteViewer from './NoteViewer.vue';
 import HtmlViewer from './HtmlViewer.vue';
 import TextViewer from './TextViewer.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';

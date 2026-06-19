@@ -718,27 +718,9 @@ const handleKbDirConfirm = async ({ path: destDir, name: kbName }) => {
     const html = editor.value.getHTML();
     const title = extractTitleFromContent(html);
 
-    const TurndownService = (await import('turndown')).default;
-    const turndown = new TurndownService({
-      headingStyle: 'atx',
-      codeBlockStyle: 'fenced',
-      bulletListMarker: '-',
-    });
-    turndown.addRule('taskListItems', {
-      filter: (node) => {
-        return node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem';
-      },
-      replacement: (content, node) => {
-        const checkbox = node.querySelector('input[type="checkbox"]');
-        const checked = checkbox?.hasAttribute('checked') ? 'x' : ' ';
-        return `- [${checked}] ${content.trim()}\n`;
-      }
-    });
-    const markdown = turndown.turndown(html);
-
     const result = await electronService.invoke('kb-save-note', {
+      noteId: props.noteId,
       title,
-      content: markdown,
       destDir
     });
 

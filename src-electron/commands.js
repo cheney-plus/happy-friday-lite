@@ -11,6 +11,68 @@ import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FI
 
 const cancelTokens = new CancellationTokens()
 
+// 扫描 KB 根目录下所有 .note 文件，返回匹配 noteId 的文件路径列表
+function findNoteRefFiles(noteId) {
+  const dataDir = getDataDir()
+  if (!dataDir) return []
+  const kbRoot = path.join(dataDir, 'knowledge')
+  if (!fs.existsSync(kbRoot)) return []
+
+  const results = []
+  function walk(dir) {
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch (e) {
+      return
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(fullPath)
+      } else if (entry.name.endsWith('.note')) {
+        try {
+          const raw = fs.readFileSync(fullPath, 'utf-8')
+          const meta = JSON.parse(raw)
+          if (meta.noteId === noteId) {
+            results.push({ path: fullPath, meta })
+          }
+        } catch (e) {
+          // 损坏的 .note 文件，跳过
+        }
+      }
+    }
+  }
+  walk(kbRoot)
+  return results
+}
+
+// 笔记标题变更时，同步更新关联 .note 文件内 JSON 的 title 字段
+// 文件名使用 noteId 永不变，只需更新内容
+function syncNoteRefOnRename(noteId, newTitle) {
+  const refs = findNoteRefFiles(noteId)
+  for (const ref of refs) {
+    try {
+      const updatedMeta = { ...ref.meta, title: newTitle || '未命名笔记' }
+      fs.writeFileSync(ref.path, JSON.stringify(updatedMeta, null, 2), 'utf-8')
+    } catch (e) {
+      console.error('[Commands] syncNoteRefOnRename error:', e)
+    }
+  }
+}
+
+// 笔记删除时，同步删除关联的 .note 文件
+function syncNoteRefOnDelete(noteId) {
+  const refs = findNoteRefFiles(noteId)
+  for (const ref of refs) {
+    try {
+      fs.unlinkSync(ref.path)
+    } catch (e) {
+      console.error('[Commands] syncNoteRefOnDelete error:', e)
+    }
+  }
+}
+
 export function registerCommands(mainWindow) {
   console.log('[Commands] Starting to register all IPC handlers...')
 
@@ -243,11 +305,22 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('update_note', (_event, args) => {
-    return db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId)
+    const oldNote = db.getNote(args.noteId)
+    const updated = db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId)
+    // 标题变更时同步重命名关联的 .note 文件
+    if (updated && oldNote && oldNote.title !== updated.title) {
+      syncNoteRefOnRename(args.noteId, updated.title)
+    }
+    return updated
   })
 
   ipcMain.handle('delete_note', (_event, args) => {
-    return db.softDeleteNote(args.noteId)
+    const result = db.softDeleteNote(args.noteId)
+    // 笔记删除时同步删除关联的 .note 文件
+    if (result) {
+      syncNoteRefOnDelete(args.noteId)
+    }
+    return result
   })
 
   ipcMain.handle('search_notes', (_event, args) => {
@@ -408,13 +481,25 @@ export function registerCommands(mainWindow) {
         .map(entry => {
           const fullPath = path.join(dirPath, entry.name)
           const stat = fs.statSync(fullPath)
-          return {
+          const result = {
             name: entry.name,
             path: fullPath,
             isDirectory: entry.isDirectory(),
             size: stat.size,
             modifiedTime: stat.mtime.toISOString()
           }
+          // .note 文件：用 JSON 内的 title 作为显示名，path 保持真实路径
+          if (!entry.isDirectory() && entry.name.endsWith('.note')) {
+            try {
+              const meta = JSON.parse(fs.readFileSync(fullPath, 'utf-8'))
+              if (meta.title) {
+                result.name = `${meta.title}.note`
+              }
+            } catch (e) {
+              // 损坏的 .note 文件，保留原文件名
+            }
+          }
+          return result
         })
         .sort((a, b) => {
           if (a.isDirectory && !b.isDirectory) return -1
@@ -461,17 +546,39 @@ export function registerCommands(mainWindow) {
         const relPath = relativePath ? relativePath + '/' + entry.name : entry.name
         const nameLower = entry.name.toLowerCase()
 
-        if (nameLower.includes(lowerQuery)) {
+        if (entry.isDirectory()) {
+          if (nameLower.includes(lowerQuery)) {
+            results.push({
+              name: entry.name,
+              path: fullPath,
+              relativePath: relPath,
+              isDirectory: true,
+              size: 0,
+              modifiedTime: fs.statSync(fullPath).mtime.toISOString()
+            })
+          }
+          walk(fullPath, relPath)
+        } else {
+          const ext = entry.name.split('.').pop().toLowerCase()
+          if (allowedExtensions && allowedExtensions.length > 0 && !allowedExtensions.includes(ext)) {
+            continue
+          }
           let stat
           try { stat = fs.statSync(fullPath) } catch (e) { continue }
-          // 对文件进行扩展名过滤
-          if (!entry.isDirectory()) {
-            const ext = entry.name.split('.').pop().toLowerCase()
-            if (allowedExtensions && allowedExtensions.length > 0 && !allowedExtensions.includes(ext)) {
-              // 不匹配白名单，跳过
-            } else {
+
+          // .note 文件：读取 JSON 内 title 参与搜索匹配，并用 title 作为显示名
+          if (entry.name.endsWith('.note')) {
+            let displayTitle = ''
+            try {
+              const meta = JSON.parse(fs.readFileSync(fullPath, 'utf-8'))
+              displayTitle = meta.title || ''
+            } catch (e) {
+              // 损坏的 .note 文件
+            }
+            const titleLower = displayTitle.toLowerCase()
+            if (nameLower.includes(lowerQuery) || titleLower.includes(lowerQuery)) {
               results.push({
-                name: entry.name,
+                name: displayTitle ? `${displayTitle}.note` : entry.name,
                 path: fullPath,
                 relativePath: relPath,
                 isDirectory: false,
@@ -479,20 +586,16 @@ export function registerCommands(mainWindow) {
                 modifiedTime: stat.mtime.toISOString()
               })
             }
-          } else {
+          } else if (nameLower.includes(lowerQuery)) {
             results.push({
               name: entry.name,
               path: fullPath,
               relativePath: relPath,
-              isDirectory: true,
-              size: 0,
+              isDirectory: false,
+              size: stat.size,
               modifiedTime: stat.mtime.toISOString()
             })
           }
-        }
-
-        if (entry.isDirectory()) {
-          walk(fullPath, relPath)
         }
       }
     }
@@ -633,31 +736,23 @@ export function registerCommands(mainWindow) {
     }
   })
 
-  // 将笔记内容保存为 Markdown 文件到指定目录
+  // 将笔记作为 .note 元数据文件保存到指定目录（实时引用，非快照）
+  // 文件名使用 noteId（永不变），显示名从 JSON 的 title 读取
   ipcMain.handle('kb-save-note', async (_event, args) => {
-    const { title, content, destDir } = args
+    const { noteId, title, destDir } = args
     if (!destDir) return { success: false, error: 'Missing destDir' }
+    if (!noteId) return { success: false, error: 'Missing noteId' }
     try {
-      // 清理标题中的非法文件名字符
-      let baseName = (title || '未命名笔记').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
-      if (!baseName) baseName = '未命名笔记'
-      // 限制文件名长度
-      if (baseName.length > 80) baseName = baseName.substring(0, 80)
+      const fileName = `${noteId}.note`
+      const filePath = path.join(destDir, fileName)
 
-      let fileName = baseName + '.md'
-      let filePath = path.join(destDir, fileName)
-
-      // 处理文件名冲突
-      if (fs.existsSync(filePath)) {
-        let counter = 1
-        while (fs.existsSync(filePath)) {
-          fileName = `${baseName} 副本${counter > 1 ? ' ' + counter : ''}.md`
-          filePath = path.join(destDir, fileName)
-          counter++
-        }
+      const meta = {
+        type: 'note-ref',
+        noteId,
+        title: title || '未命名笔记',
+        exportedAt: new Date().toISOString()
       }
-
-      fs.writeFileSync(filePath, content || '', 'utf-8')
+      fs.writeFileSync(filePath, JSON.stringify(meta, null, 2), 'utf-8')
       return { success: true, path: filePath, fileName }
     } catch (e) {
       return { success: false, error: e.message }
