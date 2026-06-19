@@ -5,6 +5,13 @@ export function defaultConfig() {
     language: 'zh-CN',
     theme: 'light',
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
-    noteFimCompletion: true
+    noteFimCompletion: true,
+    backup: {
+      enabled: false,
+      interval: 'daily',
+      lastBackupAt: null,
+      autoDir: null,
+      maxKeep: 7
+    }
   }
 }

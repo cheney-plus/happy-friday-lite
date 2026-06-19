@@ -8,6 +8,7 @@ import { streamChat, generateTitle, streamNoteAI, fimCompletion } from './llm.js
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
 import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
 import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
+import { createBackup, restoreBackup } from './backup.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -854,6 +855,73 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('python-get-path', () => {
     return getPythonPath()
+  })
+
+  // ========== 数据备份 ==========
+
+  // 手动备份：弹出保存对话框，选择保存位置
+  ipcMain.handle('backup-create', async () => {
+    const d = new Date()
+    const pad = (n) => String(n).padStart(2, '0')
+    const defaultName = `friday-backup-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.zip`
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName,
+      filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }]
+    })
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+
+    const backupResult = await createBackup(result.filePath, false)
+    // 手动备份成功后也更新 lastBackupAt
+    if (backupResult.success) {
+      try {
+        const config = loadConfig()
+        if (config.backup) {
+          config.backup.lastBackupAt = new Date().toISOString()
+          saveConfig(config)
+        }
+      } catch (e) {}
+    }
+    return backupResult
+  })
+
+  // 恢复备份：弹出打开对话框，选择 zip 文件
+  ipcMain.handle('backup-restore', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    return await restoreBackup(result.filePaths[0])
+  })
+
+  // 获取备份配置
+  ipcMain.handle('backup-get-config', async () => {
+    const config = loadConfig()
+    return config.backup || null
+  })
+
+  // 设置备份配置
+  ipcMain.handle('backup-set-config', async (_event, args) => {
+    const config = loadConfig()
+    config.backup = { ...config.backup, ...args }
+    saveConfig(config)
+    return { success: true, backup: config.backup }
+  })
+
+  // 选择自动备份目录
+  ipcMain.handle('backup-select-dir', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    return { success: true, dir: result.filePaths[0] }
   })
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')

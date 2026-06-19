@@ -5,6 +5,7 @@ import fs from 'fs'
 import { setDataDir as setConfigDataDir } from './src-electron/config.js'
 import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
+import { checkAutoBackup } from './src-electron/backup.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -83,6 +84,9 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
   }
+
+  // 启动后检查自动备份（异步，不阻塞窗口）
+  checkAutoBackup().catch(e => console.error('[Main] Auto backup check failed:', e))
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {

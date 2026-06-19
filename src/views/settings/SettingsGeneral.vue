@@ -147,6 +147,64 @@
         </div>
       </div>
 
+      <!-- 数据备份 -->
+      <div class="settings-group">
+        <div class="group-title">数据备份</div>
+        <div class="group-content">
+          <div class="setting-item">
+            <span class="item-label">立即备份</span>
+            <button
+              class="action-btn"
+              :disabled="backupState.backing"
+              @click="handleBackup"
+            >
+              {{ backupState.backing ? '备份中...' : '创建备份' }}
+            </button>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">恢复数据</span>
+            <button
+              class="text-btn"
+              :disabled="backupState.restoring"
+              @click="handleRestore"
+            >
+              {{ backupState.restoring ? '恢复中...' : '从备份恢复' }}
+            </button>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">自动备份</span>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="backupConfig.enabled" @change="saveBackupConfig" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div v-if="backupConfig.enabled" class="setting-item">
+            <span class="item-label">备份频率</span>
+            <div class="font-size-options">
+              <div
+                :class="['font-size-option', { active: backupConfig.interval === 'daily' }]"
+                @click="setBackupInterval('daily')"
+              >每天</div>
+              <div
+                :class="['font-size-option', { active: backupConfig.interval === 'weekly' }]"
+                @click="setBackupInterval('weekly')"
+              >每周</div>
+            </div>
+          </div>
+          <div v-if="backupConfig.enabled" class="setting-item clickable" @click="selectBackupDir">
+            <span class="item-label">备份目录</span>
+            <span class="item-link">
+              {{ backupConfig.autoDir ? shortenPath(backupConfig.autoDir) : '未设置' }}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </span>
+          </div>
+          <div v-if="backupConfig.lastBackupAt" class="setting-item">
+            <span class="item-label">上次备份时间</span>
+            <span class="item-link">{{ formatBackupTime(backupConfig.lastBackupAt) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 关于 -->
       <div class="settings-group">
         <div class="group-title">关于</div>
@@ -222,6 +280,114 @@ const settings = reactive({
   noteFimCompletion: appStore.noteFimCompletion
 });
 
+// 备份状态
+const backupState = reactive({
+  backing: false,
+  restoring: false
+});
+
+const backupConfig = reactive({
+  enabled: false,
+  interval: 'daily',
+  lastBackupAt: null,
+  autoDir: null,
+  maxKeep: 7
+});
+
+const loadBackupConfig = async () => {
+  try {
+    const cfg = await electronService.invoke('backup-get-config');
+    if (cfg) {
+      backupConfig.enabled = cfg.enabled || false;
+      backupConfig.interval = cfg.interval || 'daily';
+      backupConfig.lastBackupAt = cfg.lastBackupAt || null;
+      backupConfig.autoDir = cfg.autoDir || null;
+      backupConfig.maxKeep = cfg.maxKeep || 7;
+    }
+  } catch (e) {
+    console.error('加载备份配置失败:', e);
+  }
+};
+
+const saveBackupConfig = async () => {
+  try {
+    await electronService.invoke('backup-set-config', {
+      enabled: backupConfig.enabled,
+      interval: backupConfig.interval,
+      autoDir: backupConfig.autoDir,
+      maxKeep: backupConfig.maxKeep
+    });
+  } catch (e) {
+    console.error('保存备份配置失败:', e);
+  }
+};
+
+const setBackupInterval = (val) => {
+  backupConfig.interval = val;
+  saveBackupConfig();
+};
+
+const selectBackupDir = async () => {
+  try {
+    const result = await electronService.invoke('backup-select-dir');
+    if (result.success && result.dir) {
+      backupConfig.autoDir = result.dir;
+      await saveBackupConfig();
+    }
+  } catch (e) {
+    alert('选择目录失败: ' + e);
+  }
+};
+
+const handleBackup = async () => {
+  if (backupState.backing) return;
+  backupState.backing = true;
+  try {
+    const result = await electronService.invoke('backup-create');
+    if (result.success) {
+      backupConfig.lastBackupAt = new Date().toISOString();
+    } else if (!result.canceled) {
+      alert('备份失败: ' + (result.error || '未知错误'));
+    }
+  } catch (e) {
+    alert('备份失败: ' + e);
+  } finally {
+    backupState.backing = false;
+  }
+};
+
+const handleRestore = async () => {
+  if (backupState.restoring) return;
+  if (!confirm('恢复数据将覆盖当前所有数据，确定继续吗？')) return;
+  backupState.restoring = true;
+  try {
+    const result = await electronService.invoke('backup-restore');
+    if (result.success) {
+      alert('恢复成功，应用将刷新以加载恢复的数据');
+      window.location.reload();
+    } else if (!result.canceled) {
+      alert('恢复失败: ' + (result.error || '未知错误'));
+    }
+  } catch (e) {
+    alert('恢复失败: ' + e);
+  } finally {
+    backupState.restoring = false;
+  }
+};
+
+const shortenPath = (p) => {
+  if (!p) return '';
+  if (p.length <= 40) return p;
+  return '...' + p.slice(-37);
+};
+
+const formatBackupTime = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const toggleThemeDropdown = () => {
   showThemeDropdown.value = !showThemeDropdown.value;
 };
@@ -254,6 +420,7 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   initTheme();
   settings.displayMode = currentMode.value;
+  loadBackupConfig();
 });
 
 onUnmounted(() => {

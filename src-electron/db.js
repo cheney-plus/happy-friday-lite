@@ -197,6 +197,13 @@ export async function initDb() {
   await initDatabase()
 }
 
+// 确保数据库内容写入磁盘（备份前调用）
+export function flushDb() {
+  if (db) {
+    saveDb()
+  }
+}
+
 export function closeDb() {
   if (db) {
     saveDb()

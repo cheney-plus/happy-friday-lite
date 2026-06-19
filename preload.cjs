@@ -65,7 +65,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-open-in-explorer',
       'kb-read-file',
       'kb-read-file-buffer',
-      'kb-open-file-external'
+      'kb-open-file-external',
+      'backup-create',
+      'backup-restore',
+      'backup-get-config',
+      'backup-set-config',
+      'backup-select-dir'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

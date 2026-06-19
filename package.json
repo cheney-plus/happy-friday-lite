@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@somecat/epub-reader": "^0.1.11",
+    "adm-zip": "^0.5.17",
     "pdfjs-dist": "^6.0.227",
     "sql.js": "^1.14.1"
   },
