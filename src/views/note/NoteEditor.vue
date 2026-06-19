@@ -219,7 +219,7 @@
           <button class="toolbar-btn" @click="handleAddContent">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
-          <span class="tooltip">添加</span>
+          <span class="tooltip">添加到知识库</span>
         </div>
 
         <div class="dropdown-wrapper more-menu-wrapper" tabindex="-1" @blur="closeMoreMenu">
