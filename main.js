@@ -85,6 +85,15 @@ app.whenReady().then(async () => {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
   }
 
+  // 初始化 RAG 模块（注册任务处理器、启动队列、可选启动时自动更新）
+  try {
+    const { initRag } = await import('./src-electron/rag/triggers.js')
+    await initRag((channel, data) => mainWindow.webContents.send(channel, data))
+    console.log('[Main] ✅ RAG module initialized')
+  } catch (error) {
+    console.error('[Main] ❌ Failed to initialize RAG:', error)
+  }
+
   // 启动后检查自动备份（异步，不阻塞窗口）
   checkAutoBackup().catch(e => console.error('[Main] Auto backup check failed:', e))
 

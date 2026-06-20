@@ -1,5 +1,12 @@
 <template>
   <div class="file-card" @click="$emit('open', file)" @dblclick="$emit('open', file)" @contextmenu.prevent.stop="$emit('contextmenu', $event)">
+    <!-- 索引状态指示器（仅对非文件夹文件显示） -->
+    <div
+      v-if="!file.isDirectory && indexStatus !== null"
+      class="index-status-indicator"
+      :class="indexStatusClass"
+      :title="indexStatusTitle"
+    ></div>
     <div class="file-preview">
       <div class="file-type-icon" :class="file.type">
         <component :is="getFileIconComponent(file.type)" />
@@ -21,8 +28,16 @@
 </template>
 
 <script setup>
+import { ref, watch, computed, onMounted } from 'vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
 import { FILE_TYPE_LABELS } from '../constants';
+
+const props = defineProps({
+  file: { type: Object, required: true },
+  ragRefreshKey: { type: Number, default: 0 }
+});
+
+defineEmits(['open', 'contextmenu']);
 
 function getFileIconComponent(type) {
   return FILE_ICON_MAP[type] || UnknownFileIcon;
@@ -43,11 +58,63 @@ function formatDate(isoString) {
   return (d.getMonth() + 1) + '/' + d.getDate();
 }
 
-defineProps({
-  file: { type: Object, required: true }
+// RAG 索引状态: null=未知/文件夹, 'success'=已索引(绿), 'pending'/'processing'=处理中(黄), 'failed'=失败(红), 其他=未索引(红)
+const indexStatus = ref(null);
+
+const indexStatusClass = computed(() => {
+  switch (indexStatus.value) {
+    case 'success':
+      return 'status-success';
+    case 'pending':
+    case 'processing':
+      return 'status-processing';
+    case 'failed':
+      return 'status-failed';
+    default:
+      return 'status-not-indexed';
+  }
 });
 
-defineEmits(['open', 'contextmenu']);
+const indexStatusTitle = computed(() => {
+  switch (indexStatus.value) {
+    case 'success':
+      return '已索引';
+    case 'pending':
+      return '等待索引';
+    case 'processing':
+      return '索引中';
+    case 'failed':
+      return '索引失败';
+    default:
+      return '未索引';
+  }
+});
+
+async function loadIndexStatus() {
+  if (props.file.isDirectory || !props.file.path) {
+    indexStatus.value = null;
+    return;
+  }
+  try {
+    const api = window.electronAPI;
+    if (!api) return;
+    const result = await api.invoke('rag-get-file-status', { filePath: props.file.path });
+    if (result && result.success) {
+      indexStatus.value = result.status;
+    }
+  } catch (e) {
+    // 静默失败，不影响卡片显示
+  }
+}
+
+onMounted(loadIndexStatus);
+watch(() => props.file.path, loadIndexStatus);
+watch(() => props.ragRefreshKey, loadIndexStatus);
+
+// 暴露刷新方法，供父组件在索引完成后调用
+defineExpose({
+  refreshStatus: loadIndexStatus
+});
 </script>
 
 <style scoped lang="scss">
@@ -61,6 +128,38 @@ defineEmits(['open', 'contextmenu']);
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
+  position: relative;
+
+  // RAG 索引状态指示器（右上角）
+  .index-status-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    z-index: 1;
+    box-shadow: 0 0 0 2px var(--bg-primary);
+
+    &.status-success {
+      background: #10b981;
+    }
+
+    &.status-processing {
+      background: #f59e0b;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    &.status-failed,
+    &.status-not-indexed {
+      background: #ef4444;
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
 
   &:hover {
     border-color: var(--text-tertiary);

@@ -191,7 +191,7 @@
                   <img :src="model.icon" class="model-icon" alt="" />
                   <div class="model-info">
                     <span class="model-name">{{ model.name }}</span>
-                    <span v-if="model.badge" class="model-badge">{{ model.badge }}</span>
+                    <span v-if="model.embeddingName" class="model-embedding-name">Embedding: {{ model.embeddingName }}</span>
                   </div>
                   <svg v-if="modelSettings.modelId === model.id" class="model-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
@@ -422,6 +422,7 @@ const modelList = computed(() => {
   return customModels.value.map(model => ({
     id: model.id,
     name: `${model.providerLabel} ${model.modelName}`,
+    embeddingName: model.embeddingModelName || '',
     icon: providerIcons[model.provider] || providerIcons.other,
     badge: ''
   }));
@@ -1572,8 +1573,8 @@ const handleFeatureClick = (id) => {
 
 .model-info {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
   flex: 1;
   min-width: 0;
 }
@@ -1583,6 +1584,14 @@ const handleFeatureClick = (id) => {
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
+}
+
+.model-embedding-name {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .model-item.active .model-name {

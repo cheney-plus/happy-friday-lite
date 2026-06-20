@@ -29,6 +29,17 @@ function queryAll(sql, params = []) {
   return rows
 }
 
+// 原始查询函数（支持 UPDATE/DELETE 等无结果集语句，也支持 SELECT 返回行）
+// 供 RAG 队列等模块使用
+export function queryAllRaw(sql, params = []) {
+  if (sql.trim().toUpperCase().startsWith('SELECT')) {
+    return queryAll(sql, params)
+  }
+  db.run(sql, params)
+  saveDb()
+  return []
+}
+
 function queryOne(sql, params = []) {
   const rows = queryAll(sql, params)
   return rows.length > 0 ? rows[0] : null
@@ -122,12 +133,44 @@ async function initDatabase() {
     );
   `)
 
+  // RAG: 文件索引状态表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS file_status (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kb_type TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      last_modified TEXT NOT NULL,
+      index_status TEXT NOT NULL DEFAULT 'pending',
+      last_indexed_at TEXT,
+      UNIQUE(kb_type, file_path)
+    );
+  `)
+
+  // RAG: 父块文档存储表（Small-to-Big 检索）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS parent_docs (
+      uuid TEXT PRIMARY KEY,
+      doc_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      source_path TEXT NOT NULL,
+      file_type TEXT,
+      file_size INTEGER,
+      file_created_at TEXT,
+      file_modified_at TEXT,
+      extra_metadata TEXT
+    );
+  `)
+
   db.run('CREATE INDEX IF NOT EXISTS idx_messages_sessionId ON messages(sessionId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_notebookId ON notes(notebookId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_isDeleted ON notes(isDeleted)')
   db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_start ON schedule_events(start)')
   db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_end ON schedule_events(end)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_file_status_kb_type ON file_status(kb_type)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_file_status_index_status ON file_status(index_status)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_parent_docs_doc_id ON parent_docs(doc_id)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_parent_docs_source_path ON parent_docs(source_path)')
 
   saveDb()
   await migrateFromJson()
@@ -541,4 +584,165 @@ export function deleteNotebook(notebookId) {
   db.run('UPDATE notes SET notebookId = NULL WHERE notebookId = ?', [notebookId])
   saveDb()
   return db.getRowsModified() > 0
+}
+
+// ========== RAG: file_status 表操作 ==========
+
+// 插入或更新文件索引状态（不存在则插入，存在则更新）
+export function upsertFileStatus(kbType, filePath, lastModified, indexStatus = 'pending') {
+  db.run(
+    `INSERT INTO file_status (kb_type, file_path, last_modified, index_status, last_indexed_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(kb_type, file_path) DO UPDATE SET
+       last_modified = excluded.last_modified,
+       index_status = excluded.index_status`,
+    [kbType, filePath, lastModified, indexStatus, indexStatus === 'success' ? nowISO() : null]
+  )
+  saveDb()
+}
+
+// 获取单个文件的索引状态
+export function getFileStatus(kbType, filePath) {
+  return queryOne(
+    'SELECT * FROM file_status WHERE kb_type = ? AND file_path = ?',
+    [kbType, filePath]
+  )
+}
+
+// 获取某个知识库下所有文件状态
+export function getFileStatusByKbType(kbType) {
+  return queryAll(
+    'SELECT * FROM file_status WHERE kb_type = ?',
+    [kbType]
+  )
+}
+
+// 获取某个知识库下指定状态的文件
+export function getFileStatusByStatus(kbType, status) {
+  return queryAll(
+    'SELECT * FROM file_status WHERE kb_type = ? AND index_status = ?',
+    [kbType, status]
+  )
+}
+
+// 更新文件索引状态
+export function updateFileStatus(kbType, filePath, indexStatus) {
+  const lastIndexedAt = indexStatus === 'success' ? nowISO() : null
+  db.run(
+    'UPDATE file_status SET index_status = ?, last_indexed_at = ? WHERE kb_type = ? AND file_path = ?',
+    [indexStatus, lastIndexedAt, kbType, filePath]
+  )
+  saveDb()
+}
+
+// 删除文件索引状态记录
+export function deleteFileStatus(kbType, filePath) {
+  db.run(
+    'DELETE FROM file_status WHERE kb_type = ? AND file_path = ?',
+    [kbType, filePath]
+  )
+  saveDb()
+}
+
+// 删除某个知识库下所有文件状态记录
+export function deleteFileStatusByKbType(kbType) {
+  db.run('DELETE FROM file_status WHERE kb_type = ?', [kbType])
+  saveDb()
+}
+
+// ========== RAG: parent_docs 表操作 ==========
+
+// 插入父块文档
+export function insertParentDoc(args) {
+  db.run(
+    `INSERT OR REPLACE INTO parent_docs
+     (uuid, doc_id, content, source_path, file_type, file_size, file_created_at, file_modified_at, extra_metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      args.uuid,
+      args.docId,
+      args.content,
+      args.sourcePath,
+      args.fileType || null,
+      args.fileSize || null,
+      args.fileCreatedAt || null,
+      args.fileModifiedAt || null,
+      args.extraMetadata ? JSON.stringify(args.extraMetadata) : null
+    ]
+  )
+  saveDb()
+}
+
+// 批量插入父块文档
+export function insertParentDocsBatch(docs) {
+  db.exec('BEGIN TRANSACTION')
+  try {
+    for (const args of docs) {
+      db.run(
+        `INSERT OR REPLACE INTO parent_docs
+         (uuid, doc_id, content, source_path, file_type, file_size, file_created_at, file_modified_at, extra_metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          args.uuid,
+          args.docId,
+          args.content,
+          args.sourcePath,
+          args.fileType || null,
+          args.fileSize || null,
+          args.fileCreatedAt || null,
+          args.fileModifiedAt || null,
+          args.extraMetadata ? JSON.stringify(args.extraMetadata) : null
+        ]
+      )
+    }
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+  saveDb()
+}
+
+// 获取单个父块文档
+export function getParentDoc(uuid) {
+  const row = queryOne('SELECT * FROM parent_docs WHERE uuid = ?', [uuid])
+  if (row && row.extra_metadata) {
+    try {
+      row.extra_metadata = JSON.parse(row.extra_metadata)
+    } catch (_e) {}
+  }
+  return row
+}
+
+// 获取多个父块文档
+export function getParentDocs(uuids) {
+  if (!uuids || uuids.length === 0) return []
+  const placeholders = uuids.map(() => '?').join(',')
+  const rows = queryAll(
+    `SELECT * FROM parent_docs WHERE uuid IN (${placeholders})`,
+    uuids
+  )
+  return rows.map(row => {
+    if (row.extra_metadata) {
+      try {
+        row.extra_metadata = JSON.parse(row.extra_metadata)
+      } catch (_e) {}
+    }
+    return row
+  })
+}
+
+// 删除指定来源文件的所有父块
+export function deleteParentDocsBySourcePath(sourcePath) {
+  db.run('DELETE FROM parent_docs WHERE source_path = ?', [sourcePath])
+  saveDb()
+}
+
+// 删除某个知识库类型下所有父块（通过 source_path 前缀匹配）
+export function deleteParentDocsByKbType(kbType, kbRootPath) {
+  db.run(
+    'DELETE FROM parent_docs WHERE source_path LIKE ?',
+    [`${kbRootPath}%`]
+  )
+  saveDb()
 }

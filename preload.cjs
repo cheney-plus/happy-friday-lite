@@ -70,7 +70,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'backup-restore',
       'backup-get-config',
       'backup-set-config',
-      'backup-select-dir'
+      'backup-select-dir',
+      'rag-trigger-file-upload',
+      'rag-manual-update',
+      'rag-get-file-status',
+      'rag-get-batch-status',
+      'rag-get-kb-summary',
+      'rag-get-queue-stats',
+      'rag-retry-failed',
+      'rag-clear-kb-index'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -102,7 +110,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'note-ai-error',
       'note-fim-result',
       'python-stdout',
-      'python-stderr'
+      'python-stderr',
+      'rag-update-progress',
+      'rag-update-done',
+      'rag-task-complete'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

@@ -16,7 +16,10 @@
               <div class="model-select-trigger" @click="toggleModelDropdown">
                 <div v-if="selectedModelData" class="selected-model-info">
                   <img :src="selectedModelData.providerIcon" :alt="selectedModelData.providerLabel" class="model-provider-icon" />
-                  <span>{{ selectedModelData.providerLabel }} {{ selectedModelData.modelName }}</span>
+                  <div class="selected-model-text">
+                    <span>{{ selectedModelData.providerLabel }} {{ selectedModelData.modelName }}</span>
+                    <span v-if="selectedModelData.embeddingModelName" class="selected-embedding-label">Embedding: {{ selectedModelData.embeddingModelName }}</span>
+                  </div>
                 </div>
                 <svg class="model-select-arrow" :class="{ expanded: showModelDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="6 9 12 15 18 9"></polyline>
@@ -104,11 +107,21 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label">模型名称</label>
+              <label class="form-label">对话模型名称</label>
               <input
                 type="text"
                 v-model="formData.modelName"
-                placeholder="输入模型名称"
+                placeholder="输入对话模型名称"
+                class="form-input"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Embedding 模型<span class="optional-tag">可选</span></label>
+              <input
+                type="text"
+                v-model="formData.embeddingModelName"
+                placeholder="输入 Embedding 模型名称，如 text-embedding-v4"
                 class="form-input"
               />
             </div>
@@ -146,7 +159,10 @@
               <img :src="getModelProviderIcon(model.provider)" :alt="model.providerLabel" class="model-item-icon" />
               <div class="model-item-text">
                 <div class="model-item-name">{{ model.providerLabel }} {{ model.modelName }}</div>
-                <div class="model-item-desc">{{ getModelDescription(model) }}</div>
+                <div class="model-item-desc">
+                  {{ getModelDescription(model) }}
+                  <span v-if="model.embeddingModelName" class="model-item-embedding">· Embedding: {{ model.embeddingModelName }}</span>
+                </div>
               </div>
             </div>
             <div class="model-item-actions">
@@ -184,6 +200,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter } from 'vue-router';
+import { electronService } from '@/services/electron';
 
 const router = useRouter();
 
@@ -220,6 +237,7 @@ const formData = ref({
   provider: '',
   apiKey: '',
   modelName: '',
+  embeddingModelName: '',
   modelUrl: ''
 });
 
@@ -260,6 +278,7 @@ const selectModel = (model) => {
   selectedModel.value = model.id;
   showModelDropdown.value = false;
   localStorage.setItem('happy-friday-selected-model', model.id);
+  syncModelsToConfig();
 };
 
 const deleteTarget = ref(null);
@@ -276,6 +295,7 @@ const executeDelete = () => {
   const targetId = deleteTarget.value.id;
   customModels.value = customModels.value.filter(m => m.id !== targetId);
   saveCustomModels();
+  syncModelsToConfig();
 
   if (selectedModel.value === targetId) {
     selectedModel.value = customModels.value.length > 0 ? customModels.value[0].id : '';
@@ -361,6 +381,27 @@ const saveCustomModels = () => {
   }
 };
 
+const syncModelsToConfig = async () => {
+  try {
+    const config = await electronService.invoke('get-config');
+    if (config) {
+      config.customModels = customModels.value.map(m => ({
+        id: m.id,
+        provider: m.provider,
+        providerLabel: m.providerLabel,
+        apiKey: m.apiKey,
+        modelName: m.modelName,
+        embeddingModelName: m.embeddingModelName || '',
+        baseUrl: m.baseUrl
+      }));
+      config.selectedModelId = selectedModel.value;
+      await electronService.invoke('save-config', config);
+    }
+  } catch (e) {
+    console.error('Failed to sync models to config:', e);
+  }
+};
+
 const isFormValid = computed(() => {
   const baseValid = formData.value.provider && formData.value.apiKey && formData.value.modelName;
   if (formData.value.provider === 'other') {
@@ -379,6 +420,7 @@ const resetForm = () => {
     provider: '',
     apiKey: '',
     modelName: '',
+    embeddingModelName: '',
     modelUrl: ''
   };
   showApiKey.value = false;
@@ -393,12 +435,14 @@ const handleSave = () => {
       providerLabel: provider?.label || '未知',
       apiKey: formData.value.apiKey,
       modelName: formData.value.modelName,
+      embeddingModelName: formData.value.embeddingModelName || '',
       baseUrl: formData.value.provider === 'other' ? formData.value.modelUrl : (provider?.baseUrl || ''),
       createdAt: Date.now()
     };
 
     customModels.value.push(newModel);
     saveCustomModels();
+    syncModelsToConfig();
     closeModal();
   }
 };
@@ -518,6 +562,18 @@ const handleSave = () => {
   font-weight: 500;
 }
 
+.selected-model-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.selected-embedding-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
 .model-provider-icon {
   width: 22px;
   height: 22px;
@@ -610,6 +666,11 @@ const handleSave = () => {
 .model-item-desc {
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+.model-item-embedding {
+  color: var(--text-tertiary);
+  opacity: 0.8;
 }
 
 .check-icon {
@@ -770,6 +831,13 @@ const handleSave = () => {
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 8px;
+}
+
+.optional-tag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  margin-left: 6px;
 }
 
 .select-wrapper {

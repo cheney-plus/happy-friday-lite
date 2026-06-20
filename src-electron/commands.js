@@ -9,6 +9,7 @@ import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
 import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
 import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
+import { clearEmbeddingsCache } from './rag/embeddings.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -83,6 +84,8 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('save-config', (_event, config) => {
     const result = saveConfig(config)
+    // 模型配置变更时清除 Embedding 缓存
+    clearEmbeddingsCache()
     mainWindow.webContents.send(CONFIG_CHANGED, config)
     return result
   })
@@ -922,6 +925,127 @@ export function registerCommands(mainWindow) {
       return { success: false, canceled: true }
     }
     return { success: true, dir: result.filePaths[0] }
+  })
+
+  // ========== RAG 知识检索相关命令 ==========
+
+  // 触发时机1：文件上传/导入时入队索引
+  ipcMain.handle('rag-trigger-file-upload', async (_event, args) => {
+    const { filePaths } = args
+    if (!filePaths || !Array.isArray(filePaths)) {
+      return { success: false, error: 'filePaths required' }
+    }
+    try {
+      const { triggerOnFilesUpload } = await import('./rag/triggers.js')
+      const count = triggerOnFilesUpload(filePaths)
+      return { success: true, enqueued: count }
+    } catch (e) {
+      console.error('[RAG] trigger-file-upload error:', e)
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 触发时机3：手动触发知识库检索更新（内存重建覆盖）
+  ipcMain.handle('rag-manual-update', async (_event, args) => {
+    const { kbType } = args || {}
+    try {
+      const { triggerManualUpdate } = await import('./rag/triggers.js')
+      const results = await triggerManualUpdate(kbType, (progress) => {
+        mainWindow.webContents.send('rag-update-progress', progress)
+      })
+      mainWindow.webContents.send('rag-update-done', { results })
+      return { success: true, results }
+    } catch (e) {
+      console.error('[RAG] manual-update error:', e)
+      mainWindow.webContents.send('rag-update-done', { error: e.message })
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 获取单个文件的索引状态
+  ipcMain.handle('rag-get-file-status', async (_event, args) => {
+    const { filePath } = args
+    if (!filePath) return { success: false, error: 'filePath required' }
+    try {
+      const { getFileIndexStatus } = await import('./rag/index.js')
+      const status = getFileIndexStatus(filePath)
+      return { success: true, status: status ? status.index_status : null }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 批量获取文件索引状态
+  ipcMain.handle('rag-get-batch-status', async (_event, args) => {
+    const { filePaths } = args
+    if (!filePaths || !Array.isArray(filePaths)) {
+      return { success: false, error: 'filePaths required' }
+    }
+    try {
+      const { getBatchFileIndexStatus } = await import('./rag/index.js')
+      const statusMap = getBatchFileIndexStatus(filePaths)
+      return { success: true, statusMap }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 获取知识库索引摘要
+  ipcMain.handle('rag-get-kb-summary', async (_event, args) => {
+    const { kbType } = args || {}
+    try {
+      const { getKbIndexSummary } = await import('./rag/index.js')
+      if (kbType) {
+        const summary = await getKbIndexSummary(kbType)
+        return { success: true, summary: { [kbType]: summary } }
+      }
+      // 返回所有知识库摘要
+      const { KB_TYPES } = await import('./rag/vectorstore.js')
+      const allSummary = {}
+      for (const type of KB_TYPES) {
+        allSummary[type] = await getKbIndexSummary(type)
+      }
+      return { success: true, summary: allSummary }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 获取队列状态
+  ipcMain.handle('rag-get-queue-stats', async (_event, args) => {
+    const { kbType } = args || {}
+    try {
+      const { getQueueStats } = await import('./rag/queue.js')
+      const stats = getQueueStats(kbType)
+      return { success: true, stats }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 重试失败任务
+  ipcMain.handle('rag-retry-failed', async (_event, args) => {
+    const { kbType } = args || {}
+    try {
+      const { retryFailed } = await import('./rag/queue.js')
+      retryFailed(kbType)
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 清空指定知识库索引
+  ipcMain.handle('rag-clear-kb-index', async (_event, args) => {
+    const { kbType } = args
+    if (!kbType) return { success: false, error: 'kbType required' }
+    try {
+      const { clearKbIndex } = await import('./rag/index.js')
+      await clearKbIndex(kbType)
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
   })
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')

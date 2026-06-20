@@ -230,6 +230,7 @@
           v-for="file in filteredFiles"
           :key="file.path"
           :file="file"
+          :rag-refresh-key="ragRefreshKey"
           @open="$emit('open-file', $event)"
           @contextmenu="$emit('show-file-item-context-menu', $event, file)"
         />
@@ -424,11 +425,20 @@ async function handleUpload(type) {
         return;
       }
 
+      const copiedPaths = [];
       for (const src of filePaths) {
         const result = await api.invoke('kb-copy-file', { srcPath: String(src), destDir });
         console.log('[Upload] copy file result:', result);
+        if (result && result.success && result.path) {
+          copiedPaths.push(result.path);
+        }
       }
       emit('refresh');
+      // 触发 RAG 索引（异步，不阻塞 UI）
+      if (copiedPaths.length > 0) {
+        api.invoke('rag-trigger-file-upload', { filePaths: copiedPaths })
+          .catch(e => console.error('[RAG] trigger upload failed:', e));
+      }
     } else if (type === 'folder') {
       const folderPath = await api.invoke('open-file-dialog', {
         properties: ['openDirectory']
@@ -442,6 +452,11 @@ async function handleUpload(type) {
       });
       console.log('[Upload] copy folder result:', result);
       emit('refresh');
+      // 触发 RAG 索引（异步，不阻塞 UI）
+      if (result && result.success && result.path) {
+        api.invoke('rag-trigger-file-upload', { filePaths: [result.path] })
+          .catch(e => console.error('[RAG] trigger folder upload failed:', e));
+      }
     } else if (type === 'note') {
       showNoteDialog.value = true;
     } else if (type === 'webpage') {
@@ -474,6 +489,7 @@ async function confirmNoteUpload(selectedNotes) {
 
   isSavingNote.value = true;
   let failedNotes = [];
+  const savedPaths = [];
   try {
     for (const note of selectedNotes) {
       const result = await api.invoke('kb-save-note', {
@@ -483,6 +499,8 @@ async function confirmNoteUpload(selectedNotes) {
       });
       if (!result || !result.success) {
         failedNotes.push(note.title || '未命名笔记');
+      } else if (result.path) {
+        savedPaths.push(result.path);
       }
     }
     if (failedNotes.length > 0) {
@@ -491,6 +509,11 @@ async function confirmNoteUpload(selectedNotes) {
     }
     closeNoteDialog();
     emit('refresh');
+    // 触发 RAG 索引
+    if (savedPaths.length > 0) {
+      api.invoke('rag-trigger-file-upload', { filePaths: savedPaths })
+        .catch(e => console.error('[RAG] trigger note upload failed:', e));
+    }
   } catch (e) {
     console.error('[Upload note] error:', e);
     uploadErrorMsg.value = `笔记保存失败：${e.message}`;
@@ -512,6 +535,11 @@ async function confirmWebpageUpload() {
     if (result.success) {
       closeWebpageDialog();
       emit('refresh');
+      // 触发 RAG 索引
+      if (result.path) {
+        api.invoke('rag-trigger-file-upload', { filePaths: [result.path] })
+          .catch(e => console.error('[RAG] trigger webpage upload failed:', e));
+      }
     } else {
       uploadErrorMsg.value = `网页保存失败：${result.error}`;
       showUploadError.value = true;
@@ -669,14 +697,33 @@ function formatSize(file) {
   return bytes + ' B';
 }
 
+// RAG 索引状态刷新：当队列任务完成或手动更新完成时，刷新文件卡片状态
+const ragRefreshKey = ref(0);
+
+function onRagTaskComplete() {
+  ragRefreshKey.value++;
+}
+function onRagUpdateDone() {
+  ragRefreshKey.value++;
+}
+
+let unsubRagTaskComplete = null;
+let unsubRagUpdateDone = null;
+
 onMounted(() => {
   document.addEventListener('click', closeSortMenu);
   document.addEventListener('click', closeUploadMenu);
+  if (window.electronAPI) {
+    unsubRagTaskComplete = window.electronAPI.on('rag-task-complete', onRagTaskComplete);
+    unsubRagUpdateDone = window.electronAPI.on('rag-update-done', onRagUpdateDone);
+  }
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeSortMenu);
   document.removeEventListener('click', closeUploadMenu);
+  if (unsubRagTaskComplete) unsubRagTaskComplete();
+  if (unsubRagUpdateDone) unsubRagUpdateDone();
 });
 </script>
 

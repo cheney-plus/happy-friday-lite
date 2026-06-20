@@ -205,6 +205,49 @@
         </div>
       </div>
 
+      <!-- 知识库检索 (RAG) -->
+      <div class="settings-group">
+        <div class="group-title">知识库检索</div>
+        <div class="group-content">
+          <div class="setting-item">
+            <span class="item-label">更新索引</span>
+            <button
+              class="primary-btn"
+              :disabled="ragState.updating"
+              @click="handleRagUpdate"
+            >
+              {{ ragState.updating ? '更新中...' : '更新索引' }}
+            </button>
+          </div>
+          <div v-if="ragState.progress" class="setting-item">
+            <span class="item-label">{{ ragProgressKbLabel }}</span>
+            <span class="item-link">{{ ragState.progress }}</span>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">启动时自动更新</span>
+            <div class="item-toggle">
+              <input type="checkbox" v-model="ragConfig.autoUpdateOnStartup" @change="saveRagConfig" />
+            </div>
+          </div>
+          <div class="setting-item rag-stats-row">
+            <span class="item-label">索引统计</span>
+            <div class="rag-stats-inline" v-if="ragStats && Object.keys(ragStats).length > 0">
+              <span
+                v-for="(stat, kbType) in ragStats"
+                :key="kbType"
+                class="rag-stat-chip"
+                :class="{ 'has-issues': (stat.pending || 0) + (stat.failed || 0) > 0 }"
+              >
+                <span class="rag-stat-kb">{{ kbTypeLabel(kbType) }}</span>
+                <span class="rag-stat-detail">{{ stat.success || 0 }}/{{ stat.total || 0 }}</span>
+                <span class="rag-stat-vectors" v-if="stat.vectorCount">{{ stat.vectorCount }}v</span>
+              </span>
+            </div>
+            <span v-else class="item-link">暂无数据</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 关于 -->
       <div class="settings-group">
         <div class="group-title">关于</div>
@@ -388,6 +431,106 @@ const formatBackupTime = (iso) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+// ========== RAG 知识检索 ==========
+const ragState = reactive({
+  updating: false,
+  progress: '',
+  progressText: ''
+});
+
+const ragConfig = reactive({
+  autoUpdateOnStartup: true
+});
+
+const ragStats = ref({});
+
+const KB_TYPE_LABELS = {
+  personal: '个人知识库',
+  agent: 'Agent 知识库',
+  local: '本地知识库'
+};
+
+function kbTypeLabel(kbType) {
+  return KB_TYPE_LABELS[kbType] || kbType;
+}
+
+const ragProgressKbLabel = computed(() => {
+  const kb = ragState.progressText;
+  return kb ? kbTypeLabel(kb) : '';
+});
+
+const loadRagConfig = async () => {
+  try {
+    const cfg = await electronService.invoke('get-config');
+    if (cfg && cfg.rag) {
+      ragConfig.autoUpdateOnStartup = cfg.rag.autoUpdateOnStartup !== false;
+    }
+  } catch (e) {
+    console.error('加载 RAG 配置失败:', e);
+  }
+};
+
+const saveRagConfig = async () => {
+  try {
+    const cfg = await electronService.invoke('get-config');
+    cfg.rag = { ...cfg.rag, ...ragConfig };
+    await electronService.invoke('save-config', cfg);
+  } catch (e) {
+    console.error('保存 RAG 配置失败:', e);
+  }
+};
+
+const loadRagStats = async () => {
+  try {
+    const result = await electronService.invoke('rag-get-kb-summary', {});
+    if (result && result.success) {
+      ragStats.value = result.summary || {};
+    }
+  } catch (e) {
+    console.error('加载 RAG 统计失败:', e);
+  }
+};
+
+const handleRagUpdate = async () => {
+  if (ragState.updating) return;
+  ragState.updating = true;
+  ragState.progress = '准备中...';
+  ragState.progressText = '进度';
+
+  // 监听进度事件（on 返回 unsubscribe 函数）
+  let unsubProgress = null;
+  let unsubDone = null;
+  if (window.electronAPI) {
+    unsubProgress = window.electronAPI.on('rag-update-progress', (progress) => {
+      ragState.progressText = `${progress.kbType || ''}`;
+      ragState.progress = `${progress.current}/${progress.total}`;
+    });
+    unsubDone = window.electronAPI.on('rag-update-done', () => {
+      if (unsubProgress) unsubProgress();
+      if (unsubDone) unsubDone();
+    });
+  }
+
+  try {
+    const result = await electronService.invoke('rag-manual-update', {});
+    if (result && result.success) {
+      ragState.progress = '完成';
+      await loadRagStats();
+    } else {
+      ragState.progress = '失败: ' + (result?.error || '未知错误');
+    }
+  } catch (e) {
+    ragState.progress = '失败: ' + e.message;
+  } finally {
+    ragState.updating = false;
+    // 5 秒后清空进度
+    setTimeout(() => {
+      ragState.progress = '';
+      ragState.progressText = '';
+    }, 5000);
+  }
+};
+
 const toggleThemeDropdown = () => {
   showThemeDropdown.value = !showThemeDropdown.value;
 };
@@ -421,6 +564,8 @@ onMounted(() => {
   initTheme();
   settings.displayMode = currentMode.value;
   loadBackupConfig();
+  loadRagConfig();
+  loadRagStats();
 });
 
 onUnmounted(() => {
@@ -618,6 +763,41 @@ const goToModelSettings = () => {
   font-weight: 500;
 }
 
+.item-options {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.item-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.item-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.text-input {
+  width: 200px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.text-input:focus {
+  border-color: var(--text-tertiary);
+}
+
 .toggle-switch {
   position: relative;
   display: inline-block;
@@ -734,6 +914,74 @@ const goToModelSettings = () => {
 
 .text-btn:hover {
   background-color: var(--bg-hover);
+}
+
+.primary-btn {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+
+.primary-btn:hover {
+  opacity: 0.85;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* RAG 索引统计 - 紧凑内联 */
+.rag-stats-row {
+  border-bottom: none;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.rag-stats-inline {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rag-stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.rag-stat-kb {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.rag-stat-detail {
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rag-stat-vectors {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.rag-stat-chip.has-issues .rag-stat-detail,
+.rag-stat-chip.has-issues .rag-stat-vectors {
+  color: #f59e0b;
 }
 
 .footer-links {

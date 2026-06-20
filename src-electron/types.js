@@ -12,6 +12,10 @@ export function defaultConfig() {
       lastBackupAt: null,
       autoDir: null,
       maxKeep: 7
+    },
+    rag: {
+      autoUpdateOnStartup: true,
+      lastAutoUpdateAt: null
     }
   }
 }
