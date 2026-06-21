@@ -13,16 +13,21 @@
         <div class="input-wrapper">
           <!-- 挂载的文档标签 -->
           <div class="attachment-area" v-if="attachments.length > 0">
-            <div v-for="(att, idx) in attachments" :key="att.id" class="attachment-tag">
-              <img v-if="att.type === 'note'" class="tag-icon" src="" alt="" @error="$event.target.style.display='none'" />
-              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-              </svg>
+            <div v-for="(att, idx) in attachments" :key="att.id" class="attachment-tag" :class="'tag-' + att.type">
+              <span class="tag-icon-wrap">
+                <svg v-if="att.type === 'kb'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="4"></circle>
+                  <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+                </svg>
+                <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+              </span>
               <span class="tag-name">{{ att.name }}</span>
-              <span class="tag-type">{{ att.typeLabel }}</span>
+              <span class="tag-type-badge">{{ att.typeLabel }}</span>
               <button class="tag-remove" @click="removeAttachment(idx)" title="移除">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
@@ -113,9 +118,17 @@
           <div v-if="showKbDropdown" class="dropdown-overlay" :style="kbDropdownStyle" @click.stop>
             <div class="dropdown-panel kb-dropdown">
               <div v-if="kbList.length === 0" class="kb-empty">暂无知识库</div>
-              <template v-for="category in kbList" :key="category.id">
-                <div v-if="category.items.length > 0" class="kb-category">
-                  <div class="kb-category-name">{{ category.name }}</div>
+              <template v-else>
+                <div class="kb-item" @click="selectKnowledgeBase('全部知识库')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-item-icon-fallback">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                  </svg>
+                  <span class="kb-item-name">全部知识库</span>
+                </div>
+                <template v-for="category in kbList" :key="category.id">
+                  <div v-if="category.items.length > 0" class="kb-category">
+                    <div class="kb-category-name">{{ category.name }}</div>
                   <div
                     v-for="item in category.items"
                     :key="item.id"
@@ -130,6 +143,7 @@
                     <span class="kb-item-name">{{ item.name }}</span>
                   </div>
                 </div>
+              </template>
               </template>
             </div>
           </div>
@@ -550,6 +564,9 @@ const readKbDir = async (dirPath) => {
 const navigateFileTo = async (path, idx) => {
   if (idx != null && idx < fileBreadcrumb.value.length - 1) {
     fileBreadcrumb.value = fileBreadcrumb.value.slice(0, idx + 1);
+  } else if (idx == null) {
+    const dirName = path.split('/').pop();
+    fileBreadcrumb.value.push({ name: dirName, path });
   }
   await readKbDir(path);
 };
@@ -593,13 +610,15 @@ const removeAttachment = (idx) => {
 };
 
 const selectKnowledgeBase = (kbName) => {
-  const prefix = `【参考检索 ${kbName} 知识库】：`;
-  inputText.value = prefix + inputText.value;
+  attachments.value.push({
+    id: ++attachmentIdCounter,
+    type: 'kb',
+    typeLabel: '知识库',
+    name: kbName
+  });
   showKbDropdown.value = false;
   nextTick(() => {
     textareaRef.value?.focus();
-    const len = inputText.value.length;
-    textareaRef.value?.setSelectionRange(len, len);
     autoResize();
   });
 };
@@ -856,21 +875,22 @@ const handleFeatureClick = (id) => {
 .attachment-area {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 20px 4px;
+  gap: 6px;
+  padding: 10px 18px 2px;
 
   .attachment-tag {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px 6px 6px;
+    gap: 6px;
+    padding: 3px 4px 3px 3px;
     background: var(--bg-secondary, #f7f7f7);
     border: 1px solid var(--border-color, #eee);
-    border-radius: 12px;
-    font-size: 13px;
+    border-radius: 8px;
+    font-size: 12.5px;
     color: var(--text-primary);
-    max-width: 280px;
+    max-width: 260px;
     transition: all 0.15s ease;
+    line-height: 1;
 
     &:hover {
       background: var(--bg-hover, #f0f0f0);
@@ -880,27 +900,49 @@ const handleFeatureClick = (id) => {
       }
     }
 
-    .tag-icon {
+    &.tag-kb {
+      --tag-accent: #10b981;
+    }
+
+    &.tag-note {
+      --tag-accent: #6366f1;
+    }
+
+    &.tag-kb-file {
+      --tag-accent: #f59e0b;
+    }
+
+    .tag-icon-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       width: 22px;
       height: 22px;
-      border-radius: 5px;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--tag-accent, #10b981) 12%, transparent);
+      color: var(--tag-accent, #10b981);
       flex-shrink: 0;
-      object-fit: cover;
     }
 
     .tag-name {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      max-width: 140px;
+      max-width: 120px;
       font-weight: 500;
+      font-size: 12.5px;
     }
 
-    .tag-type {
-      font-size: 11px;
-      color: var(--text-tertiary, #999);
+    .tag-type-badge {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--tag-accent, #10b981);
+      background: color-mix(in srgb, var(--tag-accent, #10b981) 10%, transparent);
+      padding: 1px 5px;
+      border-radius: 4px;
       flex-shrink: 0;
       white-space: nowrap;
+      line-height: 1.4;
     }
 
     .tag-remove {
@@ -913,7 +955,7 @@ const handleFeatureClick = (id) => {
       background: transparent;
       color: var(--text-tertiary, #aaa);
       cursor: pointer;
-      border-radius: 50%;
+      border-radius: 5px;
       opacity: 0;
       transition: all 0.12s;
       flex-shrink: 0;
@@ -1282,7 +1324,6 @@ const handleFeatureClick = (id) => {
     align-items: center;
     gap: 4px;
     padding: 10px 14px;
-    border-bottom: 1px solid var(--border-color, #ececec);
     font-size: 12.5px;
     color: var(--text-tertiary, #999);
     flex-shrink: 0;
