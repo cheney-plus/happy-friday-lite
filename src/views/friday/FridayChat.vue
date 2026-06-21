@@ -119,7 +119,7 @@
             <div class="dropdown-panel kb-dropdown">
               <div v-if="kbList.length === 0" class="kb-empty">暂无知识库</div>
               <template v-else>
-                <div class="kb-item" @click="selectKnowledgeBase('全部知识库')">
+                <div class="kb-item" @click="selectKnowledgeBase('全部知识库', null)">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-item-icon-fallback">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
@@ -133,7 +133,7 @@
                     v-for="item in category.items"
                     :key="item.id"
                     class="kb-item"
-                    @click="selectKnowledgeBase(item.name)"
+                    @click="selectKnowledgeBase(item.name, category.id)"
                   >
                     <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="kb-item-icon" :src="coverOptions[item.coverIndex]" alt="" />
                     <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-item-icon-fallback">
@@ -609,12 +609,13 @@ const removeAttachment = (idx) => {
   attachments.value.splice(idx, 1);
 };
 
-const selectKnowledgeBase = (kbName) => {
+const selectKnowledgeBase = (kbName, categoryId) => {
   attachments.value.push({
     id: ++attachmentIdCounter,
     type: 'kb',
     typeLabel: '知识库',
-    name: kbName
+    name: kbName,
+    categoryId: categoryId || null
   });
   showKbDropdown.value = false;
   nextTick(() => {
@@ -694,6 +695,11 @@ const handleSend = async () => {
     return;
   }
 
+  // 提取知识库附件信息（用于 RAG 检索）
+  const kbAttachment = attachments.value.find(a => a.type === 'kb');
+  const kbName = kbAttachment ? kbAttachment.name : '';
+  const kbCategoryId = kbAttachment && kbAttachment.categoryId ? kbAttachment.categoryId : '';
+
   router.push({
     name: 'friday-chat',
     params: { sessionId: `new-${Date.now()}` },
@@ -701,7 +707,9 @@ const handleSend = async () => {
       q: text,
       mode: currentMode.value,
       modelId: selectedModel.id,
-      thinkMode: modelSettings.value.thinkMode
+      thinkMode: modelSettings.value.thinkMode,
+      kbName,
+      kbCategoryId
     }
   });
 };

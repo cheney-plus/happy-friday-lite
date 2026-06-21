@@ -78,7 +78,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'rag-get-kb-summary',
       'rag-get-queue-stats',
       'rag-retry-failed',
-      'rag-clear-kb-index'
+      'rag-clear-kb-index',
+      'rag-search'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

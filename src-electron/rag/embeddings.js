@@ -112,6 +112,21 @@ function callEmbeddingApi(baseUrl, apiKey, modelName, texts) {
 }
 
 /**
+ * L2 归一化：将向量缩放为单位长度（模长为 1）
+ * 归一化后 Faiss L2 距离可精确转换为余弦相似度
+ * @param {number[]} vec
+ * @returns {number[]}
+ */
+function normalizeVector(vec) {
+  if (!vec || vec.length === 0) return vec
+  let norm = 0
+  for (const v of vec) norm += v * v
+  norm = Math.sqrt(norm)
+  if (norm === 0) return vec
+  return vec.map(v => v / norm)
+}
+
+/**
  * 自定义 Embeddings 类，实现 LangChain Embeddings 接口
  * 通过 HTTPS API 调用获取向量
  */
@@ -141,7 +156,9 @@ class HttpApiEmbeddings {
       allEmbeddings.push(...embeddings)
     }
 
-    return allEmbeddings
+    // L2 归一化：使所有向量为单位长度，这样 Faiss L2 距离可转换为余弦相似度
+    // cosine_similarity = 1 - (L2_distance^2 / 2)  （当向量归一化时）
+    return allEmbeddings.map(vec => normalizeVector(vec))
   }
 
   /**
@@ -151,7 +168,8 @@ class HttpApiEmbeddings {
    */
   async embedQuery(text) {
     const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, [text])
-    return embeddings[0]
+    // L2 归一化，与 embedDocuments 保持一致
+    return normalizeVector(embeddings[0])
   }
 }
 
@@ -159,8 +177,10 @@ class HttpApiEmbeddings {
  * 检测 Embedding 模型是否变更，如果变更则删除所有旧的 FaissStore 索引
  * 因为不同模型的向量维度不同，旧索引无法兼容
  */
-function checkModelChangeAndCleanIndex(modelConfig) {
-  const sig = `${modelConfig.baseUrl}|${modelConfig.embeddingModelName}`
+async function checkModelChangeAndCleanIndex(modelConfig) {
+  // 签名包含模型信息和余弦相似度版本号，版本变更会强制清除旧索引
+  // cosine_v1: 使用 IndexFlatIP + L2 归一化实现余弦相似度（替代旧的 IndexFlatL2）
+  const sig = `${modelConfig.baseUrl}|${modelConfig.embeddingModelName}|cosine_v1`
   const dataDir = getDataDir()
   const sigFile = path.join(dataDir, 'rag', EMBEDDING_SIG_FILE)
 
@@ -178,6 +198,18 @@ function checkModelChangeAndCleanIndex(modelConfig) {
         fs.rmSync(storeDir, { recursive: true, force: true })
         console.log(`[RAG] Deleted old index: ${storeDir}`)
       }
+    }
+
+    // 同步清除 file_status 表中的索引状态记录
+    // 否则系统会误认为文件已索引，跳过重新索引
+    try {
+      const db = await import('../db.js')
+      for (const kbType of ['personal', 'agent', 'local']) {
+        db.deleteFileStatusByKbType(kbType)
+      }
+      console.log(`[RAG] Cleared file_status for all kb types (signature changed)`)
+    } catch (e) {
+      console.warn(`[RAG] Failed to clear file_status:`, e.message)
     }
 
     // 写入新签名
@@ -201,7 +233,7 @@ export async function getEmbeddings() {
   }
 
   // 检测模型变更，清除不兼容的旧索引
-  checkModelChangeAndCleanIndex(modelConfig)
+  await checkModelChangeAndCleanIndex(modelConfig)
 
   cachedEmbeddings = new HttpApiEmbeddings(modelConfig)
   cachedModelId = modelConfig.modelId

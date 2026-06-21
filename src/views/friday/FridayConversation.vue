@@ -307,6 +307,10 @@ async function sendChatMessage(text) {
     return;
   }
 
+  // 知识库选择信息：交由后端 RAG Agent 通过 Function Calling 自主决定是否检索
+  const kbName = route.query.kbName || '';
+  const kbCategoryId = route.query.kbCategoryId || '';
+
   messages.value.push({
     role: 'user',
     content: text
@@ -330,14 +334,18 @@ async function sendChatMessage(text) {
         sessionId: currentSessionId.value || '',
         model: model,
         message: text,
-        enableThinking: route.query.thinkMode === 'deep'
+        enableThinking: route.query.thinkMode === 'deep',
+        kbName,
+        kbCategoryId
       });
     } else {
       await electronService.invoke('chat_without_memory', {
         requestId: activeRequestId,
         model: model,
         message: text,
-        enableThinking: route.query.thinkMode === 'deep'
+        enableThinking: route.query.thinkMode === 'deep',
+        kbName,
+        kbCategoryId
       });
     }
   } catch (err) {
@@ -401,7 +409,9 @@ async function triggerAiResponse() {
         sessionId: currentSessionId.value || '',
         model: model,
         message: '',
-        enableThinking: route.query.thinkMode === 'deep'
+        enableThinking: route.query.thinkMode === 'deep',
+        kbName: route.query.kbName || '',
+        kbCategoryId: route.query.kbCategoryId || ''
       });
     }
   } catch (err) {

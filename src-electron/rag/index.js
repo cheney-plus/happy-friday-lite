@@ -344,3 +344,172 @@ export async function clearKbIndex(kbType) {
   db.deleteParentDocsByKbType(kbType, kbRootPath)
   console.log(`[RAG] Cleared all index data for kb: ${kbType}`)
 }
+
+/**
+ * 将 FAISS 返回的分数转换为置信度
+ *
+ * 使用 IndexFlatIP（内积索引）+ L2 归一化向量：
+ *   - 归一化向量的内积 = 余弦相似度
+ *   - similaritySearchWithScore 返回的 score 直接就是余弦相似度
+ *   - 范围 [-1, 1]，越大越相似；文本嵌入通常为 [0, 1]
+ *
+ * @param {number} score - Faiss IndexFlatIP 返回的内积分数（= 余弦相似度）
+ * @returns {number} 置信度 [0, 1]
+ */
+function distanceToConfidence(score) {
+  // score 已经是余弦相似度，直接截断到 [0, 1] 范围
+  return Math.max(0, Math.min(1, score))
+}
+
+/**
+ * RAG 知识检索
+ *
+ * 流程：
+ *   1. 根据用户选择的知识库确定检索范围（全部 / 某个分类下的具体知识库）
+ *   2. 在对应 FaissStore 中执行 similaritySearchWithScore
+ *   3. 将 L2 距离转换为余弦相似度（置信度），过滤低于阈值的结果
+ *   4. 按置信度降序取 TOP 3
+ *   5. 若选择了具体知识库，按目录路径过滤 TOP 3 结果
+ *   6. 对每个命中的子块，查 parent_docs 表取回父块文本（Small-to-Big）
+ *      若无父块则使用子块自身文本
+ *
+ * @param {string} query - 用户查询文本
+ * @param {string} kbName - 知识库名称（"全部知识库" 或具体名称）
+ * @param {string} kbCategoryId - 知识库所属分类 ID（personal/agent/local）
+ * @param {number} topK - 返回结果数上限，默认 3
+ * @param {number} scoreThreshold - 置信度阈值，默认 0.7
+ * @returns {Promise<Array<{content, source, confidence, kbType, metadata, parentInfo}>>}
+ */
+export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 3, scoreThreshold = 0.5) {
+  console.log(`[RAG] ====== 检索开始 ======`)
+  console.log(`[RAG] 查询: "${query}"`)
+  console.log(`[RAG] 知识库: "${kbName || '全部知识库'}", 分类: "${kbCategoryId || '无'}", topK=${topK}, 阈值=${scoreThreshold}`)
+
+  // 1. 确定检索的 FaissStore 范围和路径过滤条件
+  let kbTypesToSearch = []
+  let kbPathFilter = null
+
+  if (!kbName || kbName === '全部知识库') {
+    // 全部知识库：检索三个 FaissStore，不做路径过滤
+    kbTypesToSearch = [...KB_TYPES]
+  } else if (kbCategoryId && KB_TYPES.includes(kbCategoryId)) {
+    // 具体知识库：只检索对应分类的 FaissStore
+    kbTypesToSearch = [kbCategoryId]
+    const dataDir = getDataDir()
+    kbPathFilter = path.join(dataDir, 'knowledge', kbCategoryId, kbName)
+  } else {
+    // 未知分类，回退到全部检索
+    kbTypesToSearch = [...KB_TYPES]
+  }
+
+  console.log(`[RAG] 检索范围: ${kbTypesToSearch.join(', ')}, 路径过滤: ${kbPathFilter || '无'}`)
+
+  // 2. 在各 FaissStore 中检索并收集满足置信度阈值的结果
+  const allResults = []
+  for (const kbType of kbTypesToSearch) {
+    try {
+      const store = await loadFaissStore(kbType)
+      // 多取一些结果以便后续过滤后仍有足够数量
+      const searchK = Math.max(topK * 3, 10)
+      const results = await store.similaritySearchWithScore(query, searchK)
+      console.log(`[RAG] ${kbType} 原始检索返回 ${results.length} 条结果`)
+
+      for (const [doc, score] of results) {
+        const confidence = distanceToConfidence(score)
+        const source = (doc.metadata && doc.metadata.source) || ''
+        console.log(`[RAG]   - cosine=${score.toFixed(4)}, confidence=${confidence.toFixed(4)}, source=${source}`)
+        if (confidence >= scoreThreshold) {
+          allResults.push({ doc, confidence, score, kbType })
+        }
+      }
+      console.log(`[RAG] ${kbType} 通过阈值过滤后剩余 ${allResults.filter(r => r.kbType === kbType).length} 条`)
+    } catch (e) {
+      console.warn(`[RAG] Failed to search ${kbType}:`, e.message)
+    }
+  }
+
+  // 3. 按置信度降序排序
+  allResults.sort((a, b) => b.confidence - a.confidence)
+
+  // 4. 取 TOP 3
+  const topResults = allResults.slice(0, topK)
+  console.log(`[RAG] TOP ${topK} 结果（按置信度降序）:`)
+  topResults.forEach((r, i) => {
+    console.log(`[RAG]   ${i + 1}. confidence=${r.confidence.toFixed(4)}, kbType=${r.kbType}, source=${(r.doc.metadata && r.doc.metadata.source) || ''}`)
+  })
+
+  // 5. 若选择了具体知识库，按目录路径过滤 TOP 3 结果
+  let filteredResults = topResults
+  if (kbPathFilter) {
+    const filterPrefix = kbPathFilter + path.sep
+    filteredResults = topResults.filter(r => {
+      const source = (r.doc.metadata && r.doc.metadata.source) || ''
+      return source.startsWith(filterPrefix)
+    })
+    console.log(`[RAG] 知识库路径过滤后剩余 ${filteredResults.length} 条 (过滤前缀: ${filterPrefix})`)
+  }
+
+  // 6. 对每个命中的子块，查父块表取回父块文本（Small-to-Big）
+  const finalResults = []
+  for (const result of filteredResults) {
+    const docId = result.doc.metadata && result.doc.metadata.docId
+    let content = result.doc.pageContent
+    let parentInfo = null
+
+    if (docId) {
+      const parentDoc = db.getParentDoc(docId)
+      if (parentDoc && parentDoc.content) {
+        // 有父块则使用父块的完整大段文本
+        content = parentDoc.content
+        parentInfo = {
+          uuid: parentDoc.uuid,
+          docId: parentDoc.doc_id,
+          sourcePath: parentDoc.source_path,
+          fileType: parentDoc.file_type
+        }
+        console.log(`[RAG]   ✓ 命中父块: uuid=${parentDoc.uuid}, source=${parentDoc.source_path}, 内容长度=${content.length}`)
+      } else {
+        console.log(`[RAG]   - 无父块，使用子块自身文本 (docId=${docId}), 内容长度=${content.length}`)
+      }
+    }
+
+    finalResults.push({
+      content,
+      source: (result.doc.metadata && result.doc.metadata.source) || '',
+      confidence: result.confidence,
+      kbType: result.kbType,
+      metadata: {
+        fileType: result.doc.metadata && result.doc.metadata.fileType,
+        title: result.doc.metadata && result.doc.metadata.title,
+        noteId: result.doc.metadata && result.doc.metadata.noteId
+      },
+      parentInfo
+    })
+  }
+
+  // 7. 父块去重：多个子块可能映射到同一个父块，避免重复内容
+  const dedupedResults = []
+  const seenParentUuids = new Set()
+  const seenContents = new Set()
+  for (const result of finalResults) {
+    const parentUuid = result.parentInfo && result.parentInfo.uuid
+    if (parentUuid) {
+      if (seenParentUuids.has(parentUuid)) {
+        console.log(`[RAG]   ✗ 去重: 父块 uuid=${parentUuid} 已存在，跳过`)
+        continue
+      }
+      seenParentUuids.add(parentUuid)
+    } else {
+      // 无父块时按内容去重
+      if (seenContents.has(result.content)) {
+        console.log(`[RAG]   ✗ 去重: 子块内容重复，跳过`)
+        continue
+      }
+      seenContents.add(result.content)
+    }
+    dedupedResults.push(result)
+  }
+
+  console.log(`[RAG] ====== 检索结束，最终返回 ${dedupedResults.length} 条结果（去重前 ${finalResults.length} 条）======`)
+  return dedupedResults
+}

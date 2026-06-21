@@ -1,6 +1,8 @@
 import fs from 'fs'
 import path from 'path'
+import { v4 as uuidv4 } from 'uuid'
 import { FaissStore } from '@langchain/community/vectorstores/faiss'
+import { SynchronousInMemoryDocstore } from '@langchain/classic/stores/doc/in_memory'
 import { getEmbeddings } from './embeddings.js'
 import { getDataDir } from '../config.js'
 
@@ -8,10 +10,92 @@ import { getDataDir } from '../config.js'
  * FaissStore 向量存储管理
  * 维护三个独立的 FaissStore 数据库，分别对应 personal / agent / local 知识库
  * 存储路径: {dataDir}/rag/{kbType}/faiss_index/
+ *
+ * 使用 IndexFlatIP（内积索引）+ L2 归一化向量实现余弦相似度：
+ *   - 向量在 embedding 阶段已做 L2 归一化（单位向量）
+ *   - IndexFlatIP 计算内积，归一化向量的内积 = 余弦相似度
+ *   - similaritySearchWithScore 返回的 score 直接就是余弦相似度（越大越相似，范围 [-1, 1]）
  */
 
 // 三个知识库类型
 export const KB_TYPES = ['personal', 'agent', 'local']
+
+/**
+ * CosineFaissStore: 基于 IndexFlatIP 的余弦相似度向量存储
+ *
+ * 继承自 LangChain FaissStore，重写以下方法将 IndexFlatL2 替换为 IndexFlatIP：
+ *   - addVectors: 创建索引时使用 IndexFlatIP
+ *   - load: 读取索引时使用 IndexFlatIP.read
+ *   - importFaiss: 同时导出 IndexFlatIP
+ *
+ * 配合 embeddings.js 中的 L2 归一化，返回的分数即为余弦相似度。
+ */
+class CosineFaissStore extends FaissStore {
+  /**
+   * 重写 addVectors：使用 IndexFlatIP 替代 IndexFlatL2
+   * 逻辑与父类完全一致，仅将 new IndexFlatL2(dv) 改为 new IndexFlatIP(dv)
+   */
+  async addVectors(vectors, documents, options) {
+    if (vectors.length === 0) return []
+    if (vectors.length !== documents.length) {
+      throw new Error('Vectors and documents must have the same length')
+    }
+    const dv = vectors[0].length
+    if (!this._index) {
+      const { IndexFlatIP } = await CosineFaissStore.importFaiss()
+      this._index = new IndexFlatIP(dv)
+    }
+    const d = this.index.getDimension()
+    if (dv !== d) {
+      throw new Error(`Vectors must have the same length as the number of dimensions (${d})`)
+    }
+    const docstoreSize = this.index.ntotal()
+    const documentIds = options?.ids ?? documents.map(() => uuidv4())
+    for (let i = 0; i < vectors.length; i += 1) {
+      const documentId = documentIds[i]
+      const id = docstoreSize + i
+      this.index.add(vectors[i])
+      this._mapping[id] = documentId
+      this.docstore.add({ [documentId]: documents[i] })
+    }
+    return documentIds
+  }
+
+  /**
+   * 重写 load：使用 IndexFlatIP.read 替代 IndexFlatL2.read
+   * 逻辑与父类完全一致，仅将 IndexFlatL2.read 改为 IndexFlatIP.read
+   */
+  static async load(directory, embeddings) {
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const readStore = (directory) =>
+      fs.readFile(path.join(directory, 'docstore.json'), 'utf8').then(JSON.parse)
+    const readIndex = async (directory) => {
+      const { IndexFlatIP } = await this.importFaiss()
+      return IndexFlatIP.read(path.join(directory, 'faiss.index'))
+    }
+    const [[docstoreFiles, mapping], index] = await Promise.all([
+      readStore(directory),
+      readIndex(directory),
+    ])
+    const docstore = new SynchronousInMemoryDocstore(new Map(docstoreFiles))
+    return new this(embeddings, { docstore, index, mapping })
+  }
+
+  /**
+   * 重写 importFaiss：导出 IndexFlatIP
+   */
+  static async importFaiss() {
+    try {
+      const { default: { IndexFlatIP } } = await import('faiss-node')
+      return { IndexFlatIP }
+    } catch (err) {
+      throw new Error(
+        `Could not import faiss-node. Please install faiss-node as a dependency with, e.g. \`npm install -S faiss-node\`.\n\nError: ${err?.message}`
+      )
+    }
+  }
+}
 
 // 内存中缓存的 FaissStore 实例
 const storeCache = new Map()
@@ -49,11 +133,11 @@ export async function loadFaissStore(kbType, forceReload = false) {
 
   let store
   if (fs.existsSync(storeDir) && fs.existsSync(path.join(storeDir, 'faiss.index'))) {
-    // 从磁盘加载已有索引
-    store = await FaissStore.load(storeDir, embeddings)
+    // 从磁盘加载已有索引（使用 IndexFlatIP）
+    store = await CosineFaissStore.load(storeDir, embeddings)
   } else {
     // 创建空实例（用 fromTexts 初始化，避免 save 时报错）
-    store = await FaissStore.fromTexts([''], [{}], embeddings)
+    store = await CosineFaissStore.fromTexts([''], [{}], embeddings)
   }
 
   storeCache.set(kbType, store)
@@ -102,13 +186,13 @@ export async function rebuildStore(kbType, newChildDocs) {
   const embeddings = await getEmbeddings()
   const storeDir = ensureStoreDir(kbType)
 
-  // 在内存中构建全新的 FaissStore
+  // 在内存中构建全新的 FaissStore（使用 IndexFlatIP）
   let newStore
   if (newChildDocs.length > 0) {
-    newStore = await FaissStore.fromDocuments(newChildDocs, embeddings)
+    newStore = await CosineFaissStore.fromDocuments(newChildDocs, embeddings)
   } else {
-    // 没有文档时，用 fromTexts 创建空 store（new FaissStore() 未初始化无法 save）
-    newStore = await FaissStore.fromTexts([''], [{}], embeddings)
+    // 没有文档时，用 fromTexts 创建空 store（new CosineFaissStore() 未初始化无法 save）
+    newStore = await CosineFaissStore.fromTexts([''], [{}], embeddings)
     // 删除占位文档
     if (newStore.docstore && newStore.docstore._docs) {
       const docsMap = newStore.docstore._docs

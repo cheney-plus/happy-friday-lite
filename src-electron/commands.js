@@ -4,7 +4,7 @@ import path from 'path'
 import { CancellationTokens } from './cancellation.js'
 import { loadConfig, saveConfig, getDataDir } from './config.js'
 import * as db from './db.js'
-import { streamChat, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
+import { streamChat, streamChatWithRagAgent, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
 import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
 import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
@@ -152,7 +152,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_with_memory', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking, systemPrompt } = args
+    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId } = args
 
     let currentSessionId = sessionId
     let isNewSession = false
@@ -205,19 +205,18 @@ export function registerCommands(mainWindow) {
 
     const cancelToken = cancelTokens.insert(requestId)
 
+    // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
+    const ragConfig = (kbName || kbCategoryId)
+      ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '' }
+      : null
+
     let fullContent = ''
     let fullReasoning = ''
 
     try {
-      const result = await streamChat(
-        mainWindow,
-        allMessages,
-        model,
-        requestId,
-        currentSessionId,
-        enableThinking || false,
-        cancelToken
-      )
+      const result = ragConfig
+        ? await streamChatWithRagAgent(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken, ragConfig)
+        : await streamChat(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken)
       fullContent = result.fullContent
       fullReasoning = result.fullReasoning
     } catch (e) {
@@ -243,7 +242,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_without_memory', async (_event, args) => {
-    const { requestId, model, message, enableThinking } = args
+    const { requestId, model, message, enableThinking, kbName, kbCategoryId } = args
 
     const appConfig = loadConfig()
     const messages = [
@@ -253,19 +252,18 @@ export function registerCommands(mainWindow) {
 
     const cancelToken = cancelTokens.insert(requestId)
 
+    // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
+    const ragConfig = (kbName || kbCategoryId)
+      ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '' }
+      : null
+
     let fullContent = ''
     let fullReasoning = ''
 
     try {
-      const result = await streamChat(
-        mainWindow,
-        messages,
-        model,
-        requestId,
-        null,
-        enableThinking || false,
-        cancelToken
-      )
+      const result = ragConfig
+        ? await streamChatWithRagAgent(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken, ragConfig)
+        : await streamChat(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken)
       fullContent = result.fullContent
       fullReasoning = result.fullReasoning
     } catch (e) {
@@ -1047,6 +1045,35 @@ export function registerCommands(mainWindow) {
       return { success: false, error: e.message }
     }
   })
+
+  // RAG 知识检索：根据用户查询在知识库中检索相关内容
+  // 流程：similaritySearchWithScore → 置信度过滤 → TOP 3 → 知识库路径过滤 → 父块查表
+  ipcMain.handle('rag-search', async (_event, args) => {
+    const { query, kbName, kbCategoryId, topK, scoreThreshold } = args || {}
+    console.log(`[IPC] rag-search 收到请求: query="${query}", kbName="${kbName}", kbCategoryId="${kbCategoryId}"`)
+    if (!query) {
+      console.warn(`[IPC] rag-search 缺少 query 参数`)
+      return { success: false, error: 'query required', results: [] }
+    }
+    try {
+      const { searchKnowledgeBase } = await import('./rag/index.js')
+      const results = await searchKnowledgeBase(
+        query,
+        kbName || '',
+        kbCategoryId || '',
+        topK || 3,
+        scoreThreshold || 0.7
+      )
+      console.log(`[IPC] rag-search 返回 ${results.length} 条结果`)
+      return { success: true, results }
+    } catch (e) {
+      console.error('[IPC] rag-search 错误:', e)
+      return { success: false, error: e.message, results: [] }
+    }
+  })
+
+  // RAG 判断已移除：现在由 RAG Agent 通过 Function Calling 自主决定是否检索，
+  // 不再需要单独的预判断请求。详见 llm.js 中的 streamChatWithRagAgent。
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')
 }
