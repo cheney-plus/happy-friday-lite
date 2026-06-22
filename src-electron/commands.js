@@ -686,8 +686,13 @@ export function registerCommands(mainWindow) {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
-        redirect: 'follow'
+        redirect: 'manual'
       })
+
+      // 不跟随重定向，直接获取原始 URL 的静态内容
+      if (response.status >= 300 && response.status < 400) {
+        return { success: false, error: `该网址发生了重定向（${response.status}），请直接输入目标页面地址` }
+      }
 
       if (!response.ok) {
         return { success: false, error: `请求失败，状态码：${response.status}` }
@@ -698,16 +703,17 @@ export function registerCommands(mainWindow) {
       // 从 URL 提取文件名
       const urlObj = new URL(fetchUrl)
 
-      // 注入 <base> 标签，使相对路径（图片、CSS等）能正确解析到原网站
-      const baseUrl = urlObj.origin + urlObj.pathname.substring(0, urlObj.pathname.lastIndexOf('/') + 1)
-      const baseTag = `<base href="${baseUrl}">`
-      if (/<head[^>]*>/i.test(html)) {
-        html = html.replace(/<head[^>]*>/i, match => match + baseTag)
-      } else if (/<html[^>]*>/i.test(html)) {
-        html = html.replace(/<html[^>]*>/i, match => match + `<head>${baseTag}</head>`)
-      } else {
-        html = baseTag + html
-      }
+      // 移除可能导致跳转或动态加载的内容，确保 HTML 是纯静态的
+      // 1. 移除 <script> 标签及内容
+      html = html.replace(/<script[\s\S]*?<\/script>/gi, '')
+      // 2. 移除 meta refresh 跳转
+      html = html.replace(/<meta[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, '')
+      // 3. 移除所有 on* 事件属性（onclick, onload 等）
+      html = html.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      // 4. 移除 <iframe> 标签（可能嵌入外部页面）
+      html = html.replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+      // 5. 移除 <noscript> 标签
+      html = html.replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
       let baseName = urlObj.pathname.split('/').filter(Boolean).pop() || urlObj.hostname
       // 移除可能的查询参数
       baseName = baseName.split('?')[0].split('#')[0]

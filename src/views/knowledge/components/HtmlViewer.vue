@@ -11,7 +11,7 @@
       v-else
       class="html-iframe"
       :srcdoc="htmlContent"
-      sandbox="allow-popups allow-forms allow-scripts"
+      sandbox=""
     ></iframe>
   </div>
 </template>
