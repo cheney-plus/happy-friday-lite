@@ -79,6 +79,7 @@ export function useKnowledgeBase(fileSystem, sidebar) {
   async function selectKnowledgeBase(id, name, categoryId) {
     selectedKB.value = id;
     currentTitle.value = name;
+    currentCategoryId.value = categoryId || '';
     await fileSystem.selectKnowledgeBaseDir(id, name, categoryId);
   }
 

@@ -376,14 +376,15 @@ function distanceToConfidence(score) {
  * @param {string} query - 用户查询文本
  * @param {string} kbName - 知识库名称（"全部知识库" 或具体名称）
  * @param {string} kbCategoryId - 知识库所属分类 ID（personal/agent/local）
- * @param {number} topK - 返回结果数上限，默认 3
- * @param {number} scoreThreshold - 置信度阈值，默认 0.7
+ * @param {number} topK - 返回结果数上限，默认 10
+ * @param {number} scoreThreshold - 置信度阈值，默认 0.5
+ * @param {string} [folderPath] - 可选的文件夹路径过滤（用于基于文件夹提问时进一步过滤）
  * @returns {Promise<Array<{content, source, confidence, kbType, metadata, parentInfo}>>}
  */
-export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 3, scoreThreshold = 0.5) {
+export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 10, scoreThreshold = 0.5, folderPath = '') {
   console.log(`[RAG] ====== 检索开始 ======`)
   console.log(`[RAG] 查询: "${query}"`)
-  console.log(`[RAG] 知识库: "${kbName || '全部知识库'}", 分类: "${kbCategoryId || '无'}", topK=${topK}, 阈值=${scoreThreshold}`)
+  console.log(`[RAG] 知识库: "${kbName || '全部知识库'}", 分类: "${kbCategoryId || '无'}", topK=${topK}, 阈值=${scoreThreshold}, folderPath="${folderPath || '无'}"`)
 
   // 1. 确定检索的 FaissStore 范围和路径过滤条件
   let kbTypesToSearch = []
@@ -393,13 +394,19 @@ export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 3,
     // 全部知识库：检索三个 FaissStore，不做路径过滤
     kbTypesToSearch = [...KB_TYPES]
   } else if (kbCategoryId && KB_TYPES.includes(kbCategoryId)) {
-    // 具体知识库：只检索对应分类的 FaissStore
+    // 具体知识库：只检索对应分类的 FaissStore，不加载其他分类的 faiss 文件
     kbTypesToSearch = [kbCategoryId]
     const dataDir = getDataDir()
     kbPathFilter = path.join(dataDir, 'knowledge', kbCategoryId, kbName)
   } else {
-    // 未知分类，回退到全部检索
-    kbTypesToSearch = [...KB_TYPES]
+    // 已指定知识库名但未提供有效分类，无法定位 FaissStore，返回空结果
+    console.warn(`[RAG] 已指定知识库 "${kbName}" 但分类 "${kbCategoryId}" 无效，跳过检索避免加载无关 faiss 文件`)
+    return []
+  }
+
+  // 基于文件夹提问时，使用文件夹路径作为过滤条件（覆盖知识库路径过滤）
+  if (folderPath) {
+    kbPathFilter = folderPath
   }
 
   console.log(`[RAG] 检索范围: ${kbTypesToSearch.join(', ')}, 路径过滤: ${kbPathFilter || '无'}`)

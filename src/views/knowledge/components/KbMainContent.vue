@@ -258,7 +258,28 @@
       <p>从左侧选择或创建一个知识库开始</p>
     </div>
 
-    <KbQuestionBox :is-folder="isFolderView" />
+    <KbQuestionBox
+      :is-folder="isFolderView"
+      :context-label="questionBoxContextLabel"
+      :disabled="!selectedKB"
+      @ask="handleAsk"
+    />
+
+    <!-- 知识库/文件夹提问对话弹窗 -->
+    <KbChatDialog
+      :visible="chatDialogVisible"
+      :is-folder="isFolderView"
+      :context-label="questionBoxContextLabel"
+      :kb-name="currentTitle"
+      :kb-category-id="currentCategoryId"
+      :folder-path="chatDialogFolderPath"
+      :top-k="10"
+      :initial-question="chatDialogInitialQuestion"
+      :mode="chatDialogMode"
+      :model="chatDialogModel"
+      :think-mode="chatDialogThinkMode"
+      @close="closeChatDialog"
+    />
 
     <!-- 网页上传对话框 -->
     <NewFolderDialog
@@ -310,6 +331,7 @@
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import FileCard from './FileCard.vue';
 import KbQuestionBox from './KbQuestionBox.vue';
+import KbChatDialog from './KbChatDialog.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
 import SelectNoteDialog from './SelectNoteDialog.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
@@ -318,6 +340,7 @@ import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } fr
 const props = defineProps({
   selectedKB: String,
   currentTitle: String,
+  currentCategoryId: String,
   canGoBack: Boolean,
   canGoForward: Boolean,
   pathSegments: Array,
@@ -349,6 +372,66 @@ const sortBy = ref('name');
 const sortOrder = ref('asc');
 
 const isFolderView = computed(() => props.pathSegments && props.pathSegments.length > 1);
+
+// 提问上下文标签：知识库视图显示知识库名，文件夹视图显示当前文件夹名
+const questionBoxContextLabel = computed(() => {
+  if (!props.selectedKB) return '';
+  if (isFolderView.value && props.pathSegments && props.pathSegments.length > 0) {
+    return props.pathSegments[props.pathSegments.length - 1].name;
+  }
+  return props.currentTitle || '';
+});
+
+// 提问弹窗状态
+const chatDialogVisible = ref(false);
+const chatDialogInitialQuestion = ref('');
+const chatDialogMode = ref('chat');
+const chatDialogModel = ref(null);
+const chatDialogThinkMode = ref('fast');
+const chatDialogFolderPath = ref('');
+
+function handleAsk(payload) {
+  if (!props.selectedKB) return;
+
+  // 加载模型配置
+  const model = loadModelConfig(payload?.modelId);
+  if (!model) {
+    console.error('No model configured for chat');
+    return;
+  }
+
+  chatDialogModel.value = model;
+  chatDialogInitialQuestion.value = payload.question;
+  chatDialogMode.value = payload.mode || 'chat';
+  chatDialogThinkMode.value = payload.thinkMode || 'fast';
+  // 文件夹视图时传入当前路径作为过滤条件；知识库视图留空（由后端按 kbName/kbCategoryId 过滤）
+  chatDialogFolderPath.value = isFolderView.value ? (props.currentPath || '') : '';
+  chatDialogVisible.value = true;
+}
+
+function closeChatDialog() {
+  chatDialogVisible.value = false;
+  chatDialogInitialQuestion.value = '';
+  chatDialogModel.value = null;
+}
+
+function loadModelConfig(modelId) {
+  try {
+    const stored = localStorage.getItem('happy-friday-custom-models');
+    if (stored) {
+      const models = JSON.parse(stored);
+      let model = models.find(m => m.id === modelId);
+      if (!model && models.length > 0) {
+        const selectedId = localStorage.getItem('happy-friday-selected-model');
+        model = selectedId ? models.find(m => m.id === selectedId) : models[0];
+      }
+      return model || null;
+    }
+  } catch (e) {
+    console.error('Failed to load model config:', e);
+  }
+  return null;
+}
 
 const sortOptions = [
   { key: 'modifiedTime', label: '更新时间' },

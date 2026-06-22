@@ -37,6 +37,7 @@
     <KbMainContent
       :selected-k-b="selectedKB"
       :current-title="currentTitle"
+      :current-category-id="currentCategoryId"
       :can-go-back="canGoBack"
       :can-go-forward="canGoForward"
       :path-segments="pathSegments"
@@ -245,6 +246,7 @@ const currentPath = computed(() => fileSystem.currentPath.value);
 const {
   selectedKB,
   currentTitle,
+  currentCategoryId,
   filteredCategories,
   showCreateDialog,
   currentCategoryName,

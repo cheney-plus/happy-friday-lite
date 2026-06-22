@@ -613,8 +613,9 @@ export async function streamChatWithRagAgent(mainWindow, messages, model, reques
           query,
           ragConfig?.kbName || '',
           ragConfig?.kbCategoryId || '',
-          3,
-          0.5
+          ragConfig?.topK || 3,
+          0.5,
+          ragConfig?.folderPath || ''
         )
         if (results.length > 0) {
           toolResult = results.map((r, idx) => {

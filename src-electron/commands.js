@@ -152,137 +152,157 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_with_memory', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId } = args
+    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId, folderPath, topK } = args
 
     let currentSessionId = sessionId
     let isNewSession = false
     let userMessageId = null
 
-    if (!currentSessionId) {
-      const session = db.createSession(message.slice(0, 20) || '新对话')
-      currentSessionId = session.id
-      isNewSession = true
-    } else {
-      const existing = db.getSession(currentSessionId)
-      if (!existing) {
-        throw new Error('Session not found')
-      }
-    }
-
-    const userMsg = db.saveMessage(currentSessionId, 'user', message)
-    userMessageId = userMsg.id
-    db.updateSessionTimestamp(currentSessionId)
-
-    if (isNewSession) {
-      const modelClone = { ...model }
-      const sessionIdClone = currentSessionId
-      const userMsgClone = message
-      setImmediate(async () => {
-        try {
-          const title = await generateTitle(modelClone, userMsgClone)
-          db.updateSessionTitle(sessionIdClone, title)
-          mainWindow.webContents.send(SESSION_TITLE_UPDATED, {
-            sessionId: sessionIdClone,
-            title
-          })
-        } catch (_e) {
-        }
-      })
-    }
-
-    const dbMessages = db.getMessages(currentSessionId)
-    const historyMessages = dbMessages.map(m => ({
-      role: m.role,
-      content: m.content
-    }))
-
-    const appConfig = loadConfig()
-    const effectiveSystemPrompt = systemPrompt || appConfig.systemPrompt
-    const allMessages = [
-      { role: 'system', content: effectiveSystemPrompt },
-      ...historyMessages
-    ]
-
-    const cancelToken = cancelTokens.insert(requestId)
-
-    // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
-    const ragConfig = (kbName || kbCategoryId)
-      ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '' }
-      : null
-
-    let fullContent = ''
-    let fullReasoning = ''
-
     try {
-      const result = ragConfig
-        ? await streamChatWithRagAgent(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken, ragConfig)
-        : await streamChat(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken)
-      fullContent = result.fullContent
-      fullReasoning = result.fullReasoning
-    } catch (e) {
+      if (!currentSessionId) {
+        const session = db.createSession(message.slice(0, 20) || '新对话')
+        currentSessionId = session.id
+        isNewSession = true
+      } else {
+        const existing = db.getSession(currentSessionId)
+        if (!existing) {
+          throw new Error('Session not found')
+        }
+      }
+
+      const userMsg = db.saveMessage(currentSessionId, 'user', message)
+      userMessageId = userMsg.id
+      db.updateSessionTimestamp(currentSessionId)
+
+      if (isNewSession) {
+        const modelClone = { ...model }
+        const sessionIdClone = currentSessionId
+        const userMsgClone = message
+        setImmediate(async () => {
+          try {
+            const title = await generateTitle(modelClone, userMsgClone)
+            db.updateSessionTitle(sessionIdClone, title)
+            mainWindow.webContents.send(SESSION_TITLE_UPDATED, {
+              sessionId: sessionIdClone,
+              title
+            })
+          } catch (_e) {
+          }
+        })
+      }
+
+      const dbMessages = db.getMessages(currentSessionId)
+      const historyMessages = dbMessages.map(m => ({
+        role: m.role,
+        content: m.content
+      }))
+
+      const appConfig = loadConfig()
+      const effectiveSystemPrompt = systemPrompt || appConfig.systemPrompt
+      const allMessages = [
+        { role: 'system', content: effectiveSystemPrompt },
+        ...historyMessages
+      ]
+
+      const cancelToken = cancelTokens.insert(requestId)
+
+      // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
+      const ragConfig = (kbName || kbCategoryId || folderPath)
+        ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
+        : null
+
+      let fullContent = ''
+      let fullReasoning = ''
+
+      try {
+        const result = ragConfig
+          ? await streamChatWithRagAgent(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken, ragConfig)
+          : await streamChat(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken)
+        fullContent = result.fullContent
+        fullReasoning = result.fullReasoning
+      } catch (e) {
+        cancelTokens.remove(requestId)
+        throw e
+      }
+
       cancelTokens.remove(requestId)
+
+      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent)
+      db.updateSessionTimestamp(currentSessionId)
+
+      mainWindow.webContents.send(CHAT_DONE, {
+        requestId,
+        sessionId: currentSessionId,
+        fullContent,
+        reasoningContent: fullReasoning,
+        messageId: assistantMsg.id,
+        userMessageId
+      })
+
+      return { sessionId: currentSessionId }
+    } catch (e) {
+      // 任何阶段出错都通知前端，避免前端一直处于 streaming 状态
+      mainWindow.webContents.send(CHAT_ERROR, {
+        requestId,
+        sessionId: currentSessionId || null,
+        error: e?.message || String(e)
+      })
       throw e
     }
-
-    cancelTokens.remove(requestId)
-
-    const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent)
-    db.updateSessionTimestamp(currentSessionId)
-
-    mainWindow.webContents.send(CHAT_DONE, {
-      requestId,
-      sessionId: currentSessionId,
-      fullContent,
-      reasoningContent: fullReasoning,
-      messageId: assistantMsg.id,
-      userMessageId
-    })
-
-    return { sessionId: currentSessionId }
   })
 
   ipcMain.handle('chat_without_memory', async (_event, args) => {
-    const { requestId, model, message, enableThinking, kbName, kbCategoryId } = args
-
-    const appConfig = loadConfig()
-    const messages = [
-      { role: 'system', content: appConfig.systemPrompt },
-      { role: 'user', content: message }
-    ]
-
-    const cancelToken = cancelTokens.insert(requestId)
-
-    // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
-    const ragConfig = (kbName || kbCategoryId)
-      ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '' }
-      : null
-
-    let fullContent = ''
-    let fullReasoning = ''
+    const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK } = args
 
     try {
-      const result = ragConfig
-        ? await streamChatWithRagAgent(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken, ragConfig)
-        : await streamChat(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken)
-      fullContent = result.fullContent
-      fullReasoning = result.fullReasoning
-    } catch (e) {
+      const appConfig = loadConfig()
+      const messages = [
+        { role: 'system', content: appConfig.systemPrompt },
+        { role: 'user', content: message }
+      ]
+
+      const cancelToken = cancelTokens.insert(requestId)
+
+      // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
+      const ragConfig = (kbName || kbCategoryId || folderPath)
+        ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
+        : null
+
+      let fullContent = ''
+      let fullReasoning = ''
+
+      try {
+        const result = ragConfig
+          ? await streamChatWithRagAgent(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken, ragConfig)
+          : await streamChat(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken)
+        fullContent = result.fullContent
+        fullReasoning = result.fullReasoning
+      } catch (e) {
+        cancelTokens.remove(requestId)
+        throw e
+      }
+
       cancelTokens.remove(requestId)
+
+      mainWindow.webContents.send(CHAT_DONE, {
+        requestId,
+        sessionId: null,
+        fullContent,
+        reasoningContent: fullReasoning,
+        messageId: null,
+        userMessageId: null
+      })
+
+      return {}
+    } catch (e) {
+      // 任何阶段出错都通知前端，避免前端一直处于 streaming 状态
+      mainWindow.webContents.send(CHAT_ERROR, {
+        requestId,
+        sessionId: null,
+        error: e?.message || String(e)
+      })
       throw e
     }
-
-    cancelTokens.remove(requestId)
-
-    mainWindow.webContents.send(CHAT_DONE, {
-      requestId,
-      sessionId: null,
-      fullContent,
-      reasoningContent: fullReasoning,
-      messageId: null,
-      userMessageId: null
-    })
-
-    return {}
   })
 
   ipcMain.handle('stop_chat', (_event, args) => {
@@ -1053,10 +1073,10 @@ export function registerCommands(mainWindow) {
   })
 
   // RAG 知识检索：根据用户查询在知识库中检索相关内容
-  // 流程：similaritySearchWithScore → 置信度过滤 → TOP 3 → 知识库路径过滤 → 父块查表
+  // 流程：similaritySearchWithScore → 置信度过滤 → TOP 10 → 知识库/文件夹路径过滤 → 父块查表
   ipcMain.handle('rag-search', async (_event, args) => {
-    const { query, kbName, kbCategoryId, topK, scoreThreshold } = args || {}
-    console.log(`[IPC] rag-search 收到请求: query="${query}", kbName="${kbName}", kbCategoryId="${kbCategoryId}"`)
+    const { query, kbName, kbCategoryId, topK, scoreThreshold, folderPath } = args || {}
+    console.log(`[IPC] rag-search 收到请求: query="${query}", kbName="${kbName}", kbCategoryId="${kbCategoryId}", folderPath="${folderPath || ''}"`)
     if (!query) {
       console.warn(`[IPC] rag-search 缺少 query 参数`)
       return { success: false, error: 'query required', results: [] }
@@ -1067,8 +1087,9 @@ export function registerCommands(mainWindow) {
         query,
         kbName || '',
         kbCategoryId || '',
-        topK || 3,
-        scoreThreshold || 0.7
+        topK || 10,
+        scoreThreshold || 0.5,
+        folderPath || ''
       )
       console.log(`[IPC] rag-search 返回 ${results.length} 条结果`)
       return { success: true, results }
