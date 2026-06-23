@@ -199,8 +199,10 @@ function resetState() {
 
 function setupListeners() {
   cleanupListeners();
+  console.log('[KbChat] setupListeners 注册监听器, activeRequestId=', activeRequestId);
   unlistenChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
+    console.log('[KbChat] chat-chunk 收到, requestId=', data.requestId, 'active=', activeRequestId, 'content长度=', (data.content || '').length);
     if (data.requestId !== activeRequestId) return;
     streamingContent.value += data.content;
     scrollToBottom();
@@ -215,6 +217,7 @@ function setupListeners() {
 
   unlistenDone = electronService.listen('chat-done', (event) => {
     const data = event.payload;
+    console.log('[KbChat] chat-done 收到, requestId=', data.requestId, 'active=', activeRequestId, 'fullContent长度=', (data.fullContent || '').length);
     if (data.requestId !== activeRequestId) return;
     if (isDoneReceived) return;
     isDoneReceived = true;
@@ -240,6 +243,15 @@ function setupListeners() {
         reasoning: data.reasoningContent || streamingReasoning.value || undefined,
         id: data.messageId
       });
+    } else {
+      // LLM 返回空内容（如模型不支持 Function Calling 或 Agent 循环未产出答案），给出可见提示
+      messages.value.push({
+        role: 'assistant',
+        content: '',
+        reasoning: undefined,
+        id: data.messageId,
+        error: '模型未返回内容，可能不支持工具调用或检索循环未得出答案'
+      });
     }
 
     if (data.sessionId && !currentSessionId) {
@@ -257,6 +269,7 @@ function setupListeners() {
 
   unlistenError = electronService.listen('chat-error', (event) => {
     const data = event.payload;
+    console.log('[KbChat] chat-error 收到, requestId=', data.requestId, 'active=', activeRequestId, 'error=', data.error);
     if (data.requestId !== activeRequestId) return;
     isStreaming.value = false;
     const partialContent = streamingContent.value;
@@ -321,10 +334,14 @@ async function sendChatMessage(text) {
 
   activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   isDoneReceived = false;
+  console.log('[KbChat] sendChatMessage 开始, requestId=', activeRequestId, 'mode=', mode, 'model=', props.model?.modelName, 'kbName=', props.kbName, 'folderPath=', props.folderPath);
+
+  // props.model 是 Vue 响应式 Proxy，无法被 Electron IPC structured clone，必须深拷贝成普通对象
+  const plainModel = JSON.parse(JSON.stringify(props.model));
 
   const baseArgs = {
     requestId: activeRequestId,
-    model: props.model,
+    model: plainModel,
     message: text,
     enableThinking,
     kbName: props.kbName || '',
@@ -343,20 +360,42 @@ async function sendChatMessage(text) {
     } else {
       result = await electronService.invoke('chat_without_memory', baseArgs);
     }
+    console.log('[KbChat] invoke 返回, result=', result, 'isStreaming=', isStreaming.value, 'isDoneReceived=', isDoneReceived);
     // electronService.invoke 捕获异常后返回 null，需要手动处理
     if (result === null) {
       console.error('Chat invoke returned null - backend error');
-      if (isStreaming.value) {
+      // 如果 done/error 事件都没收到，需要手动恢复状态并提示
+      if (isStreaming.value && !isDoneReceived) {
         isStreaming.value = false;
         streamingContent.value = '';
         streamingReasoning.value = '';
         showScrollDownBtn.value = false;
+        messages.value.push({
+          role: 'assistant',
+          content: '',
+          reasoning: undefined,
+          id: null,
+          error: '后端调用失败（invoke 返回 null），请查看主进程日志'
+        });
+        scrollToBottom(true);
       }
     }
   } catch (err) {
-    console.error('Chat invoke error:', err);
+    console.error('[KbChat] Chat invoke error:', err, err?.stack);
     isStreaming.value = false;
     streamingContent.value = '';
+    streamingReasoning.value = '';
+    showScrollDownBtn.value = false;
+    if (!isDoneReceived) {
+      messages.value.push({
+        role: 'assistant',
+        content: '',
+        reasoning: undefined,
+        id: null,
+        error: `调用失败: ${err?.message || String(err)}`
+      });
+      scrollToBottom(true);
+    }
   }
 }
 
