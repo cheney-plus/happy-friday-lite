@@ -1,7 +1,7 @@
 <template>
   <div class="conversation-container">
     <header class="conversation-header">
-      <button class="header-btn back-btn" @click="goBack">
+      <button v-if="showBackBtn" class="header-btn back-btn" @click="goBack">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 12H5"></path>
           <polyline points="12 19 5 12 12 5"></polyline>
@@ -81,7 +81,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
@@ -129,6 +129,8 @@ function formatTime(date) {
   const m = date.getMinutes().toString().padStart(2, '0');
   return `${h}:${m}`;
 }
+
+const showBackBtn = computed(() => route.query.hideBack !== 'true');
 
 function goBack() {
   router.push('/friday');
