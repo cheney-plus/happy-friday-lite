@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'update_schedule_event',
       'delete_schedule_event',
       'get_sessions',
+      'get_sessions_with_stats',
       'get_session',
       'get_session_messages',
       'create_session',

@@ -116,6 +116,10 @@ export function registerCommands(mainWindow) {
     return db.getSessions()
   })
 
+  ipcMain.handle('get_sessions_with_stats', () => {
+    return db.getSessionsWithStats()
+  })
+
   ipcMain.handle('get_session', (_event, args) => {
     return db.getSession(args.sessionId)
   })

@@ -58,6 +58,13 @@
           </div>
         </div>
 
+        <div v-if="sessions.length > 0" class="drawer-footer" @click="goToHistoryPage">
+          <span>查看全部历史</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+
         <Teleport to="body">
           <div
             v-if="activeMenuSessionId"
@@ -153,12 +160,17 @@ const loadSessions = async () => {
   loading.value = true;
   try {
     const result = await electronService.invoke('get_sessions');
-    sessions.value = result;
+    sessions.value = (result || []).slice(0, 20);
   } catch (err) {
     console.error('Failed to load sessions:', err);
   } finally {
     loading.value = false;
   }
+};
+
+const goToHistoryPage = () => {
+  router.push('/history');
+  isOpen.value = false;
 };
 
 const formatDateTime = (dateStr) => {
@@ -408,6 +420,26 @@ defineExpose({ loadSessions });
   flex: 1;
   overflow-y: auto;
   padding: 4px;
+}
+
+.drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 16px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.drawer-footer:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .drawer-body::-webkit-scrollbar {

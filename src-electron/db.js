@@ -284,6 +284,25 @@ export function getSessions() {
   return queryAll('SELECT * FROM sessions ORDER BY updatedAt DESC')
 }
 
+export function getSessionsWithStats() {
+  const sessions = queryAll('SELECT * FROM sessions ORDER BY updatedAt DESC')
+  return sessions.map(s => {
+    const stats = queryOne(
+      'SELECT COUNT(*) as messageCount FROM messages WHERE sessionId = ?',
+      [s.id]
+    )
+    const firstUserMsg = queryOne(
+      "SELECT content FROM messages WHERE sessionId = ? AND role = 'user' ORDER BY id ASC LIMIT 1",
+      [s.id]
+    )
+    return {
+      ...s,
+      messageCount: stats ? stats.messageCount : 0,
+      preview: firstUserMsg ? firstUserMsg.content : ''
+    }
+  })
+}
+
 export function getSession(sessionId) {
   return queryOne('SELECT * FROM sessions WHERE id = ?', [sessionId])
 }
