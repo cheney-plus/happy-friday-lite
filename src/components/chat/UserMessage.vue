@@ -61,5 +61,6 @@ defineProps({
   background: var(--text-primary);
   color: var(--bg-primary);
   border-bottom-right-radius: 4px;
+  white-space: pre-wrap;
 }
 </style>
