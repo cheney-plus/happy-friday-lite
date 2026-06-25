@@ -118,6 +118,7 @@ import { ref, computed, onMounted, onUnmounted, onActivated, nextTick } from 'vu
 const props = defineProps({
   isFolder: { type: Boolean, default: false },
   contextLabel: { type: String, default: '' },
+  categoryId: { type: String, default: '' },
   disabled: { type: Boolean, default: false }
 });
 
@@ -144,6 +145,7 @@ const currentModeLabel = computed(() => {
 
 const placeholderText = computed(() => {
   if (props.disabled) return '请先选择知识库';
+  if (props.categoryId === 'agent') return '在本目录执行 Agent 工作流...';
   return props.isFolder ? '基于当前文件夹提问...' : '基于当前知识库提问...';
 });
 

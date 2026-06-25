@@ -35,7 +35,7 @@ export function setOnTaskComplete(callback) {
 
 /**
  * 将文件入队（如果已存在且状态为 pending/processing 则忽略，避免重复入队）
- * @param {string} kbType - 知识库类型: personal / agent / local
+ * @param {string} kbType - 知识库类型: personal / local（工作区 agent 不入队）
  * @param {string} filePath - 文件路径
  * @param {string} lastModified - 文件最后修改时间 ISO 字符串
  * @param {boolean} forceReindex - 是否强制重新索引（即使状态为 success 也重置为 pending）

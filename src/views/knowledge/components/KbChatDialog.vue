@@ -18,7 +18,7 @@
                 </div>
                 <div class="header-titles">
                   <span class="header-title">{{ contextLabel }}</span>
-                  <span class="header-subtitle">{{ isFolder ? '基于文件夹提问' : '基于知识库提问' }} · RAG 检索 Top {{ topK }}</span>
+                  <span class="header-subtitle">{{ subtitleText }}</span>
                 </div>
               </div>
               <div class="header-right">
@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { electronService } from '@/services/electron';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
@@ -140,6 +140,12 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
+
+// 顶部副标题：工作区不参与 RAG 检索，提示可执行 Agent 工作流
+const subtitleText = computed(() => {
+  if (props.kbCategoryId === 'agent') return '在本目录执行 Agent 工作流 ...';
+  return `${props.isFolder ? '基于文件夹提问' : '基于知识库提问'} · RAG 检索 Top ${props.topK}`;
+});
 
 const messages = ref([]);
 const inputText = ref('');

@@ -446,7 +446,6 @@ const ragStats = ref({});
 
 const KB_TYPE_LABELS = {
   personal: '个人知识库',
-  agent: 'Agent 知识库',
   local: '本地知识库'
 };
 

@@ -211,7 +211,9 @@ export function registerCommands(mainWindow) {
       const cancelToken = cancelTokens.insert(requestId)
 
       // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
-      const ragConfig = (kbName || kbCategoryId || folderPath)
+      // 工作区(agent)不参与向量化与检索，跳过 RAG 配置
+      const isAgentKb = kbCategoryId === 'agent'
+      const ragConfig = (!isAgentKb && (kbName || kbCategoryId || folderPath))
         ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
         : null
 
@@ -268,7 +270,9 @@ export function registerCommands(mainWindow) {
       const cancelToken = cancelTokens.insert(requestId)
 
       // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
-      const ragConfig = (kbName || kbCategoryId || folderPath)
+      // 工作区(agent)不参与向量化与检索，跳过 RAG 配置
+      const isAgentKb = kbCategoryId === 'agent'
+      const ragConfig = (!isAgentKb && (kbName || kbCategoryId || folderPath))
         ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
         : null
 

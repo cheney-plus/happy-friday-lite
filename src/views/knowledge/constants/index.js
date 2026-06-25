@@ -77,19 +77,19 @@ export const DEFAULT_CATEGORIES = [
     ]
   },
   {
-    id: 'agent',
-    name: 'Agent知识库',
-    expanded: true,
-    items: [
-      { id: 'rag-thinking', name: 'SKILL' }
-    ]
-  },
-  {
     id: 'local',
     name: '本地知识库',
     expanded: false,
     items: [
       { id: 'local-books', name: '我的书籍' }
+    ]
+  },
+  {
+    id: 'agent',
+    name: '工作区',
+    expanded: true,
+    items: [
+      { id: 'rag-thinking', name: 'SKILL' }
     ]
   }
 ];

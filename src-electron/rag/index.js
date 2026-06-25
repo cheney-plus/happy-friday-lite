@@ -32,12 +32,12 @@ import {
 
 // 根据文件路径推断所属知识库类型
 // 文件路径形如: {dataDir}/knowledge/{categoryId}/{kbName}/...
+// 工作区(agent)不参与向量化与检索，返回 null 跳过处理
 export function inferKbType(filePath) {
   const dataDir = getDataDir()
   const knowledgeDir = path.join(dataDir, 'knowledge')
   const relativePath = path.relative(knowledgeDir, filePath)
   if (relativePath.startsWith('personal')) return 'personal'
-  if (relativePath.startsWith('agent')) return 'agent'
   if (relativePath.startsWith('local')) return 'local'
   return null
 }
@@ -375,7 +375,7 @@ function distanceToConfidence(score) {
  *
  * @param {string} query - 用户查询文本
  * @param {string} kbName - 知识库名称（"全部知识库" 或具体名称）
- * @param {string} kbCategoryId - 知识库所属分类 ID（personal/agent/local）
+ * @param {string} kbCategoryId - 知识库所属分类 ID（personal/local，工作区 agent 不参与检索）
  * @param {number} topK - 返回结果数上限，默认 10
  * @param {number} scoreThreshold - 置信度阈值，默认 0.5
  * @param {string} [folderPath] - 可选的文件夹路径过滤（用于基于文件夹提问时进一步过滤）

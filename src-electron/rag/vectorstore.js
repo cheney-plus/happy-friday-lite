@@ -8,7 +8,8 @@ import { getDataDir } from '../config.js'
 
 /**
  * FaissStore 向量存储管理
- * 维护三个独立的 FaissStore 数据库，分别对应 personal / agent / local 知识库
+ * 维护两个独立的 FaissStore 数据库，分别对应 personal / local 知识库
+ * （工作区/agent 不参与向量化与检索，不维护 FaissStore）
  * 存储路径: {dataDir}/rag/{kbType}/faiss_index/
  *
  * 使用 IndexFlatIP（内积索引）+ L2 归一化向量实现余弦相似度：
@@ -17,8 +18,8 @@ import { getDataDir } from '../config.js'
  *   - similaritySearchWithScore 返回的 score 直接就是余弦相似度（越大越相似，范围 [-1, 1]）
  */
 
-// 三个知识库类型
-export const KB_TYPES = ['personal', 'agent', 'local']
+// 参与向量化的知识库类型（工作区 agent 不参与）
+export const KB_TYPES = ['personal', 'local']
 
 /**
  * CosineFaissStore: 基于 IndexFlatIP 的余弦相似度向量存储

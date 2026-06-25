@@ -126,8 +126,8 @@ async function loadKbTree() {
     const knowledgeDir = dataDir.value + '/knowledge';
     const categories = [
       { id: 'personal', name: '个人知识库' },
-      { id: 'agent', name: 'Agent知识库' },
-      { id: 'local', name: '本地知识库' }
+      { id: 'local', name: '本地知识库' },
+      { id: 'agent', name: '工作区' }
     ];
 
     const tree = [];

@@ -261,6 +261,7 @@
     <KbQuestionBox
       :is-folder="isFolderView"
       :context-label="questionBoxContextLabel"
+      :category-id="currentCategoryId"
       :disabled="!selectedKB"
       @ask="handleAsk"
     />
@@ -517,8 +518,8 @@ async function handleUpload(type) {
         }
       }
       emit('refresh');
-      // 触发 RAG 索引（异步，不阻塞 UI）
-      if (copiedPaths.length > 0) {
+      // 触发 RAG 索引（异步，不阻塞 UI）；工作区不参与向量化
+      if (copiedPaths.length > 0 && props.currentCategoryId !== 'agent') {
         api.invoke('rag-trigger-file-upload', { filePaths: copiedPaths })
           .catch(e => console.error('[RAG] trigger upload failed:', e));
       }
@@ -535,8 +536,8 @@ async function handleUpload(type) {
       });
       console.log('[Upload] copy folder result:', result);
       emit('refresh');
-      // 触发 RAG 索引（异步，不阻塞 UI）
-      if (result && result.success && result.path) {
+      // 触发 RAG 索引（异步，不阻塞 UI）；工作区不参与向量化
+      if (result && result.success && result.path && props.currentCategoryId !== 'agent') {
         api.invoke('rag-trigger-file-upload', { filePaths: [result.path] })
           .catch(e => console.error('[RAG] trigger folder upload failed:', e));
       }
@@ -592,8 +593,8 @@ async function confirmNoteUpload(selectedNotes) {
     }
     closeNoteDialog();
     emit('refresh');
-    // 触发 RAG 索引
-    if (savedPaths.length > 0) {
+    // 触发 RAG 索引；工作区不参与向量化
+    if (savedPaths.length > 0 && props.currentCategoryId !== 'agent') {
       api.invoke('rag-trigger-file-upload', { filePaths: savedPaths })
         .catch(e => console.error('[RAG] trigger note upload failed:', e));
     }
@@ -618,8 +619,8 @@ async function confirmWebpageUpload() {
     if (result.success) {
       closeWebpageDialog();
       emit('refresh');
-      // 触发 RAG 索引
-      if (result.path) {
+      // 触发 RAG 索引；工作区不参与向量化
+      if (result.path && props.currentCategoryId !== 'agent') {
         api.invoke('rag-trigger-file-upload', { filePaths: [result.path] })
           .catch(e => console.error('[RAG] trigger webpage upload failed:', e));
       }

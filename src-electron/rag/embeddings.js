@@ -192,7 +192,7 @@ async function checkModelChangeAndCleanIndex(modelConfig) {
     }
 
     // 模型变更，删除所有 FaissStore 索引
-    for (const kbType of ['personal', 'agent', 'local']) {
+    for (const kbType of ['personal', 'local']) {
       const storeDir = path.join(dataDir, 'rag', kbType, 'faiss_index')
       if (fs.existsSync(storeDir)) {
         fs.rmSync(storeDir, { recursive: true, force: true })
@@ -204,7 +204,7 @@ async function checkModelChangeAndCleanIndex(modelConfig) {
     // 否则系统会误认为文件已索引，跳过重新索引
     try {
       const db = await import('../db.js')
-      for (const kbType of ['personal', 'agent', 'local']) {
+      for (const kbType of ['personal', 'local']) {
         db.deleteFileStatusByKbType(kbType)
       }
       console.log(`[RAG] Cleared file_status for all kb types (signature changed)`)
