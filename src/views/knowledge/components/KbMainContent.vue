@@ -500,13 +500,15 @@ async function handleUpload(type) {
       });
       if (!filePaths || !filePaths.length) return;
 
-      // 校验文件格式
-      const invalidFiles = filePaths.filter(f => !isAllowedFile(f));
-      if (invalidFiles.length > 0) {
-        const names = invalidFiles.map(f => f.split('/').pop() || f.split('\\').pop());
-        uploadErrorMsg.value = `以下文件格式不支持：${names.join('、')}\n\n仅允许上传：PDF、PPT/PPTX、DOC/DOCX、XLS/XLSX、HTML、TXT/CSV/JSON/XML、EPUB 等文本类文件`;
-        showUploadError.value = true;
-        return;
+      // 校验文件格式（工作区不限制文件格式）
+      if (props.currentCategoryId !== 'agent') {
+        const invalidFiles = filePaths.filter(f => !isAllowedFile(f));
+        if (invalidFiles.length > 0) {
+          const names = invalidFiles.map(f => f.split('/').pop() || f.split('\\').pop());
+          uploadErrorMsg.value = `以下文件格式不支持：${names.join('、')}\n\n仅允许上传：PDF、PPT/PPTX、DOC/DOCX、XLS/XLSX、HTML、TXT/CSV/JSON/XML、EPUB 等文本类文件`;
+          showUploadError.value = true;
+          return;
+        }
       }
 
       const copiedPaths = [];
@@ -528,11 +530,11 @@ async function handleUpload(type) {
         properties: ['openDirectory']
       });
       if (!folderPath) return;
-      // 文件夹上传时过滤非法格式文件
+      // 文件夹上传时过滤非法格式文件（工作区不限制文件格式）
       const result = await api.invoke('kb-copy-folder', {
         srcPath: String(folderPath),
         destDir,
-        allowedExtensions: ALLOWED_EXTENSIONS
+        allowedExtensions: props.currentCategoryId === 'agent' ? null : ALLOWED_EXTENSIONS
       });
       console.log('[Upload] copy folder result:', result);
       emit('refresh');

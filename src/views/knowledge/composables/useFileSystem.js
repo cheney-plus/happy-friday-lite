@@ -84,8 +84,11 @@ export function useFileSystem() {
     if (!api) return;
     try {
       const entries = await api.invoke('kb-read-dir', { dirPath });
+      // 工作区(agent)不限制文件格式，其他知识库仅显示允许的文件类型
+      const isAgentDir = dirPath.includes('/knowledge/agent/');
+      const isVisible = entry => entry.isDirectory || isAgentDir || isAllowedFile(entry.name);
       files.value = entries
-        .filter(entry => entry.isDirectory || isAllowedFile(entry.name))
+        .filter(isVisible)
         .map(entry => ({
           ...entry,
           type: entry.isDirectory ? 'folder' : getFileType(entry.name)
@@ -94,7 +97,7 @@ export function useFileSystem() {
         if (file.isDirectory) {
           try {
             const subEntries = await api.invoke('kb-read-dir', { dirPath: file.path });
-            file.count = subEntries.filter(e => e.isDirectory || isAllowedFile(e.name)).length + '项';
+            file.count = subEntries.filter(isVisible).length + '项';
           } catch {
             file.count = '0项';
           }
