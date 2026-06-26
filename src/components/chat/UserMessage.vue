@@ -62,5 +62,7 @@ defineProps({
   color: var(--bg-primary);
   border-bottom-right-radius: 4px;
   white-space: pre-wrap;
+  -webkit-user-select: text;
+  user-select: text;
 }
 </style>

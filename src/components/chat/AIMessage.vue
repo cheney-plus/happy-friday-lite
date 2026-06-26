@@ -305,6 +305,13 @@ onUnmounted(() => {
 
 .markdown-body {
   white-space: normal;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.markdown-body :deep(*) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .markdown-body :deep(p) {
