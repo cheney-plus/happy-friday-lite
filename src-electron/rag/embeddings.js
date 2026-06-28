@@ -41,9 +41,13 @@ function getEmbeddingModelConfig() {
     throw new Error('RAG: 当前首选模型未配置 Embedding 模型名称，请在模型设置中为模型添加 Embedding 模型')
   }
 
+  // 仅“其他”厂商可选择为 Embedding 模型单独配置地址与 API Key
+  const useSeparate = selectedModel.useSeparateEmbeddingConfig &&
+    selectedModel.embeddingApiKey && selectedModel.embeddingBaseUrl
+
   return {
-    apiKey: selectedModel.apiKey,
-    baseUrl: selectedModel.baseUrl,
+    apiKey: useSeparate ? selectedModel.embeddingApiKey : selectedModel.apiKey,
+    baseUrl: useSeparate ? selectedModel.embeddingBaseUrl : selectedModel.baseUrl,
     embeddingModelName: selectedModel.embeddingModelName,
     modelId: selectedModel.id
   }

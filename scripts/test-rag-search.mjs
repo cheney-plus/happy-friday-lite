@@ -56,9 +56,13 @@ function getEmbeddingModelConfig() {
     process.exit(1)
   }
 
+  // 仅“其他”厂商可选择为 Embedding 模型单独配置地址与 API Key
+  const useSeparate = selectedModel.useSeparateEmbeddingConfig &&
+    selectedModel.embeddingApiKey && selectedModel.embeddingBaseUrl
+
   return {
-    apiKey: selectedModel.apiKey,
-    baseUrl: selectedModel.baseUrl,
+    apiKey: useSeparate ? selectedModel.embeddingApiKey : selectedModel.apiKey,
+    baseUrl: useSeparate ? selectedModel.embeddingBaseUrl : selectedModel.baseUrl,
     modelName: selectedModel.embeddingModelName,
   }
 }

@@ -136,6 +136,45 @@
               />
             </div>
 
+            <div v-if="formData.provider === 'other'" class="form-group form-group-checkbox">
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="formData.useSeparateEmbeddingConfig" />
+                <span>Embedding 模型使用不同的地址和 API Key</span>
+              </label>
+            </div>
+
+            <div v-if="formData.provider === 'other' && formData.useSeparateEmbeddingConfig" class="form-group">
+              <label class="form-label">Embedding API Key</label>
+              <div class="input-wrapper">
+                <input
+                  :type="showEmbeddingApiKey ? 'text' : 'password'"
+                  v-model="formData.embeddingApiKey"
+                  placeholder="输入 Embedding 模型的 API Key"
+                  class="form-input"
+                />
+                <button class="toggle-visibility" @click="showEmbeddingApiKey = !showEmbeddingApiKey">
+                  <svg v-if="!showEmbeddingApiKey" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                  <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div v-if="formData.provider === 'other' && formData.useSeparateEmbeddingConfig" class="form-group">
+              <label class="form-label">Embedding 模型地址</label>
+              <input
+                type="text"
+                v-model="formData.embeddingUrl"
+                placeholder="输入 Embedding 模型 API 地址，如 https://api.example.com/v1"
+                class="form-input"
+              />
+            </div>
+
             <p class="form-hint">自定义配置，请遵守法规并关注模型使用Token消耗</p>
           </div>
 
@@ -212,6 +251,7 @@ const selectedModel = ref('');
 
 const showAddModal = ref(false);
 const showApiKey = ref(false);
+const showEmbeddingApiKey = ref(false);
 const showDeleteConfirm = ref(false);
 const showProviderDropdown = ref(false);
 const showModelDropdown = ref(false);
@@ -238,7 +278,10 @@ const formData = ref({
   apiKey: '',
   modelName: '',
   embeddingModelName: '',
-  modelUrl: ''
+  modelUrl: '',
+  useSeparateEmbeddingConfig: false,
+  embeddingApiKey: '',
+  embeddingUrl: ''
 });
 
 const customModels = ref([]);
@@ -392,7 +435,10 @@ const syncModelsToConfig = async () => {
         apiKey: m.apiKey,
         modelName: m.modelName,
         embeddingModelName: m.embeddingModelName || '',
-        baseUrl: m.baseUrl
+        baseUrl: m.baseUrl,
+        useSeparateEmbeddingConfig: m.useSeparateEmbeddingConfig || false,
+        embeddingApiKey: m.embeddingApiKey || '',
+        embeddingBaseUrl: m.embeddingBaseUrl || ''
       }));
       config.selectedModelId = selectedModel.value;
       await electronService.invoke('save-config', config);
@@ -405,7 +451,11 @@ const syncModelsToConfig = async () => {
 const isFormValid = computed(() => {
   const baseValid = formData.value.provider && formData.value.apiKey && formData.value.modelName;
   if (formData.value.provider === 'other') {
-    return baseValid && formData.value.modelUrl;
+    if (!baseValid || !formData.value.modelUrl) return false;
+    if (formData.value.useSeparateEmbeddingConfig) {
+      return !!(formData.value.embeddingApiKey && formData.value.embeddingUrl);
+    }
+    return true;
   }
   return baseValid;
 });
@@ -421,14 +471,19 @@ const resetForm = () => {
     apiKey: '',
     modelName: '',
     embeddingModelName: '',
-    modelUrl: ''
+    modelUrl: '',
+    useSeparateEmbeddingConfig: false,
+    embeddingApiKey: '',
+    embeddingUrl: ''
   };
   showApiKey.value = false;
+  showEmbeddingApiKey.value = false;
 };
 
 const handleSave = () => {
   if (isFormValid.value) {
     const provider = providerList.find(p => p.value === formData.value.provider);
+    const isOther = formData.value.provider === 'other';
     const newModel = {
       id: `model_${Date.now()}`,
       provider: formData.value.provider,
@@ -436,9 +491,17 @@ const handleSave = () => {
       apiKey: formData.value.apiKey,
       modelName: formData.value.modelName,
       embeddingModelName: formData.value.embeddingModelName || '',
-      baseUrl: formData.value.provider === 'other' ? formData.value.modelUrl : (provider?.baseUrl || ''),
+      baseUrl: isOther ? formData.value.modelUrl : (provider?.baseUrl || ''),
       createdAt: Date.now()
     };
+
+    if (isOther) {
+      newModel.useSeparateEmbeddingConfig = !!formData.value.useSeparateEmbeddingConfig;
+      if (formData.value.useSeparateEmbeddingConfig) {
+        newModel.embeddingApiKey = formData.value.embeddingApiKey;
+        newModel.embeddingBaseUrl = formData.value.embeddingUrl;
+      }
+    }
 
     customModels.value.push(newModel);
     saveCustomModels();
@@ -838,6 +901,28 @@ const handleSave = () => {
   color: var(--text-tertiary);
   font-weight: 400;
   margin-left: 6px;
+}
+
+.form-group-checkbox {
+  padding: 4px 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--text-primary);
+  margin: 0;
 }
 
 .select-wrapper {
