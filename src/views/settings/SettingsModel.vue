@@ -127,11 +127,11 @@
             </div>
 
             <div v-if="formData.provider === 'other'" class="form-group">
-              <label class="form-label">模型地址</label>
+              <label class="form-label">对话模型地址</label>
               <input
                 type="text"
                 v-model="formData.modelUrl"
-                placeholder="输入模型API地址，如 https://api.example.com/v1"
+                placeholder="输入完整的对话模型 API 地址，如 https://api.example.com/v1/chat/completions"
                 class="form-input"
               />
             </div>
@@ -170,7 +170,7 @@
               <input
                 type="text"
                 v-model="formData.embeddingUrl"
-                placeholder="输入 Embedding 模型 API 地址，如 https://api.example.com/v1"
+                placeholder="输入完整的 Embedding 模型 API 地址，如 https://api.example.com/v1/embeddings"
                 class="form-input"
               />
             </div>

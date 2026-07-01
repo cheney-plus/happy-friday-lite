@@ -49,7 +49,9 @@ function getEmbeddingModelConfig() {
     apiKey: useSeparate ? selectedModel.embeddingApiKey : selectedModel.apiKey,
     baseUrl: useSeparate ? selectedModel.embeddingBaseUrl : selectedModel.baseUrl,
     embeddingModelName: selectedModel.embeddingModelName,
-    modelId: selectedModel.id
+    modelId: selectedModel.id,
+    // “其他”厂商的地址为完整 URL，不做 /embeddings 路径拼接
+    rawUrl: selectedModel.provider === 'other'
   }
 }
 
@@ -57,8 +59,9 @@ function getEmbeddingModelConfig() {
  * 通过 HTTPS 调用 Embedding API
  * 兼容 OpenAI /embeddings 接口格式
  */
-function callEmbeddingApi(baseUrl, apiKey, modelName, texts) {
-  const url = new URL(`${baseUrl.replace(/\/+$/, '')}/embeddings`)
+function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
+  const fullUrl = rawUrl ? baseUrl : `${baseUrl.replace(/\/+$/, '')}/embeddings`
+  const url = new URL(fullUrl)
 
   const body = JSON.stringify({
     model: modelName,
@@ -140,6 +143,7 @@ class HttpApiEmbeddings {
     this.baseUrl = config.baseUrl
     this.modelName = config.embeddingModelName
     this.modelId = config.modelId
+    this.rawUrl = config.rawUrl
   }
 
   /**
@@ -156,7 +160,7 @@ class HttpApiEmbeddings {
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize)
-      const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, batch)
+      const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, batch, this.rawUrl)
       allEmbeddings.push(...embeddings)
     }
 
@@ -171,7 +175,7 @@ class HttpApiEmbeddings {
    * @returns {Promise<number[]>}
    */
   async embedQuery(text) {
-    const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, [text])
+    const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, [text], this.rawUrl)
     // L2 归一化，与 embedDocuments 保持一致
     return normalizeVector(embeddings[0])
   }

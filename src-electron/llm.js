@@ -3,7 +3,11 @@ import http from 'http'
 import { AppError } from './error.js'
 import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_ERROR, NOTE_AI_CHUNK, NOTE_AI_ERROR } from './events.js'
 
-function buildApiUrl(baseUrl) {
+function buildApiUrl(baseUrl, provider) {
+  // “其他”厂商的对话模型地址为完整的 URL，不做路径拼接
+  if (provider === 'other') {
+    return baseUrl.replace(/\/+$/, '')
+  }
   return `${baseUrl.replace(/\/+$/, '')}/chat/completions`
 }
 
@@ -35,7 +39,7 @@ function buildStreamBody(model, messages, enableThinking) {
 }
 
 export function streamChat(mainWindow, messages, model, requestId, sessionId, enableThinking, cancelToken) {
-  const url = new URL(buildApiUrl(model.baseUrl))
+  const url = new URL(buildApiUrl(model.baseUrl, model.provider))
   const body = buildStreamBody(model, messages, enableThinking)
   const bodyStr = JSON.stringify(body)
 
@@ -166,7 +170,7 @@ const FIM_SYSTEM_PROMPT = `你是一个文本笔记补全助手。根据光标�
 - 如果光标后有内容，确保补全能与后续内容自然衔接`
 
 export function fimCompletion(model, prefix, suffix, cancelToken) {
-  const url = buildApiUrl(model.baseUrl)
+  const url = buildApiUrl(model.baseUrl, model.provider)
 
   const userContent = prefix
     ? (suffix
@@ -270,7 +274,7 @@ export function fimCompletion(model, prefix, suffix, cancelToken) {
 }
 
 export async function generateTitle(model, userMessage) {
-  const url = buildApiUrl(model.baseUrl)
+  const url = buildApiUrl(model.baseUrl, model.provider)
 
   const body = {
     model: model.modelName,
@@ -503,7 +507,7 @@ export async function streamChatWithRagAgent(mainWindow, messages, model, reques
   console.log(`[RAG-Agent] ====== Agent 开始 ======`)
   console.log(`[RAG-Agent] 知识库: "${ragConfig?.kbName || '全部知识库'}", 分类: "${ragConfig?.kbCategoryId || '无'}"`)
 
-  const url = buildApiUrl(model.baseUrl)
+  const url = buildApiUrl(model.baseUrl, model.provider)
 
   // Agent 系统指令：追加到已有 system 消息后，说明工具使用时机
   const agentInstruction = `\n\n【知识库工具使用说明】
@@ -695,7 +699,7 @@ export function streamNoteAI(mainWindow, action, noteContent, selectedText, mode
     { role: 'user', content: userContent }
   ]
 
-  const url = new URL(buildApiUrl(model.baseUrl))
+  const url = new URL(buildApiUrl(model.baseUrl, model.provider))
   const body = buildStreamBody(model, messages, false)
   const bodyStr = JSON.stringify(body)
 

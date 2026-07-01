@@ -64,13 +64,15 @@ function getEmbeddingModelConfig() {
     apiKey: useSeparate ? selectedModel.embeddingApiKey : selectedModel.apiKey,
     baseUrl: useSeparate ? selectedModel.embeddingBaseUrl : selectedModel.baseUrl,
     modelName: selectedModel.embeddingModelName,
+    rawUrl: selectedModel.provider === 'other',
   }
 }
 
 // ==================== Embedding API（带 L2 归一化）====================
 
-function callEmbeddingApi(baseUrl, apiKey, modelName, texts) {
-  const url = new URL(`${baseUrl.replace(/\/+$/, '')}/embeddings`)
+function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
+  const fullUrl = rawUrl ? baseUrl : `${baseUrl.replace(/\/+$/, '')}/embeddings`
+  const url = new URL(fullUrl)
   const body = JSON.stringify({ model: modelName, input: texts })
 
   const isHttps = url.protocol === 'https:'
@@ -137,6 +139,7 @@ class HttpApiEmbeddings {
     this.apiKey = config.apiKey
     this.baseUrl = config.baseUrl
     this.modelName = config.modelName
+    this.rawUrl = config.rawUrl
   }
 
   async embedDocuments(texts) {
@@ -145,7 +148,7 @@ class HttpApiEmbeddings {
     const allEmbeddings = []
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize)
-      const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, batch)
+      const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, batch, this.rawUrl)
       allEmbeddings.push(...embeddings)
     }
     // L2 归一化
@@ -153,7 +156,7 @@ class HttpApiEmbeddings {
   }
 
   async embedQuery(text) {
-    const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, [text])
+    const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, [text], this.rawUrl)
     // L2 归一化
     return normalizeVector(embeddings[0])
   }
