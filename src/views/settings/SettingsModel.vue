@@ -824,6 +824,9 @@ const handleSave = () => {
   border-radius: 12px;
   width: 90%;
   max-width: 480px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
   animation: slideUp 0.25s ease;
 }
@@ -845,6 +848,7 @@ const handleSave = () => {
   justify-content: space-between;
   padding: 20px 24px 16px;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -878,6 +882,9 @@ const handleSave = () => {
 
 .modal-body {
   padding: 24px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .form-group {
@@ -1089,6 +1096,7 @@ const handleSave = () => {
   padding: 16px 24px 20px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .save-btn {

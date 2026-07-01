@@ -276,35 +276,41 @@ export function fimCompletion(model, prefix, suffix, cancelToken) {
 export async function generateTitle(model, userMessage) {
   const url = buildApiUrl(model.baseUrl, model.provider)
 
-  const body = {
-    model: model.modelName,
-    messages: [
-      { role: 'system', content: '请用5-10个字总结概括以下用户的消息内容，只需要总结概括，不要展开扩展。不要加引号或其他格式。' },
-      { role: 'user', content: userMessage }
-    ],
-    stream: false,
-    max_tokens: 50
-  }
+  const messages = [
+    { role: 'system', content: '请用5-10个字总结概括以下用户的消息内容，只需要总结概括，不要展开扩展。不要加引号或其他格式。' },
+    { role: 'user', content: userMessage }
+  ]
 
   const knownProviders = ['qwen', 'minimax', 'deepseek', 'zhipu', 'kimi', 'doubao']
 
-  if (knownProviders.includes(model.provider)) {
-    switch (model.provider) {
-      case 'qwen':
-        body.enable_thinking = false
-        break
-      case 'minimax':
-        break
-      case 'deepseek':
-      case 'zhipu':
-      case 'kimi':
-      case 'doubao':
-        body.thinking = { type: 'disabled' }
-        break
+  // 发送标题生成请求；disableThinking 为 true 时尝试关闭思考模式以快速拿到标题，
+  // 为 false 时不发送思考相关参数（适配本身就是深度思考、无法关闭思考的模型）。
+  const sendRequest = async (disableThinking) => {
+    const body = {
+      model: model.modelName,
+      messages,
+      stream: false
     }
-  }
 
-  try {
+    if (disableThinking) {
+      body.max_tokens = 50
+      if (knownProviders.includes(model.provider)) {
+        switch (model.provider) {
+          case 'qwen':
+            body.enable_thinking = false
+            break
+          case 'minimax':
+            break
+          case 'deepseek':
+          case 'zhipu':
+          case 'kimi':
+          case 'doubao':
+            body.thinking = { type: 'disabled' }
+            break
+        }
+      }
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -314,15 +320,28 @@ export async function generateTitle(model, userMessage) {
       body: JSON.stringify(body)
     })
 
-    if (!response.ok) {
-      return '新对话'
-    }
+    if (!response.ok) return null
 
     const parsed = await response.json()
-    const title = parsed.choices?.[0]?.message?.content?.trim() || '新对话'
-    return title || '新对话'
+    return parsed.choices?.[0]?.message?.content?.trim() || ''
+  }
+
+  // 兜底：取用户输入内容的前 15 个字符作为标题
+  const fallbackTitle = userMessage.slice(0, 10) || '新对话'
+
+  try {
+    // 第一次尝试：关闭思考模式，快速生成标题
+    const title = await sendRequest(true)
+    if (title) return title
+
+    // 第二次尝试：不关闭思考模式（适用于本身就是深度思考模型的情况，
+    // 此时 max_tokens 不限制，让模型完成思考后输出标题）
+    const titleWithThinking = await sendRequest(false)
+    if (titleWithThinking) return titleWithThinking
+
+    return fallbackTitle
   } catch (_e) {
-    return '新对话'
+    return fallbackTitle
   }
 }
 
