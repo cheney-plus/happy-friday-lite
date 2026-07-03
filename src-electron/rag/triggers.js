@@ -194,11 +194,11 @@ function findChangedFiles(kbType, kbRootPath) {
  * 触发时机 3：用户点击"知识库检索更新"按钮
  * 仅对修改日期不一致的文件进行重建索引
  *
- * 采用"内存重建覆盖"策略：
+ * 采用"增量删除+重插"策略：
  *   - 比对状态库找出变更文件
- *   - 未变更文件向量从旧索引加载
- *   - 变更文件重新生成向量
- *   - 内存中构建全新 FaissStore，覆盖写入磁盘
+ *   - 变更文件：先按 source 删除旧向量，再重新生成向量插入
+ *   - 未变更文件向量原位保留在共享 Zvec collection 中
+ *   - 批量处理后调用 optimizeCollection 优化 HNSW 索引
  *
  * @param {string} kbType - 指定知识库类型，不传则更新所有
  * @param {(progress: {current: number, total: number, file: string, kbType: string}) => void} onProgress

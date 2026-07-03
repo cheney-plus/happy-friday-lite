@@ -6,6 +6,8 @@ import { loadConfig, getDataDir } from '../config.js'
 
 let cachedEmbeddings = null
 let cachedModelId = null
+// 缓存的向量维度（首次探针后复用，避免重复 API 调用）
+let cachedDimension = null
 
 // 记录上次使用的 embedding 模型签名（用于检测变更并清除旧索引）
 const EMBEDDING_SIG_FILE = 'embedding_model_sig.txt'
@@ -182,13 +184,13 @@ class HttpApiEmbeddings {
 }
 
 /**
- * 检测 Embedding 模型是否变更，如果变更则删除所有旧的 FaissStore 索引
+ * 检测 Embedding 模型是否变更，如果变更则删除所有旧的向量索引
  * 因为不同模型的向量维度不同，旧索引无法兼容
  */
 async function checkModelChangeAndCleanIndex(modelConfig) {
-  // 签名包含模型信息和余弦相似度版本号，版本变更会强制清除旧索引
-  // cosine_v1: 使用 IndexFlatIP + L2 归一化实现余弦相似度（替代旧的 IndexFlatL2）
-  const sig = `${modelConfig.baseUrl}|${modelConfig.embeddingModelName}|cosine_v1`
+  // 签名包含模型信息和向量库版本号，版本变更会强制清除旧索引
+  // zvec_v1: 使用 Zvec HNSW + COSINE 度量（替代旧的 faiss-node + cosine_v1）
+  const sig = `${modelConfig.baseUrl}|${modelConfig.embeddingModelName}|zvec_v1`
   const dataDir = getDataDir()
   const sigFile = path.join(dataDir, 'rag', EMBEDDING_SIG_FILE)
 
@@ -199,14 +201,30 @@ async function checkModelChangeAndCleanIndex(modelConfig) {
       console.log(`[RAG] Embedding model changed: ${oldSig} → ${sig}, clearing old indexes`)
     }
 
-    // 模型变更，删除所有 FaissStore 索引
+    // 模型变更，关闭并清除 Zvec collection 缓存
+    try {
+      const { clearStoreCache } = await import('./vectorstore.js')
+      clearStoreCache()
+    } catch (e) { /* ignore */ }
+
+    // 删除 Zvec 索引目录（所有知识库共用一个 collection）
+    const zvecDir = path.join(dataDir, 'rag', 'zvec_index')
+    if (fs.existsSync(zvecDir)) {
+      fs.rmSync(zvecDir, { recursive: true, force: true })
+      console.log(`[RAG] Deleted old zvec index: ${zvecDir}`)
+    }
+
+    // 兼容：清除旧的 FaissStore 索引目录（cosine_v1 时代）
     for (const kbType of ['personal', 'local']) {
-      const storeDir = path.join(dataDir, 'rag', kbType, 'faiss_index')
-      if (fs.existsSync(storeDir)) {
-        fs.rmSync(storeDir, { recursive: true, force: true })
-        console.log(`[RAG] Deleted old index: ${storeDir}`)
+      const oldFaissDir = path.join(dataDir, 'rag', kbType, 'faiss_index')
+      if (fs.existsSync(oldFaissDir)) {
+        fs.rmSync(oldFaissDir, { recursive: true, force: true })
+        console.log(`[RAG] Deleted legacy faiss index: ${oldFaissDir}`)
       }
     }
+
+    // 重置缓存的维度（模型变了维度可能不同）
+    cachedDimension = null
 
     // 同步清除 file_status 表中的索引状态记录
     // 否则系统会误认为文件已索引，跳过重新索引
@@ -226,6 +244,26 @@ async function checkModelChangeAndCleanIndex(modelConfig) {
   } catch (e) {
     console.warn('[RAG] Failed to check/clean embedding model signature:', e.message)
   }
+}
+
+/**
+ * 探针获取当前 Embedding 模型的向量维度
+ * 首次调用会发起一次 embedQuery 请求并缓存结果，后续直接返回缓存值。
+ * 用于创建 Zvec collection 时确定 schema 中的 dimension 字段。
+ * @param {HttpApiEmbeddings} embeddings
+ * @returns {Promise<number>}
+ */
+export async function getEmbeddingDimension(embeddings) {
+  if (cachedDimension && cachedDimension > 0) {
+    return cachedDimension
+  }
+  const probe = await embeddings.embedQuery('dimension probe')
+  if (!probe || !probe.length) {
+    throw new Error('RAG: embedding 探针返回空向量')
+  }
+  cachedDimension = probe.length
+  console.log(`[RAG] Detected embedding dimension: ${cachedDimension}`)
+  return cachedDimension
 }
 
 /**
@@ -253,6 +291,7 @@ export async function getEmbeddings() {
 export function clearEmbeddingsCache() {
   cachedEmbeddings = null
   cachedModelId = null
+  cachedDimension = null
   // 延迟导入避免循环依赖
   import('./vectorstore.js').then(m => m.clearStoreCache()).catch(() => {})
 }

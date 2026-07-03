@@ -2,15 +2,14 @@ import fs from 'fs'
 import path from 'path'
 import * as db from '../db.js'
 import { getDataDir } from '../config.js'
-import { loadDocument, getFileType } from './loaders.js'
+import { loadDocument } from './loaders.js'
 import { splitDocuments } from './chunkers.js'
 import {
-  loadFaissStore,
-  saveFaissStore,
   addDocuments,
-  rebuildStore,
-  deleteFaissStore,
-  getStoreDocCount,
+  deleteStore,
+  deleteBySource,
+  optimizeCollection,
+  searchByQuery,
   KB_TYPES
 } from './vectorstore.js'
 
@@ -21,13 +20,15 @@ import {
  *   1. 加载文档（根据文件类型选择加载器）
  *   2. 分块（笔记用结构感知，其他用父子分块）
  *   3. 父块存入 SQLite parent_docs 表
- *   4. 子块向量化后存入 FaissStore
+ *   4. 子块向量化后存入 Zvec collection
  *
  * 知识库更新流程（用户手动触发）：
- *   1. 扫描知识库目录，比对 file_status 表找出变更文件
- *   2. 采用"内存重建覆盖"策略重建 FaissStore
- *   3. 未变更文件的向量从旧索引加载，变更文件重新生成向量
- *   4. 在内存中构建全新 FaissStore，覆盖写入磁盘
+ *   采用"增量删除+重插"策略：
+ *   1. 扫描知识库目录，比对 file_status 表找出变更/删除文件
+ *   2. 变更文件：addDocuments 内部先按 source 删除旧向量再插入新向量
+ *   3. 删除文件：按 source 删除对应向量
+ *   4. 批量处理后调用 optimizeCollection 优化 HNSW 索引
+ *   未变更文件的向量原位保留在共享 collection 中，无需迁移。
  */
 
 // 根据文件路径推断所属知识库类型
@@ -103,9 +104,10 @@ export async function processFileTask(task) {
   const { kbType, filePath, lastModified } = task
 
   if (!fs.existsSync(filePath)) {
-    // 文件已被删除，清理状态和父块
+    // 文件已被删除，清理状态、父块和向量
     db.deleteFileStatus(kbType, filePath)
     db.deleteParentDocsBySourcePath(filePath)
+    await deleteBySource(filePath)
     console.log(`[RAG] File deleted, cleaned: ${filePath}`)
     return
   }
@@ -127,25 +129,28 @@ export async function processFileTask(task) {
     db.insertParentDocsBatch(parentDocs)
   }
 
-  // 5. 子块向量化后存入 FaissStore
-  // 注意：单文件增量添加时直接 addDocuments
-  // 重建场景由 rebuildKbStore 统一处理
-  if (childDocs.length > 0) {
-    await addDocuments(kbType, childDocs)
-  }
+  // 5. 子块向量化后存入 Zvec collection
+  // addDocuments 内部会先按 source 删除旧向量，再 embedding 并插入新向量
+  const insertedCount = childDocs.length > 0
+    ? await addDocuments(kbType, childDocs)
+    : 0
 
-  console.log(`[RAG] File indexed: ${filePath} (parents: ${parentDocs.length}, children: ${childDocs.length})`)
+  // 6. 记录子块数量，用于 getVectorCount 统计
+  db.setFileChunkCount(kbType, filePath, insertedCount)
+
+  console.log(`[RAG] File indexed: ${filePath} (parents: ${parentDocs.length}, children: ${childDocs.length}, inserted: ${insertedCount})`)
 }
 
 /**
- * 重建指定知识库的 FaissStore（内存重建覆盖策略）
+ * 重建指定知识库的向量索引（增量删除+重插策略）
  *
  * 流程：
  *   1. 扫描知识库目录，找出所有可索引文件
- *   2. 比对 file_status 表，区分"未变更文件"和"需重新索引文件"
- *   3. 对未变更文件：从旧 FaissStore 中提取其子块向量
- *   4. 对变更文件：重新加载→分块→向量化
- *   5. 在内存中构建全新 FaissStore，覆盖写入磁盘
+ *   2. 比对 file_status 表，区分"未变更文件"、"变更文件"和"已删除文件"
+ *   3. 变更文件：重新加载→分块→addDocuments（内部按 source 删旧插新）+ 更新 chunk_count
+ *   4. 已删除文件：按 source 删除向量 + 清理 file_status 和 parent_docs
+ *   5. 批量处理后调用 optimizeCollection 优化 HNSW 索引
+ *   未变更文件的向量原位保留在共享 collection 中，无需迁移。
  *
  * @param {string} kbType - 知识库类型
  * @param {(progress: {current: number, total: number, file: string}) => void} onProgress - 进度回调
@@ -159,56 +164,43 @@ export async function rebuildKbStore(kbType, onProgress = null) {
   const allFiles = scanIndexableFiles(kbRootPath)
   console.log(`[RAG] Found ${allFiles.length} indexable files`)
 
-  // 2. 比对状态库，区分变更/未变更
+  // 2. 比对状态库，区分变更/未变更/已删除
   const changedFiles = []
-  const unchangedFiles = []
   const existingStatusMap = new Map()
   const allStatus = db.getFileStatusByKbType(kbType)
   for (const status of allStatus) {
     existingStatusMap.set(status.file_path, status)
   }
 
-  // 记录当前磁盘上的文件集合，用于后续清理已删除文件的状态
+  // 记录当前磁盘上的文件集合，用于识别已删除文件
   const currentFilePaths = new Set(allFiles.map(f => f.filePath))
 
   for (const file of allFiles) {
     const existing = existingStatusMap.get(file.filePath)
     if (!existing || existing.index_status !== 'success' || existing.last_modified !== file.lastModified) {
       changedFiles.push(file)
-    } else {
-      unchangedFiles.push(file)
     }
   }
 
-  console.log(`[RAG] Changed: ${changedFiles.length}, Unchanged: ${unchangedFiles.length}`)
-
-  // 3. 加载旧 FaissStore，提取未变更文件的子块向量
-  let oldStore = null
-  let unchangedChildDocs = []
-  try {
-    oldStore = await loadFaissStore(kbType, true)
-    // 从旧索引中提取未变更文件对应的子块
-    // FaissStore 的 docstore 存储了所有文档，通过 metadata.source 过滤
-    unchangedChildDocs = extractDocsBySources(oldStore, unchangedFiles.map(f => f.filePath))
-    console.log(`[RAG] Extracted ${unchangedChildDocs.length} unchanged child docs from old store`)
-  } catch (e) {
-    console.warn(`[RAG] Failed to load old store, treating all as changed:`, e.message)
-    // 旧索引加载失败，所有文件都视为变更
-    changedFiles.push(...unchangedFiles)
-    unchangedFiles.length = 0
-    unchangedChildDocs = []
+  // 已删除文件：在 file_status 中存在，但磁盘上已不存在
+  const deletedFiles = []
+  for (const [filePath] of existingStatusMap.entries()) {
+    if (!currentFilePaths.has(filePath)) {
+      deletedFiles.push(filePath)
+    }
   }
 
-  // 4. 处理变更文件：重新加载→分块→向量化
-  const newChildDocs = []
-  const newParentDocs = []
+  console.log(`[RAG] Changed: ${changedFiles.length}, Deleted: ${deletedFiles.length}`)
+
+  // 3. 处理已删除文件：清理向量、状态和父块
+  for (const filePath of deletedFiles) {
+    db.deleteFileStatus(kbType, filePath)
+    db.deleteParentDocsBySourcePath(filePath)
+    await deleteBySource(filePath)
+  }
+
+  // 4. 处理变更文件：重新加载→分块→addDocuments
   let failedCount = 0
-
-  // 先删除所有变更文件的旧父块
-  for (const file of changedFiles) {
-    db.deleteParentDocsBySourcePath(file.filePath)
-  }
-
   const total = changedFiles.length
   for (let i = 0; i < changedFiles.length; i++) {
     const file = changedFiles[i]
@@ -219,10 +211,21 @@ export async function rebuildKbStore(kbType, onProgress = null) {
       const rawDocs = await loadDocument(file.filePath, db)
       const fileType = path.extname(file.filePath).toLowerCase().slice(1)
       const { parentDocs, childDocs } = await splitDocuments(rawDocs, fileType)
-      newParentDocs.push(...parentDocs)
-      newChildDocs.push(...childDocs)
-      // 更新状态为 success
+
+      // 删除旧父块后插入新父块
+      db.deleteParentDocsBySourcePath(file.filePath)
+      if (parentDocs.length > 0) {
+        db.insertParentDocsBatch(parentDocs)
+      }
+
+      // 向量化（addDocuments 内部按 source 删旧插新）
+      const insertedCount = childDocs.length > 0
+        ? await addDocuments(kbType, childDocs)
+        : 0
+
+      // 更新状态和子块数量
       db.upsertFileStatus(kbType, file.filePath, file.lastModified, 'success')
+      db.setFileChunkCount(kbType, file.filePath, insertedCount)
     } catch (e) {
       console.error(`[RAG] Failed to index ${file.filePath}:`, e.message)
       db.upsertFileStatus(kbType, file.filePath, file.lastModified, 'failed')
@@ -230,60 +233,18 @@ export async function rebuildKbStore(kbType, onProgress = null) {
     }
   }
 
-  // 5. 批量插入新父块
-  if (newParentDocs.length > 0) {
-    db.insertParentDocsBatch(newParentDocs)
-  }
-
-  // 6. 合并所有子块（未变更 + 新生成），构建全新 FaissStore
-  const allChildDocs = [...unchangedChildDocs, ...newChildDocs]
-  await rebuildStore(kbType, allChildDocs)
-
-  // 7. 清理已删除文件的状态记录和父块
-  for (const [filePath, status] of existingStatusMap.entries()) {
-    if (!currentFilePaths.has(filePath)) {
-      db.deleteFileStatus(kbType, filePath)
-      db.deleteParentDocsBySourcePath(filePath)
-    }
+  // 5. 批量插入后优化 HNSW 索引，提升后续检索性能
+  if (changedFiles.length > 0 || deletedFiles.length > 0) {
+    await optimizeCollection()
   }
 
   const result = {
     total: allFiles.length,
     changed: changedFiles.length,
-    unchanged: unchangedFiles.length,
+    unchanged: allFiles.length - changedFiles.length,
     failed: failedCount
   }
   console.log(`[RAG] Rebuild complete:`, result)
-  return result
-}
-
-/**
- * 从 FaissStore 中提取指定来源文件的子块文档
- * @param {FaissStore} store
- * @param {string[]} sourcePaths
- * @returns {Array} Document 数组
- */
-function extractDocsBySources(store, sourcePaths) {
-  if (!sourcePaths.length || !store.docstore) return []
-  const sourceSet = new Set(sourcePaths)
-  const result = []
-
-  // FaissStore 内部 docstore._docs 是 Map<string, Document>
-  const docsMap = store.docstore._docs
-  if (docsMap && docsMap instanceof Map) {
-    for (const [id, doc] of docsMap) {
-      if (doc && doc.metadata && sourceSet.has(doc.metadata.source)) {
-        result.push(doc)
-      }
-    }
-  } else if (docsMap && typeof docsMap === 'object') {
-    // 兼容普通对象
-    for (const [id, doc] of Object.entries(docsMap)) {
-      if (doc && doc.metadata && sourceSet.has(doc.metadata.source)) {
-        result.push(doc)
-      }
-    }
-  }
   return result
 }
 
@@ -299,7 +260,7 @@ export async function getKbIndexSummary(kbType) {
     pending: 0,
     processing: 0,
     failed: 0,
-    vectorCount: await getStoreDocCount(kbType)
+    vectorCount: db.getVectorCount(kbType)
   }
   for (const s of stats) {
     if (summary.hasOwnProperty(s.index_status)) {
@@ -338,7 +299,8 @@ export function getBatchFileIndexStatus(filePaths) {
  * @param {string} kbType
  */
 export async function clearKbIndex(kbType) {
-  await deleteFaissStore(kbType)
+  // 删除该 kbType 在 Zvec collection 中的全部向量
+  await deleteStore(kbType)
   db.deleteFileStatusByKbType(kbType)
   const kbRootPath = getKbRootPath(kbType)
   db.deleteParentDocsByKbType(kbType, kbRootPath)
@@ -346,19 +308,20 @@ export async function clearKbIndex(kbType) {
 }
 
 /**
- * 将 FAISS 返回的分数转换为置信度
+ * 将 Zvec 返回的分数转换为置信度
  *
- * 使用 IndexFlatIP（内积索引）+ L2 归一化向量：
- *   - 归一化向量的内积 = 余弦相似度
- *   - similaritySearchWithScore 返回的 score 直接就是余弦相似度
- *   - 范围 [-1, 1]，越大越相似；文本嵌入通常为 [0, 1]
+ * Zvec 使用 COSINE 度量，query 返回的 score 为余弦【距离】：
+ *   - distance = 1 - cosine_similarity
+ *   - 范围 [0, 2]，越小越相似（0 表示完全相同）
+ *   - 转换为相似度/置信度：confidence = 1 - distance，范围 [-1, 1]
+ *   - 文本嵌入通常落在 [0, 1] 区间
  *
- * @param {number} score - Faiss IndexFlatIP 返回的内积分数（= 余弦相似度）
+ * @param {number} score - Zvec COSINE 返回的距离（越小越相似）
  * @returns {number} 置信度 [0, 1]
  */
 function distanceToConfidence(score) {
-  // score 已经是余弦相似度，直接截断到 [0, 1] 范围
-  return Math.max(0, Math.min(1, score))
+  // 距离转相似度，截断到 [0, 1] 范围
+  return Math.max(0, Math.min(1, 1 - score))
 }
 
 /**
@@ -366,10 +329,10 @@ function distanceToConfidence(score) {
  *
  * 流程：
  *   1. 根据用户选择的知识库确定检索范围（全部 / 某个分类下的具体知识库）
- *   2. 在对应 FaissStore 中执行 similaritySearchWithScore
- *   3. 将 L2 距离转换为余弦相似度（置信度），过滤低于阈值的结果
- *   4. 按置信度降序取 TOP 3
- *   5. 若选择了具体知识库，按目录路径过滤 TOP 3 结果
+ *   2. 在 Zvec collection 中按 kb_type 过滤执行向量检索
+ *   3. 将余弦距离转换为置信度，过滤低于阈值的结果
+ *   4. 按置信度降序取 TOP K
+ *   5. 若选择了具体知识库，按目录路径过滤结果
  *   6. 对每个命中的子块，查 parent_docs 表取回父块文本（Small-to-Big）
  *      若无父块则使用子块自身文本
  *
@@ -386,21 +349,21 @@ export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 10
   console.log(`[RAG] 查询: "${query}"`)
   console.log(`[RAG] 知识库: "${kbName || '全部知识库'}", 分类: "${kbCategoryId || '无'}", topK=${topK}, 阈值=${scoreThreshold}, folderPath="${folderPath || '无'}"`)
 
-  // 1. 确定检索的 FaissStore 范围和路径过滤条件
+  // 1. 确定检索的知识库范围和路径过滤条件
   let kbTypesToSearch = []
   let kbPathFilter = null
 
   if (!kbName || kbName === '全部知识库') {
-    // 全部知识库：检索三个 FaissStore，不做路径过滤
+    // 全部知识库：检索 personal + local，不做路径过滤
     kbTypesToSearch = [...KB_TYPES]
   } else if (kbCategoryId && KB_TYPES.includes(kbCategoryId)) {
-    // 具体知识库：只检索对应分类的 FaissStore，不加载其他分类的 faiss 文件
+    // 具体知识库：只检索对应分类
     kbTypesToSearch = [kbCategoryId]
     const dataDir = getDataDir()
     kbPathFilter = path.join(dataDir, 'knowledge', kbCategoryId, kbName)
   } else {
-    // 已指定知识库名但未提供有效分类，无法定位 FaissStore，返回空结果
-    console.warn(`[RAG] 已指定知识库 "${kbName}" 但分类 "${kbCategoryId}" 无效，跳过检索避免加载无关 faiss 文件`)
+    // 已指定知识库名但未提供有效分类，无法定位，返回空结果
+    console.warn(`[RAG] 已指定知识库 "${kbName}" 但分类 "${kbCategoryId}" 无效，跳过检索`)
     return []
   }
 
@@ -411,41 +374,46 @@ export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 10
 
   console.log(`[RAG] 检索范围: ${kbTypesToSearch.join(', ')}, 路径过滤: ${kbPathFilter || '无'}`)
 
-  // 2. 在各 FaissStore 中检索并收集满足置信度阈值的结果
-  const allResults = []
-  for (const kbType of kbTypesToSearch) {
-    try {
-      const store = await loadFaissStore(kbType)
-      // 多取一些结果以便后续过滤后仍有足够数量
-      const searchK = Math.max(topK * 3, 10)
-      const results = await store.similaritySearchWithScore(query, searchK)
-      console.log(`[RAG] ${kbType} 原始检索返回 ${results.length} 条结果`)
-
-      for (const [doc, score] of results) {
-        const confidence = distanceToConfidence(score)
-        const source = (doc.metadata && doc.metadata.source) || ''
-        console.log(`[RAG]   - cosine=${score.toFixed(4)}, confidence=${confidence.toFixed(4)}, source=${source}`)
-        if (confidence >= scoreThreshold) {
-          allResults.push({ doc, confidence, score, kbType })
-        }
-      }
-      console.log(`[RAG] ${kbType} 通过阈值过滤后剩余 ${allResults.filter(r => r.kbType === kbType).length} 条`)
-    } catch (e) {
-      console.warn(`[RAG] Failed to search ${kbType}:`, e.message)
-    }
+  // 2. 在 Zvec collection 中检索（单次调用，按 kb_type 过滤）
+  // 多取一些结果以便后续过滤后仍有足够数量
+  const searchK = Math.max(topK * 3, 10)
+  let rawResults = []
+  try {
+    rawResults = await searchByQuery(query, kbTypesToSearch, searchK)
+    console.log(`[RAG] Zvec 原始检索返回 ${rawResults.length} 条结果`)
+  } catch (e) {
+    console.warn(`[RAG] searchByQuery failed:`, e.message)
+    return []
   }
 
-  // 3. 按置信度降序排序
+  // 3. 距离转置信度，过滤低于阈值的结果
+  const allResults = []
+  for (const r of rawResults) {
+    const confidence = distanceToConfidence(r.score)
+    const source = (r.doc.metadata && r.doc.metadata.source) || ''
+    console.log(`[RAG]   - distance=${r.score.toFixed(4)}, confidence=${confidence.toFixed(4)}, source=${source}`)
+    if (confidence >= scoreThreshold) {
+      allResults.push({
+        doc: r.doc,
+        confidence,
+        score: r.score,
+        kbType: r.kbType
+      })
+    }
+  }
+  console.log(`[RAG] 通过阈值过滤后剩余 ${allResults.length} 条`)
+
+  // 4. 按置信度降序排序
   allResults.sort((a, b) => b.confidence - a.confidence)
 
-  // 4. 取 TOP 3
+  // 5. 取 TOP K
   const topResults = allResults.slice(0, topK)
   console.log(`[RAG] TOP ${topK} 结果（按置信度降序）:`)
   topResults.forEach((r, i) => {
     console.log(`[RAG]   ${i + 1}. confidence=${r.confidence.toFixed(4)}, kbType=${r.kbType}, source=${(r.doc.metadata && r.doc.metadata.source) || ''}`)
   })
 
-  // 5. 若选择了具体知识库，按目录路径过滤 TOP 3 结果
+  // 6. 若选择了具体知识库，按目录路径过滤结果
   let filteredResults = topResults
   if (kbPathFilter) {
     const filterPrefix = kbPathFilter + path.sep
@@ -456,7 +424,7 @@ export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 10
     console.log(`[RAG] 知识库路径过滤后剩余 ${filteredResults.length} 条 (过滤前缀: ${filterPrefix})`)
   }
 
-  // 6. 对每个命中的子块，查父块表取回父块文本（Small-to-Big）
+  // 7. 对每个命中的子块，查父块表取回父块文本（Small-to-Big）
   const finalResults = []
   for (const result of filteredResults) {
     const docId = result.doc.metadata && result.doc.metadata.docId
@@ -494,7 +462,7 @@ export async function searchKnowledgeBase(query, kbName, kbCategoryId, topK = 10
     })
   }
 
-  // 7. 父块去重：多个子块可能映射到同一个父块，避免重复内容
+  // 8. 父块去重：多个子块可能映射到同一个父块，避免重复内容
   const dedupedResults = []
   const seenParentUuids = new Set()
   const seenContents = new Set()

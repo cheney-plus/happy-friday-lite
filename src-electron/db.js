@@ -142,9 +142,17 @@ async function initDatabase() {
       last_modified TEXT NOT NULL,
       index_status TEXT NOT NULL DEFAULT 'pending',
       last_indexed_at TEXT,
+      chunk_count INTEGER NOT NULL DEFAULT 0,
       UNIQUE(kb_type, file_path)
     );
   `)
+
+  // 迁移：为旧版 file_status 表补充 chunk_count 列（已存在则忽略）
+  try {
+    db.run('ALTER TABLE file_status ADD COLUMN chunk_count INTEGER NOT NULL DEFAULT 0')
+  } catch (_e) {
+    // 列已存在，忽略
+  }
 
   // RAG: 父块文档存储表（Small-to-Big 检索）
   db.run(`
@@ -667,6 +675,26 @@ export function deleteFileStatus(kbType, filePath) {
 export function deleteFileStatusByKbType(kbType) {
   db.run('DELETE FROM file_status WHERE kb_type = ?', [kbType])
   saveDb()
+}
+
+// 设置某个文件的子块（向量）数量，用于在单个 Zvec collection 中按 kb_type 统计向量数
+export function setFileChunkCount(kbType, filePath, chunkCount) {
+  db.run(
+    'UPDATE file_status SET chunk_count = ? WHERE kb_type = ? AND file_path = ?',
+    [chunkCount || 0, kbType, filePath]
+  )
+  saveDb()
+}
+
+// 获取某个知识库类型的向量总数（SUM chunk_count）
+// Zvec collection.stats.docCount 只能返回所有知识库合计数，无法按 kb_type 分组，
+// 故通过 file_status.chunk_count 累加得到每个知识库的向量数。
+export function getVectorCount(kbType) {
+  const row = queryOne(
+    'SELECT COALESCE(SUM(chunk_count), 0) AS total FROM file_status WHERE kb_type = ?',
+    [kbType]
+  )
+  return row ? (row.total || 0) : 0
 }
 
 // ========== RAG: parent_docs 表操作 ==========

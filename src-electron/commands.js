@@ -1081,7 +1081,7 @@ export function registerCommands(mainWindow) {
   })
 
   // RAG 知识检索：根据用户查询在知识库中检索相关内容
-  // 流程：similaritySearchWithScore → 置信度过滤 → TOP 10 → 知识库/文件夹路径过滤 → 父块查表
+  // 流程：Zvec 向量检索 → 置信度过滤 → TOP 10 → 知识库/文件夹路径过滤 → 父块查表
   ipcMain.handle('rag-search', async (_event, args) => {
     const { query, kbName, kbCategoryId, topK, scoreThreshold, folderPath } = args || {}
     console.log(`[IPC] rag-search 收到请求: query="${query}", kbName="${kbName}", kbCategoryId="${kbCategoryId}", folderPath="${folderPath || ''}"`)

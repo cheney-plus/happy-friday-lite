@@ -1,258 +1,399 @@
 import fs from 'fs'
 import path from 'path'
-import { v4 as uuidv4 } from 'uuid'
-import { FaissStore } from '@langchain/community/vectorstores/faiss'
-import { SynchronousInMemoryDocstore } from '@langchain/classic/stores/doc/in_memory'
-import { getEmbeddings } from './embeddings.js'
+import crypto from 'crypto'
+import {
+  ZVecCollectionSchema,
+  ZVecCreateAndOpen,
+  ZVecOpen,
+  ZVecDataType,
+  ZVecIndexType,
+  ZVecMetricType
+} from '@zvec/zvec'
+import { getEmbeddings, getEmbeddingDimension } from './embeddings.js'
 import { getDataDir } from '../config.js'
 
 /**
- * FaissStore 向量存储管理
- * 维护两个独立的 FaissStore 数据库，分别对应 personal / local 知识库
- * （工作区/agent 不参与向量化与检索，不维护 FaissStore）
- * 存储路径: {dataDir}/rag/{kbType}/faiss_index/
+ * Zvec 向量存储管理
  *
- * 使用 IndexFlatIP（内积索引）+ L2 归一化向量实现余弦相似度：
- *   - 向量在 embedding 阶段已做 L2 归一化（单位向量）
- *   - IndexFlatIP 计算内积，归一化向量的内积 = 余弦相似度
- *   - similaritySearchWithScore 返回的 score 直接就是余弦相似度（越大越相似，范围 [-1, 1]）
+ * 与旧的 FaissStore 实现的关键差异：
+ *   - 个人知识库 (personal) 与本地知识库 (local) 的所有文档向量统一存放在【同一个】 Zvec collection 中，
+ *     通过标量字段 kb_type 区分归属；工作区 (agent) 不参与向量化。
+ *   - 使用 Zvec HNSW 索引 + COSINE 距离度量，向量无需手动 L2 归一化（embeddings.js 仍保留归一化，结果一致）。
+ *   - Zvec 的 query 返回的 score 为余弦【距离】（越小越相似），需用 1 - score 转换为相似度/置信度。
+ *   - Zvec 支持按标量过滤高效删除（deleteByFilterSync），无需像 Faiss 那样整体重建以避免碎片化。
+ *   - 数据落盘在 {dataDir}/rag/zvec_index/，插入后立即持久化，无需显式 save。
  */
 
 // 参与向量化的知识库类型（工作区 agent 不参与）
 export const KB_TYPES = ['personal', 'local']
 
+// 向量字段名（schema 中定义，后续 insert/query 必须严格使用此名称）
+const VECTOR_FIELD = 'embedding'
+
+// 标量字段名
+const FIELD_KB_TYPE = 'kb_type'
+const FIELD_SOURCE = 'source'
+const FIELD_DOC_ID = 'doc_id'
+const FIELD_CONTENT = 'content'
+const FIELD_FILE_TYPE = 'file_type'
+const FIELD_TITLE = 'title'
+const FIELD_NOTE_ID = 'note_id'
+
+// 内存中缓存的 Zvec collection 实例（所有知识库共用一个）
+let collectionCache = null
+
 /**
- * CosineFaissStore: 基于 IndexFlatIP 的余弦相似度向量存储
- *
- * 继承自 LangChain FaissStore，重写以下方法将 IndexFlatL2 替换为 IndexFlatIP：
- *   - addVectors: 创建索引时使用 IndexFlatIP
- *   - load: 读取索引时使用 IndexFlatIP.read
- *   - importFaiss: 同时导出 IndexFlatIP
- *
- * 配合 embeddings.js 中的 L2 归一化，返回的分数即为余弦相似度。
+ * 获取 Zvec collection 的存储目录（所有知识库共用）
  */
-class CosineFaissStore extends FaissStore {
-  /**
-   * 重写 addVectors：使用 IndexFlatIP 替代 IndexFlatL2
-   * 逻辑与父类完全一致，仅将 new IndexFlatL2(dv) 改为 new IndexFlatIP(dv)
-   */
-  async addVectors(vectors, documents, options) {
-    if (vectors.length === 0) return []
-    if (vectors.length !== documents.length) {
-      throw new Error('Vectors and documents must have the same length')
-    }
-    const dv = vectors[0].length
-    if (!this._index) {
-      const { IndexFlatIP } = await CosineFaissStore.importFaiss()
-      this._index = new IndexFlatIP(dv)
-    }
-    const d = this.index.getDimension()
-    if (dv !== d) {
-      throw new Error(`Vectors must have the same length as the number of dimensions (${d})`)
-    }
-    const docstoreSize = this.index.ntotal()
-    const documentIds = options?.ids ?? documents.map(() => uuidv4())
-    for (let i = 0; i < vectors.length; i += 1) {
-      const documentId = documentIds[i]
-      const id = docstoreSize + i
-      this.index.add(vectors[i])
-      this._mapping[id] = documentId
-      this.docstore.add({ [documentId]: documents[i] })
-    }
-    return documentIds
-  }
-
-  /**
-   * 重写 load：使用 IndexFlatIP.read 替代 IndexFlatL2.read
-   * 逻辑与父类完全一致，仅将 IndexFlatL2.read 改为 IndexFlatIP.read
-   */
-  static async load(directory, embeddings) {
-    const fs = await import('node:fs/promises')
-    const path = await import('node:path')
-    const readStore = (directory) =>
-      fs.readFile(path.join(directory, 'docstore.json'), 'utf8').then(JSON.parse)
-    const readIndex = async (directory) => {
-      const { IndexFlatIP } = await this.importFaiss()
-      return IndexFlatIP.read(path.join(directory, 'faiss.index'))
-    }
-    const [[docstoreFiles, mapping], index] = await Promise.all([
-      readStore(directory),
-      readIndex(directory),
-    ])
-    const docstore = new SynchronousInMemoryDocstore(new Map(docstoreFiles))
-    return new this(embeddings, { docstore, index, mapping })
-  }
-
-  /**
-   * 重写 importFaiss：导出 IndexFlatIP
-   */
-  static async importFaiss() {
-    try {
-      const { default: { IndexFlatIP } } = await import('faiss-node')
-      return { IndexFlatIP }
-    } catch (err) {
-      throw new Error(
-        `Could not import faiss-node. Please install faiss-node as a dependency with, e.g. \`npm install -S faiss-node\`.\n\nError: ${err?.message}`
-      )
-    }
-  }
-}
-
-// 内存中缓存的 FaissStore 实例
-const storeCache = new Map()
-
-// 获取指定知识库类型的 FaissStore 存储目录
-export function getFaissStoreDir(kbType) {
+export function getStoreDir() {
   const dataDir = getDataDir()
-  return path.join(dataDir, 'rag', kbType, 'faiss_index')
-}
-
-// 确保 FaissStore 目录存在
-function ensureStoreDir(kbType) {
-  const storeDir = getFaissStoreDir(kbType)
-  if (!fs.existsSync(storeDir)) {
-    fs.mkdirSync(storeDir, { recursive: true })
-  }
-  return storeDir
+  return path.join(dataDir, 'rag', 'zvec_index')
 }
 
 /**
- * 加载指定知识库的 FaissStore
- * 如果磁盘上存在已保存的索引则加载，否则创建空实例
- * @param {string} kbType - 知识库类型
- * @param {boolean} forceReload - 是否强制从磁盘重新加载
- * @returns {Promise<FaissStore>}
+ * 构造 collection schema
+ * @param {number} dimension - 向量维度（由 embedding 模型决定）
  */
-export async function loadFaissStore(kbType, forceReload = false) {
-  // 如果已缓存且不强制重载，直接返回
-  if (!forceReload && storeCache.has(kbType)) {
-    return storeCache.get(kbType)
+function buildSchema(dimension) {
+  return new ZVecCollectionSchema({
+    name: 'knowledge',
+    fields: [
+      // kb_type 必填且建倒排索引，用于按知识库类型过滤检索/删除
+      {
+        name: FIELD_KB_TYPE,
+        dataType: ZVecDataType.STRING,
+        indexParams: { indexType: ZVecIndexType.INVERT }
+      },
+      // source（文件路径）建倒排索引，用于按文件删除旧向量、避免重复
+      {
+        name: FIELD_SOURCE,
+        dataType: ZVecDataType.STRING,
+        nullable: true,
+        indexParams: { indexType: ZVecIndexType.INVERT }
+      },
+      { name: FIELD_DOC_ID, dataType: ZVecDataType.STRING, nullable: true },
+      // content（子块文本）用于检索后回填子块内容（父块缺失时的兜底）
+      { name: FIELD_CONTENT, dataType: ZVecDataType.STRING, nullable: true },
+      { name: FIELD_FILE_TYPE, dataType: ZVecDataType.STRING, nullable: true },
+      { name: FIELD_TITLE, dataType: ZVecDataType.STRING, nullable: true },
+      { name: FIELD_NOTE_ID, dataType: ZVecDataType.STRING, nullable: true }
+    ],
+    vectors: [
+      {
+        name: VECTOR_FIELD,
+        dataType: ZVecDataType.VECTOR_FP32,
+        dimension,
+        indexParams: { indexType: ZVecIndexType.HNSW, metricType: ZVecMetricType.COSINE }
+      }
+    ]
+  })
+}
+
+/**
+ * 判断目录是否已经是一个已创建的 Zvec collection（目录非空即认为已存在）
+ */
+function collectionExists(storeDir) {
+  try {
+    return fs.existsSync(storeDir) && fs.readdirSync(storeDir).length > 0
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * 加载（或创建并打开）唯一的 Zvec collection
+ *
+ * 流程：
+ *   1. 若已缓存则直接返回
+ *   2. 若目录已存在 collection 数据则 ZVecOpen 打开
+ *   3. 否则探针一次 embedding 取得维度，构造 schema 后 ZVecCreateAndOpen 创建
+ *
+ * @param {boolean} forceReload - 是否强制重新打开（忽略缓存）
+ * @returns {Promise<ZVecCollection>}
+ */
+export async function loadStore(forceReload = false) {
+  if (!forceReload && collectionCache) {
+    return collectionCache
   }
 
+  // 若之前缓存了实例，先关闭释放资源
+  if (collectionCache) {
+    try { collectionCache.closeSync() } catch (e) { /* ignore */ }
+    collectionCache = null
+  }
+
+  // getEmbeddings 内部会检测模型变更并清理不兼容的旧索引
   const embeddings = await getEmbeddings()
-  const storeDir = getFaissStoreDir(kbType)
+  const storeDir = getStoreDir()
+  // 仅确保父目录存在，collection 目录由 ZVecCreateAndOpen 自行创建
+  // （ZVecCreateAndOpen 要求目标路径不存在，否则会报 "path exists"）
+  fs.mkdirSync(path.dirname(storeDir), { recursive: true })
 
-  let store
-  if (fs.existsSync(storeDir) && fs.existsSync(path.join(storeDir, 'faiss.index'))) {
-    // 从磁盘加载已有索引（使用 IndexFlatIP）
-    store = await CosineFaissStore.load(storeDir, embeddings)
+  let collection
+  if (collectionExists(storeDir)) {
+    collection = ZVecOpen(storeDir)
   } else {
-    // 创建空实例（用 fromTexts 初始化，避免 save 时报错）
-    store = await CosineFaissStore.fromTexts([''], [{}], embeddings)
+    // 若残留空目录（异常中断等场景），先清理以便 ZVecCreateAndOpen 创建
+    if (fs.existsSync(storeDir)) {
+      fs.rmSync(storeDir, { recursive: true, force: true })
+    }
+    // 首次创建：探针获取维度
+    const dimension = await getEmbeddingDimension(embeddings)
+    if (!dimension || dimension <= 0) {
+      throw new Error('RAG: 无法确定 embedding 维度，请检查模型配置')
+    }
+    collection = ZVecCreateAndOpen(storeDir, buildSchema(dimension))
   }
 
-  storeCache.set(kbType, store)
-  return store
+  collectionCache = collection
+  return collection
 }
 
 /**
- * 保存指定知识库的 FaissStore 到磁盘
- * @param {string} kbType
- * @param {FaissStore} store - 可选，不传则使用缓存的实例
+ * 转义 filter 表达式中的字符串字面量（单引号 -> '' ）
  */
-export async function saveFaissStore(kbType, store = null) {
-  const targetStore = store || storeCache.get(kbType)
-  if (!targetStore) {
-    throw new Error(`No FaissStore in cache for kbType: ${kbType}`)
+function escapeFilterString(value) {
+  return String(value == null ? '' : value).replace(/'/g, "''")
+}
+
+/**
+ * 构造 "field = 'value'" 的过滤片段
+ */
+function eqFilter(field, value) {
+  return `${field} = '${escapeFilterString(value)}'`
+}
+
+/**
+ * 构造多个 source 的 OR 过滤：source = 'a' OR source = 'b' ...
+ */
+function sourcesOrFilter(sourcePaths) {
+  return sourcePaths.map(p => eqFilter(FIELD_SOURCE, p)).join(' OR ')
+}
+
+/**
+ * 将 LangChain 风格的子块 Document 转为 Zvec 输入文档
+ * @param {object} childDoc - 含 pageContent 与 metadata 的子块
+ * @param {string} kbType
+ * @param {number[]} vector - 已 embedding 的向量
+ */
+function toZvecDoc(childDoc, kbType, vector) {
+  const meta = childDoc.metadata || {}
+  return {
+    id: crypto.randomUUID(),
+    vectors: { [VECTOR_FIELD]: vector },
+    fields: {
+      [FIELD_KB_TYPE]: kbType,
+      [FIELD_SOURCE]: meta.source || '',
+      [FIELD_DOC_ID]: meta.docId || '',
+      [FIELD_CONTENT]: childDoc.pageContent || '',
+      [FIELD_FILE_TYPE]: meta.fileType || '',
+      [FIELD_TITLE]: meta.title || '',
+      [FIELD_NOTE_ID]: meta.noteId || ''
+    }
   }
-  const storeDir = ensureStoreDir(kbType)
-  await targetStore.save(storeDir)
-  storeCache.set(kbType, targetStore)
+}
+
+/**
+ * 将 Zvec 返回的 Doc 还原为检索流程使用的结构
+ */
+function fromZvecDoc(zDoc) {
+  const fields = zDoc.fields || {}
+  return {
+    doc: {
+      pageContent: fields[FIELD_CONTENT] || '',
+      metadata: {
+        source: fields[FIELD_SOURCE] || '',
+        docId: fields[FIELD_DOC_ID] || '',
+        fileType: fields[FIELD_FILE_TYPE] || '',
+        title: fields[FIELD_TITLE] || '',
+        noteId: fields[FIELD_NOTE_ID] || ''
+      }
+    },
+    score: zDoc.score,
+    kbType: fields[FIELD_KB_TYPE] || ''
+  }
 }
 
 /**
  * 向指定知识库添加子块文档（向量）
+ *
+ * 为避免同一文件重复索引产生重复向量，会先按 source 删除该文件已有的旧向量，
+ * 再统一 embedding 并批量插入。插入后立即可检索（暂存于临时索引），无需 optimize。
+ *
  * @param {string} kbType
  * @param {Array} childDocs - Document 数组，metadata 中含 docId 指向父块
- * @returns {Promise<Array>} 返回添加的文档 ID 列表
+ * @returns {Promise<number>} 实际插入的文档数
  */
 export async function addDocuments(kbType, childDocs) {
-  const store = await loadFaissStore(kbType)
-  const ids = await store.addDocuments(childDocs)
-  await saveFaissStore(kbType, store)
-  return ids
-}
+  if (!childDocs || childDocs.length === 0) return 0
 
-/**
- * 内存重建覆盖策略：
- * 比对状态库找出变更文件后，将该知识库中未发生改变的文件对应的向量加载到内存，
- * 加上修改后文件重新生成的向量，在内存中构建一个全新的 FaissStore，然后覆盖写入磁盘。
- * 这样彻底避免了在原索引上执行删除操作导致的文件膨胀和碎片化问题。
- *
- * @param {string} kbType - 知识库类型
- * @param {Array} newChildDocs - 所有需要保留的子块文档（未变更 + 重新生成的）
- * @returns {Promise<FaissStore>} 新构建的 FaissStore
- */
-export async function rebuildStore(kbType, newChildDocs) {
-  const embeddings = await getEmbeddings()
-  const storeDir = ensureStoreDir(kbType)
+  const collection = await loadStore()
 
-  // 在内存中构建全新的 FaissStore（使用 IndexFlatIP）
-  let newStore
-  if (newChildDocs.length > 0) {
-    newStore = await CosineFaissStore.fromDocuments(newChildDocs, embeddings)
-  } else {
-    // 没有文档时，用 fromTexts 创建空 store（new CosineFaissStore() 未初始化无法 save）
-    newStore = await CosineFaissStore.fromTexts([''], [{}], embeddings)
-    // 删除占位文档
-    if (newStore.docstore && newStore.docstore._docs) {
-      const docsMap = newStore.docstore._docs
-      if (docsMap instanceof Map) {
-        for (const id of docsMap.keys()) {
-          docsMap.delete(id)
-        }
-      } else {
-        for (const id of Object.keys(docsMap)) {
-          delete docsMap[id]
-        }
-      }
+  // 1. 收集本次涉及的所有 source，删除这些文件已有的旧向量（防止重复索引产生重复）
+  const sources = [...new Set(childDocs.map(d => (d.metadata && d.metadata.source) || '').filter(Boolean))]
+  if (sources.length > 0) {
+    try {
+      collection.deleteByFilterSync(sourcesOrFilter(sources))
+    } catch (e) {
+      console.warn(`[RAG] deleteByFilter for sources failed (ignored):`, e.message)
     }
   }
 
-  // 覆盖写入磁盘
-  await newStore.save(storeDir)
-  storeCache.set(kbType, newStore)
-  return newStore
+  // 2. 批量 embedding
+  const embeddings = await getEmbeddings()
+  const texts = childDocs.map(d => d.pageContent || '')
+  const vectors = await embeddings.embedDocuments(texts)
+
+  // 3. 构造 Zvec 文档并批量插入
+  const zDocs = childDocs.map((doc, i) => toZvecDoc(doc, kbType, vectors[i]))
+  const results = collection.insertSync(zDocs)
+  const failed = Array.isArray(results) ? results.filter(r => !r.ok) : []
+  if (failed.length > 0) {
+    console.warn(`[RAG] ${failed.length}/${results.length} docs failed to insert`)
+  }
+
+  console.log(`[RAG] Inserted ${results.length - failed.length}/${childDocs.length} docs into zvec (kb=${kbType})`)
+  return results.length - failed.length
 }
 
 /**
- * 删除指定知识库的整个 FaissStore（清空索引）
+ * 检查 collection 是否已存在（内存缓存或磁盘上有数据）。
+ * 用于 delete/optimize 等操作的前置判断，避免为空操作而强制创建 collection。
+ */
+function isStoreReady() {
+  if (collectionCache) return true
+  try {
+    return collectionExists(getStoreDir())
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * 删除指定知识库在该 collection 中的全部向量（按 kb_type 过滤删除）
  * @param {string} kbType
  */
-export async function deleteFaissStore(kbType) {
-  const storeDir = getFaissStoreDir(kbType)
-  if (fs.existsSync(storeDir)) {
-    fs.rmSync(storeDir, { recursive: true, force: true })
+export async function deleteStore(kbType) {
+  if (!isStoreReady()) return
+  const collection = await loadStore()
+  try {
+    collection.deleteByFilterSync(eqFilter(FIELD_KB_TYPE, kbType))
+  } catch (e) {
+    console.warn(`[RAG] deleteStore(${kbType}) failed:`, e.message)
   }
-  storeCache.delete(kbType)
 }
 
 /**
- * 清除所有缓存的 FaissStore 实例
+ * 按 source 路径删除对应的向量（用于文件被删除时清理）
+ * @param {string} sourcePath
+ */
+export async function deleteBySource(sourcePath) {
+  if (!isStoreReady()) return
+  const collection = await loadStore()
+  try {
+    collection.deleteByFilterSync(eqFilter(FIELD_SOURCE, sourcePath))
+  } catch (e) {
+    console.warn(`[RAG] deleteBySource(${sourcePath}) failed:`, e.message)
+  }
+}
+
+/**
+ * 优化 collection 索引（将临时索引中的新向量构建为完整 HNSW 索引，加速检索）
+ * 建议在批量重建后调用。
+ */
+export async function optimizeCollection() {
+  if (!isStoreReady()) return
+  const collection = await loadStore()
+  try {
+    await collection.optimize()
+  } catch (e) {
+    console.warn(`[RAG] optimize failed:`, e.message)
+  }
+}
+
+/**
+ * 从 collection 中提取指定 source 文件对应的子块文档（用于重建时复用未变更文件的向量）
+ *
+ * 注意：当前重建策略已改为"按变更文件增量删除+重插"，未变更文件向量原位保留，
+ * 此函数仅供需要时使用，默认不再调用。
+ *
+ * @param {string[]} sourcePaths
+ * @returns {Promise<Array>} Document 数组（含 pageContent 与 metadata）
+ */
+export async function extractDocsBySources(sourcePaths) {
+  if (!sourcePaths || sourcePaths.length === 0) return []
+  const collection = await loadStore()
+  try {
+    const zDocs = collection.querySync({
+      filter: sourcesOrFilter(sourcePaths),
+      topk: 1000000,
+      outputFields: [
+        FIELD_KB_TYPE, FIELD_SOURCE, FIELD_DOC_ID, FIELD_CONTENT,
+        FIELD_FILE_TYPE, FIELD_TITLE, FIELD_NOTE_ID
+      ]
+    })
+    return zDocs.map(fromZvecDoc).map(r => ({
+      pageContent: r.doc.pageContent,
+      metadata: r.doc.metadata
+    }))
+  } catch (e) {
+    console.warn(`[RAG] extractDocsBySources failed:`, e.message)
+    return []
+  }
+}
+
+/**
+ * 向量相似度检索
+ *
+ * @param {string} queryText - 查询文本
+ * @param {string[]} kbTypes - 限定检索的知识库类型（如 ['personal','local'] 或 ['personal']）
+ * @param {number} topK - 返回结果数上限
+ * @returns {Promise<Array<{doc, score, kbType}>>}
+ *   - doc: { pageContent, metadata:{source, docId, fileType, title, noteId} }
+ *   - score: Zvec 返回的余弦【距离】（越小越相似）
+ *   - kbType: 命中文档所属知识库类型
+ */
+export async function searchByQuery(queryText, kbTypes, topK) {
+  const collection = await loadStore()
+  const embeddings = await getEmbeddings()
+  const vector = await embeddings.embedQuery(queryText)
+
+  // 构造 kb_type 过滤表达式
+  const kbFilter = kbTypes.map(t => eqFilter(FIELD_KB_TYPE, t)).join(' OR ')
+
+  const zDocs = collection.querySync({
+    fieldName: VECTOR_FIELD,
+    vector,
+    topk: topK,
+    filter: kbFilter,
+    includeVector: false,
+    outputFields: [
+      FIELD_KB_TYPE, FIELD_SOURCE, FIELD_DOC_ID, FIELD_CONTENT,
+      FIELD_FILE_TYPE, FIELD_TITLE, FIELD_NOTE_ID
+    ]
+  })
+
+  return zDocs.map(fromZvecDoc)
+}
+
+/**
+ * 获取 collection 中文档总数（所有知识库合计）
+ */
+export async function getTotalDocCount() {
+  try {
+    const collection = await loadStore()
+    return collection.stats?.docCount || 0
+  } catch (e) {
+    return 0
+  }
+}
+
+/**
+ * 关闭并清除缓存的 collection 实例（模型配置变更时调用）
  */
 export function clearStoreCache() {
-  storeCache.clear()
-}
-
-/**
- * 获取指定知识库 FaissStore 中的文档数量
- * @param {string} kbType
- * @returns {Promise<number>}
- */
-export async function getStoreDocCount(kbType) {
-  try {
-    const store = await loadFaissStore(kbType)
-    // FaissStore 内部 docstore._docs 是 Map
-    if (store.docstore && store.docstore._docs) {
-      const docsMap = store.docstore._docs
-      if (docsMap instanceof Map) {
-        return docsMap.size
-      }
-      return Object.keys(docsMap).length
-    }
-    return 0
-  } catch (e) {
-    console.error(`[RAG] Failed to get doc count for ${kbType}:`, e)
-    return 0
+  if (collectionCache) {
+    try { collectionCache.closeSync() } catch (e) { /* ignore */ }
+    collectionCache = null
   }
 }
