@@ -337,6 +337,17 @@ import NewFolderDialog from './NewFolderDialog.vue';
 import SelectNoteDialog from './SelectNoteDialog.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
 import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
+import { Readability } from '@mozilla/readability';
+
+// 转义 HTML 文本，防止标题/URL 中的特殊字符破坏文档结构
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 const props = defineProps({
   selectedKB: String,
@@ -617,12 +628,65 @@ async function confirmWebpageUpload() {
 
   isSavingWebpage.value = true;
   try {
-    const result = await api.invoke('kb-save-webpage', { url, destDir });
+    // 1. 主进程抓取原始 HTML（规避渲染进程跨域限制）
+    const fetched = await api.invoke('kb-fetch-webpage', { url });
+    if (!fetched.success) {
+      uploadErrorMsg.value = `网页抓取失败：${fetched.error}`;
+      showUploadError.value = true;
+      closeWebpageDialog();
+      return;
+    }
+
+    // 2. 用 DOMParser + Readability 解析正文，去除导航/广告/推荐位等噪音
+    const doc = new DOMParser().parseFromString(fetched.html, 'text/html');
+    // 注入 <base> 以便 Readability 解析相对链接
+    if (fetched.finalUrl) {
+      const base = doc.createElement('base');
+      base.href = fetched.finalUrl;
+      doc.head.prepend(base);
+    }
+    const article = new Readability(doc).parse();
+    if (!article || !article.content) {
+      uploadErrorMsg.value = '无法解析该网页的正文内容，请尝试其他网页地址';
+      showUploadError.value = true;
+      closeWebpageDialog();
+      return;
+    }
+
+    const title = article.title || '未命名网页';
+    const safeTitle = escapeHtml(title);
+    const safeSource = escapeHtml(fetched.finalUrl || url);
+    const lang = article.lang ? escapeHtml(article.lang) : '';
+
+    // 3. 组装干净的独立 HTML 文档
+    const cleanHtml = `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${safeTitle}</title>
+<meta name="source-url" content="${safeSource}">
+</head>
+<body>
+<article>
+<h1>${safeTitle}</h1>
+${article.content}
+</article>
+</body>
+</html>`;
+
+    // 4. 保存到目标目录
+    const result = await api.invoke('kb-save-webpage', {
+      content: cleanHtml,
+      title,
+      destDir,
+      sourceUrl: fetched.finalUrl || url
+    });
     if (result.success) {
       closeWebpageDialog();
       emit('refresh');
       // 触发 RAG 索引；工作区不参与向量化
-      if (result.path && props.currentCategoryId !== 'agent') {
+      if (props.currentCategoryId !== 'agent') {
         api.invoke('rag-trigger-file-upload', { filePaths: [result.path] })
           .catch(e => console.error('[RAG] trigger webpage upload failed:', e));
       }

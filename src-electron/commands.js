@@ -699,10 +699,11 @@ export function registerCommands(mainWindow) {
     }
   })
 
-  // 抓取网页 HTML 并保存到指定目录
-  ipcMain.handle('kb-save-webpage', async (_event, args) => {
-    const { url, destDir } = args
-    if (!url || !destDir) return { success: false, error: 'Missing parameters' }
+  // 抓取网页原始 HTML（在主进程执行以规避渲染进程跨域限制）
+  // 正文清洗交由渲染进程的 @mozilla/readability 完成，这里只负责抓取
+  ipcMain.handle('kb-fetch-webpage', async (_event, args) => {
+    const { url } = args
+    if (!url) return { success: false, error: 'Missing url' }
     try {
       // 规范化 URL
       let fetchUrl = url.trim()
@@ -714,41 +715,40 @@ export function registerCommands(mainWindow) {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
-        redirect: 'manual'
+        redirect: 'follow'
       })
-
-      // 不跟随重定向，直接获取原始 URL 的静态内容
-      if (response.status >= 300 && response.status < 400) {
-        return { success: false, error: `该网址发生了重定向（${response.status}），请直接输入目标页面地址` }
-      }
 
       if (!response.ok) {
         return { success: false, error: `请求失败，状态码：${response.status}` }
       }
 
-      let html = await response.text()
+      const html = await response.text()
+      // response.url 为跟随重定向后的最终地址，用于解析相对链接
+      return { success: true, html, finalUrl: response.url || fetchUrl }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
 
-      // 从 URL 提取文件名
-      const urlObj = new URL(fetchUrl)
-
-      // 移除可能导致跳转或动态加载的内容，确保 HTML 是纯静态的
-      // 1. 移除 <script> 标签及内容
-      html = html.replace(/<script[\s\S]*?<\/script>/gi, '')
-      // 2. 移除 meta refresh 跳转
-      html = html.replace(/<meta[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, '')
-      // 3. 移除所有 on* 事件属性（onclick, onload 等）
-      html = html.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      // 4. 移除 <iframe> 标签（可能嵌入外部页面）
-      html = html.replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-      // 5. 移除 <noscript> 标签
-      html = html.replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
-      let baseName = urlObj.pathname.split('/').filter(Boolean).pop() || urlObj.hostname
-      // 移除可能的查询参数
-      baseName = baseName.split('?')[0].split('#')[0]
-      // 移除扩展名（后续统一加 .html）
-      baseName = baseName.replace(/\.[^/.]+$/, '')
+  // 保存经 Readability 清洗后的网页正文 HTML 到指定目录
+  ipcMain.handle('kb-save-webpage', async (_event, args) => {
+    const { content, destDir, sourceUrl } = args
+    if (!content || !destDir) return { success: false, error: 'Missing parameters' }
+    try {
+      // 从来源 URL 提取文件名
+      let baseName
+      try {
+        const urlObj = new URL(sourceUrl || 'webpage')
+        baseName = urlObj.pathname.split('/').filter(Boolean).pop() || urlObj.hostname
+        // 移除可能的查询参数
+        baseName = baseName.split('?')[0].split('#')[0]
+        // 移除扩展名（后续统一加 .html）
+        baseName = baseName.replace(/\.[^/.]+$/, '')
+      } catch (e) {
+        baseName = 'webpage'
+      }
       // 清理非法文件名字符
-      baseName = baseName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim() || urlObj.hostname
+      baseName = baseName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim() || 'webpage'
       // 限制文件名长度
       if (baseName.length > 80) baseName = baseName.substring(0, 80)
 
@@ -765,7 +765,7 @@ export function registerCommands(mainWindow) {
         }
       }
 
-      fs.writeFileSync(filePath, html, 'utf-8')
+      fs.writeFileSync(filePath, content, 'utf-8')
       return { success: true, path: filePath, fileName }
     } catch (e) {
       return { success: false, error: e.message }
