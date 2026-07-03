@@ -55,27 +55,46 @@
             @click="onCellClick(cell.date)"
           >
             <div class="cell-date-container">
-              <div class="cell-date">{{ cell.day }}</div>
+              <div :class="['cell-date', { 'is-month-start': cell.day === 1 }]">
+                <template v-if="cell.day === 1">{{ getMonthDayLabel(cell.date) }}</template>
+                <template v-else>{{ cell.day }}</template>
+              </div>
               <div v-if="getHolidayForDate(cell.date)" :class="['cell-holiday', { 'lunar-holiday': getHolidayForDate(cell.date)?.isLunar }]">
                 {{ getHolidayForDate(cell.date)?.holiday }}
               </div>
             </div>
-            <div class="cell-events">
+            <div class="cell-events" :style="{ marginTop: getMultiDayBarOffset(cell.date) + 'px' }">
               <div
-                v-for="event in getEventsForDate(cell.date).slice(0, 3)"
+                v-for="event in getSingleDayEventsForDate(cell.date).slice(0, getVisibleSingleDayCount(cell.date))"
                 :key="event.id"
-                class="cell-event"
-                :style="{ backgroundColor: getEventDisplayColor(event) + '18', color: getEventDisplayColor(event), borderLeftColor: getEventDisplayColor(event) }"
+                :class="['cell-event', event.completed ? 'is-completed' : 'is-incomplete']"
+                :style="{ backgroundColor: getEventBgColor(event), borderLeftColor: getEventDisplayColor(event) }"
                 @click.stop="onEventClick(event)"
                 @contextmenu.prevent.stop="onEventRightClick($event, event)"
               >
-                <span class="event-dot" :style="{ backgroundColor: getEventDisplayColor(event) }"></span>
                 {{ event.title }}
               </div>
-              <div v-if="getEventsForDate(cell.date).length > 3" class="cell-more">
-                +{{ getEventsForDate(cell.date).length - 3 }}
+              <div v-if="getTotalEventCountForDate(cell.date) > 5" class="cell-more" @click.stop="onMoreClick(cell.date, $event)">
+                +{{ getTotalEventCountForDate(cell.date) - 5 }}
               </div>
             </div>
+          </div>
+          <!-- Multi-day event bars overlay (continuous across cells) -->
+          <div
+            v-for="(bar, bidx) in multiDayEventBars"
+            :key="'mdb-' + bidx"
+            :class="['multi-day-bar', bar.event.completed ? 'is-completed' : 'is-incomplete']"
+            :style="{
+              left: 'calc(' + (bar.startCol * (100/7)) + '% + 4px)',
+              width: 'calc(' + ((bar.endCol - bar.startCol + 1) * (100/7)) + '% - 8px)',
+              top: 'calc(' + (bar.row * (100/6)) + '% + 22px + ' + (bar.slot * 18) + 'px)',
+              backgroundColor: getEventBgColor(bar.event),
+              borderLeftColor: getEventDisplayColor(bar.event)
+            }"
+            @click.stop="onEventClick(bar.event)"
+            @contextmenu.prevent.stop="onEventRightClick($event, bar.event)"
+          >
+            <span class="multi-day-bar-title">{{ bar.event.title }}</span>
           </div>
         </div>
       </div>
@@ -107,7 +126,7 @@
                 v-for="evt in getAllDayEventsForDate(day.date)"
                 :key="evt.id"
                 class="wk-allday-evt"
-                :style="{ backgroundColor: getEventDisplayColor(evt) + '22', color: getEventDisplayColor(evt), borderLeftColor: getEventDisplayColor(evt) }"
+                :style="{ backgroundColor: getEventBgColor(evt), color: getEventDisplayColor(evt), borderLeftColor: getEventDisplayColor(evt) }"
                 @click.stop="onEventClick(evt)"
                 @contextmenu.prevent.stop="onEventRightClick($event, evt)"
               >{{ evt.title }}</div>
@@ -132,7 +151,7 @@
                   :key="h"
                   :class="['wk-cell', { 'wk-cell-selected': weekTimeDrag.active && day.date === weekTimeDrag.startDate && h - 1 >= Math.min(weekTimeDrag.startHour, weekTimeDrag.endHour) && h - 1 <= Math.max(weekTimeDrag.startHour, weekTimeDrag.endHour) }]"
                   :style="{ height: hourPx + 'px' }"
-                  @mousedown.prevent="onWeekCellMouseDown(day.date, h - 1)"
+                  @mousedown.prevent="onWeekCellMouseDown(day.date, h - 1, $event)"
                   @mouseenter="onWeekCellMouseEnter(h - 1)"
                   @click="onWeekCellClick(day.date, h - 1)"
                 >
@@ -284,7 +303,7 @@
       <div v-if="contextMenuVisible" class="ctx-overlay" @click="contextMenuVisible = false" @contextmenu.prevent>
         <div class="ctx-menu" :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }">
           <div v-if="contextMenuEvent" class="ctx-item" @click="toggleComplete()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="contextMenuEvent.completed ? 'var(--text-tertiary)' : '#16a34a'" stroke-width="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="contextMenuEvent.completed ? 'var(--text-tertiary)' : 'var(--text-secondary)'" stroke-width="2">
               <polyline v-if="!contextMenuEvent.completed" points="20 6 9 17 4 12"></polyline>
               <circle v-else cx="12" cy="12" r="10"></circle>
             </svg>
@@ -297,6 +316,45 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- More events panel (shown when clicking +n) -->
+    <Teleport to="body">
+      <div v-if="morePanelVisible" class="more-overlay" @click="closeMorePanel" @contextmenu.prevent>
+        <div class="more-panel" :style="{ left: morePanelPos.x + 'px', top: morePanelPos.y + 'px' }" @click.stop>
+          <div class="more-panel-header">
+            <span class="more-panel-date">{{ morePanelDate }}</span>
+            <span class="more-panel-count">{{ morePanelEvents.length }} 个日程</span>
+          </div>
+          <div class="more-panel-list">
+            <div
+              v-for="event in morePanelEvents"
+              :key="event.id"
+              :class="['more-panel-item', event.completed ? 'is-completed' : 'is-incomplete']"
+              :style="{ backgroundColor: getEventBgColor(event), borderLeftColor: getEventDisplayColor(event) }"
+              @click.stop="onPanelEventClick(event)"
+              @contextmenu.prevent.stop="onPanelEventRightClick($event, event)"
+            >
+              <div class="more-panel-item-main">
+                <div class="more-panel-item-title">{{ event.title }}</div>
+                <div class="more-panel-item-meta">
+                  <span v-if="event.start !== event.end" class="more-panel-item-range">{{ event.start }} ~ {{ event.end }}</span>
+                  <span v-else-if="!event.allDay && event.startTime" class="more-panel-item-time">{{ event.startTime }} - {{ event.endTime }}</span>
+                  <span v-else class="more-panel-item-allday">全天</span>
+                </div>
+              </div>
+              <button
+                class="more-panel-toggle"
+                :title="event.completed ? t('schedule.markUncomplete') : t('schedule.markComplete')"
+                @click.stop="toggleEventComplete(event)"
+              >
+                <svg v-if="event.completed" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -304,7 +362,7 @@
 import { ref, computed, reactive, nextTick, onMounted, onUnmounted, watch, onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { useScheduleStore, EVENT_COLORS } from '@/store/modules/schedule';
+import { useScheduleStore, EVENT_COLORS, getColorByStatus } from '@/store/modules/schedule';
 import ScheduleTaskList from './ScheduleTaskList.vue';
 
 const { t, locale } = useI18n();
@@ -491,6 +549,16 @@ function getHolidayForDate(dateStr) {
   return null;
 }
 
+function getMonthDayLabel(dateStr) {
+  const m = parseInt(dateStr.slice(5, 7));
+  const d = parseInt(dateStr.slice(8, 10));
+  if (isZh.value) {
+    return `${m}月${d}日`;
+  }
+  const monthAbbr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1];
+  return `${monthAbbr} ${d}`;
+}
+
 const formData = reactive({
   title: '',
   start: '',
@@ -604,17 +672,23 @@ function timedEventStyle(evt) {
   return {
     top: `${top}px`,
     height: `${height}px`,
-    backgroundColor: dc + '18',
+    backgroundColor: dc + (evt.completed ? '18' : '40'),
     borderLeftColor: dc,
     color: dc,
   };
 }
 
 function getEventDisplayColor(evt) {
-  if (evt.completed) return '#16a34a';
-  const today = new Date().toISOString().split('T')[0];
-  if (evt.end < today) return '#ef4444';
-  return evt.color;
+  // 已完成 → 浅色马卡龙；未完成 → 深色马卡龙
+  if (evt.completed) {
+    return getColorByStatus(evt.color, true);
+  }
+  return getColorByStatus(evt.color, false);
+}
+
+// 已完成 item 背景透明度 18（淡），未完成 40（深）
+function getEventBgColor(evt) {
+  return getEventDisplayColor(evt) + (evt.completed ? '18' : '40');
 }
 
 const monthGridCells = computed(() => {
@@ -718,6 +792,190 @@ function getEventsForDate(date) {
   return scheduleStore.getEventsForDateRange(date, date);
 }
 
+function getSingleDayEventsForDate(date) {
+  return getEventsForDate(date).filter(e => e.start === e.end);
+}
+
+// Compute continuous multi-day event bars for the month view overlay.
+// Each bar represents a single week-segment of a multi-day event.
+const multiDayEventBars = computed(() => {
+  const cells = monthGridCells.value;
+  if (cells.length === 0) return [];
+
+  const firstDate = cells[0].date;
+  const lastDate = cells[cells.length - 1].date;
+
+  // Collect unique multi-day events visible in the grid
+  const multiDayEvents = new Map();
+  for (const cell of cells) {
+    const events = getEventsForDate(cell.date);
+    for (const evt of events) {
+      if (evt.start !== evt.end && !multiDayEvents.has(evt.id)) {
+        multiDayEvents.set(evt.id, evt);
+      }
+    }
+  }
+
+  const segments = [];
+  for (const evt of multiDayEvents.values()) {
+    let startDate = evt.start;
+    let endDate = evt.end;
+
+    // Skip if entirely outside visible range
+    if (endDate < firstDate || startDate > lastDate) continue;
+
+    // Clamp to visible range
+    if (startDate < firstDate) startDate = firstDate;
+    if (endDate > lastDate) endDate = lastDate;
+
+    const startIdx = cells.findIndex(c => c.date === startDate);
+    const endIdx = cells.findIndex(c => c.date === endDate);
+    if (startIdx === -1 || endIdx === -1) continue;
+
+    const startRow = Math.floor(startIdx / 7);
+    const endRow = Math.floor(endIdx / 7);
+
+    // Split into week segments (each row is one week)
+    for (let row = startRow; row <= endRow; row++) {
+      const rowStartIdx = row * 7;
+      const rowEndIdx = rowStartIdx + 6;
+      const segStartIdx = Math.max(startIdx, rowStartIdx);
+      const segEndIdx = Math.min(endIdx, rowEndIdx);
+
+      segments.push({
+        event: evt,
+        row,
+        startCol: segStartIdx % 7,
+        endCol: segEndIdx % 7,
+        startIdx: segStartIdx,
+        endIdx: segEndIdx,
+      });
+    }
+  }
+
+  // Assign vertical slots per row to handle overlapping bars
+  const segmentsByRow = {};
+  for (const seg of segments) {
+    if (!segmentsByRow[seg.row]) segmentsByRow[seg.row] = [];
+    segmentsByRow[seg.row].push(seg);
+  }
+
+  const bars = [];
+  for (const row of Object.keys(segmentsByRow)) {
+    const rowSegs = segmentsByRow[row];
+    rowSegs.sort((a, b) => a.startIdx - b.startIdx);
+
+    // Interval partitioning: assign each bar to a non-overlapping slot
+    const activeEndIndices = [];
+    for (const seg of rowSegs) {
+      let slot = -1;
+      for (let i = 0; i < activeEndIndices.length; i++) {
+        if (activeEndIndices[i] < seg.startIdx) {
+          slot = i;
+          break;
+        }
+      }
+      if (slot === -1) {
+        slot = activeEndIndices.length;
+        activeEndIndices.push(seg.endIdx);
+      } else {
+        activeEndIndices[slot] = seg.endIdx;
+      }
+      seg.slot = slot;
+      bars.push(seg);
+    }
+  }
+
+  return bars;
+});
+
+// 计算某日单元格被多少条跨日日程条覆盖，用于把单日 item 下移避免叠加
+function getMultiDayBarOffset(date) {
+  const cells = monthGridCells.value;
+  const idx = cells.findIndex(c => c.date === date);
+  if (idx === -1) return 0;
+
+  const row = Math.floor(idx / 7);
+  const col = idx % 7;
+
+  let maxSlot = -1;
+  for (const bar of multiDayEventBars.value) {
+    if (bar.row === row && bar.startCol <= col && bar.endCol >= col) {
+      if (bar.slot > maxSlot) maxSlot = bar.slot;
+    }
+  }
+
+  return (maxSlot + 1) * 18; // 每条 18px 高度
+}
+
+// 获取覆盖某日的跨日日程条
+function getMultiDayBarsForDate(date) {
+  const cells = monthGridCells.value;
+  const idx = cells.findIndex(c => c.date === date);
+  if (idx === -1) return [];
+  const row = Math.floor(idx / 7);
+  const col = idx % 7;
+  return multiDayEventBars.value.filter(bar =>
+    bar.row === row && bar.startCol <= col && bar.endCol >= col
+  );
+}
+
+// 单日 item 可见数量 = 5 - 跨日条数（下限 0）
+function getVisibleSingleDayCount(date) {
+  return Math.max(0, 5 - getMultiDayBarsForDate(date).length);
+}
+
+// 某日日程总数 = 跨日条数 + 单日事件数
+function getTotalEventCountForDate(date) {
+  return getMultiDayBarsForDate(date).length + getSingleDayEventsForDate(date).length;
+}
+
+// +n 点击：在附近弹出面板显示该日所有日程
+const morePanelVisible = ref(false);
+const morePanelDate = ref(null);
+const morePanelPos = ref({ x: 0, y: 0 });
+
+const morePanelEvents = computed(() => {
+  if (!morePanelDate.value) return [];
+  return getEventsForDate(morePanelDate.value);
+});
+
+function onMoreClick(date, event) {
+  morePanelDate.value = date;
+  const panelWidth = 260;
+  const panelHeight = 360;
+  let x = event.clientX;
+  let y = event.clientY;
+  if (x + panelWidth > window.innerWidth) x = window.innerWidth - panelWidth - 8;
+  if (y + panelHeight > window.innerHeight) y = window.innerHeight - panelHeight - 8;
+  morePanelPos.value = { x, y };
+  morePanelVisible.value = true;
+}
+
+function closeMorePanel() {
+  morePanelVisible.value = false;
+  morePanelDate.value = null;
+}
+
+// 面板 item 点击：关闭面板并跳转详情
+function onPanelEventClick(event) {
+  closeMorePanel();
+  onEventClick(event);
+}
+
+// 面板 item 右键：在光标处打开上下文菜单（保持面板开启以观察状态变化）
+function onPanelEventRightClick(e, evt) {
+  e.stopPropagation();
+  contextMenuEvent.value = evt;
+  contextMenuPos.value = { x: e.clientX, y: e.clientY };
+  contextMenuVisible.value = true;
+}
+
+// 面板 item 切换完成状态
+async function toggleEventComplete(evt) {
+  await scheduleStore.updateEvent(evt.id, { completed: !evt.completed });
+}
+
 function isDateInRange(date, start, end) {
   if (!start || !end) return false;
   const s = start < end ? start : end;
@@ -792,7 +1050,8 @@ function onCellClick(date) {
   openCreateModal(date);
 }
 
-function onCellMouseDown(date, _event) {
+function onCellMouseDown(date, event) {
+  if (event.button !== 0) return; // 仅左键可拖拽
   isDragging.value = true;
   selectionStart.value = date;
   selectionEnd.value = date;
@@ -835,7 +1094,8 @@ function onWeekCellClick(date, hour) {
   openCreateModal(date, date, startTime, endTime, false);
 }
 
-function onWeekCellMouseDown(date, hour) {
+function onWeekCellMouseDown(date, hour, event) {
+  if (event && event.button !== 0) return; // 仅左键可拖拽
   weekTimeDrag.value = {
     active: true,
     startDate: date,
@@ -885,6 +1145,7 @@ async function toggleComplete() {
 function goToDetail() {
   if (!contextMenuEvent.value) return;
   contextMenuVisible.value = false;
+  closeMorePanel();
   router.push(`/schedule/${contextMenuEvent.value.id}`);
 }
 
@@ -1168,6 +1429,7 @@ onDeactivated(() => {
   flex: 1;
   border-left: 1px solid var(--border-color);
   border-top: 1px solid var(--border-color);
+  position: relative;
 }
 
 .month-cell {
@@ -1186,7 +1448,7 @@ onDeactivated(() => {
 }
 
 .month-cell:hover {
-  background: var(--bg-hover);
+  background: transparent;
 }
 
 .month-cell.other-month {
@@ -1202,6 +1464,13 @@ onDeactivated(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.month-cell.is-today .cell-date.is-month-start {
+  width: auto;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
 }
 
 .month-cell.is-selected {
@@ -1228,28 +1497,26 @@ onDeactivated(() => {
 }
 
 .cell-holiday {
-  position: absolute;
-  top: -2px;
-  right: 0;
-  font-size: 10px;
-  color: #f59e0b;
+  margin-left: auto;
+  font-size: 12px;
+  color: #16a34a;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 60px;
+  max-width: 70px;
   line-height: 1.2;
   text-align: right;
 }
 
 .cell-holiday.lunar-holiday {
-  color: #ef4444;
+  color: #16a34a;
 }
 
 .cell-events {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
 }
 
 .cell-event {
@@ -1260,28 +1527,86 @@ onDeactivated(() => {
   font-size: 11px;
   border-radius: 3px;
   border-left: 2px solid;
+  color: var(--text-primary);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 .cell-event:hover {
-  opacity: 0.8;
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-.event-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.cell-event.is-completed {
+  font-weight: 400;
+  opacity: 0.65;
+}
+
+.cell-event.is-incomplete {
+  font-weight: 700;
+  opacity: 1.0;
 }
 
 .cell-more {
   font-size: 10px;
+  font-weight: 700;
   color: var(--text-secondary);
   padding: 0 4px;
+  cursor: pointer;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.cell-more:hover {
+  color: var(--text-primary);
+}
+
+/* ========== Multi-day Event Bar Overlay ========== */
+.multi-day-bar {
+  position: absolute;
+  height: 16px;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 3px;
+  border-left: 2px solid;
+  color: var(--text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  pointer-events: auto;
+}
+
+.multi-day-bar:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.multi-day-bar.is-completed {
+  opacity: 0.65;
+}
+
+.multi-day-bar.is-completed .multi-day-bar-title {
+  font-weight: 400;
+}
+
+.multi-day-bar.is-incomplete .multi-day-bar-title {
+  font-weight: 700;
+}
+
+.multi-day-bar-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ========== Week View ========== */
@@ -1891,7 +2216,7 @@ onDeactivated(() => {
 
 .ctx-menu {
   position: fixed;
-  background: white;
+  background: var(--bg-primary);
   border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
   padding: 5px;
@@ -1919,11 +2244,127 @@ onDeactivated(() => {
 }
 
 .ctx-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--bg-hover);
 }
 
 .ctx-item.danger:hover {
-  background-color: #fef2f2;
+  background-color: rgba(239, 68, 68, 0.1);
   color: #ef4444;
+}
+
+/* ========== More Events Panel ========== */
+.more-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+}
+
+.more-panel {
+  position: fixed;
+  width: 260px;
+  max-height: 360px;
+  background: var(--bg-primary);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: ctxIn 0.15s ease;
+  z-index: 901;
+}
+
+.more-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+}
+
+.more-panel-date {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.more-panel-count {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.more-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.more-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border-left: 3px solid;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.more-panel-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.more-panel-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.more-panel-item-title {
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.more-panel-item.is-completed .more-panel-item-title {
+  font-weight: 400;
+  opacity: 0.65;
+}
+
+.more-panel-item.is-incomplete .more-panel-item-title {
+  font-weight: 700;
+  opacity: 1.0;
+}
+
+.more-panel-item-meta {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.more-panel-toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: background-color 0.12s;
+}
+
+.more-panel-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.06);
 }
 </style>

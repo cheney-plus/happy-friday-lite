@@ -48,9 +48,9 @@
           <div class="setting-item">
             <span class="item-label">{{ t('schedule.status') }}</span>
             <button class="status-toggle" @click="toggleStatus">
-              <svg v-if="event.completed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 8 12 12 15 14"></polyline></svg>
-              <span :style="{ color: event.completed ? '#16a34a' : '' }">{{ event.completed ? t('schedule.completed') : t('schedule.uncompleted') }}</span>
+              <svg v-if="event.completed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 8 12 12 15 14"></polyline></svg>
+              <span>{{ event.completed ? t('schedule.completed') : t('schedule.uncompleted') }}</span>
             </button>
           </div>
 
@@ -415,7 +415,7 @@ onDeactivated(() => {
 }
 
 .action-btn.danger:hover {
-  background-color: #fef2f2;
+  background-color: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }
 
@@ -654,7 +654,7 @@ onDeactivated(() => {
 }
 
 .btn-back:hover {
-  background-color: #f5f5f5;
+  background-color: var(--bg-hover);
 }
 
 .modal-overlay {
@@ -677,7 +677,7 @@ onDeactivated(() => {
 }
 
 .delete-confirm-dialog {
-  background-color: white;
+  background-color: var(--bg-primary);
   border-radius: 12px;
   width: 90%;
   max-width: 360px;

@@ -126,7 +126,7 @@
             class="task-checkbox"
             @click.stop="toggleTaskComplete(task)"
           >
-            <svg v-if="task.completed" width="16" height="16" viewBox="0 0 24 24" fill="#16a34a" stroke="white" stroke-width="2">
+            <svg v-if="task.completed" width="16" height="16" viewBox="0 0 24 24" fill="var(--text-secondary)" stroke="white" stroke-width="2">
               <rect x="3" y="3" width="18" height="18" rx="4"></rect>
               <polyline points="20 6 9 17 4 12" stroke="white" fill="none"></polyline>
             </svg>
@@ -543,22 +543,22 @@ onUnmounted(() => {
 }
 
 .stat-icon-wrap.total {
-  background: linear-gradient(135deg, #dbeafe, #eff6ff);
+  background: rgba(37, 99, 235, 0.12);
   color: #2563eb;
 }
 
 .stat-icon-wrap.completed {
-  background: linear-gradient(135deg, #dcfce7, #ecfdf5);
-  color: #16a34a;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .stat-icon-wrap.uncompleted {
-  background: linear-gradient(135deg, #fef3c7, #fffbeb);
+  background: rgba(217, 119, 6, 0.12);
   color: #d97706;
 }
 
 .stat-icon-wrap.progress {
-  background: linear-gradient(135deg, #ede9fe, #f5f3ff);
+  background: rgba(124, 58, 237, 0.12);
   color: #7c3aed;
 }
 
@@ -578,7 +578,7 @@ onUnmounted(() => {
 }
 
 .stat-number.completed-num {
-  color: #16a34a;
+  color: var(--text-secondary);
 }
 
 .stat-number.uncompleted-num {
@@ -745,12 +745,12 @@ onUnmounted(() => {
 }
 
 .task-status-badge.done {
-  background: #ecfdf5;
-  color: #16a34a;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .task-status-badge.pending {
-  background: #fffbeb;
+  background: rgba(217, 119, 6, 0.12);
   color: #d97706;
 }
 </style>
