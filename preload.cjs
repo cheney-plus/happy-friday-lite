@@ -81,7 +81,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'rag-get-queue-stats',
       'rag-retry-failed',
       'rag-clear-kb-index',
-      'rag-search'
+      'rag-search',
+      'agent-invoke',
+      'agent-stop',
+      'agent-tool-approval-resume',
+      'agent-list-tools',
+      'agent-list-skills'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -116,7 +121,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'python-stderr',
       'rag-update-progress',
       'rag-update-done',
-      'rag-task-complete'
+      'rag-task-complete',
+      'agent-tool-call',
+      'agent-tool-result',
+      'agent-tool-approval'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

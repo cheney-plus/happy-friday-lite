@@ -690,8 +690,19 @@ const handleSend = async () => {
 
   if (!selectedModel) return;
 
+  // Agent 模式：跳转对话页，由 FridayConversation 根据 mode=agent 走 Agent 流程
+  // Agent 模式不使用知识库附件（Agent 自主通过 retrieve_knowledge 工具检索）
   if (currentMode.value === 'agent') {
-    console.log('Agent mode is not yet implemented');
+    router.push({
+      name: 'friday-chat',
+      params: { sessionId: `new-${Date.now()}` },
+      query: {
+        q: text,
+        mode: 'agent',
+        modelId: selectedModel.id,
+        thinkMode: modelSettings.value.thinkMode
+      }
+    });
     return;
   }
 

@@ -8,3 +8,13 @@ export const NOTE_AI_CHUNK = 'note-ai-chunk'
 export const NOTE_AI_DONE = 'note-ai-done'
 export const NOTE_AI_ERROR = 'note-ai-error'
 export const NOTE_FIM_RESULT = 'note-fim-result'
+
+// ========== Agent 相关事件 ==========
+// 流式正文/思考分片复用 CHAT_CHUNK / CHAT_REASONING_CHUNK / CHAT_DONE / CHAT_ERROR，
+// 这样前端流式渲染逻辑可最大化复用。以下为 Agent 专有事件：
+//   - AGENT_TOOL_CALL: 工具调用开始（前端展示工具气泡）
+//   - AGENT_TOOL_RESULT: 工具调用结果
+//   - AGENT_TOOL_APPROVAL: 触发人机交互审批
+export const AGENT_TOOL_CALL = 'agent-tool-call'
+export const AGENT_TOOL_RESULT = 'agent-tool-result'
+export const AGENT_TOOL_APPROVAL = 'agent-tool-approval'

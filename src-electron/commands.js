@@ -10,6 +10,7 @@ import { runPython, runPythonStreaming, checkPython, getPythonPath } from './pyt
 import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
+import { registerAgentCommands } from './agent/ipc.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -1109,6 +1110,12 @@ export function registerCommands(mainWindow) {
 
   // RAG 判断已移除：现在由 RAG Agent 通过 Function Calling 自主决定是否检索，
   // 不再需要单独的预判断请求。详见 llm.js 中的 streamChatWithRagAgent。
+
+  // ========== Agent 智能体相关命令 ==========
+  // 设计参考：src/views/knowledge/agent/Agent智能体设计.md
+  // Agent 模式提供工具调用能力（知识检索、笔记/日程操作、文件操作），
+  // 支持 HITL 审批。会话复用 sessions 表，与普通对话历史一致。
+  registerAgentCommands(mainWindow)
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')
 }

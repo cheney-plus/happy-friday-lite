@@ -37,6 +37,24 @@
           />
         </template>
 
+        <!-- ========== Agent 模式：工具调用区域 ==========
+             采用与"思考过程"一致的可展开/收缩样式，
+             每个工具调用一个独立 section，标题根据工具类别与状态智能映射 -->
+        <div
+          v-if="currentMode === 'agent' && activeToolCalls.length > 0"
+          class="tool-calls-wrapper"
+        >
+          <ToolCallSection
+            v-for="tc in activeToolCalls"
+            :key="tc.toolCallId"
+            :tool-name="tc.toolName"
+            :arguments="tc.arguments"
+            :output="tc.output"
+            :status="tc.status"
+            :default-collapsed="tc.status === 'success' && !tc.requireApproval"
+          />
+        </div>
+
         <template v-if="isStreaming">
           <AIMessage
             :content="streamingContent"
@@ -72,6 +90,16 @@
       @cancel="rollbackDialogVisible = false"
     />
 
+    <!-- ========== Agent 模式：HITL 工具调用审批弹窗 ========== -->
+    <!-- 当后端工具标记 requireApproval=true 时弹出，等待用户批准或拒绝 -->
+    <ToolApprovalDialog
+      :visible="!!pendingApproval"
+      :tool-name="pendingApproval?.toolName || ''"
+      :arguments="pendingApproval?.arguments || {}"
+      @approve="handleApproveTool"
+      @reject="handleRejectTool"
+    />
+
     <Transition name="toast-fade">
       <div v-if="saveToastVisible" class="save-toast">
         {{ saveToastMessage }}
@@ -90,6 +118,8 @@ import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import RollbackConfirmDialog from '@/components/chat/RollbackConfirmDialog.vue';
+import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
+import ToolCallSection from '@/components/chat/ToolCallSection.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -116,8 +146,20 @@ let unlistenReasoning = null;
 let unlistenDone = null;
 let unlistenError = null;
 let unlistenTitle = null;
+// Agent 模式专有事件监听器
+let unlistenAgentToolCall = null;
+let unlistenAgentToolResult = null;
+let unlistenAgentApproval = null;
 let activeRequestId = '';
 let isDoneReceived = false;
+
+// ========== Agent 模式状态 ==========
+// 当前流式响应中活跃的工具调用列表（仅 Agent 模式使用）
+// 结构: [{ toolCallId, toolName, arguments, status, output, requireApproval }]
+//   status: 'running' | 'success' | 'rejected' | 'pending_approval'
+const activeToolCalls = ref([]);
+// 待审批的工具调用（HITL 弹窗）
+const pendingApproval = ref(null);
 
 const rollbackDialogVisible = ref(false);
 const rollbackPreviewContent = ref('');
@@ -322,6 +364,8 @@ async function sendChatMessage(text) {
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
+  // Agent 模式：清空上一轮的工具调用记录
+  activeToolCalls.value = [];
   showScrollDownBtn.value = false;
   isAtBottom.value = true;
   scrollToBottom(true);
@@ -330,7 +374,18 @@ async function sendChatMessage(text) {
   isDoneReceived = false;
 
   try {
-    if (mode === 'chat') {
+    if (mode === 'agent') {
+      // Agent 模式：调用 agent-invoke，后端走 Agent Loop（多工具 + HITL）
+      // Agent 自主通过 retrieve_knowledge 工具检索，无需前端传 kbName
+      console.log('[Agent] 发起 Agent 调用, requestId=', activeRequestId);
+      await electronService.invoke('agent-invoke', {
+        requestId: activeRequestId,
+        sessionId: currentSessionId.value || '',
+        model: model,
+        message: text,
+        enableThinking: route.query.thinkMode === 'deep'
+      });
+    } else if (mode === 'chat') {
       await electronService.invoke('chat_with_memory', {
         requestId: activeRequestId,
         sessionId: currentSessionId.value || '',
@@ -366,7 +421,10 @@ async function handleStop() {
   if (!isStreaming.value || !activeRequestId) return;
 
   try {
-    await electronService.invoke('stop_chat', { requestId: activeRequestId });
+    // Agent 模式使用 agent-stop，普通对话使用 stop_chat
+    const mode = route.query.mode || 'chat';
+    const channel = mode === 'agent' ? 'agent-stop' : 'stop_chat';
+    await electronService.invoke(channel, { requestId: activeRequestId });
   } catch (err) {
     console.error('Stop chat error:', err);
   }
@@ -397,6 +455,7 @@ async function triggerAiResponse() {
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
+  activeToolCalls.value = [];
   showScrollDownBtn.value = false;
   isAtBottom.value = true;
   scrollToBottom(true);
@@ -405,7 +464,16 @@ async function triggerAiResponse() {
   isDoneReceived = false;
 
   try {
-    if (mode === 'chat') {
+    if (mode === 'agent') {
+      // Agent 模式：已有会话历史时继续 Agent 对话（message 传空，由后端读取历史）
+      await electronService.invoke('agent-invoke', {
+        requestId: activeRequestId,
+        sessionId: currentSessionId.value || '',
+        model: model,
+        message: '',
+        enableThinking: route.query.thinkMode === 'deep'
+      });
+    } else if (mode === 'chat') {
       await electronService.invoke('chat_with_memory', {
         requestId: activeRequestId,
         sessionId: currentSessionId.value || '',
@@ -517,6 +585,8 @@ onMounted(async () => {
 
     streamingContent.value = '';
     streamingReasoning.value = '';
+    // Agent 模式：保留工具调用记录展示直到下一轮，这里不清空
+    // （activeToolCalls 在下一次 sendChatMessage 时清空）
     showScrollDownBtn.value = false;
     scrollToBottom(true);
   });
@@ -538,6 +608,49 @@ onMounted(async () => {
     }
   });
 
+  // ========== Agent 模式专有事件 ==========
+  // 工具调用开始：推送工具气泡
+  unlistenAgentToolCall = electronService.listen('agent-tool-call', (event) => {
+    const data = event.payload;
+    if (data.requestId !== activeRequestId) return;
+    console.log('[Agent] 工具调用:', data.toolName, data.arguments);
+    activeToolCalls.value.push({
+      toolCallId: data.toolCallId,
+      toolName: data.toolName,
+      arguments: data.arguments,
+      status: data.requireApproval ? 'pending_approval' : 'running',
+      output: '',
+      requireApproval: !!data.requireApproval
+    });
+    scrollToBottom();
+  });
+
+  // 工具调用结果：更新工具气泡状态
+  unlistenAgentToolResult = electronService.listen('agent-tool-result', (event) => {
+    const data = event.payload;
+    if (data.requestId !== activeRequestId) return;
+    console.log('[Agent] 工具结果:', data.toolName, data.status);
+    const tc = activeToolCalls.value.find((t) => t.toolCallId === data.toolCallId);
+    if (tc) {
+      tc.status = data.status || 'success';
+      tc.output = data.output || '';
+    }
+    scrollToBottom();
+  });
+
+  // 触发人机交互审批：弹出审批对话框
+  unlistenAgentApproval = electronService.listen('agent-tool-approval', (event) => {
+    const data = event.payload;
+    if (data.requestId !== activeRequestId) return;
+    console.log('[Agent] 请求审批:', data.toolName);
+    pendingApproval.value = {
+      requestId: data.requestId,
+      toolName: data.toolName,
+      toolCallId: data.toolCallId,
+      arguments: data.arguments
+    };
+  });
+
   await initConversation();
 
   if (messagesContainer.value) {
@@ -551,6 +664,9 @@ onUnmounted(() => {
   if (unlistenDone) unlistenDone();
   if (unlistenError) unlistenError();
   if (unlistenTitle) unlistenTitle();
+  if (unlistenAgentToolCall) unlistenAgentToolCall();
+  if (unlistenAgentToolResult) unlistenAgentToolResult();
+  if (unlistenAgentApproval) unlistenAgentApproval();
   if (messagesContainer.value) {
     messagesContainer.value.removeEventListener('scroll', checkScrollPosition);
   }
@@ -558,7 +674,47 @@ onUnmounted(() => {
 
 onDeactivated(() => {
   rollbackDialogVisible.value = false;
+  pendingApproval.value = null;
 });
+
+// ========== Agent 审批处理 ==========
+// 用户批准工具调用
+async function handleApproveTool() {
+  if (!pendingApproval.value) return;
+  const { requestId } = pendingApproval.value;
+  console.log('[Agent] 用户批准工具调用');
+  pendingApproval.value = null;
+  try {
+    await electronService.invoke('agent-tool-approval-resume', {
+      requestId,
+      decision: { type: 'approve' }
+    });
+  } catch (err) {
+    console.error('[Agent] 审批回传失败:', err);
+  }
+}
+
+// 用户拒绝工具调用
+async function handleRejectTool(decision) {
+  if (!pendingApproval.value) return;
+  const { requestId, toolCallId } = pendingApproval.value;
+  console.log('[Agent] 用户拒绝工具调用:', decision.reason);
+  // 更新工具气泡状态为已拒绝
+  const tc = activeToolCalls.value.find((t) => t.toolCallId === toolCallId);
+  if (tc) {
+    tc.status = 'rejected';
+    tc.output = decision.reason || '用户拒绝';
+  }
+  pendingApproval.value = null;
+  try {
+    await electronService.invoke('agent-tool-approval-resume', {
+      requestId,
+      decision: { type: 'reject', reason: decision.reason || '用户拒绝执行' }
+    });
+  } catch (err) {
+    console.error('[Agent] 审批回传失败:', err);
+  }
+}
 </script>
 
 <style scoped>
@@ -732,5 +888,15 @@ onDeactivated(() => {
 .toast-fade-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(-4px);
+}
+
+/* ========== Agent 模式：工具调用区域 wrapper ==========
+   单个工具调用的展开/收缩样式由 ToolCallSection.vue 内部 scoped 样式负责，
+   这里仅保留容器布局，与"思考过程"区域保持视觉一致 */
+.tool-calls-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
 }
 </style>
