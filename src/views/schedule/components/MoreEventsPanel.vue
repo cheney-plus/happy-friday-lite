@@ -16,7 +16,17 @@
             @contextmenu.prevent.stop="$emit('event-right-click', $event, event)"
           >
             <div class="more-panel-item-main">
-              <div class="more-panel-item-title">{{ event.title }}</div>
+              <div class="more-panel-item-title">
+                <span class="more-panel-item-title-text">{{ event.title }}</span>
+                <span
+                  class="more-panel-item-priority"
+                  :class="priorityClass(event.priority)"
+                  :title="priorityLabel(event.priority)"
+                >
+                  <span class="more-panel-item-priority-dot"></span>
+                  {{ priorityLabel(event.priority) }}
+                </span>
+              </div>
               <div class="more-panel-item-meta">
                 <span v-if="event.start !== event.end" class="more-panel-item-range">{{ event.start }} ~ {{ event.end }}</span>
                 <span v-else-if="!event.allDay && event.startTime" class="more-panel-item-time">{{ event.startTime }} - {{ event.endTime }}</span>
@@ -42,6 +52,7 @@
 import { onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getEventBgColor, getEventDisplayColor } from '../utils/calendarHelpers';
+import { DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 
 const { t } = useI18n();
 
@@ -53,6 +64,17 @@ defineProps({
 });
 
 const emit = defineEmits(['close', 'event-click', 'event-right-click', 'toggle-complete']);
+
+function priorityClass(p) {
+  return `priority-${p || DEFAULT_EVENT_PRIORITY}`;
+}
+
+function priorityLabel(p) {
+  const key = p || DEFAULT_EVENT_PRIORITY;
+  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'minor') return t('schedule.priorityMinor');
+  return t('schedule.priorityImportant');
+}
 
 function close() {
   emit('close');
@@ -140,11 +162,54 @@ onDeactivated(() => emit('close'));
 }
 
 .more-panel-item-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   color: var(--text-primary);
+}
+
+.more-panel-item-title-text {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.more-panel-item-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.more-panel-item-priority-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.more-panel-item-priority.priority-urgent {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+.more-panel-item-priority.priority-important {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+.more-panel-item-priority.priority-minor {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
 }
 
 .more-panel-item.is-completed .more-panel-item-title {

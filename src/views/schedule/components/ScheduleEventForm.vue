@@ -62,6 +62,22 @@
     </div>
 
     <div class="form-group">
+      <label class="form-label">{{ t('schedule.priority') }}</label>
+      <div class="priority-picker">
+        <button
+          v-for="opt in priorityOptions"
+          :key="opt.key"
+          type="button"
+          :class="['priority-option', opt.key, { active: model.priority === opt.key }]"
+          @click="onFieldChange('priority', opt.key)"
+        >
+          <span class="priority-dot"></span>
+          <span>{{ opt.label }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="form-group">
       <label class="form-label">{{ t('schedule.color') }}</label>
       <div class="color-picker">
         <div
@@ -81,7 +97,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { EVENT_COLORS } from '@/store/modules/schedule';
+import { EVENT_COLORS, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 
 const { t } = useI18n();
 
@@ -93,6 +109,17 @@ const props = defineProps({
 const emit = defineEmits(['change', 'submit']);
 
 const titleInputRef = ref(null);
+
+// 优先级缺失时回填默认值，保证表单始终有可用值
+if (!props.model.priority) {
+  props.model.priority = DEFAULT_EVENT_PRIORITY;
+}
+
+const priorityOptions = computed(() => [
+  { key: 'urgent', label: t('schedule.priorityUrgent') },
+  { key: 'important', label: t('schedule.priorityImportant') },
+  { key: 'minor', label: t('schedule.priorityMinor') },
+]);
 
 const isPast = computed(() => {
   if (!props.model.end) return false;
@@ -255,4 +282,64 @@ defineExpose({ focusTitle });
   border-color: var(--text-primary);
   box-shadow: 0 0 0 2px var(--bg-primary);
 }
+
+.priority-picker {
+  display: flex;
+  gap: 6px;
+}
+
+.priority-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.priority-option:hover {
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
+}
+
+.priority-option.active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.priority-option.active.urgent {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+}
+
+.priority-option.active.important {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: #f59e0b;
+}
+
+.priority-option.active.minor {
+  background: rgba(100, 116, 139, 0.12);
+  border-color: #64748b;
+}
+
+.priority-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-tertiary);
+}
+
+.priority-option.urgent .priority-dot { background: #ef4444; }
+.priority-option.important .priority-dot { background: #f59e0b; }
+.priority-option.minor .priority-dot { background: #64748b; }
 </style>

@@ -154,9 +154,13 @@
                 </svg>
                 {{ task.startTime }} - {{ task.endTime }}
               </span>
+              <span class="task-priority" :class="priorityClass(task.priority)">
+                <span class="task-priority-dot"></span>
+                {{ priorityLabel(task.priority) }}
+              </span>
               <span v-if="task.reminder" class="task-reminder">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18 s-3-2-3-9"></path>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                 </svg>
               </span>
@@ -245,7 +249,15 @@ const filterTabs = computed(() => [
 const sortOptions = computed(() => [
   { key: 'time', label: t('schedule.sortByTime') },
   { key: 'status', label: t('schedule.sortByStatus') },
+  { key: 'priority', label: t('schedule.sortByPriority') },
 ]);
+
+// 优先级权重：紧急 > 重要 > 次要，未设置按重要处理
+const priorityWeight = (p) => {
+  if (p === 'urgent') return 0;
+  if (p === 'minor') return 2;
+  return 1;
+};
 
 const activeFilterLabel = computed(() => filterTabs.value.find(f => f.key === activeFilter.value)?.label || '');
 const activeFilterCount = computed(() => filterTabs.value.find(f => f.key === activeFilter.value)?.count || 0);
@@ -281,6 +293,15 @@ const filteredTasks = computed(() => {
       if (a.start !== b.start) return a.start < b.start ? -1 : 1;
       return 0;
     });
+  } else if (sortBy.value === 'priority') {
+    // 按优先级升序：紧急 → 重要 → 次要；同级按时间靠前
+    list.sort((a, b) => {
+      const diff = priorityWeight(a.priority) - priorityWeight(b.priority);
+      if (diff !== 0) return diff;
+      if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+      if (a.startTime && b.startTime) return a.startTime < b.startTime ? -1 : 1;
+      return 0;
+    });
   }
 
   return list;
@@ -289,6 +310,17 @@ const filteredTasks = computed(() => {
 function formatDate(task) {
   if (task.start === task.end) return task.start;
   return `${task.start} ~ ${task.end}`;
+}
+
+function priorityClass(p) {
+  return `priority-${p || 'important'}`;
+}
+
+function priorityLabel(p) {
+  const key = p || 'important';
+  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'minor') return t('schedule.priorityMinor');
+  return t('schedule.priorityImportant');
 }
 
 function onTaskClick(task) {
@@ -733,6 +765,42 @@ onUnmounted(() => {
   font-size: 11px;
   color: var(--text-tertiary);
 }
+
+.task-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  line-height: 1.5;
+}
+
+.task-priority-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.task-priority.priority-urgent {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.task-priority.priority-urgent .task-priority-dot { background: #ef4444; }
+
+.task-priority.priority-important {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+.task-priority.priority-important .task-priority-dot { background: #f59e0b; }
+
+.task-priority.priority-minor {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
+.task-priority.priority-minor .task-priority-dot { background: #64748b; }
 
 .task-status-badge {
   font-size: 11px;

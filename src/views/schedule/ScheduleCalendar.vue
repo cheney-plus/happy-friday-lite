@@ -12,13 +12,25 @@
         <h2 class="current-date-label">{{ currentDateLabel }}</h2>
       </div>
       <div class="header-right">
-        <div class="view-switcher">
-          <button
-            v-for="view in views"
-            :key="view.key"
-            :class="['view-btn', { active: currentView === view.key }]"
-            @click="switchView(view.key)"
-          >{{ view.label }}</button>
+        <div class="view-dropdown-wrapper" ref="viewDropdownRef">
+          <button class="view-dropdown-trigger" @click.stop="toggleViewDropdown">
+            <span class="view-trigger-label">{{ currentViewLabel }}</span>
+            <svg class="view-trigger-arrow" :class="{ expanded: showViewDropdown }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <Transition name="view-dropdown">
+            <div v-if="showViewDropdown" class="view-dropdown-panel" @click.stop>
+              <div
+                v-for="view in views"
+                :key="view.key"
+                :class="['view-dropdown-item', { active: currentView === view.key }]"
+                @click="selectView(view.key)"
+              >
+                <svg v-if="currentView === view.key" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span v-else style="width:14px"></span>
+                <span class="view-dropdown-item-label">{{ view.label }}</span>
+              </div>
+            </div>
+          </Transition>
         </div>
         <button class="create-btn" @click="openCreateModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -72,7 +84,8 @@
                 @click.stop="onEventClick(event)"
                 @contextmenu.prevent.stop="onEventRightClick($event, event)"
               >
-                {{ event.title }}
+                <span class="cell-event-title">{{ event.title }}</span>
+                <span class="cell-event-priority" :class="priorityClass(event.priority)" :title="priorityLabel(event.priority)"></span>
               </div>
             </div>
             <div v-if="shouldShowMore(cell.date)" class="cell-more" @click.stop="onMoreClick(cell.date, $event)">
@@ -95,6 +108,7 @@
             @contextmenu.prevent.stop="onEventRightClick($event, bar.event)"
           >
             <span class="multi-day-bar-title">{{ bar.event.title }}</span>
+            <span class="multi-day-bar-priority" :class="priorityClass(bar.event.priority)" :title="priorityLabel(bar.event.priority)"></span>
           </div>
         </div>
       </div>
@@ -243,7 +257,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { useScheduleStore } from '@/store/modules/schedule';
+import { useScheduleStore, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 import ScheduleTaskList from './ScheduleTaskList.vue';
 import EventFormModal from './components/EventFormModal.vue';
 import EventContextMenu from './components/EventContextMenu.vue';
@@ -280,6 +294,30 @@ const views = computed(() => [
   { key: 'year', label: t('schedule.year') },
   { key: 'list', label: t('schedule.list') },
 ]);
+
+const currentViewLabel = computed(() => {
+  const v = views.value.find(item => item.key === currentView.value);
+  return v ? v.label : '';
+});
+
+// ========== 视图下拉 ==========
+const showViewDropdown = ref(false);
+const viewDropdownRef = ref(null);
+
+function toggleViewDropdown() {
+  showViewDropdown.value = !showViewDropdown.value;
+}
+
+function selectView(key) {
+  switchView(key);
+  showViewDropdown.value = false;
+}
+
+function onViewDocClick(e) {
+  if (viewDropdownRef.value && !viewDropdownRef.value.contains(e.target)) {
+    showViewDropdown.value = false;
+  }
+}
 
 const currentDateLabel = computed(() => {
   if (currentView.value === 'year') {
@@ -664,6 +702,18 @@ function getSingleDayEventsForDate(date) {
   return getEventsForDate(date).filter(e => e.start === e.end);
 }
 
+// 优先级标识：仅 urgent / minor 用强色圆点区分，important 用淡色保持视觉简洁
+function priorityClass(p) {
+  return `priority-${p || DEFAULT_EVENT_PRIORITY}`;
+}
+
+function priorityLabel(p) {
+  const key = p || DEFAULT_EVENT_PRIORITY;
+  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'minor') return t('schedule.priorityMinor');
+  return t('schedule.priorityImportant');
+}
+
 function getTimedEventsForDate(date) {
   return scheduleStore.getEventsForDateRange(date, date).filter(e => !e.allDay);
 }
@@ -945,6 +995,7 @@ onMounted(() => {
   updateNowY();
   nowTimer = setInterval(updateNowY, 60000);
   nextTick(setupGridObserver);
+  document.addEventListener('click', onViewDocClick);
 });
 
 onUnmounted(() => {
@@ -954,11 +1005,13 @@ onUnmounted(() => {
   }
   gridResizeObserver?.disconnect();
   gridResizeObserver = null;
+  document.removeEventListener('click', onViewDocClick);
 });
 
 onDeactivated(() => {
   contextMenuVisible.value = false;
   morePanelVisible.value = false;
+  showViewDropdown.value = false;
 });
 </script>
 
@@ -1033,33 +1086,104 @@ onDeactivated(() => {
   margin-left: 8px;
 }
 
-.view-switcher {
-  display: flex;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 2px;
+.view-dropdown-wrapper {
+  position: relative;
 }
 
-.view-btn {
-  padding: 5px 14px;
-  border: none;
-  background: transparent;
+.view-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 28px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
   border-radius: 6px;
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
+  font-family: inherit;
+  line-height: 1;
 }
 
-.view-btn.active {
+.view-dropdown-trigger:hover {
+  border-color: var(--text-tertiary);
+  background: var(--bg-secondary);
+}
+
+.view-trigger-label {
+  white-space: nowrap;
+}
+
+.view-trigger-arrow {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.view-trigger-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.view-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
   background: var(--bg-primary);
-  color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  z-index: 100;
+  padding: 3px;
+  min-width: 88px;
 }
 
-.view-btn:hover:not(.active) {
+.view-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
   color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.12s;
+  white-space: nowrap;
+}
+
+.view-dropdown-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.view-dropdown-item.active {
+  background: var(--accent-light);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.view-dropdown-item-label {
+  flex: 1;
+}
+
+.view-dropdown-enter-active {
+  animation: viewDropdownIn 0.15s ease-out;
+}
+
+.view-dropdown-leave-active {
+  animation: viewDropdownIn 0.12s ease-in reverse;
+}
+
+@keyframes viewDropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .create-btn {
@@ -1246,10 +1370,38 @@ onDeactivated(() => {
   border-left: 2px solid;
   color: var(--text-primary);
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   cursor: pointer;
   transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.cell-event-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cell-event-priority {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: transparent;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-tertiary) 60%, transparent);
+}
+
+.cell-event-priority.priority-urgent {
+  background: #ef4444;
+  box-shadow: none;
+}
+.cell-event-priority.priority-important {
+  background: #f59e0b;
+  box-shadow: none;
+}
+.cell-event-priority.priority-minor {
+  background: #64748b;
+  box-shadow: none;
 }
 
 .cell-event:hover {
@@ -1294,12 +1446,11 @@ onDeactivated(() => {
   border-left: 2px solid;
   color: var(--text-primary);
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   cursor: pointer;
   z-index: 2;
   display: flex;
   align-items: center;
+  gap: 5px;
   transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
   pointer-events: auto;
 }
@@ -1323,10 +1474,24 @@ onDeactivated(() => {
 }
 
 .multi-day-bar-title {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.multi-day-bar-priority {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #f59e0b;
+}
+
+.multi-day-bar-priority.priority-urgent { background: #ef4444; }
+.multi-day-bar-priority.priority-important { background: #f59e0b; }
+.multi-day-bar-priority.priority-minor { background: #64748b; }
 
 /* ========== Week View ========== */
 .week-view {

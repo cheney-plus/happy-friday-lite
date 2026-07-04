@@ -63,7 +63,12 @@
   "filterMonth": "本月",
   "sortByTime": "按时间排序",
   "sortByStatus": "按状态排序",
+  "sortByPriority": "按优先级排序",
   "totalTasks": "全部任务",
   "completionRate": "完成率",
-  "noTasks": "暂无任务"
+  "noTasks": "暂无任务",
+  "priority": "优先级",
+  "priorityUrgent": "紧急",
+  "priorityImportant": "重要",
+  "priorityMinor": "次要"
 }

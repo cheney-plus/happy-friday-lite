@@ -24,7 +24,7 @@
 <script setup>
 import { ref, reactive, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { EVENT_COLORS } from '@/store/modules/schedule';
+import { EVENT_COLORS, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 import ScheduleEventForm from './ScheduleEventForm.vue';
 
 const { t } = useI18n();
@@ -44,6 +44,7 @@ const formData = reactive({
   color: EVENT_COLORS[0],
   reminder: false,
   completed: false,
+  priority: DEFAULT_EVENT_PRIORITY,
 });
 
 /**
@@ -63,6 +64,7 @@ function open(initial = {}) {
     color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
     reminder: false,
     completed: false,
+    priority: DEFAULT_EVENT_PRIORITY,
   });
   visible.value = true;
   nextTick(() => formRef.value?.focusTitle());
@@ -85,6 +87,7 @@ function save() {
     color: formData.color,
     reminder: formData.reminder,
     completed: formData.completed,
+    priority: formData.priority,
   });
   close();
 }

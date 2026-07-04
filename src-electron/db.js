@@ -128,10 +128,18 @@ async function initDatabase() {
       color TEXT NOT NULL DEFAULT '#60a5fa',
       reminder INTEGER NOT NULL DEFAULT 0,
       completed INTEGER NOT NULL DEFAULT 0,
+      priority TEXT NOT NULL DEFAULT 'important',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
   `)
+
+  // 迁移：为旧版 schedule_events 表补充 priority 列（已存在则忽略）
+  try {
+    db.run("ALTER TABLE schedule_events ADD COLUMN priority TEXT NOT NULL DEFAULT 'important'")
+  } catch (_e) {
+    // 列已存在，忽略
+  }
 
   // RAG: 文件索引状态表
   db.run(`
@@ -235,8 +243,8 @@ async function migrateFromJson() {
 
   migrateArray('schedule_events.json', (e) => {
     db.run(
-      'INSERT OR IGNORE INTO schedule_events (id, title, start, end, startTime, endTime, allDay, description, color, reminder, completed, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [e.id, e.title, e.start, e.end, e.startTime, e.endTime, e.allDay ? 1 : 0, e.description, e.color, e.reminder ? 1 : 0, e.completed ? 1 : 0, e.createdAt, e.updatedAt]
+      'INSERT OR IGNORE INTO schedule_events (id, title, start, end, startTime, endTime, allDay, description, color, reminder, completed, priority, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [e.id, e.title, e.start, e.end, e.startTime, e.endTime, e.allDay ? 1 : 0, e.description, e.color, e.reminder ? 1 : 0, e.completed ? 1 : 0, e.priority || 'important', e.createdAt, e.updatedAt]
     )
   })
 
@@ -268,6 +276,7 @@ function normalizeEvent(row) {
   row.allDay = !!row.allDay
   row.reminder = !!row.reminder
   row.completed = !!row.completed
+  if (!row.priority) row.priority = 'important'
   return row
 }
 
@@ -497,13 +506,14 @@ export function getScheduleEvent(eventId) {
 export function createScheduleEvent(args) {
   const now = nowISO()
   const id = generateId()
+  const priority = args.priority || 'important'
   db.run(
-    'INSERT INTO schedule_events (id, title, start, end, startTime, endTime, allDay, description, color, reminder, completed, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO schedule_events (id, title, start, end, startTime, endTime, allDay, description, color, reminder, completed, priority, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       id, args.title || '', args.startDate || '', args.endDate || '',
       args.startTime || '', args.endTime || '', args.allDay ? 1 : 0,
       args.description || '', args.color || '#60a5fa', args.reminder ? 1 : 0,
-      args.completed ? 1 : 0, now, now
+      args.completed ? 1 : 0, priority, now, now
     ]
   )
   saveDb()
@@ -519,6 +529,7 @@ export function createScheduleEvent(args) {
     color: args.color || '#60a5fa',
     reminder: args.reminder || false,
     completed: args.completed || false,
+    priority,
     createdAt: now,
     updatedAt: now
   }
@@ -541,6 +552,7 @@ export function updateScheduleEvent(eventId, args) {
   if (args.color !== undefined) { fields.push('color = ?'); values.push(args.color) }
   if (args.reminder !== undefined) { fields.push('reminder = ?'); values.push(args.reminder ? 1 : 0) }
   if (args.completed !== undefined) { fields.push('completed = ?'); values.push(args.completed ? 1 : 0) }
+  if (args.priority !== undefined) { fields.push('priority = ?'); values.push(args.priority) }
 
   if (fields.length > 0) {
     fields.push('updatedAt = ?')

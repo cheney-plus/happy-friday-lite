@@ -54,6 +54,16 @@
             </button>
           </div>
 
+          <div class="setting-item">
+            <span class="item-label">{{ t('schedule.priority') }}</span>
+            <div class="item-value-row">
+              <span class="priority-badge" :class="priorityClass(event.priority)">
+                <span class="priority-badge-dot"></span>
+                {{ priorityLabel(event.priority) }}
+              </span>
+            </div>
+          </div>
+
           <div v-if="event.description" class="setting-item desc-item">
             <span class="item-label">{{ t('schedule.description') }}</span>
             <p class="desc-text">{{ event.description }}</p>
@@ -113,7 +123,7 @@
 import { ref, reactive, computed, nextTick, onMounted, onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { useScheduleStore, EVENT_COLORS } from '@/store/modules/schedule';
+import { useScheduleStore, EVENT_COLORS, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 import ScheduleEventForm from './components/ScheduleEventForm.vue';
 
 const { t } = useI18n();
@@ -139,7 +149,19 @@ const editForm = reactive({
   color: EVENT_COLORS[0],
   reminder: false,
   completed: false,
+  priority: DEFAULT_EVENT_PRIORITY,
 });
+
+function priorityClass(p) {
+  return `priority-${p || DEFAULT_EVENT_PRIORITY}`;
+}
+
+function priorityLabel(p) {
+  const key = p || DEFAULT_EVENT_PRIORITY;
+  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'minor') return t('schedule.priorityMinor');
+  return t('schedule.priorityImportant');
+}
 
 function goBack() {
   router.push('/schedule');
@@ -158,6 +180,7 @@ function startEdit() {
     color: event.value.color,
     reminder: event.value.reminder || false,
     completed: event.value.completed || false,
+    priority: event.value.priority || DEFAULT_EVENT_PRIORITY,
   });
   isEditing.value = true;
   nextTick(() => editFormRef.value?.focusTitle());
@@ -180,6 +203,7 @@ async function saveEdit() {
     color: editForm.color,
     reminder: editForm.reminder,
     completed: editForm.completed,
+    priority: editForm.priority,
   });
   isEditing.value = false;
 }
@@ -549,4 +573,40 @@ onDeactivated(() => {
 .status-toggle:hover {
   background-color: #ecfdf5;
 }
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.2px;
+}
+
+.priority-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.priority-badge.priority-urgent {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.priority-badge.priority-urgent .priority-badge-dot { background: #ef4444; }
+
+.priority-badge.priority-important {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+.priority-badge.priority-important .priority-badge-dot { background: #f59e0b; }
+
+.priority-badge.priority-minor {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
+.priority-badge.priority-minor .priority-badge-dot { background: #64748b; }
 </style>

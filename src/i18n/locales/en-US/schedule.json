@@ -63,7 +63,12 @@
   "filterMonth": "This Month",
   "sortByTime": "Sort by Time",
   "sortByStatus": "Sort by Status",
+  "sortByPriority": "Sort by Priority",
   "totalTasks": "Total",
   "completionRate": "Done",
-  "noTasks": "No tasks"
+  "noTasks": "No tasks",
+  "priority": "Priority",
+  "priorityUrgent": "Urgent",
+  "priorityImportant": "Important",
+  "priorityMinor": "Minor"
 }

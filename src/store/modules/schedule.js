@@ -16,6 +16,10 @@ export const EVENT_COLORS = [
   '#546E7A', // 灰蓝
 ]
 
+// 日程优先级：urgent 紧急 / important 重要 / minor 次要
+export const EVENT_PRIORITIES = ['urgent', 'important', 'minor']
+export const DEFAULT_EVENT_PRIORITY = 'important'
+
 export const useScheduleStore = defineStore('schedule', {
   state: () => ({
     events: [],
@@ -63,7 +67,8 @@ export const useScheduleStore = defineStore('schedule', {
           description: event.description,
           color: event.color,
           reminder: event.reminder,
-          completed: event.completed
+          completed: event.completed,
+          priority: event.priority
         })
         this.events.push(newEvent)
         return newEvent
@@ -90,7 +95,8 @@ export const useScheduleStore = defineStore('schedule', {
           description: merged.description,
           color: merged.color,
           reminder: merged.reminder,
-          completed: merged.completed
+          completed: merged.completed,
+          priority: merged.priority
         })
         const idx = this.events.findIndex(e => e.id === id)
         if (idx >= 0) {
