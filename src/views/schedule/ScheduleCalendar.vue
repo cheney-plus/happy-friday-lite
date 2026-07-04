@@ -114,18 +114,20 @@
             </div>
           </div>
         </div>
-        <div class="wk-allday" v-if="hasAllDayEvents">
+        <div class="wk-allday">
           <div class="wk-gutter-allday">{{ t('schedule.allDay') }}</div>
           <div class="wk-allday-cols">
             <div
               v-for="day in weekDays"
               :key="day.date"
               :class="['wk-allday-col', { 'wk-today-col': day.isToday }]"
+              :style="allDayCellStyle(day.date)"
+              @click="onAllDayCellClick(day.date)"
             >
               <div
-                v-for="evt in getAllDayEventsForDate(day.date)"
+                v-for="evt in getDayEventsForAllDayRow(day.date)"
                 :key="evt.id"
-                class="wk-allday-evt"
+                :class="['wk-allday-evt', evt.completed ? 'is-completed' : 'is-incomplete']"
                 :style="{ backgroundColor: getEventBgColor(evt), color: getEventDisplayColor(evt), borderLeftColor: getEventDisplayColor(evt) }"
                 @click.stop="onEventClick(evt)"
                 @contextmenu.prevent.stop="onEventRightClick($event, evt)"
@@ -173,8 +175,8 @@
               </div>
             </div>
             <div v-if="isCurrentWeek" class="wk-now" :style="{ top: nowY + 'px' }">
-              <div class="wk-now-dot"></div>
               <div class="wk-now-line"></div>
+              <div v-if="todayColIndex >= 0" class="wk-now-bold" :style="nowBoldStyle()"></div>
             </div>
           </div>
         </div>
@@ -451,30 +453,36 @@ const visibleMultiDayEventBars = computed(() =>
 
 /**
  * 计算某格的跨日程条偏移量。
- * 偏移量按整行最大可见 slot 计算 —— 即使该格未被长日程条覆盖，
- * 也要为同行的 slot 预留高度，保证一周内各格的单日程 item 对齐。
+ * 仅对实际覆盖该格的色条计算偏移 —— 未被覆盖的格子不留空白，
+ * 单日程 item 从顶部开始排列，充分利用空间。
  */
 function getMultiDayBarOffset(date) {
   const cells = monthGridCells.value;
   const idx = cells.findIndex(c => c.date === date);
   if (idx === -1) return 0;
   const row = Math.floor(idx / 7);
+  const col = idx % 7;
   let maxSlot = -1;
   for (const bar of visibleMultiDayEventBars.value) {
-    if (bar.row === row && bar.slot > maxSlot) maxSlot = bar.slot;
+    if (bar.row === row && bar.startCol <= col && bar.endCol >= col) {
+      if (bar.slot > maxSlot) maxSlot = bar.slot;
+    }
   }
   return (maxSlot + 1) * ITEM_LINE_H;
 }
 
-/** 同行可见跨日程条占用的 slot 行数（用于兜底计算） */
+/** 覆盖该格的可见跨日程条占用的 slot 行数（用于兜底计算） */
 function getRowBarSlotCount(date) {
   const cells = monthGridCells.value;
   const idx = cells.findIndex(c => c.date === date);
   if (idx === -1) return 0;
   const row = Math.floor(idx / 7);
+  const col = idx % 7;
   let maxSlot = -1;
   for (const bar of visibleMultiDayEventBars.value) {
-    if (bar.row === row && bar.slot > maxSlot) maxSlot = bar.slot;
+    if (bar.row === row && bar.startCol <= col && bar.endCol >= col && bar.slot > maxSlot) {
+      maxSlot = bar.slot;
+    }
   }
   return maxSlot + 1;
 }
@@ -557,10 +565,37 @@ const weekDays = computed(() => {
 
 const isCurrentWeek = computed(() => weekOffset.value === 0);
 
-const hasAllDayEvents = computed(() => {
-  const dates = weekDays.value.map(d => d.date);
-  return scheduleStore.events.some(e => e.allDay && dates.some(d => d >= e.start && d <= e.end));
-});
+// 今日在周视图中的列索引（0=周一 … 6=周日），用于定位蓝色时间线加粗段
+const todayColIndex = computed(() => weekDays.value.findIndex(d => d.isToday));
+
+/** 今日列的加粗蓝色线段位置 */
+function nowBoldStyle() {
+  const idx = todayColIndex.value;
+  if (idx < 0) return {};
+  return {
+    left: `calc(56px + ${idx} * (100% - 56px) / 7)`,
+    width: `calc((100% - 56px) / 7)`,
+  };
+}
+
+// 全天行展示当日全部任务（含跨日 + 定时），作为当日任务清单
+const ALLDAY_ITEM_H = 20;   // 单个 item 占用高度（含 gap）
+const ALLDAY_BASE_MIN_H = 56; // 全天行最小高度（已调高）
+
+function getDayEventsForAllDayRow(date) {
+  return scheduleStore.getEventsForDateRange(date, date);
+}
+
+/** 全天行单元格高度：随 item 数量增长，并始终预留至少一个空位以便点击 */
+function allDayCellStyle(date) {
+  const count = getDayEventsForAllDayRow(date).length;
+  const minH = Math.max(ALLDAY_BASE_MIN_H, (count + 1) * ALLDAY_ITEM_H + 8);
+  return { minHeight: minH + 'px' };
+}
+
+function onAllDayCellClick(date) {
+  openCreateModal(date, date, undefined, undefined, true);
+}
 
 function timedEventStyle(evt) {
   const s = timeToMin(evt.startTime || '00:00');
@@ -587,6 +622,7 @@ function onWeekScroll() {}
 function scrollToNow() {
   if (!weekScrollRef.value) return;
   const now = new Date();
+  // 统一定位到当前时间点
   const y = (now.getHours() - 1) * hourPx;
   weekScrollRef.value.scrollTop = Math.max(0, y);
 }
@@ -626,10 +662,6 @@ function getEventsForDate(date) {
 
 function getSingleDayEventsForDate(date) {
   return getEventsForDate(date).filter(e => e.start === e.end);
-}
-
-function getAllDayEventsForDate(date) {
-  return scheduleStore.getEventsForDateRange(date, date).filter(e => e.allDay);
 }
 
 function getTimedEventsForDate(date) {
@@ -673,6 +705,26 @@ function navigateToday() {
 }
 
 function switchView(view) {
+  // 周↔月切换时同步日期，确保周视图创建的日程在月视图中可见
+  if (view === 'month' && currentView.value === 'week') {
+    // 当前周用今日所在月份；跨月周用周末（较新）所在月份，避免显示旧月
+    const refDay = isCurrentWeek.value
+      ? (weekDays.value.find(d => d.isToday) || weekDays.value[6])
+      : weekDays.value[6];
+    if (refDay) {
+      const d = new Date(refDay.date);
+      viewYear.value = d.getFullYear();
+      viewMonth.value = d.getMonth();
+    }
+  } else if (view === 'week' && currentView.value === 'month') {
+    const now = new Date();
+    const currentDay = now.getDay();
+    const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+    const thisMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    const targetMonday = new Date(viewYear.value, viewMonth.value, 1);
+    const diffDays = Math.round((targetMonday - thisMonday) / 86400000);
+    weekOffset.value = Math.round(diffDays / 7);
+  }
   currentView.value = view;
   if (view === 'week') {
     nextTick(scrollToNow);
@@ -1177,6 +1229,9 @@ onDeactivated(() => {
   gap: 4px;
   padding: 1px 4px;
   font-size: 11px;
+  line-height: 1.2;
+  height: 15px;
+  flex-shrink: 0;
   border-radius: 3px;
   border-left: 2px solid;
   color: var(--text-primary);
@@ -1285,18 +1340,19 @@ onDeactivated(() => {
 }
 
 .wk-header-days {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   flex: 1;
   padding-right: 8px;
 }
 
 .wk-head-day {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 8px 0 10px;
   gap: 2px;
+  min-width: 0;
 }
 
 .wk-head-weekday {
@@ -1328,7 +1384,6 @@ onDeactivated(() => {
   display: flex;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-color);
-  min-height: 28px;
   background: var(--bg-primary);
 }
 
@@ -1345,19 +1400,26 @@ onDeactivated(() => {
 }
 
 .wk-allday-cols {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   flex: 1;
   padding-right: 8px;
 }
 
 .wk-allday-col {
-  flex: 1;
   border-left: 1px solid var(--border-color);
-  padding: 3px 4px;
+  padding: 4px 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-height: 24px;
+  min-height: 56px;
+  min-width: 0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.wk-allday-col:hover {
+  background: var(--bg-hover);
 }
 
 .wk-allday-evt {
@@ -1375,6 +1437,16 @@ onDeactivated(() => {
 
 .wk-allday-evt:hover {
   opacity: 0.85;
+}
+
+.wk-allday-evt.is-completed {
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.wk-allday-evt.is-incomplete {
+  opacity: 1;
+  font-weight: 600;
 }
 
 .wk-scroll {
@@ -1427,14 +1499,15 @@ onDeactivated(() => {
 }
 
 .wk-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   flex: 1;
 }
 
 .wk-col {
-  flex: 1;
   border-left: 1px solid var(--border-color);
   position: relative;
+  min-width: 0;
 }
 
 .wk-today-col {
@@ -1515,23 +1588,26 @@ onDeactivated(() => {
   right: 0;
   z-index: 10;
   pointer-events: none;
-  display: flex;
-  align-items: center;
 }
 
-.wk-now-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-color);
-  flex-shrink: 0;
-  margin-left: 52px;
-}
-
+/* 非今日列的淡色时间线（横跨整周） */
 .wk-now-line {
-  flex: 1;
-  height: 2px;
+  position: absolute;
+  left: 56px;
+  right: 0;
+  top: -1px;
+  height: 3px;
   background: var(--accent-color);
+  opacity: 0.35;
+}
+
+/* 今日列的加粗时间线段 */
+.wk-now-bold {
+  position: absolute;
+  top: -1px;
+  height: 3px;
+  background: var(--accent-color);
+  z-index: 1;
 }
 
 /* ========== Year View ========== */
