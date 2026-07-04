@@ -196,6 +196,8 @@ export function useKnowledgeBase(fileSystem, sidebar) {
 
   async function deleteKnowledgeBase(contextMenu) {
     if (!contextMenu.item) return;
+    // 受保护的默认知识库（如 SKILL、沙盒区）不可删除
+    if (contextMenu.item.protected) return;
     const categoryId = contextMenu.categoryId;
     const itemId = contextMenu.item.id;
 

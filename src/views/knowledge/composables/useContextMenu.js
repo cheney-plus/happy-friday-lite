@@ -24,6 +24,7 @@ export function useContextMenu() {
   });
 
   function showContextMenu(event, categoryId, item) {
+    if (item?.protected) return;
     contextMenu.visible = true;
     contextMenu.x = event.clientX;
     contextMenu.y = event.clientY;

@@ -86,10 +86,11 @@ export const DEFAULT_CATEGORIES = [
   },
   {
     id: 'agent',
-    name: '工作区',
+    name: 'Agent智能体',
     expanded: true,
     items: [
-      { id: 'rag-thinking', name: 'SKILL' }
+      { id: 'rag-thinking', name: 'SKILL', protected: true },
+      { id: 'rag-sandbox', name: '沙盒区', protected: true }
     ]
   }
 ];
