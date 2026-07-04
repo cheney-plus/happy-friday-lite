@@ -75,61 +75,7 @@
       <div v-else class="edit-form">
         <div class="group-title">编辑日程</div>
         <div class="group-content edit-group">
-          <div class="form-group">
-            <label class="form-label">{{ t('schedule.eventTitle') }}</label>
-            <input ref="editTitleRef" v-model="editForm.title" type="text" class="form-input" :placeholder="t('schedule.eventTitlePlaceholder')" />
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">{{ t('schedule.startDate') }}</label>
-              <input v-model="editForm.start" type="date" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">{{ t('schedule.endDate') }}</label>
-              <input v-model="editForm.end" type="date" class="form-input" :min="editForm.start" />
-            </div>
-          </div>
-
-          <div class="form-group checkbox-form">
-            <div class="checkbox-row">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="editForm.allDay" class="checkbox-input" />
-                <span class="checkbox-custom"></span>
-                {{ t('schedule.allDay') }}
-              </label>
-              <label :class="['checkbox-label', { disabled: isPastEvent }]">
-                <input type="checkbox" v-model="editForm.reminder" class="checkbox-input" :disabled="isPastEvent" />
-                <span class="checkbox-custom"></span>
-                {{ t('schedule.reminder') }}
-              </label>
-            </div>
-          </div>
-
-          <div v-if="!editForm.allDay" class="form-row">
-            <div class="form-group">
-              <label class="form-label">{{ t('schedule.startTime') }}</label>
-              <input v-model="editForm.startTime" type="time" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">{{ t('schedule.endTime') }}</label>
-              <input v-model="editForm.endTime" type="time" class="form-input" />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">{{ t('schedule.description') }}</label>
-            <textarea v-model="editForm.description" class="form-textarea" :placeholder="t('schedule.descriptionPlaceholder')" rows="4"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">{{ t('schedule.color') }}</label>
-            <div class="color-picker">
-              <div v-for="color in EVENT_COLORS" :key="color" :class="['color-option', { active: editForm.color === color }]" :style="{ backgroundColor: color }" @click="editForm.color = color">
-                <svg v-if="editForm.color === color" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </div>
-            </div>
-          </div>
+          <ScheduleEventForm ref="editFormRef" :model="editForm" @submit="saveEdit" />
         </div>
 
         <div class="edit-actions-bar">
@@ -168,6 +114,7 @@ import { ref, reactive, computed, nextTick, onMounted, onDeactivated } from 'vue
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useScheduleStore, EVENT_COLORS } from '@/store/modules/schedule';
+import ScheduleEventForm from './components/ScheduleEventForm.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -175,17 +122,11 @@ const router = useRouter();
 const scheduleStore = useScheduleStore();
 
 const isEditing = ref(false);
-const editTitleRef = ref(null);
+const editFormRef = ref(null);
 const deleteConfirmVisible = ref(false);
 
 const eventId = computed(() => route.params.id);
 const event = computed(() => scheduleStore.getEventById(eventId.value));
-
-const isPastEvent = computed(() => {
-  if (!event.value) return false;
-  const today = new Date().toISOString().split('T')[0];
-  return event.value.end < today;
-});
 
 const editForm = reactive({
   title: '',
@@ -206,20 +147,20 @@ function goBack() {
 
 function startEdit() {
   if (!event.value) return;
-  editForm.title = event.value.title;
-  editForm.start = event.value.start;
-  editForm.end = event.value.end;
-  editForm.allDay = event.value.allDay;
-  editForm.startTime = event.value.startTime || '09:00';
-  editForm.endTime = event.value.endTime || '10:00';
-  editForm.description = event.value.description;
-  editForm.color = event.value.color;
-  editForm.reminder = event.value.reminder || false;
-  editForm.completed = event.value.completed || false;
-  isEditing.value = true;
-  nextTick(() => {
-    editTitleRef.value?.focus();
+  Object.assign(editForm, {
+    title: event.value.title,
+    start: event.value.start,
+    end: event.value.end,
+    allDay: event.value.allDay,
+    startTime: event.value.startTime || '09:00',
+    endTime: event.value.endTime || '10:00',
+    description: event.value.description,
+    color: event.value.color,
+    reminder: event.value.reminder || false,
+    completed: event.value.completed || false,
   });
+  isEditing.value = true;
+  nextTick(() => editFormRef.value?.focusTitle());
 }
 
 function cancelEdit() {
@@ -423,160 +364,6 @@ onDeactivated(() => {
   padding: 20px;
 }
 
-.form-group {
-  margin-bottom: 18px;
-}
-
-.form-group:last-of-type {
-  margin-bottom: 0;
-}
-
-.form-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
-  outline: none;
-  transition: border-color 0.15s;
-  font-family: inherit;
-  box-sizing: border-box;
-}
-
-.form-input:focus {
-  border-color: var(--text-primary);
-}
-
-.form-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.form-textarea {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
-  outline: none;
-  resize: vertical;
-  font-family: inherit;
-  box-sizing: border-box;
-  transition: border-color 0.15s;
-}
-
-.form-textarea:focus {
-  border-color: var(--text-primary);
-}
-
-.form-textarea::placeholder {
-  color: var(--text-tertiary);
-}
-
-.form-row {
-  display: flex;
-  gap: 12px;
-}
-
-.form-row .form-group {
-  flex: 1;
-}
-
-.checkbox-form {
-  margin-bottom: 18px;
-}
-
-.checkbox-row {
-  display: flex;
-  gap: 20px;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px !important;
-  color: var(--text-primary) !important;
-  user-select: none;
-  font-weight: 400 !important;
-  margin-bottom: 0 !important;
-}
-
-.checkbox-label.disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.checkbox-input {
-  display: none;
-}
-
-.checkbox-custom {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border-color);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  flex-shrink: 0;
-  background: var(--bg-primary);
-}
-
-.checkbox-input:checked + .checkbox-custom {
-  background: var(--text-primary);
-  border-color: var(--text-primary);
-}
-
-.checkbox-input:checked + .checkbox-custom::after {
-  content: '';
-  width: 5px;
-  height: 9px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg) translate(-1px, -1px);
-}
-
-.color-picker {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.color-option {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s, box-shadow 0.15s;
-  border: 2px solid transparent;
-}
-
-.color-option:hover {
-  transform: scale(1.1);
-}
-
-.color-option.active {
-  border-color: var(--text-primary);
-  box-shadow: 0 0 0 2px var(--bg-primary);
-}
-
 .edit-actions-bar {
   display: flex;
   justify-content: flex-end;
@@ -615,7 +402,7 @@ onDeactivated(() => {
 }
 
 .save-btn:not(:disabled) {
-  background-color: var(--text-primary);
+  background-color: var(--accent-color);
 }
 
 .save-btn:not(:disabled):hover {

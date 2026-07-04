@@ -1,64 +1,20 @@
 import { defineStore } from 'pinia'
 import { electronService } from '@/services/electron'
 
-// 深色马卡龙色系：完成日程使用（picker 默认显示），字体加粗
+// 马卡龙色系：每色相仅保留一个，完成/未完成通过透明度区分深浅
 export const EVENT_COLORS = [
-  '#D81B60', // 莓粉深
-  '#8E24AA', // 紫罗兰深
-  '#1E88E5', // 海蓝深
-  '#43A047', // 薄荷深
-  '#FB8C00', // 杏黄深
-  '#F4511E', // 蜜桃深
-  '#E53935', // 珊瑚深
-  '#2E7D32', // 嫩绿深
-  '#6A1B9A', // 兰花紫深
-  '#546E7A', // 灰蓝深
-  // 以下为中等色调，在白色与深色主题下均可见
-  '#00897B', // 青绿
-  '#5C6BC0', // 靛蓝
-  '#00ACC1', // 青色
-  '#AD1457', // 树莓
-  '#8D6E63', // 摩卡
+  '#E53935', // 珊瑚红
+  '#FB8C00', // 杏黄
   '#558B2F', // 橄榄
+  '#43A047', // 薄荷绿
+  '#00897B', // 青绿
+  '#1E88E5', // 海蓝
+  '#5C6BC0', // 靛蓝
+  '#8E24AA', // 紫罗兰
+  '#D81B60', // 莓粉
+  '#8D6E63', // 摩卡
+  '#546E7A', // 灰蓝
 ]
-
-
-// 浅色马卡龙色系：未完成日程使用，字体稍淡
-export const EVENT_COLORS_LIGHT = [
-  '#F4798F', // 莓粉
-  '#BB8FCE', // 紫罗兰
-  '#5DADE2', // 海蓝
-  '#7DCEA0', // 薄荷
-  '#F5B041', // 杏黄
-  '#EB984E', // 蜜桃
-  '#F1948A', // 珊瑚
-  '#52BE80', // 嫩绿
-  '#A569BD', // 兰花紫
-  '#85929E', // 灰蓝
-  // 以下为中等色调，在白色与深色主题下均可见
-  '#76D7C4', // 青绿浅
-  '#9FA8DA', // 靛蓝浅
-  '#80DEEA', // 青色浅
-  '#F06292', // 树莓浅
-  '#BCAAA4', // 摩卡浅
-  '#C0CA28', // 橄榄浅
-]
-
-// 深 ↔ 浅 互查表
-const DARK_TO_LIGHT = {};
-const LIGHT_TO_DARK = {};
-EVENT_COLORS.forEach((dark, i) => {
-  DARK_TO_LIGHT[dark] = EVENT_COLORS_LIGHT[i];
-  LIGHT_TO_DARK[EVENT_COLORS_LIGHT[i]] = dark;
-});
-
-// 根据完成状态返回显示色：已完成 → 浅色；未完成 → 深色
-export function getColorByStatus(color, completed) {
-  if (completed) {
-    return DARK_TO_LIGHT[color] || color;
-  }
-  return LIGHT_TO_DARK[color] || color;
-}
 
 export const useScheduleStore = defineStore('schedule', {
   state: () => ({
