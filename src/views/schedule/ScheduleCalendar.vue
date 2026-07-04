@@ -920,14 +920,17 @@ async function toggleEventComplete(evt) {
 watch(currentView, (v) => {
   if (v === 'week') {
     nextTick(scrollToNow);
+  } else if (v === 'month') {
+    nextTick(setupGridObserver);
   }
 });
 
-onMounted(() => {
-  scheduleStore.loadEvents();
-  updateNowY();
-  nowTimer = setInterval(updateNowY, 60000);
+function setupGridObserver() {
+  gridResizeObserver?.disconnect();
+  gridResizeObserver = null;
   if (monthGridRef.value) {
+    // 立即测量一次，避免 v-if 重建 DOM 后 rowHeight 仍为 0 导致 +n 失效
+    rowHeight.value = monthGridRef.value.clientHeight / 6;
     gridResizeObserver = new ResizeObserver(entries => {
       for (const entry of entries) {
         rowHeight.value = entry.contentRect.height / 6;
@@ -935,6 +938,13 @@ onMounted(() => {
     });
     gridResizeObserver.observe(monthGridRef.value);
   }
+}
+
+onMounted(() => {
+  scheduleStore.loadEvents();
+  updateNowY();
+  nowTimer = setInterval(updateNowY, 60000);
+  nextTick(setupGridObserver);
 });
 
 onUnmounted(() => {
