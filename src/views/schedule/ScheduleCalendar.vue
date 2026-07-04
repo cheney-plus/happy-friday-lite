@@ -39,7 +39,7 @@
         <div class="weekday-header">
           <div v-for="day in weekDayLabels" :key="day" class="weekday-cell">{{ day }}</div>
         </div>
-        <div class="month-grid" @mouseup="onGridMouseUp">
+        <div ref="monthGridRef" class="month-grid" @mouseup="onGridMouseUp">
           <div
             v-for="(cell, idx) in monthGridCells"
             :key="idx"
@@ -74,14 +74,14 @@
               >
                 {{ event.title }}
               </div>
-              <div v-if="getTotalEventCountForDate(cell.date) > 5" class="cell-more" @click.stop="onMoreClick(cell.date, $event)">
-                +{{ getTotalEventCountForDate(cell.date) - 5 }}
-              </div>
+            </div>
+            <div v-if="shouldShowMore(cell.date)" class="cell-more" @click.stop="onMoreClick(cell.date, $event)">
+              +{{ getHiddenEventCount(cell.date) }}
             </div>
           </div>
           <!-- Multi-day event bars overlay (continuous across cells) -->
           <div
-            v-for="(bar, bidx) in multiDayEventBars"
+            v-for="(bar, bidx) in visibleMultiDayEventBars"
             :key="'mdb-' + bidx"
             :class="['multi-day-bar', bar.event.completed ? 'is-completed' : 'is-incomplete']"
             :style="{
@@ -308,6 +308,20 @@ const currentDateLabel = computed(() => {
 });
 
 // ========== 月视图网格 ==========
+const monthGridRef = ref(null);
+const rowHeight = ref(0);
+
+// 格子内单日程 item 的尺寸常量（与 CSS 对应）
+const CELL_PADDING_Y = 8;     // .month-cell padding top+bottom (4+4)
+const DATE_HEADER_H = 20;     // .cell-date-container 高度
+const ITEM_LINE_H = 18;       // .cell-event 高度 + gap (15+3)
+const MAX_VISIBLE_ITEMS = 5;  // 单格最多展示的 item 数
+// 跨日程条尺寸（与 CSS 中 .multi-day-bar 对应）
+const BAR_TOP_OFFSET = 22;    // 色条顶部基准偏移（日期头高度）
+const BAR_HEIGHT = 16;        // 色条高度
+
+let gridResizeObserver = null;
+
 const monthGridCells = computed(() => {
   const cells = [];
   const year = viewYear.value;
@@ -420,38 +434,95 @@ const multiDayEventBars = computed(() => {
   return bars;
 });
 
+/**
+ * 根据行高计算最大可见 slot —— 行高不足时低优先级（高 slot）的色条自动隐藏，
+ * 避免色条溢出到下一行格子。
+ */
+const maxVisibleBarSlot = computed(() => {
+  if (rowHeight.value === 0) return 99; // 兜底：Observer 尚未触发时全部显示
+  const slot = Math.floor((rowHeight.value - BAR_TOP_OFFSET - BAR_HEIGHT) / ITEM_LINE_H);
+  return Math.max(-1, slot);
+});
+
+/** 实际渲染的跨日程条（仅含可见 slot） */
+const visibleMultiDayEventBars = computed(() =>
+  multiDayEventBars.value.filter(bar => bar.slot <= maxVisibleBarSlot.value)
+);
+
+/**
+ * 计算某格的跨日程条偏移量。
+ * 偏移量按整行最大可见 slot 计算 —— 即使该格未被长日程条覆盖，
+ * 也要为同行的 slot 预留高度，保证一周内各格的单日程 item 对齐。
+ */
 function getMultiDayBarOffset(date) {
   const cells = monthGridCells.value;
   const idx = cells.findIndex(c => c.date === date);
   if (idx === -1) return 0;
   const row = Math.floor(idx / 7);
-  const col = idx % 7;
   let maxSlot = -1;
-  for (const bar of multiDayEventBars.value) {
-    if (bar.row === row && bar.startCol <= col && bar.endCol >= col) {
-      if (bar.slot > maxSlot) maxSlot = bar.slot;
-    }
+  for (const bar of visibleMultiDayEventBars.value) {
+    if (bar.row === row && bar.slot > maxSlot) maxSlot = bar.slot;
   }
-  return (maxSlot + 1) * 18;
+  return (maxSlot + 1) * ITEM_LINE_H;
 }
 
-function getMultiDayBarsForDate(date) {
+/** 同行可见跨日程条占用的 slot 行数（用于兜底计算） */
+function getRowBarSlotCount(date) {
   const cells = monthGridCells.value;
   const idx = cells.findIndex(c => c.date === date);
-  if (idx === -1) return [];
+  if (idx === -1) return 0;
+  const row = Math.floor(idx / 7);
+  let maxSlot = -1;
+  for (const bar of visibleMultiDayEventBars.value) {
+    if (bar.row === row && bar.slot > maxSlot) maxSlot = bar.slot;
+  }
+  return maxSlot + 1;
+}
+
+/**
+ * 根据格子实际行高动态计算可容纳的单日程数量。
+ * 行高由 ResizeObserver 监听，行高不足时自动减少可见 item。
+ */
+function getVisibleSingleDayCount(date) {
+  const barOffset = getMultiDayBarOffset(date);
+  if (rowHeight.value === 0) {
+    // ResizeObserver 尚未触发时的兜底
+    return Math.max(0, MAX_VISIBLE_ITEMS - getRowBarSlotCount(date));
+  }
+  const available = rowHeight.value - CELL_PADDING_Y - DATE_HEADER_H - barOffset;
+  const fit = Math.floor(available / ITEM_LINE_H);
+  return Math.max(0, Math.min(MAX_VISIBLE_ITEMS, fit));
+}
+
+/** 被隐藏的单日程数量 */
+function getHiddenSingleDayCount(date) {
+  const singles = getSingleDayEventsForDate(date);
+  const visible = getVisibleSingleDayCount(date);
+  return Math.max(0, singles.length - visible);
+}
+
+/** 被隐藏的跨日程条数量（slot 超出可见范围且覆盖该格） */
+function getHiddenBarCountForDate(date) {
+  const cells = monthGridCells.value;
+  const idx = cells.findIndex(c => c.date === date);
+  if (idx === -1) return 0;
   const row = Math.floor(idx / 7);
   const col = idx % 7;
   return multiDayEventBars.value.filter(bar =>
-    bar.row === row && bar.startCol <= col && bar.endCol >= col
-  );
+    bar.row === row &&
+    bar.startCol <= col && bar.endCol >= col &&
+    bar.slot > maxVisibleBarSlot.value
+  ).length;
 }
 
-function getVisibleSingleDayCount(date) {
-  return Math.max(0, 5 - getMultiDayBarsForDate(date).length);
+/** 格子中被隐藏的日程总数（单日程 + 跨日程条），用于 +n 显示 */
+function getHiddenEventCount(date) {
+  return getHiddenSingleDayCount(date) + getHiddenBarCountForDate(date);
 }
 
-function getTotalEventCountForDate(date) {
-  return getMultiDayBarsForDate(date).length + getSingleDayEventsForDate(date).length;
+/** 格子是否需要显示 +n */
+function shouldShowMore(date) {
+  return getHiddenEventCount(date) > 0;
 }
 
 // ========== 周视图 ==========
@@ -804,6 +875,14 @@ onMounted(() => {
   scheduleStore.loadEvents();
   updateNowY();
   nowTimer = setInterval(updateNowY, 60000);
+  if (monthGridRef.value) {
+    gridResizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        rowHeight.value = entry.contentRect.height / 6;
+      }
+    });
+    gridResizeObserver.observe(monthGridRef.value);
+  }
 });
 
 onUnmounted(() => {
@@ -811,6 +890,8 @@ onUnmounted(() => {
     clearInterval(nowTimer);
     nowTimer = null;
   }
+  gridResizeObserver?.disconnect();
+  gridResizeObserver = null;
 });
 
 onDeactivated(() => {
@@ -990,8 +1071,9 @@ onDeactivated(() => {
 .month-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(6, 1fr);
+  grid-template-rows: repeat(6, minmax(0, 1fr));
   flex: 1;
+  min-height: 0;
   border-left: 1px solid var(--border-color);
   border-top: 1px solid var(--border-color);
   position: relative;
@@ -1006,6 +1088,8 @@ onDeactivated(() => {
   cursor: pointer;
   transition: background 0.1s;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .month-cell:nth-child(7n) {
@@ -1082,6 +1166,9 @@ onDeactivated(() => {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cell-event {
@@ -1117,17 +1204,19 @@ onDeactivated(() => {
 }
 
 .cell-more {
+  position: absolute;
+  bottom: 2px;
+  right: 5px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-secondary);
-  padding: 0 4px;
   cursor: pointer;
-  align-self: flex-end;
-  margin-left: auto;
+  z-index: 5;
+  user-select: none;
 }
 
 .cell-more:hover {
-  color: var(--text-primary);
+  color: var(--accent-color);
 }
 
 /* ========== Multi-day Event Bar Overlay ========== */
