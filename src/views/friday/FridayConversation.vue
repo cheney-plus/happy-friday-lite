@@ -477,11 +477,18 @@ async function handleStop() {
 async function loadSessionHistory(sessionId) {
   try {
     const history = await electronService.invoke('get_session_messages', { sessionId });
-    messages.value = history.map(m => ({
-      role: m.role,
-      content: m.content,
-      id: m.id
-    }));
+    messages.value = history.map(m => {
+      const msg = {
+        role: m.role,
+        content: m.content,
+        id: m.id
+      };
+      // 从 metadata 恢复 Agent 模式的时间线段
+      if (m.metadata && m.metadata.segments && Array.isArray(m.metadata.segments)) {
+        msg.segments = m.metadata.segments;
+      }
+      return msg;
+    });
   } catch (err) {
     console.error('Failed to load session history:', err);
   }

@@ -141,6 +141,13 @@ async function initDatabase() {
     // 列已存在，忽略
   }
 
+  // 迁移：为 messages 表补充 metadata 列，存储 Agent 模式的工具调用时间线等附加数据
+  try {
+    db.run('ALTER TABLE messages ADD COLUMN metadata TEXT')
+  } catch (_e) {
+    // 列已存在，忽略
+  }
+
   // RAG: 文件索引状态表
   db.run(`
     CREATE TABLE IF NOT EXISTS file_status (
@@ -390,20 +397,32 @@ export function updateSessionTimestamp(sessionId) {
   saveDb()
 }
 
-export function saveMessage(sessionId, role, content) {
+export function saveMessage(sessionId, role, content, metadata = null) {
   const now = nowISO()
+  const metadataStr = metadata ? JSON.stringify(metadata) : null
   db.run(
-    'INSERT INTO messages (sessionId, role, content, createdAt) VALUES (?, ?, ?, ?)',
-    [sessionId, role, content, now]
+    'INSERT INTO messages (sessionId, role, content, createdAt, metadata) VALUES (?, ?, ?, ?, ?)',
+    [sessionId, role, content, now, metadataStr]
   )
   const row = queryOne('SELECT last_insert_rowid() as id')
   const id = row ? row.id : 0
   saveDb()
-  return { id, sessionId, role, content, createdAt: now }
+  return { id, sessionId, role, content, createdAt: now, metadata }
 }
 
 export function getMessages(sessionId) {
-  return queryAll('SELECT * FROM messages WHERE sessionId = ? ORDER BY id ASC', [sessionId])
+  const rows = queryAll('SELECT * FROM messages WHERE sessionId = ? ORDER BY id ASC', [sessionId])
+  // 解析 metadata JSON
+  return rows.map(row => {
+    if (row.metadata && typeof row.metadata === 'string') {
+      try {
+        row.metadata = JSON.parse(row.metadata)
+      } catch (_e) {
+        // 解析失败保留原始字符串
+      }
+    }
+    return row
+  })
 }
 
 export function rollbackSession(sessionId, messageId) {

@@ -131,6 +131,7 @@ export function registerAgentCommands(mainWindow) {
       // 9. 流式执行 Agent（含 HITL 中断处理循环）
       let fullContent = ''
       let fullReasoning = ''
+      let toolSegments = []
 
       try {
         const result = await streamAgentWithHITL({
@@ -143,6 +144,7 @@ export function registerAgentCommands(mainWindow) {
         })
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
+        toolSegments = result.segments || []
       } catch (e) {
         log.error(`Agent 流式执行失败: ${e.message}`)
         log.error(e.stack)
@@ -152,8 +154,9 @@ export function registerAgentCommands(mainWindow) {
       // 10. 同步记忆到 SQLite
       await syncStoreToSQLite(currentSessionId)
 
-      // 11. 保存助手消息
-      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent)
+      // 11. 保存助手消息（含工具调用时间线段 metadata）
+      const metadata = toolSegments.length > 0 ? { segments: toolSegments } : null
+      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent, metadata)
       db.updateSessionTimestamp(currentSessionId)
 
       // 12. 发送完成事件
@@ -246,6 +249,11 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
   let iteration = 0
   const MAX_ITERATIONS = 20 // 防止无限循环
 
+  // 收集工具调用时间线段，用于持久化到消息 metadata
+  // 段类型: { type: 'text', content } 或 { type: 'tool', toolCallId, toolName, arguments, status, output, requireApproval }
+  const segments = []
+  let currentTextSegment = null // 当前正在构建的 text 段引用
+
   while (iteration < MAX_ITERATIONS) {
     if (cancelToken?.cancelled) {
       log.info(`Agent 已取消，退出 HITL 循环`)
@@ -299,6 +307,13 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
                 : ''
             if (content) {
               fullContent += content
+              // 维护 segments：追加到当前 text 段
+              if (!currentTextSegment) {
+                currentTextSegment = { type: 'text', content }
+                segments.push(currentTextSegment)
+              } else {
+                currentTextSegment.content += content
+              }
               mainWindow.webContents.send(CHAT_CHUNK, {
                 requestId,
                 sessionId: config.configurable.thread_id,
@@ -323,9 +338,30 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
         // 处理工具调用事件（补充日志，主要通知由 registry.js 包装层处理）
         if (eventType === 'on_tool_start') {
           log.info(`工具开始: ${name}`)
+          // 新工具调用开始，关闭当前 text 段，新增 tool 段
+          currentTextSegment = null
+          const toolCallId = data?.run_id || `tool_${segments.length}_${Date.now()}`
+          const toolArgs = data?.input || {}
+          segments.push({
+            type: 'tool',
+            toolCallId,
+            toolName: name || 'unknown',
+            arguments: toolArgs,
+            status: 'running',
+            output: '',
+            requireApproval: false
+          })
         }
         if (eventType === 'on_tool_end') {
           log.info(`工具结束: ${name}`)
+          // 更新对应 tool 段状态
+          const lastTool = [...segments].reverse().find(s => s.type === 'tool' && s.status === 'running')
+          if (lastTool) {
+            lastTool.status = 'success'
+            const output = data?.output
+            lastTool.output = typeof output === 'string' ? output : (output ? JSON.stringify(output) : '')
+          }
+          currentTextSegment = null // 下一段文本应新建
         }
 
         // 处理中断事件
@@ -355,34 +391,59 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
 
         // 提取工具调用信息，推送到前端审批
         const actionRequests = interrupt.value?.actionRequests || interrupt.value?.action_requests || []
+        let approvalToolCallId = `approval_${iteration}`
+        let approvalToolName = 'unknown'
+        let approvalToolArgs = {}
         if (actionRequests.length > 0) {
           const req = actionRequests[0]
+          approvalToolCallId = req.id || approvalToolCallId
+          approvalToolName = req.name || approvalToolName
+          approvalToolArgs = req.args || req.arguments || {}
           emitApprovalRequest(mainWindow, {
             requestId,
-            toolCallId: req.id || `approval_${iteration}`,
-            toolName: req.name || 'unknown',
-            arguments: req.args || req.arguments || {},
-            description: interrupt.value?.description || `工具 ${req.name} 需要审批`
+            toolCallId: approvalToolCallId,
+            toolName: approvalToolName,
+            arguments: approvalToolArgs,
+            description: interrupt.value?.description || `工具 ${approvalToolName} 需要审批`
           })
         } else {
           // 兜底：直接用 interrupt value
+          approvalToolArgs = interrupt.value
           emitApprovalRequest(mainWindow, {
             requestId,
-            toolCallId: `approval_${iteration}`,
-            toolName: 'unknown',
-            arguments: interrupt.value,
+            toolCallId: approvalToolCallId,
+            toolName: approvalToolName,
+            arguments: approvalToolArgs,
             description: '操作需要审批'
           })
         }
+
+        // 添加需要审批的 tool 段
+        currentTextSegment = null
+        const approvalToolSeg = {
+          type: 'tool',
+          toolCallId: approvalToolCallId,
+          toolName: approvalToolName,
+          arguments: approvalToolArgs,
+          status: 'pending_approval',
+          output: '',
+          requireApproval: true
+        }
+        segments.push(approvalToolSeg)
 
         // 等待用户审批决策
         log.info(`等待用户审批决策...`)
         const decision = await waitForApproval(requestId)
 
+        // 更新审批 tool 段状态
         if (decision.type === 'approve') {
           log.info(`用户已批准，恢复执行`)
+          approvalToolSeg.status = 'success'
+          approvalToolSeg.requireApproval = false
         } else {
           log.info(`用户已拒绝: ${decision.reason}`)
+          approvalToolSeg.status = 'rejected'
+          approvalToolSeg.output = decision.reason || '用户拒绝'
         }
 
         // 构造 Command resume 继续执行
@@ -400,5 +461,5 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
     log.warn(`HITL 循环达到最大次数 ${MAX_ITERATIONS}，强制退出`)
   }
 
-  return { fullContent, fullReasoning }
+  return { fullContent, fullReasoning, segments }
 }

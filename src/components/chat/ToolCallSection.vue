@@ -24,10 +24,10 @@
       <!-- 标题文案：根据工具类别与状态智能映射 -->
       <span class="toggle-label">{{ titleText }}</span>
 
-      <!-- 收缩箭头 -->
+      <!-- 收缩箭头：展开时向下 ∨，收缩时向右 > -->
       <svg
+        v-if="!collapsed"
         class="toggle-arrow"
-        :class="{ collapsed: collapsed }"
         width="13"
         height="13"
         viewBox="0 0 24 24"
@@ -38,6 +38,20 @@
         stroke-linejoin="round"
       >
         <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+      <svg
+        v-else
+        class="toggle-arrow"
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="9 6 15 12 9 18"></polyline>
       </svg>
     </span>
 
@@ -282,12 +296,7 @@ const hasOutput = computed(() => {
 }
 
 .toggle-arrow {
-  transition: transform 0.2s ease;
   flex-shrink: 0;
-}
-
-.toggle-arrow.collapsed {
-  transform: rotate(180deg);
 }
 
 /* 展开内容：左侧带细线，模仿"思考过程"的视觉风格 */
