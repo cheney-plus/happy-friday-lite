@@ -506,7 +506,7 @@ async function triggerAiResponse() {
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
-  activeToolCalls.value = [];
+  agentSegments.value = [];
   showScrollDownBtn.value = false;
   isAtBottom.value = true;
   scrollToBottom(true);
@@ -558,7 +558,7 @@ async function initConversation() {
     currentSessionId.value = '';
   }
 
-  if (currentMode.value === 'chat' && currentSessionId.value) {
+  if (currentSessionId.value) {
     const queryTitle = route.query.title;
     if (queryTitle) {
       chatTitle.value = queryTitle;
@@ -568,6 +568,10 @@ async function initConversation() {
       const sessionInfo = await electronService.invoke('get_session', { sessionId: currentSessionId.value });
       if (sessionInfo) {
         chatTitle.value = sessionInfo.title;
+        // 从后端恢复 mode，确保历史记录打开 Agent 会话时使用正确模式
+        if (sessionInfo.mode) {
+          currentMode.value = sessionInfo.mode;
+        }
       }
     } catch {}
   }

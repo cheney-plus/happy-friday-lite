@@ -68,7 +68,7 @@ export function registerAgentCommands(mainWindow) {
     try {
       // 1. 会话管理：复用 sessions 表（前端兼容），同时在 agent_threads 表记录
       if (!currentSessionId) {
-        const session = db.createSession(message.slice(0, 20) || '新 Agent 对话')
+        const session = db.createSession(message.slice(0, 20) || '新 Agent 对话', 'agent')
         currentSessionId = session.id
         isNewSession = true
         log.info(`创建新会话: ${currentSessionId}`)

@@ -75,10 +75,18 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT '新对话',
+      mode TEXT NOT NULL DEFAULT 'chat',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
   `)
+
+  // 迁移：为旧版 sessions 表补充 mode 列
+  try {
+    db.run('ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT \'chat\'')
+  } catch (_e) {
+    // 列已存在，忽略
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -336,15 +344,15 @@ function normalizeNote(row) {
   return row
 }
 
-export function createSession(title) {
+export function createSession(title, mode = 'chat') {
   const now = nowISO()
   const id = generateId()
   db.run(
-    'INSERT INTO sessions (id, title, createdAt, updatedAt) VALUES (?, ?, ?, ?)',
-    [id, title || '新对话', now, now]
+    'INSERT INTO sessions (id, title, mode, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
+    [id, title || '新对话', mode, now, now]
   )
   saveDb()
-  return { id, title: title || '新对话', createdAt: now, updatedAt: now }
+  return { id, title: title || '新对话', mode, createdAt: now, updatedAt: now }
 }
 
 export function getSessions() {

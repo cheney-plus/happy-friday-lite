@@ -353,7 +353,7 @@ const openSession = (session) => {
   router.push({
     name: 'friday-chat',
     params: { sessionId: session.id },
-    query: { mode: 'chat', title: session.title, hideBack: 'true' }
+    query: { mode: session.mode || 'chat', title: session.title, hideBack: 'true' }
   });
 };
 
