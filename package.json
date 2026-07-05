@@ -18,12 +18,15 @@
   "dependencies": {
     "@langchain/community": "^1.1.28",
     "@langchain/core": "^1.1.0",
+    "@langchain/langgraph": "^1.0.0",
+    "@langchain/openai": "^1.0.0",
     "@langchain/textsplitters": "^1.0.0",
     "@mozilla/readability": "^0.6.0",
     "@somecat/epub-reader": "^0.1.11",
     "@zvec/zvec": "^0.5.0",
     "adm-zip": "^0.5.17",
     "cheerio": "^1.2.0",
+    "deepagents": "^1.10.5",
     "epub2": "^3.0.2",
     "html-to-text": "^9.0.5",
     "mammoth": "^1.12.0",
@@ -31,7 +34,8 @@
     "pdf-parse": "^1.1.4",
     "pdfjs-dist": "^6.0.227",
     "sql.js": "^1.14.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@schedule-x/calendar": "^4.5.0",

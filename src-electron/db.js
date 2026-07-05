@@ -177,6 +177,45 @@ async function initDatabase() {
     );
   `)
 
+  // ========== Agent 智能体相关表 ==========
+  // agent_threads: Agent 会话（与 sessions 表独立，避免污染对话历史）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS agent_threads (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '新 Agent 会话',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `)
+
+  // agent_memories: 跨会话记忆（与 StoreBackend 双向同步）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS agent_memories (
+      id TEXT PRIMARY KEY,
+      threadId TEXT,
+      namespace TEXT NOT NULL DEFAULT 'memories',
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `)
+
+  // agent_tool_logs: 工具调用审计日志（「改进」能力的数据源）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS agent_tool_logs (
+      id TEXT PRIMARY KEY,
+      threadId TEXT,
+      requestId TEXT,
+      toolName TEXT NOT NULL,
+      arguments TEXT,
+      output TEXT,
+      status TEXT NOT NULL DEFAULT 'success',
+      durationMs INTEGER DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+  `)
+
   db.run('CREATE INDEX IF NOT EXISTS idx_messages_sessionId ON messages(sessionId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_notebookId ON notes(notebookId)')
@@ -187,6 +226,10 @@ async function initDatabase() {
   db.run('CREATE INDEX IF NOT EXISTS idx_file_status_index_status ON file_status(index_status)')
   db.run('CREATE INDEX IF NOT EXISTS idx_parent_docs_doc_id ON parent_docs(doc_id)')
   db.run('CREATE INDEX IF NOT EXISTS idx_parent_docs_source_path ON parent_docs(source_path)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_agent_memories_threadId ON agent_memories(threadId)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_agent_memories_namespace ON agent_memories(namespace)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_agent_tool_logs_threadId ON agent_tool_logs(threadId)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_agent_tool_logs_requestId ON agent_tool_logs(requestId)')
 
   saveDb()
   await migrateFromJson()

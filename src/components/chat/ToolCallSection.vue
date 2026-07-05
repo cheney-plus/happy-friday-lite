@@ -83,9 +83,13 @@ const ACTION_LABELS = {
   create_note: '创建笔记',
   list_events: '查询日程',
   create_event: '创建日程',
+  update_event: '更新日程',
+  delete_event: '删除日程',
   list_agent_files: '浏览文件',
   read_agent_file: '读取文件',
-  write_agent_file: '写入文件'
+  write_agent_file: '写入文件',
+  execute_command: '执行命令',
+  get_current_time: '获取当前时间'
 }
 
 // 状态 → 前缀文案
