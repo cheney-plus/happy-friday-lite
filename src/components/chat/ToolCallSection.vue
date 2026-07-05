@@ -43,9 +43,15 @@
 
     <!-- 展开内容：工具参数 + 输出 -->
     <div v-show="!collapsed" class="tool-call-body">
-      <div v-if="hasArgs" class="tool-call-block">
+      <div v-if="argEntries.length > 0" class="tool-call-block">
         <div class="block-label">参数</div>
-        <pre class="block-content">{{ formattedArgs }}</pre>
+        <div class="arg-list">
+          <div v-for="entry in argEntries" :key="entry.key" class="arg-row">
+            <span class="arg-key">{{ entry.key }}</span>
+            <span class="arg-sep">:</span>
+            <span class="arg-value" :class="{ 'arg-value-long': entry.isLong }">{{ entry.value }}</span>
+          </div>
+        </div>
       </div>
       <div v-if="hasOutput" class="tool-call-block">
         <div class="block-label">结果</div>
@@ -117,22 +123,66 @@ const titleText = computed(() => {
   return prefix + action
 })
 
-// 格式化参数：尝试 JSON.parse 后再 stringify 美化
-const formattedArgs = computed(() => {
+// 参数键名 → 友好中文显示名映射
+const ARG_LABELS = {
+  query: '查询',
+  keywords: '关键词',
+  note_id: '笔记ID',
+  title: '标题',
+  content: '内容',
+  category: '分类',
+  tags: '标签',
+  path: '路径',
+  dir_path: '目录路径',
+  file_path: '文件路径',
+  command: '命令',
+  description: '描述',
+  start_date: '开始日期',
+  end_date: '结束日期',
+  event_id: '日程ID',
+  summary: '摘要',
+  location: '地点',
+  kb_name: '知识库',
+  category_id: '分类ID',
+  limit: '数量限制',
+  offset: '偏移量',
+  recursive: '递归',
+  encoding: '编码',
+  overwrite: '覆盖'
+}
+
+// 将参数对象解析为键值对列表，用于可读性更强的列表渲染
+const argEntries = computed(() => {
   let args = props.arguments
+  if (!args) return []
   if (typeof args === 'string') {
     try {
       args = JSON.parse(args)
     } catch (_e) {
-      return args
+      return [{ key: '参数', value: args, isLong: args.length > 60 }]
     }
   }
-  try {
-    const str = JSON.stringify(args, null, 2)
-    return str.length > 600 ? str.slice(0, 600) + '\n...' : str
-  } catch (_e) {
-    return String(args)
+  if (typeof args !== 'object' || args === null) {
+    return [{ key: '参数', value: String(args), isLong: String(args).length > 60 }]
   }
+  return Object.entries(args).map(([key, val]) => {
+    let value
+    if (val === null) value = 'null'
+    else if (val === undefined) value = 'undefined'
+    else if (typeof val === 'boolean') value = val ? '是' : '否'
+    else if (typeof val === 'number') value = String(val)
+    else if (typeof val === 'object') {
+      const str = JSON.stringify(val, null, 2)
+      value = str.length > 300 ? str.slice(0, 300) + '...' : str
+    } else {
+      value = String(val)
+    }
+    return {
+      key: ARG_LABELS[key] || key,
+      value,
+      isLong: value.length > 60 || typeof val === 'object'
+    }
+  })
 })
 
 // 格式化输出
@@ -143,13 +193,7 @@ const formattedOutput = computed(() => {
   return str.length > 1000 ? str.slice(0, 1000) + '\n...' : str
 })
 
-const hasArgs = computed(() => {
-  if (!props.arguments) return false
-  if (typeof props.arguments === 'object') {
-    return Object.keys(props.arguments).length > 0
-  }
-  return !!String(props.arguments).trim()
-})
+const hasArgs = computed(() => argEntries.value.length > 0)
 
 const hasOutput = computed(() => {
   if (!props.output) return false
@@ -284,6 +328,58 @@ const hasOutput = computed(() => {
   word-break: break-all;
   max-height: 220px;
   overflow-y: auto;
+}
+
+/* 参数键值对列表 */
+.arg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-secondary, #fafafa);
+  border: 1px solid var(--border-color, #eee);
+  border-radius: 6px;
+}
+
+.arg-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.arg-key {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--text-secondary, #555);
+  white-space: nowrap;
+}
+
+.arg-sep {
+  flex-shrink: 0;
+  color: var(--text-tertiary, #999);
+}
+
+.arg-value {
+  color: var(--text-primary, #333);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.arg-value-long {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #eee);
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* 流式光标：running 状态下显示，与 AIMessage 中的样式一致 */

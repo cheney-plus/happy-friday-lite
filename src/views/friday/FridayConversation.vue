@@ -27,6 +27,30 @@
       <div class="messages-inner">
         <template v-for="(msg, index) in messages" :key="msg.id ?? index">
           <UserMessage v-if="msg.role === 'user'" :content="msg.content" />
+          <!-- Agent 模式：带时间线段的消息 → 交错渲染文本与工具调用 -->
+          <div v-else-if="msg.segments && msg.segments.length > 0" class="agent-response-block">
+            <div class="agent-response-header">
+              <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
+              <span class="ai-name">周五</span>
+            </div>
+            <div class="agent-timeline">
+              <template v-for="(seg, si) in msg.segments" :key="`${msg.id}-seg-${si}`">
+                <div v-if="seg.type === 'text' && seg.content" class="agent-text-body">
+                  <div class="markdown-body" v-html="renderMarkdown(seg.content)"></div>
+                </div>
+                <ToolCallSection
+                  v-else-if="seg.type === 'tool'"
+                  :tool-name="seg.toolName"
+                  :arguments="seg.arguments"
+                  :output="seg.output"
+                  :status="seg.status"
+                  :default-collapsed="seg.status === 'success' && !seg.requireApproval"
+                />
+              </template>
+            </div>
+            <div class="message-divider"></div>
+          </div>
+          <!-- 普通模式：标准 AIMessage -->
           <AIMessage
             v-else
             :content="msg.content"
@@ -37,25 +61,37 @@
           />
         </template>
 
-        <!-- ========== Agent 模式：工具调用区域 ==========
-             采用与"思考过程"一致的可展开/收缩样式，
-             每个工具调用一个独立 section，标题根据工具类别与状态智能映射 -->
-        <div
-          v-if="currentMode === 'agent' && activeToolCalls.length > 0"
-          class="tool-calls-wrapper"
-        >
-          <ToolCallSection
-            v-for="tc in activeToolCalls"
-            :key="tc.toolCallId"
-            :tool-name="tc.toolName"
-            :arguments="tc.arguments"
-            :output="tc.output"
-            :status="tc.status"
-            :default-collapsed="tc.status === 'success' && !tc.requireApproval"
-          />
-        </div>
+        <!-- ========== Agent 模式流式：统一时间线 ==========
+             工具调用与文本交替出现，保持事件流的原始顺序 -->
+        <template v-if="currentMode === 'agent' && (isStreaming || agentSegments.length > 0)">
+          <div class="agent-response-block">
+            <div class="agent-response-header">
+              <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
+              <span class="ai-name">周五</span>
+            </div>
+            <div class="agent-timeline">
+              <template v-for="seg in agentSegments" :key="seg.id">
+                <div v-if="seg.type === 'text' && seg.content" class="agent-text-body">
+                  <div class="markdown-body" v-html="renderMarkdown(seg.content)"></div>
+                  <span v-if="seg.isStreaming" class="streaming-cursor"></span>
+                </div>
+                <ToolCallSection
+                  v-else-if="seg.type === 'tool'"
+                  :tool-name="seg.toolName"
+                  :arguments="seg.arguments"
+                  :output="seg.output"
+                  :status="seg.status"
+                  :default-collapsed="seg.status === 'success' && !seg.requireApproval"
+                />
+              </template>
+              <!-- 尚未收到任何段但已开始流式 → 显示思考光标 -->
+              <span v-if="agentSegments.length === 0 && isStreaming" class="streaming-cursor"></span>
+            </div>
+          </div>
+        </template>
 
-        <template v-if="isStreaming">
+        <!-- 非 Agent 模式流式 -->
+        <template v-else-if="isStreaming">
           <AIMessage
             :content="streamingContent"
             :reasoning-streaming-content="streamingReasoning"
@@ -154,10 +190,12 @@ let activeRequestId = '';
 let isDoneReceived = false;
 
 // ========== Agent 模式状态 ==========
-// 当前流式响应中活跃的工具调用列表（仅 Agent 模式使用）
-// 结构: [{ toolCallId, toolName, arguments, status, output, requireApproval }]
-//   status: 'running' | 'success' | 'rejected' | 'pending_approval'
-const activeToolCalls = ref([]);
+// 当前流式响应的 Agent 时间线段（仅 Agent 模式使用）
+// 段类型:
+//   { type: 'text', id, content, isStreaming }
+//   { type: 'tool', id, toolCallId, toolName, arguments, status, output, requireApproval }
+//     status: 'running' | 'success' | 'rejected' | 'pending_approval'
+const agentSegments = ref([]);
 // 待审批的工具调用（HITL 弹窗）
 const pendingApproval = ref(null);
 
@@ -170,6 +208,12 @@ function formatTime(date) {
   const h = date.getHours().toString().padStart(2, '0');
   const m = date.getMinutes().toString().padStart(2, '0');
   return `${h}:${m}`;
+}
+
+// Agent 模式文本段 Markdown 渲染
+marked.setOptions({ breaks: true, gfm: true });
+function renderMarkdown(content) {
+  return marked.parse(content);
 }
 
 const showBackBtn = computed(() => route.query.hideBack !== 'true');
@@ -364,8 +408,8 @@ async function sendChatMessage(text) {
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
-  // Agent 模式：清空上一轮的工具调用记录
-  activeToolCalls.value = [];
+  // Agent 模式：清空上一轮的时间线段
+  agentSegments.value = [];
   showScrollDownBtn.value = false;
   isAtBottom.value = true;
   scrollToBottom(true);
@@ -540,6 +584,21 @@ onMounted(async () => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
     streamingContent.value += data.content;
+    // Agent 模式：维护时间线段，文本追加到最后一个 text 段或新建
+    if (currentMode.value === 'agent') {
+      const segs = agentSegments.value;
+      const last = segs.length > 0 ? segs[segs.length - 1] : null;
+      if (last && last.type === 'text') {
+        last.content += data.content;
+      } else {
+        segs.push({
+          type: 'text',
+          id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          content: data.content,
+          isStreaming: true
+        });
+      }
+    }
     scrollToBottom();
   });
 
@@ -571,12 +630,23 @@ onMounted(async () => {
     const hasReasoning = streamingReasoning.value || data.reasoningContent;
 
     if (hasContent || hasReasoning) {
-      messages.value.push({
+      const newMsg = {
         role: 'assistant',
         content: data.fullContent || streamingContent.value,
         reasoning: data.reasoningContent || streamingReasoning.value || undefined,
         id: data.messageId
-      });
+      };
+      // Agent 模式：将时间线段深拷贝到消息对象，用于历史渲染
+      if (currentMode.value === 'agent' && agentSegments.value.length > 0) {
+        // 标记最后一个 text 段为非流式
+        const segs = agentSegments.value;
+        const lastSeg = segs.length > 0 ? segs[segs.length - 1] : null;
+        if (lastSeg && lastSeg.type === 'text') {
+          lastSeg.isStreaming = false;
+        }
+        newMsg.segments = JSON.parse(JSON.stringify(segs));
+      }
+      messages.value.push(newMsg);
     }
 
     if (data.sessionId && !currentSessionId.value) {
@@ -585,8 +655,8 @@ onMounted(async () => {
 
     streamingContent.value = '';
     streamingReasoning.value = '';
-    // Agent 模式：保留工具调用记录展示直到下一轮，这里不清空
-    // （activeToolCalls 在下一次 sendChatMessage 时清空）
+    // Agent 模式：清空时间线段（已保存到消息对象中）
+    agentSegments.value = [];
     showScrollDownBtn.value = false;
     scrollToBottom(true);
   });
@@ -609,12 +679,20 @@ onMounted(async () => {
   });
 
   // ========== Agent 模式专有事件 ==========
-  // 工具调用开始：推送工具气泡
+  // 工具调用开始：推送工具段时间线
   unlistenAgentToolCall = electronService.listen('agent-tool-call', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
     console.log('[Agent] 工具调用:', data.toolName, data.arguments);
-    activeToolCalls.value.push({
+    // 标记前一个 text 段为非流式（AI 已切换到工具调用）
+    const segs = agentSegments.value;
+    const last = segs.length > 0 ? segs[segs.length - 1] : null;
+    if (last && last.type === 'text') {
+      last.isStreaming = false;
+    }
+    segs.push({
+      type: 'tool',
+      id: data.toolCallId,
       toolCallId: data.toolCallId,
       toolName: data.toolName,
       arguments: data.arguments,
@@ -625,15 +703,15 @@ onMounted(async () => {
     scrollToBottom();
   });
 
-  // 工具调用结果：更新工具气泡状态
+  // 工具调用结果：更新工具段状态
   unlistenAgentToolResult = electronService.listen('agent-tool-result', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
     console.log('[Agent] 工具结果:', data.toolName, data.status);
-    const tc = activeToolCalls.value.find((t) => t.toolCallId === data.toolCallId);
-    if (tc) {
-      tc.status = data.status || 'success';
-      tc.output = data.output || '';
+    const seg = agentSegments.value.find((s) => s.type === 'tool' && s.toolCallId === data.toolCallId);
+    if (seg) {
+      seg.status = data.status || 'success';
+      seg.output = data.output || '';
     }
     scrollToBottom();
   });
@@ -699,11 +777,11 @@ async function handleRejectTool(decision) {
   if (!pendingApproval.value) return;
   const { requestId, toolCallId } = pendingApproval.value;
   console.log('[Agent] 用户拒绝工具调用:', decision.reason);
-  // 更新工具气泡状态为已拒绝
-  const tc = activeToolCalls.value.find((t) => t.toolCallId === toolCallId);
-  if (tc) {
-    tc.status = 'rejected';
-    tc.output = decision.reason || '用户拒绝';
+  // 更新工具段状态为已拒绝
+  const seg = agentSegments.value.find((s) => s.type === 'tool' && s.toolCallId === toolCallId);
+  if (seg) {
+    seg.status = 'rejected';
+    seg.output = decision.reason || '用户拒绝';
   }
   pendingApproval.value = null;
   try {
@@ -890,13 +968,183 @@ async function handleRejectTool(decision) {
   transform: translateX(-50%) translateY(-4px);
 }
 
-/* ========== Agent 模式：工具调用区域 wrapper ==========
-   单个工具调用的展开/收缩样式由 ToolCallSection.vue 内部 scoped 样式负责，
-   这里仅保留容器布局，与"思考过程"区域保持视觉一致 */
-.tool-calls-wrapper {
+/* ========== Agent 模式：响应块与时间线 ==========
+   整个 Agent 回复作为一个响应块，头部含头像/名称，
+   时间线内文本段与工具调用段交替排列 */
+
+.agent-response-block {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
+}
+
+.agent-response-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-response-header .avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.agent-response-header .ai-avatar {
+  background: linear-gradient(135deg, #6ee7b7 0%, #34d399 50%, #10b981 100%);
+}
+
+.agent-response-header .avatar-icon {
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.agent-response-header .ai-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.agent-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 44px; /* 与头像对齐 */
+}
+
+.agent-text-body {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.agent-text-body .markdown-body {
+  white-space: normal;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.agent-text-body .markdown-body :deep(*) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.agent-text-body .markdown-body :deep(p) {
+  margin: 0 0 8px;
+}
+
+.agent-text-body .markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.agent-text-body .markdown-body :deep(h1),
+.agent-text-body .markdown-body :deep(h2),
+.agent-text-body .markdown-body :deep(h3) {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.agent-text-body .markdown-body :deep(h1) { font-size: 1.3em; }
+.agent-text-body .markdown-body :deep(h2) { font-size: 1.15em; }
+.agent-text-body .markdown-body :deep(h3) { font-size: 1.05em; }
+
+.agent-text-body .markdown-body :deep(ul),
+.agent-text-body .markdown-body :deep(ol) {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.agent-text-body .markdown-body :deep(li) {
+  margin: 4px 0;
+}
+
+.agent-text-body .markdown-body :deep(code) {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+[data-theme='dark'] .agent-text-body .markdown-body :deep(code) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.agent-text-body .markdown-body :deep(pre) {
+  margin: 10px 0;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+[data-theme='dark'] .agent-text-body .markdown-body :deep(pre) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agent-text-body .markdown-body :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  font-size: 0.85em;
+}
+
+.agent-text-body .markdown-body :deep(blockquote) {
+  margin: 10px 0;
+  padding: 8px 14px;
+  border-left: 3px solid #10b981;
+  background: rgba(16, 185, 129, 0.06);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-secondary);
+}
+
+.agent-text-body .markdown-body :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 0.9em;
+}
+
+.agent-text-body .markdown-body :deep(th),
+.agent-text-body .markdown-body :deep(td) {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.agent-text-body .markdown-body :deep(th) {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+/* Agent 响应块内的分隔线 */
+.agent-response-block .message-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border-color);
+  margin-top: 8px;
+}
+
+/* Agent 时间线内的流式光标 */
+.agent-timeline .streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  background: #10b981;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
 </style>
