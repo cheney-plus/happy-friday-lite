@@ -10,7 +10,32 @@
 
 import { z } from 'zod'
 import { marked } from 'marked'
+import TurndownService from 'turndown'
 import { registerTool } from '../registry.js'
+
+// HTML → Markdown 转换器（用于将笔记的 HTML 内容转为 LLM 友好的 Markdown）
+const turndownService = new TurndownService({
+  headingStyle: 'atx',     // # 风格标题
+  codeBlockStyle: 'fenced', // ``` 风格代码块
+  bulletListMarker: '-',
+  emDelimiter: '*',
+  strongDelimiter: '**'
+})
+// 保留 <br> 转换为换行
+turndownService.addRule('lineBreak', {
+  filter: 'br',
+  replacement: () => '\n'
+})
+
+const htmlToMarkdown = (html) => {
+  if (!html) return ''
+  try {
+    return turndownService.turndown(html).trim()
+  } catch (_e) {
+    // 转换失败时回退到纯文本（剥离标签）
+    return html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+  }
+}
 
 // ========== search_notes ==========
 
@@ -87,7 +112,9 @@ async function getNoteHandler(args, ctx) {
     return `未找到笔记: ${noteId}`
   }
 
-  return `【笔记 ${note.id}】${note.title}\n\n${note.content || ''}`
+  // 数据库中 note.content 是 HTML 格式，转为 Markdown 便于 LLM 阅读和用户理解
+  const markdownContent = htmlToMarkdown(note.content)
+  return `【笔记 ${note.id}】${note.title}\n\n${markdownContent}`
 }
 
 registerTool({

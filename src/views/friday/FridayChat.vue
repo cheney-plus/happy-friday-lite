@@ -77,7 +77,7 @@
                 </svg>
               </button>
 
-              <button class="action-btn icon-only" @click.stop="toggleKbDropdown($event)" title="引用知识库">
+              <button v-if="currentMode !== 'agent'" class="action-btn icon-only" @click.stop="toggleKbDropdown($event)" title="引用知识库">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="4"></circle>
                   <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
@@ -331,7 +331,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onDeactivated, onActivated, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, onDeactivated, onActivated, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { electronService } from '@/services/electron';
@@ -629,6 +629,13 @@ const selectMode = (mode) => {
   showModeDropdown.value = false;
 };
 
+// 切换到 Agent 模式时清除知识库附件（Agent 通过 retrieve_knowledge 工具自主检索）
+watch(currentMode, (newMode) => {
+  if (newMode === 'agent') {
+    attachments.value = attachments.value.filter(a => a.type !== 'kb');
+  }
+});
+
 const selectModel = (modelId) => {
   modelSettings.value.modelId = modelId;
   localStorage.setItem(SELECTED_MODEL_KEY, modelId);
@@ -690,23 +697,23 @@ const handleSend = async () => {
 
   if (!selectedModel) return;
 
-  // Agent 模式：跳转对话页，由 FridayConversation 根据 mode=agent 走 Agent 流程
-  // Agent 模式不使用知识库附件（Agent 自主通过 retrieve_knowledge 工具检索）
-  if (currentMode.value === 'agent') {
-    router.push({
-      name: 'friday-chat',
-      params: { sessionId: `new-${Date.now()}` },
-      query: {
-        q: text,
-        mode: 'agent',
-        modelId: selectedModel.id,
-        thinkMode: modelSettings.value.thinkMode
-      }
-    });
-    return;
+  // 所有模式统一支持 @ 引用笔记/知识库文件
+  // - note / kb-file：直接将内容注入到首条用户消息中（LLM 上下文 10k 字符）
+  // - kb：作为 RAG 检索源，仅在 chat/memoryless 模式生效（Agent 模式通过 watcher 自动清除 kb 附件）
+  const noteAttachments = attachments.value.filter(a => a.type === 'note');
+  const kbFileAttachments = attachments.value.filter(a => a.type === 'kb-file');
+
+  let hasAtt = false;
+  if (noteAttachments.length > 0 || kbFileAttachments.length > 0) {
+    const attData = buildAttachmentData(text, noteAttachments, kbFileAttachments);
+    if (attData) {
+      // 通过 sessionStorage 传递：userMessage（简洁引用格式）+ attachments（元数据）
+      sessionStorage.setItem('friday-att-data', JSON.stringify(attData));
+      hasAtt = true;
+    }
   }
 
-  // 提取知识库附件信息（用于 RAG 检索）
+  // 提取知识库附件信息（用于 chat/memoryless 模式的 RAG 检索）
   const kbAttachment = attachments.value.find(a => a.type === 'kb');
   const kbName = kbAttachment ? kbAttachment.name : '';
   const kbCategoryId = kbAttachment && kbAttachment.categoryId ? kbAttachment.categoryId : '';
@@ -720,9 +727,41 @@ const handleSend = async () => {
       modelId: selectedModel.id,
       thinkMode: modelSettings.value.thinkMode,
       kbName,
-      kbCategoryId
+      kbCategoryId,
+      ...(hasAtt ? { hasAtt: 'true' } : {})
     }
   });
+};
+
+// 构造 @ 引用相关数据
+// 前端只构造简洁的引用格式（用户气泡 + 数据库存储）：
+//   {text}\n\n---\n用户引用【笔记】：xxx\n用户引用【文档】：yyy
+// 后端根据附件元数据 attachments 和 mode 构造 LLM 提示（不在前端展示）
+const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
+  if (noteAttachments.length === 0 && kbFileAttachments.length === 0) {
+    return null;
+  }
+
+  // 简洁引用格式（前端展示 + 数据库存储）
+  const refLines = [];
+  for (const note of noteAttachments) {
+    refLines.push(`用户引用【笔记】：${note.name}`);
+  }
+  for (const file of kbFileAttachments) {
+    refLines.push(`用户引用【文档】：${file.name}`);
+  }
+  const userMessage = `${text}\n\n---\n${refLines.join('\n')}`;
+
+  // 附件元数据（供后端构造 LLM 消息时使用）
+  const attachments = [];
+  for (const note of noteAttachments) {
+    attachments.push({ kind: 'note', name: note.name, noteId: note.noteId });
+  }
+  for (const file of kbFileAttachments) {
+    attachments.push({ kind: 'file', name: file.name, path: file.path });
+  }
+
+  return { userMessage, attachments };
 };
 
 onMounted(() => {

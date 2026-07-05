@@ -10,6 +10,7 @@ import { runPython, runPythonStreaming, checkPython, getPythonPath } from './pyt
 import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
+import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
 
 const cancelTokens = new CancellationTokens()
@@ -157,7 +158,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_with_memory', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId, folderPath, topK } = args
+    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
     let currentSessionId = sessionId
     let isNewSession = false
@@ -175,6 +176,7 @@ export function registerCommands(mainWindow) {
         }
       }
 
+      // 保存用户消息到数据库（简洁引用格式）
       const userMsg = db.saveMessage(currentSessionId, 'user', message)
       userMessageId = userMsg.id
       db.updateSessionTimestamp(currentSessionId)
@@ -197,10 +199,18 @@ export function registerCommands(mainWindow) {
       }
 
       const dbMessages = db.getMessages(currentSessionId)
-      const historyMessages = dbMessages.map(m => ({
+      let historyMessages = dbMessages.map(m => ({
         role: m.role,
         content: m.content
       }))
+
+      // 如果有 @ 引用附件，将最后一条用户消息替换为 LLM 完整格式（含引用内容）
+      // 数据库仍存储简洁格式，仅 LLM 输入使用完整格式
+      if (attachments && attachments.length > 0) {
+        const llmContent = buildLlmMessage(message, attachments, 'chat')
+        historyMessages = historyMessages.slice(0, -1)
+        historyMessages.push({ role: 'user', content: llmContent })
+      }
 
       const appConfig = loadConfig()
       const effectiveSystemPrompt = systemPrompt || appConfig.systemPrompt
@@ -259,13 +269,17 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_without_memory', async (_event, args) => {
-    const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK } = args
+    const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
     try {
       const appConfig = loadConfig()
+      // 如果有 @ 引用附件，将用户消息替换为 LLM 完整格式（含引用内容）
+      const userContent = (attachments && attachments.length > 0)
+        ? buildLlmMessage(message, attachments, 'memoryless')
+        : message
       const messages = [
         { role: 'system', content: appConfig.systemPrompt },
-        { role: 'user', content: message }
+        { role: 'user', content: userContent }
       ]
 
       const cancelToken = cancelTokens.insert(requestId)

@@ -26,6 +26,7 @@ import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_DONE, CHAT_ERROR } from '../even
 import { CancellationTokens } from '../cancellation.js'
 import { getDataDir } from '../config.js'
 import * as db from '../db.js'
+import { buildLlmMessage } from '../attachmentContext.js'
 import { createAgentWithContext } from './index.js'
 import { createLogger } from './logger.js'
 import { listSkills, generateSkillIndex } from './skills.js'
@@ -57,7 +58,7 @@ export function registerAgentCommands(mainWindow) {
 
   // ========== agent-invoke: 发起 Agent 调用 ==========
   ipcMain.handle('agent-invoke', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking } = args
+    const { requestId, sessionId, model, message, enableThinking, attachments } = args
     log.info(`====== agent-invoke 开始: requestId=${requestId} ======`)
     log.info(`model=${model?.modelName}, enableThinking=${!!enableThinking}, sessionId=${sessionId || '(new)'}`)
 
@@ -83,7 +84,7 @@ export function registerAgentCommands(mainWindow) {
       createThread(message.slice(0, 20) || '新 Agent 对话')
       touchThread(currentSessionId)
 
-      // 2. 保存用户消息到 messages 表（前端加载历史时可见）
+      // 2. 保存用户消息到 messages 表（简洁引用格式，前端展示一致）
       const userMsg = db.saveMessage(currentSessionId, 'user', message)
       userMessageId = userMsg.id
       db.updateSessionTimestamp(currentSessionId)
@@ -95,6 +96,12 @@ export function registerAgentCommands(mainWindow) {
         role: m.role,
         content: m.content
       }))
+
+      // 4. 构造 LLM 输入：如果有 @ 引用附件，替换为 LLM 完整格式
+      //    Agent 模式只列名称，由 Agent 自主调用工具读取内容
+      const userContent = (attachments && attachments.length > 0)
+        ? buildLlmMessage(message, attachments, 'agent')
+        : message
 
       // 4. 创建带上下文的 Agent
       const modelConfig = { ...model, enableThinking: enableThinking || false }
@@ -117,14 +124,14 @@ export function registerAgentCommands(mainWindow) {
       // 7. 取消令牌
       const cancelToken = cancelTokens.insert(requestId)
 
-      // 8. 构建 Agent 输入
+      // 8. 构建 Agent 输入（使用 LLM 完整格式的 userContent）
       const input = {
         messages: [
           ...historyMessages.map(m => ({
             role: m.role,
             content: m.content
           })),
-          { role: 'user', content: message }
+          { role: 'user', content: userContent }
         ]
       }
 
@@ -226,6 +233,46 @@ export function registerAgentCommands(mainWindow) {
   })
 
   log.info('====== Agent IPC 通道注册完成 ======')
+}
+
+/**
+ * 从 LangChain ToolMessage 中提取可读的工具输出文本
+ *
+ * on_tool_end 事件的 data.output 通常是 ToolMessage 对象，结构如：
+ *   { content: string | Array, name, tool_call_id, additional_kwargs, response_metadata }
+ *
+ * 直接 JSON.stringify 会得到完整对象 JSON，难以阅读。
+ * 本函数提取 content 字段（兼容 string 和数组形式），保留 handler 原始返回的文本。
+ *
+ * @param {any} output on_tool_end 事件的 data.output
+ * @returns {string} 可读的工具输出文本
+ */
+function extractToolOutput(output) {
+  if (!output) return ''
+  // 字符串：handler 直接返回的字符串
+  if (typeof output === 'string') return output
+  // ToolMessage 对象：提取 content 字段
+  if (typeof output === 'object') {
+    const content = output.content
+    if (typeof content === 'string') return content
+    if (Array.isArray(content)) {
+      // content 可能是 [{ type: 'text', text }, ...] 形式
+      const text = content
+        .map(c => typeof c === 'string' ? c : (c?.text || c?.content || ''))
+        .join('')
+      if (text) return text
+    }
+    // 兜底：尝试常见字段
+    if (typeof output.text === 'string') return output.text
+    if (typeof output.output === 'string') return output.output
+    // 最终兜底：JSON 序列化（避免丢失信息）
+    try {
+      return JSON.stringify(output, null, 2)
+    } catch (_e) {
+      return String(output)
+    }
+  }
+  return String(output)
 }
 
 /**
@@ -338,19 +385,40 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
         // 处理工具调用事件（补充日志，主要通知由 registry.js 包装层处理）
         if (eventType === 'on_tool_start') {
           log.info(`工具开始: ${name}`)
-          // 新工具调用开始，关闭当前 text 段，新增 tool 段
+          // 新工具调用开始，关闭当前 text 段
           currentTextSegment = null
           const toolCallId = data?.run_id || `tool_${segments.length}_${Date.now()}`
           const toolArgs = data?.input || {}
-          segments.push({
-            type: 'tool',
-            toolCallId,
-            toolName: name || 'unknown',
-            arguments: toolArgs,
-            status: 'running',
-            output: '',
-            requireApproval: false
-          })
+          // 对 interruptOn 工具：on_tool_start 在 interrupt 之后才触发
+          // （LangGraph 在 tool 实际执行前才触发 on_tool_start，而 interrupt 在此之前已暂停）
+          // 此时审批代码已推送一个 pending_approval / running（已批准）段，这里复用而非新建，避免重复
+          // 匹配条件：同名工具 + 无 output（on_tool_end 未触发）+ 非 rejected
+          const existingSeg = [...segments]
+            .reverse()
+            .find(s =>
+              s.type === 'tool' &&
+              s.toolName === name &&
+              s.output === '' &&
+              s.status !== 'rejected'
+            )
+          if (existingSeg) {
+            // 复用已有段（来自审批代码或 on_tool_start 先于 interrupt 的情况）
+            existingSeg.status = 'running'
+            existingSeg.toolCallId = toolCallId
+            // 参数以 on_tool_start 的为准（更准确）
+            existingSeg.arguments = toolArgs
+          } else {
+            // 普通工具（无 interruptOn）：新建段
+            segments.push({
+              type: 'tool',
+              toolCallId,
+              toolName: name || 'unknown',
+              arguments: toolArgs,
+              status: 'running',
+              output: '',
+              requireApproval: false
+            })
+          }
         }
         if (eventType === 'on_tool_end') {
           log.info(`工具结束: ${name}`)
@@ -358,8 +426,10 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
           const lastTool = [...segments].reverse().find(s => s.type === 'tool' && s.status === 'running')
           if (lastTool) {
             lastTool.status = 'success'
-            const output = data?.output
-            lastTool.output = typeof output === 'string' ? output : (output ? JSON.stringify(output) : '')
+            // on_tool_end 的 data.output 通常是 LangChain ToolMessage 对象
+            // 直接 JSON.stringify 会得到 {"content":"...","name":"...","tool_call_id":"..."} 难以阅读
+            // 这里提取 content 字段，保留 handler 返回的可读文本
+            lastTool.output = extractToolOutput(data?.output)
           }
           currentTextSegment = null // 下一段文本应新建
         }
@@ -419,17 +489,34 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
         }
 
         // 添加需要审批的 tool 段
+        // 优化：复用 on_tool_start 已推送的 running 段，避免出现重复的工具调用段
+        // （否则会得到两段：一段只有参数无结果，一段既有参数也有结果）
         currentTextSegment = null
-        const approvalToolSeg = {
-          type: 'tool',
-          toolCallId: approvalToolCallId,
-          toolName: approvalToolName,
-          arguments: approvalToolArgs,
-          status: 'pending_approval',
-          output: '',
-          requireApproval: true
+        // 查找最近的 running 工具段（on_tool_start 已推送）
+        let approvalToolSeg = [...segments]
+          .reverse()
+          .find(s => s.type === 'tool' && s.status === 'running')
+        if (approvalToolSeg) {
+          // 复用已有段：更新为待审批状态
+          approvalToolSeg.status = 'pending_approval'
+          approvalToolSeg.requireApproval = true
+          // 用 interrupt 中的工具信息覆盖（更准确，包含 LLM 的 tool_call_id）
+          approvalToolSeg.toolCallId = approvalToolCallId
+          approvalToolSeg.toolName = approvalToolName
+          approvalToolSeg.arguments = approvalToolArgs
+        } else {
+          // 兜底：on_tool_start 未触发时（理论上不会发生），新建段
+          approvalToolSeg = {
+            type: 'tool',
+            toolCallId: approvalToolCallId,
+            toolName: approvalToolName,
+            arguments: approvalToolArgs,
+            status: 'pending_approval',
+            output: '',
+            requireApproval: true
+          }
+          segments.push(approvalToolSeg)
         }
-        segments.push(approvalToolSeg)
 
         // 等待用户审批决策
         log.info(`等待用户审批决策...`)
@@ -438,7 +525,8 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
         // 更新审批 tool 段状态
         if (decision.type === 'approve') {
           log.info(`用户已批准，恢复执行`)
-          approvalToolSeg.status = 'success'
+          // 批准后恢复为 running，让 on_tool_end 能找到此段并填充结果
+          approvalToolSeg.status = 'running'
           approvalToolSeg.requireApproval = false
         } else {
           log.info(`用户已拒绝: ${decision.reason}`)

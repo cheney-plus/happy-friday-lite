@@ -399,9 +399,33 @@ async function sendChatMessage(text) {
   const kbName = route.query.kbName || '';
   const kbCategoryId = route.query.kbCategoryId || '';
 
+  // 读取 @ 引用附件数据（由 FridayChat.vue 通过 sessionStorage 传递）
+  // - userMessage: 简洁引用格式（用户气泡展示 + 数据库存储）
+  // - attachments: 附件元数据（供后端构造 LLM 消息）
+  let userMessage = text;
+  let attachments = [];
+  if (route.query.hasAtt === 'true') {
+    try {
+      const attDataRaw = sessionStorage.getItem('friday-att-data') || '';
+      sessionStorage.removeItem('friday-att-data');
+      if (attDataRaw) {
+        const attData = JSON.parse(attDataRaw);
+        if (attData.userMessage) {
+          userMessage = attData.userMessage;
+        }
+        if (Array.isArray(attData.attachments)) {
+          attachments = attData.attachments;
+        }
+      }
+    } catch (e) {
+      console.error('[Friday] Failed to parse attachment data:', e);
+    }
+  }
+
+  // 推送用户气泡：简洁引用格式（与数据库存储一致）
   messages.value.push({
     role: 'user',
-    content: text
+    content: userMessage
   });
 
   inputText.value = '';
@@ -421,12 +445,14 @@ async function sendChatMessage(text) {
     if (mode === 'agent') {
       // Agent 模式：调用 agent-invoke，后端走 Agent Loop（多工具 + HITL）
       // Agent 自主通过 retrieve_knowledge 工具检索，无需前端传 kbName
+      // 附件由后端根据 attachments 元数据构造 LLM 提示（Agent 模式只列名称，由工具读取内容）
       console.log('[Agent] 发起 Agent 调用, requestId=', activeRequestId);
       await electronService.invoke('agent-invoke', {
         requestId: activeRequestId,
         sessionId: currentSessionId.value || '',
         model: model,
-        message: text,
+        message: userMessage,
+        attachments,
         enableThinking: route.query.thinkMode === 'deep'
       });
     } else if (mode === 'chat') {
@@ -434,7 +460,8 @@ async function sendChatMessage(text) {
         requestId: activeRequestId,
         sessionId: currentSessionId.value || '',
         model: model,
-        message: text,
+        message: userMessage,
+        attachments,
         enableThinking: route.query.thinkMode === 'deep',
         kbName,
         kbCategoryId
@@ -443,7 +470,8 @@ async function sendChatMessage(text) {
       await electronService.invoke('chat_without_memory', {
         requestId: activeRequestId,
         model: model,
-        message: text,
+        message: userMessage,
+        attachments,
         enableThinking: route.query.thinkMode === 'deep',
         kbName,
         kbCategoryId
@@ -695,22 +723,38 @@ onMounted(async () => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
     console.log('[Agent] 工具调用:', data.toolName, data.arguments);
-    // 标记前一个 text 段为非流式（AI 已切换到工具调用）
     const segs = agentSegments.value;
+    // 标记前一个 text 段为非流式（AI 已切换到工具调用）
     const last = segs.length > 0 ? segs[segs.length - 1] : null;
     if (last && last.type === 'text') {
       last.isStreaming = false;
     }
-    segs.push({
-      type: 'tool',
-      id: data.toolCallId,
-      toolCallId: data.toolCallId,
-      toolName: data.toolName,
-      arguments: data.arguments,
-      status: data.requireApproval ? 'pending_approval' : 'running',
-      output: '',
-      requireApproval: !!data.requireApproval
-    });
+    // 审批工具：on_tool_start 在 interrupt 之后才触发（用户批准后工具才实际执行）
+    // 此时 agentSegments 已有 pending_approval 段（由 agent-tool-approval 事件推送）
+    // 复用而非新建，避免出现两个重复段
+    const existing = segs.find(s =>
+      s.type === 'tool' &&
+      s.toolName === data.toolName &&
+      s.status === 'pending_approval'
+    );
+    if (existing) {
+      existing.toolCallId = data.toolCallId;
+      existing.id = data.toolCallId;
+      existing.arguments = data.arguments;
+      existing.status = 'running';
+      existing.requireApproval = !!data.requireApproval;
+    } else {
+      segs.push({
+        type: 'tool',
+        id: data.toolCallId,
+        toolCallId: data.toolCallId,
+        toolName: data.toolName,
+        arguments: data.arguments,
+        status: data.requireApproval ? 'pending_approval' : 'running',
+        output: '',
+        requireApproval: !!data.requireApproval
+      });
+    }
     scrollToBottom();
   });
 
@@ -728,6 +772,8 @@ onMounted(async () => {
   });
 
   // 触发人机交互审批：弹出审批对话框
+  // 关键：同时往 agentSegments 推送一个 pending_approval 段
+  // 否则用户拒绝时 handleRejectTool 找不到段更新，时间线上看不到被拒绝的工具调用
   unlistenAgentApproval = electronService.listen('agent-tool-approval', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
@@ -738,6 +784,23 @@ onMounted(async () => {
       toolCallId: data.toolCallId,
       arguments: data.arguments
     };
+    // 推送 pending_approval 段到时间线（用户拒绝时可见）
+    const segs = agentSegments.value;
+    const last = segs.length > 0 ? segs[segs.length - 1] : null;
+    if (last && last.type === 'text') {
+      last.isStreaming = false;
+    }
+    segs.push({
+      type: 'tool',
+      id: data.toolCallId,
+      toolCallId: data.toolCallId,
+      toolName: data.toolName,
+      arguments: data.arguments,
+      status: 'pending_approval',
+      output: '',
+      requireApproval: true
+    });
+    scrollToBottom();
   });
 
   await initConversation();
