@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod'
+import { marked } from 'marked'
 import { registerTool } from '../registry.js'
 
 // ========== search_notes ==========
@@ -117,10 +118,12 @@ async function createNoteHandler(args, ctx) {
   ctx.logger.info(`[create_note] title="${title}", kbId=${knowledgeBaseId}`)
 
   const { importNote } = await import('../../../db.js')
-  // 提取纯文本（去除 Markdown 标记）
-  const contentText = (content || '').replace(/[#*`>\-_\[\]()!]/g, '')
+  // 将 Markdown 转为 HTML 存入 content 字段（编辑器期望 HTML 格式）
+  const htmlContent = content ? marked.parse(content) : ''
+  // 从 HTML 提取纯文本用于搜索
+  const contentText = htmlContent.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 
-  const note = importNote(knowledgeBaseId, notebookId, title, content, contentText)
+  const note = importNote(knowledgeBaseId, notebookId, title, htmlContent, contentText)
   ctx.logger.info(`[create_note] 已创建笔记: id=${note.id}`)
   return `已创建笔记: id=${note.id}, title="${title}"`
 }
@@ -152,10 +155,16 @@ async function updateNoteHandler(args, ctx) {
   }
 
   const newTitle = title !== undefined ? title : existing.title
-  const newContent = content !== undefined ? content : existing.content
-  const contentText = (newContent || '').replace(/[#*`>\-_\[\]()!]/g, '')
+  // 如果提供了新内容，将 Markdown 转为 HTML；否则保留原有 HTML
+  let htmlContent
+  if (content !== undefined) {
+    htmlContent = content ? marked.parse(content) : ''
+  } else {
+    htmlContent = existing.content
+  }
+  const contentText = htmlContent.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 
-  const updated = updateNote(noteId, newTitle, newContent, contentText)
+  const updated = updateNote(noteId, newTitle, htmlContent, contentText)
   ctx.logger.info(`[update_note] 已更新笔记: ${noteId}`)
   return `已更新笔记: id=${noteId}, title="${newTitle}"`
 }
