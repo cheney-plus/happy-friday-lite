@@ -86,15 +86,20 @@ async function renderPage(pageNum) {
   const ctx = canvas.getContext('2d');
   const page = await pdfDoc.getPage(pageNum);
   const containerWidth = containerRef.value.clientWidth - 48;
-  const viewport = page.getViewport({ scale: 1 });
-  const scale = Math.min(containerWidth / viewport.width, 1.5);
-  const scaledViewport = page.getViewport({ scale });
-  canvas.width = scaledViewport.width;
-  canvas.height = scaledViewport.height;
-  canvas.style.width = scaledViewport.width + 'px';
-  canvas.style.height = scaledViewport.height + 'px';
+  const baseViewport = page.getViewport({ scale: 1 });
+  const displayScale = Math.min(containerWidth / baseViewport.width, 1.5);
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const renderScale = displayScale * dpr;
+  const renderViewport = page.getViewport({ scale: renderScale });
+  canvas.width = Math.floor(renderViewport.width);
+  canvas.height = Math.floor(renderViewport.height);
+  canvas.style.width = Math.floor(displayScale * baseViewport.width) + 'px';
+  canvas.style.height = Math.floor(displayScale * baseViewport.height) + 'px';
   if (renderTasks[pageNum]) renderTasks[pageNum].cancel();
-  renderTasks[pageNum] = page.render({ canvasContext: ctx, viewport: scaledViewport });
+  renderTasks[pageNum] = page.render({
+    canvasContext: ctx,
+    viewport: renderViewport
+  });
   try {
     await renderTasks[pageNum].promise;
   } catch (e) {

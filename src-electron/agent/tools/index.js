@@ -28,5 +28,20 @@ import './builtin/shellExec.js'
 // 系统信息工具（当前时间）
 import './builtin/systemOps.js'
 
+// 数学计算工具（包装 @langchain/community 的 Calculator）
+import './builtin/calculator.js'
+
+// Python 代码执行工具（使用项目内置 Python 运行时）
+import './builtin/pythonRepl.js'
+
+// HTTP 请求工具（GET/POST/PUT/DELETE/PATCH）
+import './builtin/httpRequests.js'
+
+// JSON 处理工具（parse/extract/format）
+import './builtin/jsonOps.js'
+
+// 网页正文抓取工具
+import './builtin/webpageScraper.js'
+
 // 用户可在下方追加自定义工具导入：
 // import './builtin/myCustomTool.js'

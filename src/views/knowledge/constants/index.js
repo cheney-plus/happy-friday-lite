@@ -90,7 +90,7 @@ export const DEFAULT_CATEGORIES = [
     expanded: true,
     items: [
       { id: 'rag-thinking', name: 'SKILL', protected: true },
-      { id: 'rag-sandbox', name: '沙盒区', protected: true }
+      { id: 'rag-sandbox', name: 'SANDBOX', protected: true }
     ]
   }
 ];

@@ -9,7 +9,7 @@
  *   - 不在白名单的命令默认触发审批
  *
  * 安全约束：
- *   - cwd 锁定为 Agent 沙箱目录 {userData}/knowledge/agent/sandbox/
+ *   - cwd 锁定为 Agent 沙箱目录 {userData}/knowledge/agent/SANDBOX/
  *   - 超时 30 秒
  *   - 输出截断 10KB
  */
@@ -85,8 +85,8 @@ async function handler(args, ctx) {
     return `命令被拒绝: ${analysis.reason}`
   }
 
-  // 确保沙盒区目录存在（cwd 锁定于此）
-  const sandboxDir = path.join(ctx.agentRootDir, 'sandbox')
+  // 确保沙盒区目录存在（cwd 锁定于此，所有 shell 命令均在 SANDBOX 下执行）
+  const sandboxDir = path.join(ctx.agentRootDir, 'SANDBOX')
   if (!fs.existsSync(sandboxDir)) {
     fs.mkdirSync(sandboxDir, { recursive: true })
   }

@@ -118,12 +118,28 @@ export async function createAgent(modelConfig) {
       '- 管理笔记（search_notes / get_note / create_note / update_note）\n' +
       '- 管理日程（list_events / create_event / update_event）\n' +
       '- 操作 Agent 工作区文件（list_agent_files / read_agent_file / write_agent_file）\n' +
-      '- 执行受限 shell 命令（execute_command）\n\n' +
+      '- 执行受限 shell 命令（execute_command）\n' +
+      '- 执行 Python 代码（python_repl，已预装 pandas/numpy/requests/beautifulsoup4/openpyxl/markitdown 等库）\n' +
+      '- 调用 REST API（requests_get / requests_post / requests_put / requests_patch / requests_delete）\n' +
+      '- 处理 JSON 数据（json_parse / json_extract / json_format）\n' +
+      '- 抓取网页正文（fetch_webpage_text，自动去除导航/广告等非正文内容）\n\n' +
+      '## 文件存放约束（强制）\n' +
+      'Agent 工作区根目录下只有以下子目录有特殊用途，**严禁**在其他位置创建文件：\n' +
+      '- `/SKILL/`：技能文件（只读，由前端管理，Agent 不可写入）\n' +
+      '- `/memories/`：跨会话记忆（Agent 可读写，用于长期记忆）\n' +
+      '- `/SANDBOX/`：**Agent 工作区，所有 LLM 生成的文件（write_file、Python 输出、shell 重定向等）必须存放于此**\n\n' +
+      '权限规则已强制约束：写入 `/SKILL/` 或根目录其他位置会被拒绝。\n' +
+      '在 `/SANDBOX/` 下建议按任务组织子目录，例如：\n' +
+      '  - `/SANDBOX/20260705-1/report.md`（python_repl 默认工作目录）\n' +
+      '  - `/SANDBOX/data/process/input.json`\n' +
+      '  - `/SANDBOX/exports/sheet.xlsx`\n\n' +
+      '调用 write_file / edit_file 时，路径必须以 `/SANDBOX/` 开头；其他路径会被权限层拒绝。\n\n' +
       '## 行为准则\n' +
       '1. 优先使用工具获取信息，避免凭空回答\n' +
-      '2. 写操作（创建笔记/日程/文件）需用户审批后执行\n' +
+      '2. 写操作（创建笔记/日程/文件、执行 Python 代码、POST/PUT/PATCH/DELETE 请求）需用户审批后执行\n' +
       '3. 涉及用户隐私的信息不得外泄\n' +
-      '4. 用中文回答用户问题\n'
+      '4. 用中文回答用户问题\n' +
+      '5. 所有文件操作路径必须位于 `/SANDBOX/` 下（memories 除外）\n'
   })
 
   log.info('====== DeepAgent 创建完成 ======')

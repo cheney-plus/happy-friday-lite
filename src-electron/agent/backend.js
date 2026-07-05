@@ -28,8 +28,7 @@ let sharedBackend = null
 
 /**
  * 获取 Agent 工作根目录（沙箱边界）
- * 路径：{dataDir}/knowledge/agent/
- * @returns {string}
+ * 路径：{dataDir}/knowledge/agent
  */
 export function getAgentRootDir() {
   const dataDir = getDataDir()
@@ -51,8 +50,13 @@ export function getSharedStore() {
 
 /**
  * 装配 CompositeBackend
- * - 默认后端：FilesystemBackend（rootDir = {userData}/knowledge/agent/，virtualMode=false）
+ * - 默认后端：FilesystemBackend（rootDir = {userData}/knowledge/agent/，virtualMode=true）
  * - /memories/ 路由：StoreBackend（namespace='memories'）
+ *
+ * 目录结构（rootDir 下）：
+ *   /SKILL/       Skill 文件（前端管理，Agent 只读）
+ *   /memories/    跨会话记忆（StoreBackend，Agent 读写）
+ *   /SANDBOX/     Agent 工作区（所有 LLM 生成的文件均存放于此，permissions 强制约束）
  *
  * @returns {CompositeBackend}
  */
@@ -60,10 +64,17 @@ export function buildBackend() {
   if (sharedBackend) return sharedBackend
 
   const rootDir = getAgentRootDir()
-  // 确保沙箱目录存在
+  // 确保沙箱根目录存在
   if (!fs.existsSync(rootDir)) {
     fs.mkdirSync(rootDir, { recursive: true })
     log.info(`已创建 Agent 沙箱目录: ${rootDir}`)
+  }
+
+  // 确保 SANDBOX 工作区目录存在（Agent 所有生成文件的默认存放位置）
+  const sandboxDir = path.join(rootDir, 'SANDBOX')
+  if (!fs.existsSync(sandboxDir)) {
+    fs.mkdirSync(sandboxDir, { recursive: true })
+    log.info(`已创建 Agent 工作区: ${sandboxDir}`)
   }
 
   // 默认后端：本地磁盘文件系统（virtualMode=true 沙箱化为虚拟路径）
