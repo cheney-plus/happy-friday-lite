@@ -69,8 +69,8 @@ const FALLBACK_TAG = '20260623'
 // target 用于匹配 release asset 名称中的平台段
 // binDir / exeName 用于校验解压后的可执行文件路径
 const PLATFORM_TARGETS = {
-  'win32-x64':    { target: 'x86_64-pc-windows-msvc-shared',  exeName: 'python.exe', binDir: '' },
-  'win32-arm64':  { target: 'aarch64-pc-windows-msvc-shared', exeName: 'python.exe', binDir: '' },
+  'win32-x64':    { target: 'x86_64-pc-windows-msvc',  exeName: 'python.exe', binDir: '' },
+  'win32-arm64':  { target: 'aarch64-pc-windows-msvc', exeName: 'python.exe', binDir: '' },
   'darwin-arm64': { target: 'aarch64-apple-darwin',           exeName: 'python3',    binDir: 'bin' },
   'darwin-x64':   { target: 'x86_64-apple-darwin',            exeName: 'python3',    binDir: 'bin' },
   'linux-x64':    { target: 'x86_64-unknown-linux-gnu',       exeName: 'python3',    binDir: 'bin' },
