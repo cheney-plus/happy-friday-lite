@@ -53,6 +53,10 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Remove Chinese npm mirrors (CI uses official sources)
+        run: rm -f .npmrc
+        shell: bash
+
       - name: Install Linux system dependencies
         run: |
           sudo apt-get update
@@ -112,6 +116,10 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+
+      - name: Remove Chinese npm mirrors (CI uses official sources)
+        run: rm -f .npmrc
+        shell: bash
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
@@ -180,6 +188,10 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+
+      - name: Remove Chinese npm mirrors (CI uses official sources)
+        run: rm -f .npmrc
+        shell: bash
 
       - name: Install Rosetta 2 (macOS x64 cross-build)
         if: matrix.platform-key == 'darwin-x64'
