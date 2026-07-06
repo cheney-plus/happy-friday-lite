@@ -290,7 +290,7 @@ registerTool({
     '适用于数据处理（pandas/numpy）、绘图（matplotlib）、文件转换、调用第三方库等场景。\n' +
     '工作目录默认为 Agent 沙盒区 SANDBOX/YYYYMMDD-N/（自动递增避免冲突），可通过 workDir 参数指定 SANDBOX/ 下的子目录。决不允许使用非 SANDBOX 下的子目录。\n' +
     'Python 进程的 cwd 与输出文件目录统一为该工作目录。\n' + 
-    '已预装 requests/beautifulsoup4/pandas/numpy/openpyxl/markitdown 等库。需用户审批后执行。'+
+    '已预装 requests/beautifulsoup4/lxml/pandas/numpy/openpyxl/matplotlib/pillow/PyYAML/python-dateutil/tqdm/markitdown 等常用库（不含科学计算与机器学习库）。需用户审批后执行。'+
     'matplotlib 中文支持 ：matplotlib 默认字体不支持中文，绘图时中文会显示为方框。如果需要中文图表，可在 Python 代码中配置：'+
     'import matplotlib'+
     'matplotlib.rcParams["font.sans-serif"] = ["Arial Unicode MS", "PingFang SC", "Heiti TC"]'+
