@@ -6,6 +6,7 @@ import { setDataDir as setConfigDataDir } from './src-electron/config.js'
 import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
 import { checkAutoBackup } from './src-electron/backup.js'
+import { initPythonEnv } from './src-electron/python-env.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -84,6 +85,10 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
   }
+
+  // 初始化 Python 运行时环境（异步，不阻塞窗口显示）
+  // macOS 优先检测系统 Python，其他平台使用打包 Python
+  initPythonEnv().catch(e => console.error('[Main] ❌ Python env init failed:', e))
 
   // 初始化 RAG 模块（注册任务处理器、启动队列、可选启动时自动更新）
   try {

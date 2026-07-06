@@ -3,8 +3,13 @@
  * ============================================
  * 设计参考：Agent智能体设计.md 2.9 内置工具清单
  *
- * 使用项目内置的 Python 运行时（python/python-darwin-arm64/）执行任意 Python 代码，
+ * 使用 Python 运行时执行任意 Python 代码，
  * 支持数据处理、绘图、脚本导入等场景。
+ *
+ * Python 运行时解析由 src-electron/python-env.js 统一管理：
+ *   - macOS：优先使用系统 Python（含全部依赖），否则使用打包 Python
+ *   - Windows/Linux：使用打包 Python（从 resourcesPath 解压到 userData）
+ *   - 开发环境：项目根目录/python/python-{platform}/bin/python3
  *
  * 工作目录策略：
  *   - 默认：{agentRootDir}/SANDBOX/YYYYMMDD-N/（自动生成，N 从 1 递增避免冲突）
@@ -16,100 +21,14 @@
  *   - 超时 60 秒（可配置）
  *   - stdout/stderr 输出截断 20KB
  *   - 需用户审批后执行
- *
- * Python 路径解析：
- *   - 开发环境：项目根目录/python/python-{platform}-{arch}/bin/python
- *   - 打包环境：process.resourcesPath/python/python-{platform}-{arch}/bin/python
  */
 
 import { spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { z } from 'zod'
 import { registerTool } from '../registry.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-/**
- * 检测是否处于 Electron 打包环境
- * 通过 process.versions.electron 判断是否在 Electron 中运行，
- * 通过 process.resourcesPath 是否非默认值判断是否打包后运行。
- * @returns {boolean}
- */
-function isPackagedEnvironment() {
-  // process.versions.electron 在 Electron 主进程中存在
-  if (!process.versions.electron) return false
-  // 打包后 process.resourcesPath 以 app.asar 结尾；开发环境则是项目内 node_modules
-  try {
-    return (
-      typeof process.resourcesPath === 'string' &&
-      !process.resourcesPath.includes('node_modules') &&
-      // process.execPath 在打包后指向 Electron 可执行文件，不是 node
-      !process.execPath.endsWith('node') &&
-      !process.execPath.endsWith('node.exe')
-    )
-  } catch (_e) {
-    return false
-  }
-}
-
-/**
- * 根据当前平台解析 Python 可执行文件路径
- * @returns {string} Python 可执行文件绝对路径
- */
-function resolvePythonPath() {
-  // 平台映射：darwin-arm64 / darwin-x64 / win32-x64 / win32-arm64 / linux-x64 / linux-arm64
-  const platformKey = `${process.platform}-${process.arch}`
-
-  // 子目录名（与 python/download-python.js 中 DOWNLOADS.dirName 保持一致）
-  const dirName = `python-${platformKey}`
-
-  // 可执行文件名
-  const exeName = process.platform === 'win32' ? 'python.exe' : 'python3'
-
-  // 1. 优先查找打包环境（extraResources 中包含 python 目录）
-  //    打包后 process.resourcesPath 指向 app.asar/resources/
-  if (isPackagedEnvironment() && typeof process.resourcesPath === 'string') {
-    const packagedPath = path.join(process.resourcesPath, 'python', dirName, 'bin', exeName)
-    if (fs.existsSync(packagedPath)) {
-      return packagedPath
-    }
-    // Windows 下可执行文件位于 python-{platform}/python.exe（无 bin/）
-    const winPackagedPath = path.join(process.resourcesPath, 'python', dirName, exeName)
-    if (fs.existsSync(winPackagedPath)) {
-      return winPackagedPath
-    }
-  }
-
-  // 2. 开发环境：项目根目录/python/python-{platform}-{arch}/bin/python
-  //    __dirname = src-electron/agent/tools/builtin/
-  //    上四级回到项目根目录：tools → agent → src-electron → 项目根
-  const projectRoot = path.resolve(__dirname, '..', '..', '..', '..')
-  const devPath = path.join(projectRoot, 'python', dirName, 'bin', exeName)
-  if (fs.existsSync(devPath)) {
-    return devPath
-  }
-  // Windows 开发环境
-  const winDevPath = path.join(projectRoot, 'python', dirName, exeName)
-  if (fs.existsSync(winDevPath)) {
-    return winDevPath
-  }
-
-  // 3. 兜底：使用系统 PATH 中的 python3 / python
-  return process.platform === 'win32' ? 'python' : 'python3'
-}
-
-// 缓存解析结果，避免每次调用都重复文件系统检查
-let cachedPythonPath = null
-
-function getPythonPath() {
-  if (!cachedPythonPath) {
-    cachedPythonPath = resolvePythonPath()
-  }
-  return cachedPythonPath
-}
+import { getPythonPath } from '../../../python-env.js'
 
 /**
  * 解析 Python 工作目录
@@ -189,7 +108,7 @@ async function handler(args, ctx) {
   const { code, workDir, timeoutMs = 60000 } = args
   ctx.logger.info(`[python_repl] codeLen=${code.length}, workDir=${workDir || '(自动)'}, timeout=${timeoutMs}ms`)
 
-  const pythonPath = getPythonPath()
+  const pythonPath = await getPythonPath()
   ctx.logger.info(`[python_repl] pythonPath=${pythonPath}`)
 
   // 解析工作目录（强制锁定在 SANDBOX 下）
@@ -286,14 +205,15 @@ async function handler(args, ctx) {
 registerTool({
   name: 'python_repl',
   description:
-    '执行任意 Python 代码（使用项目内置的 Python 3.12 运行时）。' +
-    '适用于数据处理（pandas/numpy）、绘图（matplotlib）、文件转换、调用第三方库等场景。\n' +
+    '执行任意 Python 代码（使用 Python 3.12 运行时）。' +
+    '适用于数据处理（pandas/numpy/scipy）、绘图（matplotlib/seaborn/plotly）、Excel 操作（openpyxl/xlrd/xlwt/xlsxwriter）、' +
+    '网页解析（beautifulsoup4/lxml）、文档转换（markitdown[all]）、符号计算（sympy）、中文分词（jieba）等场景。\n' +
     '工作目录默认为 Agent 沙盒区 SANDBOX/YYYYMMDD-N/（自动递增避免冲突），可通过 workDir 参数指定 SANDBOX/ 下的子目录。决不允许使用非 SANDBOX 下的子目录。\n' +
-    'Python 进程的 cwd 与输出文件目录统一为该工作目录。\n' + 
-    '已预装 requests/beautifulsoup4/lxml/pandas/numpy/openpyxl/matplotlib/pillow/PyYAML/python-dateutil/tqdm/markitdown 等常用库（不含科学计算与机器学习库）。需用户审批后执行。'+
-    'matplotlib 中文支持 ：matplotlib 默认字体不支持中文，绘图时中文会显示为方框。如果需要中文图表，可在 Python 代码中配置：'+
-    'import matplotlib'+
-    'matplotlib.rcParams["font.sans-serif"] = ["Arial Unicode MS", "PingFang SC", "Heiti TC"]'+
+    'Python 进程的 cwd 与输出文件目录统一为该工作目录。\n' +
+    '已预装 requirements.txt 中所有依赖库（含 requests/beautifulsoup4/lxml/pandas/numpy/scipy/matplotlib/seaborn/plotly/openpyxl/PyYAML/jieba/sympy/markitdown 等）。需用户审批后执行。' +
+    'matplotlib 中文支持：matplotlib 默认字体不支持中文，绘图时中文会显示为方框。如果需要中文图表，可在 Python 代码中配置：' +
+    'import matplotlib' +
+    'matplotlib.rcParams["font.sans-serif"] = ["Arial Unicode MS", "PingFang SC", "Heiti TC"]' +
     'matplotlib.rcParams["axes.unicode_minus"] = False\n',
   schema,
   handler,

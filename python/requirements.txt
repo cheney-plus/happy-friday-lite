@@ -1,0 +1,36 @@
+# 基本依赖
+requests
+beautifulsoup4
+lxml
+python-dateutil
+pytz
+
+# Excel 操作
+openpyxl
+xlrd
+xlwt
+xlsxwriter
+
+# 数据分析
+pandas
+numpy
+scipy
+
+# 数据可视化 / 绘图
+matplotlib
+seaborn
+plotly
+
+# 终端输出与表格
+rich
+tabulate
+
+# 文本处理
+PyYAML
+jieba
+
+# 符号计算
+sympy
+
+# MarkItDown - 文件转 Markdown（支持 PDF/Word/PPT/Excel/图片OCR/HTML 等）
+markitdown[all]

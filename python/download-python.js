@@ -38,31 +38,26 @@ const __dirname = path.dirname(__filename)
 // 期望的 CPython 大版本（用于从 release assets 中筛选）
 const PYTHON_MAJOR = '3.12'
 
-// 预装到运行时中的第三方库（与 pythonRepl.js 中声明的预装库一致）
-// 仅包含常用基础库，不含 scipy/scikit-learn/torch 等科学计算与机器学习库
-const PREINSTALLED_PKGS = [
-  // HTTP / 网络请求
-  'requests',
-  // HTML / XML 解析
-  'beautifulsoup4',
-  'lxml',
-  // 数据处理
-  'pandas',
-  'numpy',
-  'openpyxl', // Excel 读写
-  // 绘图
-  'matplotlib',
-  // 图像处理（matplotlib 后端常用）
-  'pillow',
-  // 配置 / 序列化
-  'PyYAML',
-  // 日期时间处理（pandas 依赖，显式预装以便直接使用）
-  'python-dateutil',
-  // 进度条
-  'tqdm',
-  // 文档转换
-  'markitdown'
-]
+// requirements.txt 路径（与本脚本同目录）
+const REQUIREMENTS_PATH = path.join(__dirname, 'requirements.txt')
+
+/**
+ * 读取 requirements.txt 并解析为依赖列表
+ * - 自动过滤空行与 # 注释行
+ * - 保留 extras 标记（如 markitdown[all]）
+ * @returns {string[]}
+ */
+function readRequirements() {
+  if (!fs.existsSync(REQUIREMENTS_PATH)) {
+    logWarn(`找不到 requirements.txt: ${REQUIREMENTS_PATH}，使用空依赖列表`)
+    return []
+  }
+  const content = fs.readFileSync(REQUIREMENTS_PATH, 'utf-8')
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+}
 
 // GitHub 镜像前缀（国内加速），可通过环境变量 PYTHON_MIRROR 覆盖
 const DEFAULT_MIRROR = 'https://gh-proxy.com/'
@@ -116,6 +111,7 @@ function parseArgs() {
     mirror: false,
     tag: null,
     noDeps: false,
+    force: false,
     platform: null
   }
   for (let i = 0; i < args.length; i++) {
@@ -135,6 +131,9 @@ function parseArgs() {
         break
       case '--no-deps':
         opts.noDeps = true
+        break
+      case '--force':
+        opts.force = true
         break
       case '--platform':
         opts.platform = args[++i]
@@ -164,11 +163,15 @@ function printHelp() {
   --tag <tag>      指定 release tag（如 20260623），默认取最新
   --platform <key> 指定平台（如 linux-x64 / win32-x64 / darwin-arm64）
   --no-deps        跳过预装第三方库
+  --force          强制重新下载和解压（即使已存在）
   -h, --help       显示帮助
 
 环境变量:
   PYTHON_BUILD_STANDALONE_TAG   指定 release tag
   PYTHON_MIRROR                 自定义镜像前缀
+
+依赖:
+  预装库列表读取自 python/requirements.txt
 `)
 }
 
@@ -338,6 +341,7 @@ function extractTarball(tarballPath, destDir) {
 
 /**
  * 在解压后的 Python 运行时中安装预装库
+ * 依赖列表读取自 requirements.txt
  * 仅对当前平台有效（跨平台无法直接运行目标 Python）
  */
 function installPackages(pythonDir, platformKey) {
@@ -352,11 +356,17 @@ function installPackages(pythonDir, platformKey) {
     return
   }
 
-  logStep(`安装预装库: ${PREINSTALLED_PKGS.join(', ')}`)
+  const pkgs = readRequirements()
+  if (pkgs.length === 0) {
+    logWarn('requirements.txt 为空或不存在，跳过依赖安装')
+    return
+  }
+
+  logStep(`安装预装库（来自 requirements.txt，共 ${pkgs.length} 个）: ${pkgs.join(', ')}`)
   // -m pip install，使用 --no-cache-dir 减小体积
   const result = spawnSync(
     exePath,
-    ['-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', ...PREINSTALLED_PKGS],
+    ['-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', ...pkgs],
     {
       stdio: 'pipe',
       encoding: 'utf-8',
@@ -407,8 +417,22 @@ async function downloadPlatform(platformKey, tag, opts) {
 
   const dirName = `python-${platformKey}`
   const destDir = path.join(__dirname, dirName)
+  const exePath = path.join(destDir, conf.binDir, conf.exeName)
 
   logStep(`处理平台: ${platformKey}（target: ${conf.target}）`)
+
+  // 0. 若已存在且可用，跳过下载和解压（除非 --force）
+  if (!opts.force && fs.existsSync(exePath)) {
+    logOk(`Python 运行时已存在，跳过下载和解压（使用 --force 强制重新下载）`)
+    verifyPython(destDir, platformKey)
+    // 仍执行依赖安装（pip install 是幂等的，已安装的包会跳过）
+    if (!opts.noDeps && platformKey === getPlatformKey()) {
+      installPackages(destDir, platformKey)
+    } else if (!opts.noDeps) {
+      logWarn(`非当前平台（${platformKey}），跳过预装库安装`)
+    }
+    return true
+  }
 
   // 1. 查找 asset
   const assets = await getReleaseAssets(tag)
