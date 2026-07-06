@@ -1,6 +1,28 @@
 <template>
   <div class="question-box" @click="closeAllDropdowns">
     <div class="input-wrapper">
+      <!-- @ 附件标签区 -->
+      <div class="attachment-area" v-if="attachments.length > 0">
+        <div v-for="(att, idx) in attachments" :key="att.id" class="attachment-tag" :class="att.isDirectory ? 'tag-folder' : 'tag-file'">
+          <span class="tag-icon-wrap">
+            <svg v-if="att.isDirectory" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+          </span>
+          <span class="tag-name">{{ att.name }}</span>
+          <button class="tag-remove" @click.stop="removeAttachment(idx)" title="移除">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       <textarea
         v-model="inputText"
         class="main-input"
@@ -13,12 +35,12 @@
 
       <div class="input-actions">
         <div class="action-left">
-          <button class="action-btn dropdown-btn" @click.stop="toggleModeDropdown($event)">
+          <button class="action-btn dropdown-btn" :class="{ 'mode-fixed': isAgentCategory }" @click.stop="toggleModeDropdown($event)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
             <span>{{ currentModeLabel }}</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg v-if="!isAgentCategory" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
@@ -37,6 +59,12 @@
         </div>
 
         <div class="action-right">
+          <!-- Agent 模式：@ 引用文件/文件夹按钮 -->
+          <button v-if="isAgentCategory" class="action-btn icon-only" @click.stop="openFileSelect" title="引用文件或文件夹">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </button>
           <button
             class="send-btn"
             :class="{ active: inputText.trim() }"
@@ -109,17 +137,28 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Agent 模式：文件/文件夹选择对话框 -->
+    <AgentFileSelectDialog
+      :visible="showFileSelectDialog"
+      :root-dir="agentRootDir"
+      :initial-path="currentPath"
+      @close="showFileSelectDialog = false"
+      @select="handleFileSelect"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onActivated, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick } from 'vue';
+import AgentFileSelectDialog from './AgentFileSelectDialog.vue';
 
 const props = defineProps({
   isFolder: { type: Boolean, default: false },
   contextLabel: { type: String, default: '' },
   categoryId: { type: String, default: '' },
-  disabled: { type: Boolean, default: false }
+  disabled: { type: Boolean, default: false },
+  currentPath: { type: String, default: '' }
 });
 
 const emit = defineEmits(['ask']);
@@ -135,8 +174,20 @@ const currentMode = ref('chat');
 
 const chatModes = [
   { value: 'chat', label: '对话模式' },
-  { value: 'memoryless', label: '无忆模式' }
+  { value: 'memoryless', label: '无忆模式' },
+  { value: 'agent', label: 'Agent 模式' }
 ];
+
+// Agent 工作区固定为 Agent 模式，不可切换
+const isAgentCategory = computed(() => props.categoryId === 'agent');
+
+watch(() => props.categoryId, (newCat) => {
+  if (newCat === 'agent') {
+    currentMode.value = 'agent';
+  } else if (currentMode.value === 'agent') {
+    currentMode.value = 'chat';
+  }
+}, { immediate: true });
 
 const currentModeLabel = computed(() => {
   const mode = chatModes.find(m => m.value === currentMode.value);
@@ -155,6 +206,51 @@ const modelSettings = ref({
 });
 
 const customModels = ref([]);
+
+// ========== Agent 模式：@ 附件 ==========
+let attachmentIdCounter = 0;
+const attachments = ref([]);
+const showFileSelectDialog = ref(false);
+const agentRootDir = ref('');
+
+async function ensureAgentRootDir() {
+  if (agentRootDir.value) return;
+  try {
+    const api = window.electronAPI;
+    if (api) {
+      const dataDir = await api.invoke('kb-get-data-dir');
+      if (dataDir) {
+        agentRootDir.value = dataDir.replace(/\/$/, '') + '/knowledge/agent';
+      }
+    }
+  } catch (e) {
+    console.error('Failed to get data dir:', e);
+  }
+}
+
+function openFileSelect() {
+  ensureAgentRootDir();
+  showFileSelectDialog.value = true;
+}
+
+function handleFileSelect(item) {
+  attachments.value.push({
+    id: ++attachmentIdCounter,
+    name: item.name,
+    path: item.path,
+    virtualPath: item.virtualPath,
+    isDirectory: item.isDirectory
+  });
+  showFileSelectDialog.value = false;
+  nextTick(() => {
+    textareaRef.value?.focus();
+    autoResize();
+  });
+}
+
+function removeAttachment(idx) {
+  attachments.value.splice(idx, 1);
+}
 
 const STORAGE_KEY = 'happy-friday-custom-models';
 const SELECTED_MODEL_KEY = 'happy-friday-selected-model';
@@ -208,6 +304,7 @@ const currentModelName = computed(() => {
 });
 
 const toggleModeDropdown = (event) => {
+  if (isAgentCategory.value) return; // Agent 模式固定，不可切换
   const btn = event.currentTarget;
   const rect = btn.getBoundingClientRect();
   showModeDropdown.value = !showModeDropdown.value;
@@ -293,10 +390,17 @@ const handleSend = () => {
     question: text,
     mode: currentMode.value,
     modelId: selectedModel.id,
-    thinkMode: modelSettings.value.thinkMode
+    thinkMode: modelSettings.value.thinkMode,
+    attachments: attachments.value.length > 0 ? attachments.value.map(a => ({
+      name: a.name,
+      path: a.path,
+      virtualPath: a.virtualPath,
+      isDirectory: a.isDirectory
+    })) : []
   });
 
   inputText.value = '';
+  attachments.value = [];
   nextTick(() => {
     autoResize();
   });
@@ -364,6 +468,75 @@ onActivated(() => {
 .main-input::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 .main-input::placeholder { color: var(--text-tertiary); }
 
+/* @ 附件标签区 */
+.attachment-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 20px 0;
+}
+
+.attachment-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 3px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  max-width: 240px;
+  line-height: 1;
+  transition: all 0.15s ease;
+
+  &:hover .tag-remove { opacity: 1; }
+
+  &.tag-file { --tag-accent: #f59e0b; }
+  &.tag-folder { --tag-accent: #1560F7; }
+
+  .tag-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--tag-accent, #10b981) 12%, transparent);
+    color: var(--tag-accent, #10b981);
+    flex-shrink: 0;
+  }
+
+  .tag-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+    font-weight: 500;
+  }
+
+  .tag-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary, #aaa);
+    cursor: pointer;
+    border-radius: 5px;
+    opacity: 0;
+    transition: all 0.12s;
+    flex-shrink: 0;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.08);
+      color: var(--text-primary);
+    }
+  }
+}
+
 .input-actions {
   display: flex;
   align-items: center;
@@ -396,6 +569,24 @@ onActivated(() => {
 
 .action-btn:hover { background: var(--bg-secondary); }
 
+.action-btn.icon-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-btn.icon-only:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 .dropdown-btn span { font-size: 12.5px; }
 
 .dropdown-btn {
@@ -406,6 +597,18 @@ onActivated(() => {
 .dropdown-btn:hover {
   background: var(--bg-secondary);
   border-color: var(--text-tertiary);
+}
+
+.dropdown-btn.mode-fixed {
+  cursor: default;
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.dropdown-btn.mode-fixed:hover {
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .send-btn {

@@ -51,10 +51,16 @@ export function getCheckpointer() {
  * 创建 DeepAgent 实例
  *
  * @param {Object} modelConfig 项目模型配置（provider/baseUrl/apiKey/modelName/enableThinking）
+ * @param {Object} [options] 额外选项
+ * @param {string} [options.folderPath] 用户当前所在的工作区虚拟路径（相对于 Agent 根目录）
  * @returns {Promise<Object>} DeepAgent 实例
  */
-export async function createAgent(modelConfig) {
+export async function createAgent(modelConfig, options = {}) {
+  const { folderPath = '' } = options
   log.info('====== 开始创建 DeepAgent ======')
+  if (folderPath) {
+    log.info(`用户当前工作目录（虚拟路径）: ${folderPath}`)
+  }
 
   // 1. 确保 SKILL 目录和沙箱目录存在
   ensureSkillDir()
@@ -138,6 +144,12 @@ export async function createAgent(modelConfig) {
       '  - `/SANDBOX/exports/sheet.xlsx`\n' +
       '注意：python_repl 产生任何输出文件（xlsx/csv/png/json 等）时，必须通过 workDir 参数指定 SANDBOX/ 下的自建子目录作为输出目录；无输出文件的纯计算执行 cwd 落在 `/SANDBOX/tmpscript/`。\n\n' +
       '调用 write_file / edit_file 时，路径必须以 `/SANDBOX/` 开头；其他路径会被权限层拒绝。\n\n' +
+      (folderPath
+        ? `## 用户当前工作目录\n用户正在 Agent 工作区的以下位置浏览：\`${folderPath === '/' ? '/' : folderPath}\`（相对于 Agent 根目录的虚拟路径）\n\n` +
+          '用户在此目录下打开了对话窗口，可能希望对当前目录或其中的文件/文件夹执行操作。\n' +
+          '当用户的请求涉及"当前目录"、"这个文件夹"、"这里的文件"等指代时，应理解为指此目录。\n' +
+          '若用户在消息中通过 @ 附件指定了具体文件或文件夹，则以 @ 指定的路径为准。\n\n'
+        : '') +
       '## 行为准则\n' +
       '1. 优先使用工具获取信息，避免凭空回答\n' +
       '2. 写操作（创建笔记/日程/文件、执行 Python 代码、POST/PUT/PATCH/DELETE 请求）需用户审批后执行\n' +
@@ -155,11 +167,13 @@ export async function createAgent(modelConfig) {
  * 在 createAgent 基础上，注入运行时 ctx（mainWindow/requestId/threadId 等）
  *
  * @param {Object} modelConfig 项目模型配置
- * @param {Object} runtimeCtx 运行时上下文 { mainWindow, requestId, threadId, dataDir }
+ * @param {Object} runtimeCtx 运行时上下文 { mainWindow, requestId, threadId, dataDir, folderPath }
  * @returns {Promise<{ agent, rootDir }>}
  */
 export async function createAgentWithContext(modelConfig, runtimeCtx) {
-  const { agent, toolCtx, rootDir } = await createAgent(modelConfig)
+  const { agent, toolCtx, rootDir } = await createAgent(modelConfig, {
+    folderPath: runtimeCtx?.folderPath || ''
+  })
 
   // 动态注入运行时上下文
   Object.assign(toolCtx, {

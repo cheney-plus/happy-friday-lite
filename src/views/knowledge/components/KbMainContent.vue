@@ -263,11 +263,13 @@
       :context-label="questionBoxContextLabel"
       :category-id="currentCategoryId"
       :disabled="!selectedKB"
+      :current-path="currentPath || ''"
       @ask="handleAsk"
     />
 
-    <!-- 知识库/文件夹提问对话弹窗 -->
+    <!-- 个人/本地知识库提问对话弹窗 -->
     <KbChatDialog
+      v-if="currentCategoryId !== 'agent'"
       :visible="chatDialogVisible"
       :is-folder="isFolderView"
       :context-label="questionBoxContextLabel"
@@ -277,6 +279,21 @@
       :top-k="10"
       :initial-question="chatDialogInitialQuestion"
       :mode="chatDialogMode"
+      :model="chatDialogModel"
+      :think-mode="chatDialogThinkMode"
+      @close="closeChatDialog"
+    />
+
+    <!-- Agent 工作区对话弹窗 -->
+    <KbAgentChatDialog
+      v-else
+      :visible="chatDialogVisible"
+      :context-label="questionBoxContextLabel"
+      :kb-name="currentTitle"
+      :kb-category-id="currentCategoryId"
+      :folder-path="chatDialogFolderPath"
+      :initial-question="chatDialogInitialQuestion"
+      :initial-attachments="chatDialogAttachments"
       :model="chatDialogModel"
       :think-mode="chatDialogThinkMode"
       @close="closeChatDialog"
@@ -333,6 +350,7 @@ import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import FileCard from './FileCard.vue';
 import KbQuestionBox from './KbQuestionBox.vue';
 import KbChatDialog from './KbChatDialog.vue';
+import KbAgentChatDialog from './KbAgentChatDialog.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
 import SelectNoteDialog from './SelectNoteDialog.vue';
 import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
@@ -401,6 +419,7 @@ const chatDialogMode = ref('chat');
 const chatDialogModel = ref(null);
 const chatDialogThinkMode = ref('fast');
 const chatDialogFolderPath = ref('');
+const chatDialogAttachments = ref([]);
 
 function handleAsk(payload) {
   if (!props.selectedKB) return;
@@ -416,8 +435,14 @@ function handleAsk(payload) {
   chatDialogInitialQuestion.value = payload.question;
   chatDialogMode.value = payload.mode || 'chat';
   chatDialogThinkMode.value = payload.thinkMode || 'fast';
-  // 文件夹视图时传入当前路径作为过滤条件；知识库视图留空（由后端按 kbName/kbCategoryId 过滤）
-  chatDialogFolderPath.value = isFolderView.value ? (props.currentPath || '') : '';
+  chatDialogAttachments.value = payload.attachments || [];
+  if (props.currentCategoryId === 'agent') {
+    // Agent 工作区：始终传入当前路径（含根目录），让大模型感知用户所在位置
+    chatDialogFolderPath.value = props.currentPath || '';
+  } else {
+    // 个人/本地知识库：文件夹视图时传入当前路径作为过滤条件；知识库视图留空
+    chatDialogFolderPath.value = isFolderView.value ? (props.currentPath || '') : '';
+  }
   chatDialogVisible.value = true;
 }
 
@@ -425,6 +450,7 @@ function closeChatDialog() {
   chatDialogVisible.value = false;
   chatDialogInitialQuestion.value = '';
   chatDialogModel.value = null;
+  chatDialogAttachments.value = [];
 }
 
 function loadModelConfig(modelId) {
