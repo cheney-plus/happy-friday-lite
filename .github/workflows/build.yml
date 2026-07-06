@@ -50,8 +50,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
+
+      - name: Remove Chinese npm mirrors (CI uses official sources)
+        run: rm -f .npmrc
+        shell: bash
 
       - name: Install Linux system dependencies
         run: |
@@ -110,8 +114,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
+
+      - name: Remove Chinese npm mirrors (CI uses official sources)
+        run: rm -f .npmrc
+        shell: bash
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
@@ -178,8 +186,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
+
+      - name: Remove Chinese npm mirrors (CI uses official sources)
+        run: rm -f .npmrc
+        shell: bash
 
       - name: Install Rosetta 2 (macOS x64 cross-build)
         if: matrix.platform-key == 'darwin-x64'
