@@ -184,6 +184,52 @@ function getPlatformKey() {
 }
 
 /**
+ * 判断当前主机能否运行指定平台的 Python
+ * - 同平台同架构：始终可以
+ * - macOS arm64 主机运行 darwin-x64 Python：通过 Rosetta 2 支持
+ * - 其他跨平台/跨架构：不支持
+ * @param {string} platformKey 目标平台标识（如 darwin-x64）
+ * @returns {boolean}
+ */
+function canRunPython(platformKey) {
+  const currentKey = getPlatformKey()
+  if (platformKey === currentKey) return true
+  // macOS arm64 主机可通过 Rosetta 2 运行 x64 二进制
+  if (process.platform === 'darwin' && process.arch === 'arm64' && platformKey === 'darwin-x64') {
+    return true
+  }
+  return false
+}
+
+/**
+ * 获取运行 Python 的命令前缀（用于 Rosetta 跨架构执行）
+ * @param {string} platformKey 目标平台标识
+ * @returns {string[]} 命令前缀数组（空数组表示无需前缀）
+ */
+function getRunPrefix(platformKey) {
+  if (process.platform === 'darwin' && process.arch === 'arm64' && platformKey === 'darwin-x64') {
+    return ['arch', '-x86_64']
+  }
+  return []
+}
+
+/**
+ * 执行 Python 可执行文件（自动处理 Rosetta 跨架构前缀）
+ * @param {string} exePath Python 可执行文件路径
+ * @param {string[]} args 参数数组
+ * @param {string} platformKey 目标平台标识
+ * @param {Object} [options] spawnSync 选项
+ * @returns {import('child_process').SpawnSyncReturns}
+ */
+function runPython(exePath, args, platformKey, options = {}) {
+  const prefix = getRunPrefix(platformKey)
+  if (prefix.length > 0) {
+    return spawnSync(prefix[0], [...prefix.slice(1), exePath, ...args], options)
+  }
+  return spawnSync(exePath, args, options)
+}
+
+/**
  * HTTPS GET，自动跟随重定向，支持写入文件流
  */
 function httpsGet(url, { headers = {}, timeout = 30000 } = {}) {
@@ -342,7 +388,7 @@ function extractTarball(tarballPath, destDir) {
 /**
  * 在解压后的 Python 运行时中安装预装库
  * 依赖列表读取自 requirements.txt
- * 仅对当前平台有效（跨平台无法直接运行目标 Python）
+ * 支持同平台同架构，以及 macOS arm64 主机通过 Rosetta 运行 x64 Python
  */
 function installPackages(pythonDir, platformKey) {
   const conf = PLATFORM_TARGETS[platformKey]
@@ -356,17 +402,26 @@ function installPackages(pythonDir, platformKey) {
     return
   }
 
+  if (!canRunPython(platformKey)) {
+    logWarn(`当前主机无法运行 ${platformKey} 的 Python，跳过依赖安装`)
+    logWarn('  跨平台/跨架构（非 Rosetta）无法直接运行目标 Python')
+    return
+  }
+
   const pkgs = readRequirements()
   if (pkgs.length === 0) {
     logWarn('requirements.txt 为空或不存在，跳过依赖安装')
     return
   }
 
-  logStep(`安装预装库（来自 requirements.txt，共 ${pkgs.length} 个）: ${pkgs.join(', ')}`)
+  const prefix = getRunPrefix(platformKey)
+  const viaRosetta = prefix.length > 0
+  logStep(`安装预装库（来自 requirements.txt，共 ${pkgs.length} 个${viaRosetta ? '，通过 Rosetta' : ''}）: ${pkgs.join(', ')}`)
   // -m pip install，使用 --no-cache-dir 减小体积
-  const result = spawnSync(
+  const result = runPython(
     exePath,
     ['-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', ...pkgs],
+    platformKey,
     {
       stdio: 'pipe',
       encoding: 'utf-8',
@@ -391,9 +446,9 @@ function verifyPython(pythonDir, platformKey) {
     logErr(`校验失败：找不到 ${exePath}`)
     return false
   }
-  // 仅当前平台可执行
-  if (platformKey === getPlatformKey()) {
-    const result = spawnSync(exePath, ['--version'], { encoding: 'utf-8' })
+  // 同平台或可通过 Rosetta 运行时，执行 --version 验证
+  if (canRunPython(platformKey)) {
+    const result = runPython(exePath, ['--version'], platformKey, { encoding: 'utf-8' })
     if (result.status === 0) {
       logOk(`Python 可用: ${(result.stdout || result.stderr).trim()}`)
       return true
@@ -401,7 +456,7 @@ function verifyPython(pythonDir, platformKey) {
     logWarn(`Python 执行失败: ${result.stderr}`)
     return false
   }
-  logOk(`Python 可执行文件存在: ${conf.exeName}`)
+  logOk(`Python 可执行文件存在: ${conf.exeName}（跨平台，未执行验证）`)
   return true
 }
 
@@ -426,7 +481,7 @@ async function downloadPlatform(platformKey, tag, opts) {
     logOk(`Python 运行时已存在，跳过下载和解压（使用 --force 强制重新下载）`)
     verifyPython(destDir, platformKey)
     // 仍执行依赖安装（pip install 是幂等的，已安装的包会跳过）
-    if (!opts.noDeps && platformKey === getPlatformKey()) {
+    if (!opts.noDeps && canRunPython(platformKey)) {
       installPackages(destDir, platformKey)
     } else if (!opts.noDeps) {
       logWarn(`非当前平台（${platformKey}），跳过预装库安装`)
@@ -480,8 +535,8 @@ async function downloadPlatform(platformKey, tag, opts) {
   const ok = verifyPython(destDir, platformKey)
   if (!ok) return false
 
-  // 6. 安装预装库（仅当前平台）
-  if (!opts.noDeps && platformKey === getPlatformKey()) {
+  // 6. 安装预装库（当前平台或可通过 Rosetta 运行）
+  if (!opts.noDeps && canRunPython(platformKey)) {
     installPackages(destDir, platformKey)
   } else if (!opts.noDeps) {
     logWarn(`非当前平台（${platformKey}），跳过预装库安装`)
