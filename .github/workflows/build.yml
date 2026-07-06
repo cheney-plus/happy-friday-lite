@@ -20,60 +20,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build (${{ matrix.platform-name }}-${{ matrix.arch }})
-    if: ${{ inputs.platform == 'all' || inputs.platform == matrix.platform-name }}
+  # ──────────────────────────────────────────────────────────────────────
+  # Linux 构建（x64 + arm64）
+  # ──────────────────────────────────────────────────────────────────────
+  build-linux:
+    name: Build Linux (${{ matrix.arch }})
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'linux' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Linux x64
           - os: ubuntu-latest
-            platform-name: linux
             arch: x64
-            builder-flag: --linux
             arch-flag: --x64
             platform-key: linux-x64
             artifact-name: HappyFriday-Linux-x64
-            artifact-path: release/*.AppImage
-          # Linux arm64（原生 ARM64 runner）
           - os: ubuntu-24.04-arm
-            platform-name: linux
             arch: arm64
-            builder-flag: --linux
             arch-flag: --arm64
             platform-key: linux-arm64
             artifact-name: HappyFriday-Linux-arm64
-            artifact-path: release/*.AppImage
-          # Windows x64
-          - os: windows-latest
-            platform-name: windows
-            arch: x64
-            builder-flag: --win
-            arch-flag: --x64
-            platform-key: win32-x64
-            artifact-name: HappyFriday-Windows-x64
-            artifact-path: release/*.exe
-          # macOS arm64（Apple Silicon）
-          - os: macos-latest
-            platform-name: macos
-            arch: arm64
-            builder-flag: --mac
-            arch-flag: --arm64
-            platform-key: darwin-arm64
-            artifact-name: HappyFriday-macOS-arm64
-            artifact-path: release/*.dmg
-          # macOS x64（通过 Rosetta 2 在 ARM64 主机上交叉构建）
-          - os: macos-latest
-            platform-name: macos
-            arch: x64
-            builder-flag: --mac
-            arch-flag: --x64
-            platform-key: darwin-x64
-            artifact-name: HappyFriday-macOS-x64
-            artifact-path: release/*.dmg
 
     steps:
       - name: Checkout code
@@ -86,10 +54,132 @@ jobs:
           cache: 'npm'
 
       - name: Install Linux system dependencies
-        if: matrix.platform-name == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libarchive-tools
+
+      - name: Install npm dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Download Python runtime (${{ matrix.platform-key }})
+        run: node python/download-python.js --platform ${{ matrix.platform-key }}
+
+      - name: Verify Python runtime
+        run: |
+          echo "=== Python 目录结构 ==="
+          ls -la python/python-${{ matrix.platform-key }}/
+          echo "=== Python 版本 ==="
+          python/python-${{ matrix.platform-key }}/bin/python3 --version
+        shell: bash
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Build Electron app (Linux ${{ matrix.arch }})
+        run: npx electron-builder --linux ${{ matrix.arch-flag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List build artifacts
+        run: ls -lh release/ || true
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: release/*.AppImage
+          if-no-files-found: error
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Windows 构建（x64）
+  # ──────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows (x64)
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'windows' }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Download Python runtime (win32-x64)
+        run: node python/download-python.js --platform win32-x64
+
+      - name: Verify Python runtime
+        run: |
+          echo "=== Python 目录结构 ==="
+          ls -la python/python-win32-x64/
+          echo "=== Python 版本 ==="
+          python/python-win32-x64/python.exe --version
+        shell: bash
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Build Electron app (Windows x64)
+        run: npx electron-builder --win --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List build artifacts
+        run: ls -lh release/ || true
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HappyFriday-Windows-x64
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────────────
+  # macOS 构建（arm64 + x64）
+  # x64 通过 Rosetta 2 在 ARM64 主机上交叉构建
+  # ──────────────────────────────────────────────────────────────────────
+  build-macos:
+    name: Build macOS (${{ matrix.arch }})
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'macos' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            arch-flag: --arm64
+            platform-key: darwin-arm64
+            artifact-name: HappyFriday-macOS-arm64
+          - arch: x64
+            arch-flag: --x64
+            platform-key: darwin-x64
+            artifact-name: HappyFriday-macOS-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
 
       - name: Install Rosetta 2 (macOS x64 cross-build)
         if: matrix.platform-key == 'darwin-x64'
@@ -100,19 +190,16 @@ jobs:
 
       - name: Download Python runtime (${{ matrix.platform-key }})
         run: node python/download-python.js --platform ${{ matrix.platform-key }}
-        env:
-          # 直连 GitHub（CI 无需镜像加速）
-          PYTHON_MIRROR: ''
 
       - name: Verify Python runtime
         run: |
           echo "=== Python 目录结构 ==="
           ls -la python/python-${{ matrix.platform-key }}/
           echo "=== Python 版本 ==="
-          if [ -f "python/python-${{ matrix.platform-key }}/bin/python3" ]; then
+          if [ "${{ matrix.platform-key }}" = "darwin-x64" ]; then
+            arch -x86_64 python/python-${{ matrix.platform-key }}/bin/python3 --version
+          else
             python/python-${{ matrix.platform-key }}/bin/python3 --version
-          elif [ -f "python/python-${{ matrix.platform-key }}/python.exe" ]; then
-            python/python-${{ matrix.platform-key }}/python.exe --version
           fi
         shell: bash
 
@@ -121,23 +208,20 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Build Electron app (${{ matrix.platform-name }} ${{ matrix.arch }})
-        run: npx electron-builder ${{ matrix.builder-flag }} ${{ matrix.arch-flag }}
+      - name: Build Electron app (macOS ${{ matrix.arch }})
+        run: npx electron-builder --mac ${{ matrix.arch-flag }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 允许 electron-builder 在非目标平台上构建（如 macOS x64 在 ARM64 主机上）
           USE_HARD_LINKS: false
 
       - name: List build artifacts
-        run: |
-          echo "=== 构建产物 ==="
-          ls -lh release/ || true
+        run: ls -lh release/ || true
         shell: bash
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
-          path: ${{ matrix.artifact-path }}
+          path: release/*.dmg
           if-no-files-found: error
           retention-days: 30
