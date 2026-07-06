@@ -17,6 +17,7 @@
       @add-kb="addKnowledgeBase"
       @select-kb="selectKnowledgeBase"
       @show-context-menu="showContextMenu"
+      @open-agent-dir="openAgentDir"
     />
 
     <div
@@ -175,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { SidebarIcon } from './components/icons';
 import KbSidebar from './components/KbSidebar.vue';
 import KbMainContent from './components/KbMainContent.vue';
@@ -347,9 +348,132 @@ function openInFinder() {
   }
 }
 
+function openAgentDir() {
+  const dataDir = fileSystem.dataDir.value;
+  if (dataDir) {
+    electronService.invoke('kb-open-in-explorer', { path: dataDir + '/knowledge/agent' });
+  }
+}
+
+// ========== 知识库目录监听：外部文件变更时自动刷新 ==========
+// 后端 fileWatcher.js 监听 knowledge/ 目录变化，防抖后通过 kb-directory-changed 事件通知前端。
+// 前端策略（平衡性能与实时性）：
+//   1. 若变更目录是当前正在浏览目录 → 刷新当前目录列表（内容变化）
+//   2. 若变更目录是当前目录的直接子目录 → 刷新当前目录列表（子目录 count 字段会变）
+//   3. 若变更目录是 knowledge 根或某分类目录（personal/local/agent）→ 重新加载侧边栏知识库列表
+//   4. 否则忽略（无关目录变更）
+
+/**
+ * 判断 ancestor 是否是 target 的祖先目录或自身
+ * @param {string} ancestor 候选祖先路径
+ * @param {string} target 目标路径
+ * @returns {boolean}
+ */
+function isAncestorOrSelf(ancestor, target) {
+  if (!ancestor || !target) return false;
+  if (ancestor === target) return true;
+  // target 必须以 ancestor + 分隔符 开头
+  return target.startsWith(ancestor + '/') || target.startsWith(ancestor + '\\');
+}
+
+/**
+ * 获取 target 相对 ancestor 的剩余路径（去掉 ancestor 前缀和分隔符）。
+ * 若 target 不是 ancestor 的后代/自身，返回 null。
+ */
+function relPathUnder(ancestor, target) {
+  if (!ancestor || !target) return null;
+  if (ancestor === target) return '';
+  if (target.startsWith(ancestor + '/')) return target.slice(ancestor.length + 1);
+  if (target.startsWith(ancestor + '\\')) return target.slice(ancestor.length + 1);
+  return null;
+}
+
+// 防抖：避免短时间内多次刷新
+let refreshDebounceTimer = null;
+function debouncedRefreshCurrentDir() {
+  if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
+  refreshDebounceTimer = setTimeout(() => {
+    refreshDebounceTimer = null;
+    refreshCurrentDir();
+  }, 150);
+}
+
+let reloadCategoriesTimer = null;
+function debouncedReloadCategories() {
+  if (reloadCategoriesTimer) clearTimeout(reloadCategoriesTimer);
+  reloadCategoriesTimer = setTimeout(() => {
+    reloadCategoriesTimer = null;
+    loadCategoriesFromDisk();
+  }, 150);
+}
+
+let unsubKbDirChanged = null;
+
 onMounted(async () => {
   await loadDataDir();
   await loadCategoriesFromDisk();
+
+  // 订阅后端文件变更事件
+  if (window.electronAPI && window.electronAPI.on) {
+    unsubKbDirChanged = window.electronAPI.on('kb-directory-changed', ({ dirs }) => {
+      if (!dirs || !dirs.length) return;
+      const currentPath = fileSystem.currentPath.value;
+      const dataDir = fileSystem.dataDir.value;
+      const knowledgeRoot = dataDir ? (dataDir + '/knowledge') : '';
+
+      let needRefreshCurrent = false;
+      let needReloadCategories = false;
+
+      for (const dir of dirs) {
+        if (!dir) continue;
+
+        // 1. 变更目录就是当前目录 → 刷新（内容变化）
+        if (currentPath && dir === currentPath) {
+          needRefreshCurrent = true;
+        }
+        // 2. 变更目录是当前目录的直接子目录 → 刷新（子目录的 count 字段会变）
+        if (currentPath && isAncestorOrSelf(currentPath, dir)) {
+          const rel = relPathUnder(currentPath, dir);
+          if (rel !== null && !rel.includes('/') && !rel.includes('\\')) {
+            // rel 为空表示 dir === currentPath，已由条件1处理；这里处理直接子目录
+            if (rel !== '') needRefreshCurrent = true;
+          }
+        }
+        // 3. 变更目录是 knowledgeRoot 或其直接子目录（分类目录）→ 影响侧边栏知识库列表
+        if (knowledgeRoot) {
+          const rel = relPathUnder(knowledgeRoot, dir);
+          if (rel !== null) {
+            // rel 为空（变更在 knowledgeRoot）或 rel 是单段（变更在分类目录 personal/local/agent）
+            if (rel === '' || (!rel.includes('/') && !rel.includes('\\'))) {
+              needReloadCategories = true;
+            }
+          }
+        }
+      }
+
+      if (needRefreshCurrent) {
+        debouncedRefreshCurrentDir();
+      }
+      if (needReloadCategories) {
+        debouncedReloadCategories();
+      }
+    });
+  }
+});
+
+onBeforeUnmount(() => {
+  if (refreshDebounceTimer) {
+    clearTimeout(refreshDebounceTimer);
+    refreshDebounceTimer = null;
+  }
+  if (reloadCategoriesTimer) {
+    clearTimeout(reloadCategoriesTimer);
+    reloadCategoriesTimer = null;
+  }
+  if (unsubKbDirChanged) {
+    unsubKbDirChanged();
+    unsubKbDirChanged = null;
+  }
 });
 </script>
 

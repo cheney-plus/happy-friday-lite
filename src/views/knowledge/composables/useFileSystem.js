@@ -4,8 +4,9 @@ import { useTabStore } from '@/store';
 import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile } from '../constants';
 import { FILE_ICON_MAP, UnknownFileIcon } from '../components/icons';
 
-// 需要调用系统默认应用打开的文件类型
-const SYSTEM_APP_TYPES = ['word', 'excel', 'ppt'];
+// 可在应用内查看的文件类型（拥有对应的查看器组件）
+// 其余格式（图片、Word/Excel/PPT 等）均使用系统默认应用打开
+const IN_APP_VIEWABLE_TYPES = ['pdf', 'epub', 'markdown', 'note', 'html', 'txt', 'json', 'xml'];
 
 export function useFileSystem() {
   const api = window.electronAPI;
@@ -161,17 +162,16 @@ export function useFileSystem() {
       await navigateTo(file.path);
       return;
     }
-    // Word/Excel/PPT/CSV 使用系统默认应用打开
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (SYSTEM_APP_TYPES.includes(file.type) || ext === 'csv') {
-      if (api) {
-        await api.invoke('kb-open-file-external', { filePath: file.path });
-      }
+    // 可在应用内查看的文件类型在新标签页中打开
+    if (IN_APP_VIEWABLE_TYPES.includes(file.type)) {
+      const tab = tabStore.addFileTab(file);
+      router.push(tab.fullPath);
       return;
     }
-    // 其他文件在新标签页中打开
-    const tab = tabStore.addFileTab(file);
-    router.push(tab.fullPath);
+    // 其他格式（图片、Word/Excel/PPT 等）使用系统默认应用打开
+    if (api) {
+      await api.invoke('kb-open-file-external', { filePath: file.path });
+    }
   }
 
   // 搜索结果点击：文件夹则进入，文件则跳转到所在目录

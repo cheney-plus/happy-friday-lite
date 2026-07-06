@@ -33,6 +33,14 @@
             <div class="category-header" @click="$emit('toggle-category', category.id)">
               <ChevronIcon :class="{ expanded: category.expanded }" />
               <span class="category-name">{{ category.name }}</span>
+              <button
+                v-if="!searchQuery && category.id === 'agent'"
+                class="add-btn open-dir-btn"
+                @click.stop="$emit('open-agent-dir')"
+                title="打开Agent文件目录"
+              >
+                <FolderOpenIcon :size="14" />
+              </button>
               <button v-if="!searchQuery" class="add-btn" @click.stop="$emit('add-kb', category.id)" title="添加知识库">
                 <PlusIcon :size="14" />
               </button>
@@ -55,7 +63,7 @@
           </div>
         </template>
         <div class="sidebar-footer">
-          <p class="footer-text">本地知识库中可添加多种类型文档</p>
+          <p class="footer-text">Agent只在SANDBOX中执行命令哦！</p>
         </div>
       </div>
     </div>
@@ -63,7 +71,7 @@
 </template>
 
 <script setup>
-import { SidebarIcon, SearchIcon, ChevronIcon, PlusIcon, BookIcon } from './icons';
+import { SidebarIcon, SearchIcon, ChevronIcon, PlusIcon, BookIcon, FolderOpenIcon } from './icons';
 import { coverOptions } from '../constants';
 
 defineProps({
@@ -85,7 +93,8 @@ defineEmits([
   'toggle-category',
   'add-kb',
   'select-kb',
-  'show-context-menu'
+  'show-context-menu',
+  'open-agent-dir'
 ]);
 </script>
 
@@ -275,6 +284,10 @@ defineEmits([
         &:hover .add-btn {
           opacity: 1;
         }
+
+        .open-dir-btn {
+          margin-right: 2px;
+        }
       }
 
       .category-items {
@@ -329,11 +342,11 @@ defineEmits([
     }
 
     .sidebar-footer {
-      padding: 16px 12px;
+      padding: 16px 28px;
       margin-top: auto;
 
       .footer-text {
-        font-size: 12px;
+        font-size: 11px;
         color: var(--text-tertiary);
         text-align: center;
       }

@@ -25,8 +25,8 @@
               <p class="dialog-tip">Agent 请求执行以下操作，需要你的确认：</p>
 
               <div class="tool-info-card">
-                <div class="tool-info-row">
-                  <span class="info-label">工具</span>
+                <div class="tool-info-row tool-info-inline">
+                  <span class="info-label">工具：</span>
                   <span class="info-value tool-name">{{ toolName }}</span>
                 </div>
                 <div class="tool-info-row">
@@ -54,6 +54,13 @@
                 </svg>
                 拒绝
               </button>
+              <button class="btn btn-approve-all" @click="handleApproveAll" title="批准本次工具调用及本次 AI 执行后续所有工具调用（新对话仍需审批）">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 11 12 14 22 4"></polyline>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                全部批准
+              </button>
               <button class="btn btn-approve" @click="handleApprove">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="20 6 9 17 4 12"></polyline>
@@ -77,7 +84,7 @@ const props = defineProps({
   arguments: { type: [Object, String], default: () => ({}) }
 })
 
-const emit = defineEmits(['approve', 'reject'])
+const emit = defineEmits(['approve', 'approve-all', 'reject'])
 
 const rejectReason = ref('')
 
@@ -105,6 +112,10 @@ watch(() => props.visible, (v) => {
 
 function handleApprove() {
   emit('approve', { type: 'approve' })
+}
+
+function handleApproveAll() {
+  emit('approve-all', { type: 'approve-all' })
 }
 
 function handleReject() {
@@ -205,6 +216,21 @@ function handleReject() {
   gap: 4px;
 }
 
+/* 工具名行：标签与工具名同一行，避免工具名换行 */
+.tool-info-inline {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tool-info-inline .info-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  flex-shrink: 0;
+}
+
 .info-label {
   font-size: 11px;
   font-weight: 600;
@@ -222,6 +248,7 @@ function handleReject() {
   font-family: 'SF Mono', Monaco, monospace;
   font-weight: 600;
   color: #1560F7;
+  white-space: nowrap;
 }
 
 .args-block {
@@ -306,6 +333,15 @@ function handleReject() {
 
 .btn-approve:hover {
   background: #059669;
+}
+
+.btn-approve-all {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.btn-approve-all:hover {
+  background: #2563eb;
 }
 
 .dialog-fade-enter-active,

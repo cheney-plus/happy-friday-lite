@@ -7,6 +7,7 @@ import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.j
 import { registerCommands } from './src-electron/commands.js'
 import { checkAutoBackup } from './src-electron/backup.js'
 import { initPythonEnv } from './src-electron/python-env.js'
+import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -21,6 +22,7 @@ if (isDev) {
 }
 
 let mainWindow = null
+let kbWatcherHandle = null
 
 async function ensureDataDir() {
   const dataDir = isDev
@@ -75,7 +77,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  await ensureDataDir()
+  const dataDir = await ensureDataDir()
   createWindow()
 
   console.log('[Main] Registering IPC commands...')
@@ -84,6 +86,13 @@ app.whenReady().then(async () => {
     console.log('[Main] ✅ IPC commands registered successfully')
   } catch (error) {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
+  }
+
+  // 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
+  try {
+    kbWatcherHandle = startKnowledgeWatcher(mainWindow, dataDir)
+  } catch (e) {
+    console.error('[Main] ❌ Failed to start knowledge watcher:', e)
   }
 
   // 初始化 Python 运行时环境（异步，不阻塞窗口显示）
@@ -110,6 +119,10 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', function () {
+  if (kbWatcherHandle) {
+    kbWatcherHandle.close()
+    kbWatcherHandle = null
+  }
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()

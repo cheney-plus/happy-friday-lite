@@ -84,8 +84,11 @@
                   :default-collapsed="seg.status === 'success' && !seg.requireApproval"
                 />
               </template>
-              <!-- 尚未收到任何段但已开始流式 → 显示思考光标 -->
-              <span v-if="agentSegments.length === 0 && isStreaming" class="streaming-cursor"></span>
+              <!-- 思考中指示器：尚未收到内容 或 工具调用间等待 LLM 下一轮思考 -->
+              <div v-if="isThinking" class="thinking-indicator">
+                <span class="thinking-text">思考中</span>
+                <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+              </div>
             </div>
           </div>
         </template>
@@ -133,6 +136,7 @@
       :tool-name="pendingApproval?.toolName || ''"
       :arguments="pendingApproval?.arguments || {}"
       @approve="handleApproveTool"
+      @approve-all="handleApproveAll"
       @reject="handleRejectTool"
     />
 
@@ -145,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
@@ -198,6 +202,13 @@ let isDoneReceived = false;
 const agentSegments = ref([]);
 // 待审批的工具调用（HITL 弹窗）
 const pendingApproval = ref(null);
+// "全部批准"模式：本次 AI 执行内后续所有工具调用自动批准，新对话仍需审批
+const autoApproveAll = ref(false);
+
+// 流式结束时重置"全部批准"标记（下一次对话仍需审批）
+watch(isStreaming, (streaming) => {
+  if (!streaming) autoApproveAll.value = false;
+});
 
 const rollbackDialogVisible = ref(false);
 const rollbackPreviewContent = ref('');
@@ -217,6 +228,19 @@ function renderMarkdown(content) {
 }
 
 const showBackBtn = computed(() => route.query.hideBack !== 'true');
+
+// Agent 模式"思考中"指示器：流式执行中且未在输出文本时显示
+// 触发场景：1) 尚未收到任何段；2) 上一段是工具调用（工具结束后等待 LLM 下一轮思考）
+const isThinking = computed(() => {
+  if (!isStreaming.value || currentMode.value !== 'agent') return false;
+  const segs = agentSegments.value;
+  if (segs.length === 0) return true;
+  const last = segs[segs.length - 1];
+  // 最后一段是文本且正在流式输出 → 显示文本光标，不显示"思考中"
+  if (last.type === 'text' && last.isStreaming) return false;
+  // 最后一段是工具（running/pending_approval/success/rejected）→ LLM 正在思考下一步
+  return true;
+});
 
 function goBack() {
   router.push('/friday');
@@ -765,8 +789,12 @@ onMounted(async () => {
     console.log('[Agent] 工具结果:', data.toolName, data.status);
     const seg = agentSegments.value.find((s) => s.type === 'tool' && s.toolCallId === data.toolCallId);
     if (seg) {
-      seg.status = data.status || 'success';
-      seg.output = data.output || '';
+      // execute_command 等非 interruptOn 工具在 handler 内部触发审批，
+      // 用户拒绝后 on_tool_end 仍会触发，此时不应覆盖 rejected 状态
+      if (seg.status !== 'rejected') {
+        seg.status = data.status || 'success';
+        seg.output = data.output || '';
+      }
     }
     scrollToBottom();
   });
@@ -778,28 +806,61 @@ onMounted(async () => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
     console.log('[Agent] 请求审批:', data.toolName);
-    pendingApproval.value = {
-      requestId: data.requestId,
-      toolName: data.toolName,
-      toolCallId: data.toolCallId,
-      arguments: data.arguments
-    };
-    // 推送 pending_approval 段到时间线（用户拒绝时可见）
-    const segs = agentSegments.value;
-    const last = segs.length > 0 ? segs[segs.length - 1] : null;
-    if (last && last.type === 'text') {
-      last.isStreaming = false;
+
+    // 若用户已点击"全部批准"，自动批准后续所有工具调用，不弹窗
+    if (autoApproveAll.value) {
+      console.log('[Agent] 自动批准（全部批准模式）:', data.toolName);
+      electronService.invoke('agent-tool-approval-resume', {
+        requestId: data.requestId,
+        decision: { type: 'approve' }
+      });
+      return;
     }
-    segs.push({
-      type: 'tool',
-      id: data.toolCallId,
-      toolCallId: data.toolCallId,
-      toolName: data.toolName,
-      arguments: data.arguments,
-      status: 'pending_approval',
-      output: '',
-      requireApproval: true
-    });
+
+    // execute_command 等非 interruptOn 工具：agent-tool-call 已先推送 running 段
+    // 这里复用已有段，更新为 pending_approval，避免时间线出现重复工具段
+    const existingSeg = agentSegments.value.find(s =>
+      s.type === 'tool' &&
+      s.toolName === data.toolName &&
+      s.status === 'running'
+    );
+
+    if (existingSeg) {
+      // 复用已有段：更新为待审批状态，保留原 toolCallId 以匹配后续 agent-tool-result
+      existingSeg.status = 'pending_approval';
+      existingSeg.requireApproval = true;
+      existingSeg.arguments = data.arguments;
+      pendingApproval.value = {
+        requestId: data.requestId,
+        toolName: data.toolName,
+        toolCallId: existingSeg.toolCallId,
+        arguments: data.arguments
+      };
+    } else {
+      // interruptOn 工具（如 write_agent_file/python_repl）：on_tool_start 尚未触发，
+      // 这里新建 pending_approval 段（on_tool_start 后会复用）
+      pendingApproval.value = {
+        requestId: data.requestId,
+        toolName: data.toolName,
+        toolCallId: data.toolCallId,
+        arguments: data.arguments
+      };
+      const segs = agentSegments.value;
+      const last = segs.length > 0 ? segs[segs.length - 1] : null;
+      if (last && last.type === 'text') {
+        last.isStreaming = false;
+      }
+      segs.push({
+        type: 'tool',
+        id: data.toolCallId,
+        toolCallId: data.toolCallId,
+        toolName: data.toolName,
+        arguments: data.arguments,
+        status: 'pending_approval',
+        output: '',
+        requireApproval: true
+      });
+    }
     scrollToBottom();
   });
 
@@ -835,6 +896,23 @@ async function handleApproveTool() {
   if (!pendingApproval.value) return;
   const { requestId } = pendingApproval.value;
   console.log('[Agent] 用户批准工具调用');
+  pendingApproval.value = null;
+  try {
+    await electronService.invoke('agent-tool-approval-resume', {
+      requestId,
+      decision: { type: 'approve' }
+    });
+  } catch (err) {
+    console.error('[Agent] 审批回传失败:', err);
+  }
+}
+
+// 用户点击"全部批准"：批准当前工具 + 后续本次执行的所有工具调用自动批准
+async function handleApproveAll() {
+  if (!pendingApproval.value) return;
+  const { requestId } = pendingApproval.value;
+  console.log('[Agent] 用户点击全部批准，后续工具调用将自动批准');
+  autoApproveAll.value = true;
   pendingApproval.value = null;
   try {
     await electronService.invoke('agent-tool-approval-resume', {
@@ -1220,5 +1298,42 @@ async function handleRejectTool(decision) {
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
+}
+
+/* Agent "思考中"指示器：流式执行但未在输出文本时显示 */
+.thinking-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  font-size: 14px;
+  color: var(--text-tertiary, #999);
+}
+
+.thinking-text {
+  font-weight: 500;
+}
+
+.thinking-dots span {
+  display: inline-block;
+  opacity: 0;
+  animation: thinking-dot 1.4s infinite;
+}
+
+.thinking-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes thinking-dot {
+  0%, 60%, 100% { opacity: 0; }
+  30% { opacity: 1; }
 }
 </style>

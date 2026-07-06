@@ -1,6 +1,9 @@
 import { ref, reactive, computed, nextTick } from 'vue';
 import { coverOptions, DEFAULT_CATEGORIES } from '../constants';
 
+// Agent 智能体目录下需要隐藏的系统目录（仅显示 SKILL、SANDBOX 及用户创建的目录）
+const AGENT_HIDDEN_DIRS = ['memories', 'large_tool_results'];
+
 export function useKnowledgeBase(fileSystem, sidebar) {
   const api = window.electronAPI;
   const selectedKB = ref('');
@@ -38,6 +41,10 @@ export function useKnowledgeBase(fileSystem, sidebar) {
         // 只添加磁盘上存在但列表中没有的文件夹
         for (const entry of entries) {
           if (entry.isDirectory && !category.items.some(i => i.name === entry.name)) {
+            // Agent 智能体目录下隐藏系统目录（如 memories），仅显示 SKILL、SANDBOX 及用户创建的目录
+            if (category.id === 'agent' && AGENT_HIDDEN_DIRS.includes(entry.name)) {
+              continue;
+            }
             category.items.push({
               id: `kb-${category.id}-${entry.name}`,
               name: entry.name,

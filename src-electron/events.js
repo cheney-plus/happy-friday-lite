@@ -9,6 +9,11 @@ export const NOTE_AI_DONE = 'note-ai-done'
 export const NOTE_AI_ERROR = 'note-ai-error'
 export const NOTE_FIM_RESULT = 'note-fim-result'
 
+// ========== 知识库文件监听事件 ==========
+// 当 knowledge/ 目录下的文件/文件夹发生外部变更（新增/删除/重命名）时，
+// 由主进程 fileWatcher.js 推送给渲染进程，触发当前视图按需刷新。
+export const KB_DIRECTORY_CHANGED = 'kb-directory-changed'
+
 // ========== Agent 相关事件 ==========
 // 流式正文/思考分片复用 CHAT_CHUNK / CHAT_REASONING_CHUNK / CHAT_DONE / CHAT_ERROR，
 // 这样前端流式渲染逻辑可最大化复用。以下为 Agent 专有事件：

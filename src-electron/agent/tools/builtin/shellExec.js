@@ -6,7 +6,11 @@
  * 受限 shell 执行：
  *   - 白名单：ls/cat/pwd/echo/grep/find/wc/head/tail 等只读命令（无需审批）
  *   - 黑名单：rm -rf /、mkfs、dd if=、shutdown 等（直接拒绝）
- *   - 不在白名单的命令默认触发审批
+ *   - 不在白名单的命令（含 rm/rmdir/mv/cp/重定向等）触发用户审批
+ *
+ * 审批机制：因 interruptOn 为静态配置无法按命令动态判断，
+ *   非白名单命令在 handler 内部复用 HITL 审批流程：
+ *   推送 agent-tool-approval 事件 → 等待用户决策 → 执行或拒绝
  *
  * 安全约束：
  *   - cwd 锁定为 Agent 沙箱目录 {userData}/knowledge/agent/SANDBOX/
@@ -19,6 +23,7 @@ import fs from 'fs'
 import path from 'path'
 import { z } from 'zod'
 import { registerTool } from '../registry.js'
+import { waitForApproval } from '../../humanInTheLoop.js'
 
 // 只读命令白名单（无需审批）
 const READONLY_WHITELIST = new Set([
@@ -83,6 +88,28 @@ async function handler(args, ctx) {
   if (!analysis.safe) {
     ctx.logger.warn(`[execute_command] 拒绝执行: ${analysis.reason}`)
     return `命令被拒绝: ${analysis.reason}`
+  }
+
+  // 非白名单命令（如 rm/mv/cp/重定向等）：在 handler 内部触发审批流程
+  // 复用 HITL 的 waitForApproval 机制，推送 agent-tool-approval 事件到前端
+  if (analysis.needApproval) {
+    ctx.logger.info(`[execute_command] 非白名单命令，请求用户审批: ${command}`)
+    const approvalToolCallId = `execute_command_approval_${Date.now()}`
+    ctx.emit('agent-tool-approval', {
+      requestId: ctx.requestId,
+      toolCallId: approvalToolCallId,
+      toolName: 'execute_command',
+      arguments: { command },
+      description: analysis.reason || `命令需要审批: ${command}`
+    })
+
+    // 等待用户审批决策（与 interruptOn 工具共用同一审批通道）
+    const decision = await waitForApproval(ctx.requestId)
+    if (decision.type === 'reject') {
+      ctx.logger.info(`[execute_command] 用户拒绝执行: ${decision.reason || '无原因'}`)
+      return `命令被用户拒绝: ${decision.reason || '用户拒绝执行'}`
+    }
+    ctx.logger.info(`[execute_command] 用户已批准，继续执行`)
   }
 
   // 确保沙盒区目录存在（cwd 锁定于此，所有 shell 命令均在 SANDBOX 下执行）

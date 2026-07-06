@@ -124,7 +124,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'rag-task-complete',
       'agent-tool-call',
       'agent-tool-result',
-      'agent-tool-approval'
+      'agent-tool-approval',
+      'kb-directory-changed'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

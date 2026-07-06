@@ -19,6 +19,7 @@
 
 import { createDeepAgent } from 'deepagents'
 import { MemorySaver } from '@langchain/langgraph'
+import path from 'path'
 import { createLogger } from './logger.js'
 import { createLangChainModel } from './modelAdapter.js'
 import { buildBackend, getAgentRootDir, getSharedStore } from './backend.js'
@@ -119,20 +120,23 @@ export async function createAgent(modelConfig) {
       '- 管理日程（list_events / create_event / update_event）\n' +
       '- 操作 Agent 工作区文件（list_agent_files / read_agent_file / write_agent_file）\n' +
       '- 执行受限 shell 命令（execute_command）\n' +
-      '- 执行 Python 代码（python_repl，已预装 pandas/numpy/requests/beautifulsoup4/openpyxl/markitdown 等库）\n' +
+      '- 执行 Python 代码（python_repl，仅限预装库：pandas/numpy/scipy/matplotlib/seaborn/plotly/openpyxl/xlrd/xlwt/xlsxwriter/requests/beautifulsoup4/lxml/python-dateutil/pytz/PyYAML/jieba/sympy/rich/tabulate/markitdown[all] + 标准库；脚本统一存于 SANDBOX/tmpscript/，输出文件须存于 SANDBOX/ 自建子目录）\n' +
       '- 调用 REST API（requests_get / requests_post / requests_put / requests_patch / requests_delete）\n' +
       '- 处理 JSON 数据（json_parse / json_extract / json_format）\n' +
       '- 抓取网页正文（fetch_webpage_text，自动去除导航/广告等非正文内容）\n\n' +
       '## 文件存放约束（强制）\n' +
+      `Agent 工作区根目录绝对路径：${rootDir}\n` +
+      `SANDBOX 绝对路径：${path.join(rootDir, 'SANDBOX')}（python_repl 脚本目录与输出目录均在此之下）\n\n` +
       'Agent 工作区根目录下只有以下子目录有特殊用途，**严禁**在其他位置创建文件：\n' +
       '- `/SKILL/`：技能文件（只读，由前端管理，Agent 不可写入）\n' +
       '- `/memories/`：跨会话记忆（Agent 可读写，用于长期记忆）\n' +
       '- `/SANDBOX/`：**Agent 工作区，所有 LLM 生成的文件（write_file、Python 输出、shell 重定向等）必须存放于此**\n\n' +
       '权限规则已强制约束：写入 `/SKILL/` 或根目录其他位置会被拒绝。\n' +
-      '在 `/SANDBOX/` 下建议按任务组织子目录，例如：\n' +
-      '  - `/SANDBOX/20260705-1/report.md`（python_repl 默认工作目录）\n' +
+      '在 `/SANDBOX/` 下按任务组织子目录，例如：\n' +
+      '  - `/SANDBOX/tmpscript/`（python_repl 脚本文件统一存放处，由工具自动保存为 .py，执行后保留不删除，禁止在此目录产生输出文件）\n' +
       '  - `/SANDBOX/data/process/input.json`\n' +
-      '  - `/SANDBOX/exports/sheet.xlsx`\n\n' +
+      '  - `/SANDBOX/exports/sheet.xlsx`\n' +
+      '注意：python_repl 产生任何输出文件（xlsx/csv/png/json 等）时，必须通过 workDir 参数指定 SANDBOX/ 下的自建子目录作为输出目录；无输出文件的纯计算执行 cwd 落在 `/SANDBOX/tmpscript/`。\n\n' +
       '调用 write_file / edit_file 时，路径必须以 `/SANDBOX/` 开头；其他路径会被权限层拒绝。\n\n' +
       '## 行为准则\n' +
       '1. 优先使用工具获取信息，避免凭空回答\n' +
