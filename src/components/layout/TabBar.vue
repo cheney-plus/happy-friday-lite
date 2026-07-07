@@ -1,7 +1,7 @@
 <template>
   <div class="tab-bar-container">
     <div v-if="isMac" class="mac-traffic-lights-spacer"></div>
-    <div class="tab-bar-left" :class="{ 'linux-left': isLinux }">
+    <div class="tab-bar-left" :class="{ 'linux-left': !isMac }">
       <button class="sidebar-toggle-btn" @click="appStore.toggleSidebar()">
         <PanelLeftClose v-if="appStore.sidebarVisible" :size="16" :stroke-width="1.8" />
         <PanelLeftOpen v-else :size="16" :stroke-width="1.8" />
@@ -42,7 +42,7 @@
       <div class="tabs-area-spacer"></div>
     </div>
 
-    <div v-if="isLinux" class="linux-window-controls">
+    <div v-if="!isMac" class="linux-window-controls">
       <button class="window-ctrl-btn minimize-btn" @click="handleMinimize">
         <Minus :size="15" :stroke-width="1.5" />
       </button>
