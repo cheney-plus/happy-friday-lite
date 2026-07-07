@@ -364,27 +364,35 @@ function openAgentDir() {
 //   4. 否则忽略（无关目录变更）
 
 /**
- * 判断 ancestor 是否是 target 的祖先目录或自身
- * @param {string} ancestor 候选祖先路径
- * @param {string} target 目标路径
+ * 将路径分隔符统一规范化为 '/'，便于跨平台比较
+ * （前端 currentPath 用 '/' 拼接，但 dataDir 在 Windows 上可能含 '\\'，需统一）
+ */
+function normalizePath(p) {
+  if (!p) return p;
+  return p.replace(/\\/g, '/');
+}
+
+/**
+ * 判断 ancestor 是否是 target 的祖先目录或自身（路径已规范化为 '/' 分隔符）
+ * @param {string} ancestor 候选祖先路径（已规范化）
+ * @param {string} target 目标路径（已规范化）
  * @returns {boolean}
  */
 function isAncestorOrSelf(ancestor, target) {
   if (!ancestor || !target) return false;
   if (ancestor === target) return true;
-  // target 必须以 ancestor + 分隔符 开头
-  return target.startsWith(ancestor + '/') || target.startsWith(ancestor + '\\');
+  return target.startsWith(ancestor + '/');
 }
 
 /**
  * 获取 target 相对 ancestor 的剩余路径（去掉 ancestor 前缀和分隔符）。
  * 若 target 不是 ancestor 的后代/自身，返回 null。
+ * 路径需已规范化为 '/' 分隔符。
  */
 function relPathUnder(ancestor, target) {
   if (!ancestor || !target) return null;
   if (ancestor === target) return '';
   if (target.startsWith(ancestor + '/')) return target.slice(ancestor.length + 1);
-  if (target.startsWith(ancestor + '\\')) return target.slice(ancestor.length + 1);
   return null;
 }
 
@@ -417,9 +425,9 @@ onMounted(async () => {
   if (window.electronAPI && window.electronAPI.on) {
     unsubKbDirChanged = window.electronAPI.on('kb-directory-changed', ({ dirs }) => {
       if (!dirs || !dirs.length) return;
-      const currentPath = fileSystem.currentPath.value;
-      const dataDir = fileSystem.dataDir.value;
-      const knowledgeRoot = dataDir ? (dataDir + '/knowledge') : '';
+      // 后端已将路径分隔符统一规范化为 '/'，前端 currentPath/knowledgeRoot 也需规范化后再比较
+      const normCurrentPath = normalizePath(fileSystem.currentPath.value);
+      const normKnowledgeRoot = normalizePath(fileSystem.dataDir.value ? (fileSystem.dataDir.value + '/knowledge') : '');
 
       let needRefreshCurrent = false;
       let needReloadCategories = false;
@@ -428,23 +436,22 @@ onMounted(async () => {
         if (!dir) continue;
 
         // 1. 变更目录就是当前目录 → 刷新（内容变化）
-        if (currentPath && dir === currentPath) {
+        if (normCurrentPath && dir === normCurrentPath) {
           needRefreshCurrent = true;
         }
         // 2. 变更目录是当前目录的直接子目录 → 刷新（子目录的 count 字段会变）
-        if (currentPath && isAncestorOrSelf(currentPath, dir)) {
-          const rel = relPathUnder(currentPath, dir);
-          if (rel !== null && !rel.includes('/') && !rel.includes('\\')) {
-            // rel 为空表示 dir === currentPath，已由条件1处理；这里处理直接子目录
-            if (rel !== '') needRefreshCurrent = true;
+        if (normCurrentPath && isAncestorOrSelf(normCurrentPath, dir)) {
+          const rel = relPathUnder(normCurrentPath, dir);
+          if (rel !== null && !rel.includes('/') && rel !== '') {
+            needRefreshCurrent = true;
           }
         }
         // 3. 变更目录是 knowledgeRoot 或其直接子目录（分类目录）→ 影响侧边栏知识库列表
-        if (knowledgeRoot) {
-          const rel = relPathUnder(knowledgeRoot, dir);
+        if (normKnowledgeRoot) {
+          const rel = relPathUnder(normKnowledgeRoot, dir);
           if (rel !== null) {
             // rel 为空（变更在 knowledgeRoot）或 rel 是单段（变更在分类目录 personal/local/agent）
-            if (rel === '' || (!rel.includes('/') && !rel.includes('\\'))) {
+            if (rel === '' || !rel.includes('/')) {
               needReloadCategories = true;
             }
           }

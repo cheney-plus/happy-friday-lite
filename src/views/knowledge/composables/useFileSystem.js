@@ -113,6 +113,11 @@ export function useFileSystem() {
   async function navigateTo(dirPath, addToHistory = true) {
     currentPath.value = dirPath;
     await readDirectory(dirPath);
+    // 通知后端动态监听当前目录（Linux 不支持 recursive 监听，需切换监听目标）
+    // macOS/Windows 已有 recursive watcher，此调用为空操作
+    if (api) {
+      api.invoke('kb-watch-current-dir', { dirPath }).catch(() => {});
+    }
     if (addToHistory) {
       if (historyIndex.value < navigationHistory.value.length - 1) {
         navigationHistory.value = navigationHistory.value.slice(0, historyIndex.value + 1);

@@ -95,6 +95,18 @@ app.whenReady().then(async () => {
     console.error('[Main] ❌ Failed to start knowledge watcher:', e)
   }
 
+  // 注册"动态监听当前浏览目录"IPC（Linux 不支持 recursive 监听，需前端切换目录时通知后端）
+  ipcMain.handle('kb-watch-current-dir', (_event, args) => {
+    if (kbWatcherHandle && args && args.dirPath) {
+      try {
+        kbWatcherHandle.watchCurrentDir(args.dirPath)
+      } catch (e) {
+        console.warn('[Main] watchCurrentDir error:', e?.message || e)
+      }
+    }
+    return { success: true }
+  })
+
   // 初始化 Python 运行时环境（异步，不阻塞窗口显示）
   // macOS 优先检测系统 Python，其他平台使用打包 Python
   initPythonEnv().catch(e => console.error('[Main] ❌ Python env init failed:', e))
