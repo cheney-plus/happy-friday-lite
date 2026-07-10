@@ -1,14 +1,14 @@
 <template>
   <div class="settings-page">
-    <h1 class="settings-title">设置</h1>
+    <h1 class="settings-title">{{ t('settings.title') }}</h1>
 
     <div class="settings-content">
       <!-- 通用设置 -->
       <div class="settings-group">
-        <div class="group-title">通用设置</div>
+        <div class="group-title">{{ t('settings.general') }}</div>
         <div class="group-content">
           <div class="setting-item">
-            <span class="item-label">界面显示</span>
+            <span class="item-label">{{ t('settings.displayMode') }}</span>
             <div class="theme-select-wrapper" ref="themeSelectRef">
               <div class="theme-select-trigger" @click="toggleThemeDropdown">
                 <span>{{ currentThemeLabel }}</span>
@@ -32,7 +32,7 @@
             </div>
           </div>
           <div class="setting-item">
-            <span class="item-label">字体大小</span>
+            <span class="item-label">{{ t('settings.fontSize') }}</span>
             <div class="font-size-options">
               <div
                 v-for="option in fontSizeOptions"
@@ -45,50 +45,52 @@
             </div>
           </div>
           <div class="setting-item">
-            <span class="item-label">开机自动启动</span>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="settings.autoStart" />
-              <span class="toggle-slider"></span>
-            </label>
+            <span class="item-label">{{ t('settings.language') }}</span>
+            <div class="theme-select-wrapper" ref="langSelectRef">
+              <div class="theme-select-trigger" @click="toggleLangDropdown">
+                <span>{{ currentLangLabel }}</span>
+                <svg class="theme-select-arrow" :class="{ expanded: showLangDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div v-if="showLangDropdown" class="theme-dropdown-menu">
+                <div
+                  v-for="option in langOptions"
+                  :key="option.value"
+                  :class="['theme-dropdown-item', { active: currentLanguage === option.value }]"
+                  @click="selectLanguage(option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                  <svg v-if="currentLanguage === option.value" class="check-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="setting-item">
-            <span class="item-label">接收消息提醒</span>
+            <span class="item-label">{{ t('settings.messageNotify') }}</span>
             <label class="toggle-switch">
               <input type="checkbox" v-model="settings.messageNotify" />
               <span class="toggle-slider"></span>
             </label>
-          </div>
-          <div class="setting-item clickable" @click="goToModelSettings">
-            <span class="item-label">模型设置</span>
-            <span class="item-link">
-              支持自定义模型
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </span>
           </div>
         </div>
       </div>
 
       <!-- AI工具 -->
       <div class="settings-group">
-        <div class="group-title">AI工具</div>
+        <div class="group-title">{{ t('settings.aiTools') }}</div>
         <div class="group-content">
-          <div class="setting-item">
-            <span class="item-label">随时唤起Friday</span>
-            <span class="shortcut-key">⌘ + Space</span>
-          </div>
-          <div class="setting-item">
-            <span class="item-label">快捷截图</span>
-            <span class="shortcut-key">⌘ + J</span>
-          </div>
-          <div class="setting-item clickable">
-            <span class="item-label">AI划词工具栏</span>
+          <div class="setting-item clickable" @click="goToModelSettings">
+            <span class="item-label">{{ t('settings.modelSettings') }}</span>
             <span class="item-link">
-              仅在ima中使用
+              {{ t('settings.customModelHint') }}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </span>
           </div>
           <div class="setting-item">
-            <span class="item-label">开启笔记内容补全</span>
+            <span class="item-label">{{ t('settings.noteFimCompletion') }}</span>
             <label class="toggle-switch">
               <input type="checkbox" v-model="settings.noteFimCompletion" @change="saveNoteFimCompletion" />
               <span class="toggle-slider"></span>
@@ -97,109 +99,59 @@
         </div>
       </div>
 
-      <!-- 浏览设置 -->
-      <div class="settings-group">
-        <div class="group-title">浏览设置</div>
-        <div class="group-content">
-          <div class="setting-item">
-            <span class="item-label">网页默认用 ima 打开</span>
-            <button class="action-btn">去设置</button>
-          </div>
-          <div class="setting-item clickable">
-            <span class="item-label">搜索方式</span>
-            <span class="item-link">
-              Microsoft Bing
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </span>
-          </div>
-          <div class="setting-item">
-            <span class="item-label">启动时候复上次打开的标签页</span>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="settings.restoreTabs" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- 书签 -->
-      <div class="settings-group">
-        <div class="group-title">书签</div>
-        <div class="group-content">
-          <div class="setting-item">
-            <span class="item-label">展示书签栏</span>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="settings.showBookmarkBar" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="setting-item clickable">
-            <span class="item-label">书签管理器</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </div>
-          <div class="setting-item clickable">
-            <span class="item-label">导入书签</span>
-            <div class="import-action">
-              <span class="red-dot"></span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- 数据备份 -->
       <div class="settings-group">
-        <div class="group-title">数据备份</div>
+        <div class="group-title">{{ t('settings.backup') }}</div>
         <div class="group-content">
           <div class="setting-item">
-            <span class="item-label">立即备份</span>
+            <span class="item-label">{{ t('settings.backupNow') }}</span>
             <button
               class="action-btn"
               :disabled="backupState.backing"
               @click="handleBackup"
             >
-              {{ backupState.backing ? '备份中...' : '创建备份' }}
+              {{ backupState.backing ? t('settings.backing') : t('settings.createBackup') }}
             </button>
           </div>
           <div class="setting-item">
-            <span class="item-label">恢复数据</span>
+            <span class="item-label">{{ t('settings.restoreData') }}</span>
             <button
               class="text-btn"
               :disabled="backupState.restoring"
               @click="handleRestore"
             >
-              {{ backupState.restoring ? '恢复中...' : '从备份恢复' }}
+              {{ backupState.restoring ? t('settings.restoring') : t('settings.restoreFromBackup') }}
             </button>
           </div>
           <div class="setting-item">
-            <span class="item-label">自动备份</span>
+            <span class="item-label">{{ t('settings.autoBackup') }}</span>
             <label class="toggle-switch">
               <input type="checkbox" v-model="backupConfig.enabled" @change="saveBackupConfig" />
               <span class="toggle-slider"></span>
             </label>
           </div>
           <div v-if="backupConfig.enabled" class="setting-item">
-            <span class="item-label">备份频率</span>
+            <span class="item-label">{{ t('settings.backupFrequency') }}</span>
             <div class="font-size-options">
               <div
                 :class="['font-size-option', { active: backupConfig.interval === 'daily' }]"
                 @click="setBackupInterval('daily')"
-              >每天</div>
+              >{{ t('settings.daily') }}</div>
               <div
                 :class="['font-size-option', { active: backupConfig.interval === 'weekly' }]"
                 @click="setBackupInterval('weekly')"
-              >每周</div>
+              >{{ t('settings.weekly') }}</div>
             </div>
           </div>
           <div v-if="backupConfig.enabled" class="setting-item clickable" @click="selectBackupDir">
-            <span class="item-label">备份目录</span>
+            <span class="item-label">{{ t('settings.backupDir') }}</span>
             <span class="item-link">
-              {{ backupConfig.autoDir ? shortenPath(backupConfig.autoDir) : '未设置' }}
+              {{ backupConfig.autoDir ? shortenPath(backupConfig.autoDir) : t('settings.notSet') }}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </span>
           </div>
           <div v-if="backupConfig.lastBackupAt" class="setting-item">
-            <span class="item-label">上次备份时间</span>
+            <span class="item-label">{{ t('settings.lastBackupTime') }}</span>
             <span class="item-link">{{ formatBackupTime(backupConfig.lastBackupAt) }}</span>
           </div>
         </div>
@@ -207,16 +159,16 @@
 
       <!-- 知识库检索 (RAG) -->
       <div class="settings-group">
-        <div class="group-title">知识库检索</div>
+        <div class="group-title">{{ t('settings.rag') }}</div>
         <div class="group-content">
           <div class="setting-item">
-            <span class="item-label">更新索引</span>
+            <span class="item-label">{{ t('settings.updateIndex') }}</span>
             <button
               class="primary-btn"
               :disabled="ragState.updating"
               @click="handleRagUpdate"
             >
-              {{ ragState.updating ? '更新中...' : '更新索引' }}
+              {{ ragState.updating ? t('settings.updating') : t('settings.updateIndex') }}
             </button>
           </div>
           <div v-if="ragState.progress" class="setting-item">
@@ -224,13 +176,13 @@
             <span class="item-link">{{ ragState.progress }}</span>
           </div>
           <div class="setting-item">
-            <span class="item-label">启动时自动更新</span>
+            <span class="item-label">{{ t('settings.autoUpdateOnStartup') }}</span>
             <div class="item-toggle">
               <input type="checkbox" v-model="ragConfig.autoUpdateOnStartup" @change="saveRagConfig" />
             </div>
           </div>
           <div class="setting-item rag-stats-row">
-            <span class="item-label">索引统计</span>
+            <span class="item-label">{{ t('settings.indexStats') }}</span>
             <div class="rag-stats-inline" v-if="ragStats && Object.keys(ragStats).length > 0">
               <span
                 v-for="(stat, kbType) in ragStats"
@@ -243,83 +195,240 @@
                 <span class="rag-stat-vectors" v-if="stat.vectorCount">{{ stat.vectorCount }}v</span>
               </span>
             </div>
-            <span v-else class="item-link">暂无数据</span>
+            <span v-else class="item-link">{{ t('settings.noData') }}</span>
           </div>
         </div>
       </div>
 
       <!-- 关于 -->
       <div class="settings-group">
-        <div class="group-title">关于</div>
+        <div class="group-title">{{ t('settings.about') }}</div>
         <div class="group-content">
-          <div class="setting-item clickable">  
-            <span class="item-label">关于&nbsp;friday.copilot</span>
+          <div class="setting-item clickable" @click="showAboutModal = true">
+            <span class="item-label">{{ t('settings.aboutApp') }}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
           <div class="setting-item">
-            <span class="item-label">版本号&nbsp;1.0.1(0512)</span>
-            <button class="text-btn">检查并更新</button>
+            <span class="item-label">{{ t('settings.versionLabel') }}&nbsp;{{ appVersion }}</span>
+            <button class="text-btn" @click="checkForUpdate">{{ t('settings.checkUpdate') }}</button>
           </div>
-          <div class="setting-item clickable">
-            <span class="item-label">功能介绍</span>
+          <div class="setting-item clickable" @click="showFeaturesModal = true">
+            <span class="item-label">{{ t('settings.features') }}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
-          <div class="setting-item clickable">
-            <span class="item-label">帮助与反馈</span>
+          <div class="setting-item clickable" @click="openHelpUrl">
+            <span class="item-label">{{ t('settings.helpFeedback') }}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>
+          <div class="setting-item clickable" @click="showAuthorModal = true">
+            <span class="item-label">作者介绍</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
         </div>
       </div>
-
-      <div class="footer-links">
-        <a href="#" class="footer-link">服务协议</a>
-        <span class="footer-divider">|</span>
-        <a href="#" class="footer-link">开源版权声明</a>
-        <span class="footer-divider">|</span>
-        <a href="#" class="footer-link">隐私保护指引</a>
-      </div>
     </div>
+
+    <!-- 关于 Happy Friday 弹窗 -->
+    <Teleport to="body">
+      <div v-if="showAboutModal" class="info-modal-overlay" @click.self="showAboutModal = false">
+        <div class="info-modal-container">
+          <button class="info-modal-close" @click="showAboutModal = false">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <div class="about-modal-body">
+            <div class="about-logo">
+              <img :src="aboutLogo" alt="Happy Friday" class="about-logo-img" />
+            </div>
+            <h2 class="about-title">Happy Friday</h2>
+            <p class="about-version">{{ t('settings.version') }} {{ appVersion }}</p>
+            <p class="about-desc">{{ t('settings.aboutDesc') }}</p>
+            <div class="about-links">
+              <a class="about-link" @click="openHelpUrl">{{ t('settings.githubLink') }}</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 功能介绍 弹窗 -->
+    <Teleport to="body">
+      <div v-if="showFeaturesModal" class="info-modal-overlay" @click.self="showFeaturesModal = false">
+        <div class="info-modal-container info-modal-wide">
+          <div class="info-modal-header">
+            <h3 class="info-modal-title">{{ t('settings.features') }}</h3>
+            <button class="info-modal-close" @click="showFeaturesModal = false">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="features-modal-body">
+            <div v-for="feature in features" :key="feature.title" class="feature-item">
+              <div class="feature-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="feature.icon"></svg>
+              </div>
+              <div class="feature-text">
+                <div class="feature-name">{{ feature.title }}</div>
+                <div class="feature-desc">{{ feature.desc }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 作者介绍 弹窗 -->
+    <Teleport to="body">
+      <div v-if="showAuthorModal" class="info-modal-overlay" @click.self="showAuthorModal = false">
+        <div class="author-modal">
+          <button class="author-modal-close" @click="showAuthorModal = false">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+
+          <!-- 渐变 Banner 头部 -->
+          <div class="author-banner">
+            <div class="author-banner-bg"></div>
+            <div class="author-avatar-lg">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <h2 class="author-name-lg">Cheney</h2>
+            <div class="author-badges">
+              <span class="author-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                  <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+                </svg>
+                浙江工业大学
+              </span>
+              <span class="author-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 21h18"></path>
+                  <path d="M5 21V7l8-4v18"></path>
+                  <path d="M19 21V11l-6-4"></path>
+                </svg>
+                杭州某城商行
+              </span>
+            </div>
+          </div>
+
+          <!-- 内容区 -->
+          <div class="author-content">
+            <!-- 研究方向 -->
+            <div class="author-block">
+              <div class="author-block-title">
+                <span class="author-block-icon author-icon-research">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                  </svg>
+                </span>
+                <span>研究方向</span>
+              </div>
+              <p class="author-desc">计算机视觉、图像模型攻防</p>
+              <div class="author-tags">
+                <span class="pub-tag pub-tag-aaai">AAAI · 防御知识蒸馏 ×1</span>
+                <span class="pub-tag pub-tag-ccf">CCF-C ×2</span>
+              </div>
+            </div>
+
+            <!-- 分隔线 -->
+            <div class="author-divider"></div>
+
+            <!-- 业余爱好 -->
+            <div class="author-block">
+              <div class="author-block-title">
+                <span class="author-block-icon author-icon-hobby">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2a10 10 0 1 0 10 10"></path>
+                    <path d="M12 6v6l4 2"></path>
+                  </svg>
+                </span>
+                <span>业余爱好</span>
+              </div>
+              <p class="author-desc">大模型应用落地与 Agent Coding，探索 AI 驱动的工程实践。</p>
+            </div>
+
+            <!-- 主页按钮 -->
+            <button class="author-homepage-btn" @click="openAuthorHomepage">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              <span>访问作者主页</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { reactive, ref, computed, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/store';
 import { useTheme } from '@/utils/theme';
 import { electronService } from '@/services/electron';
+import { setI18nLanguage } from '@/i18n';
 
+const { t } = useI18n();
 const router = useRouter();
 const appStore = useAppStore();
-const { currentMode, setTheme: applyTheme, initTheme } = useTheme();
+const { currentMode, appliedTheme, setTheme: applyTheme, initTheme } = useTheme();
 
 const showThemeDropdown = ref(false);
 const themeSelectRef = ref(null);
+const showLangDropdown = ref(false);
+const langSelectRef = ref(null);
 
-const themeOptions = [
-  { value: 'light', label: '浅色模式' },
-  { value: 'dark', label: '深色模式' },
-  { value: 'system', label: '跟随系统' }
-];
+const themeOptions = computed(() => [
+  { value: 'light', label: t('settings.themeLight') },
+  { value: 'dark', label: t('settings.themeDark') },
+  { value: 'system', label: t('settings.themeSystem') }
+]);
 
-const fontSizeOptions = [
-  { value: 14, label: '小' },
-  { value: 16, label: '标准' },
-  { value: 18, label: '大' }
-];
+const langOptions = computed(() => [
+  { value: 'zh-CN', label: t('settings.langZhCN') },
+  { value: 'en-US', label: t('settings.langEnUS') }
+]);
+
+const currentLanguage = ref(appStore.language || 'zh-CN');
+
+const fontSizeOptions = computed(() => [
+  { value: 14, label: t('settings.fontSizeSmall') },
+  { value: 16, label: t('settings.fontSizeStandard') },
+  { value: 18, label: t('settings.fontSizeLarge') }
+]);
 
 const currentThemeLabel = computed(() => {
-  const option = themeOptions.find(opt => opt.value === currentMode.value);
-  return option?.label || '浅色模式';
+  const option = themeOptions.value.find(opt => opt.value === currentMode.value);
+  return option?.label || t('settings.themeLight');
+});
+
+const currentLangLabel = computed(() => {
+  const option = langOptions.value.find(opt => opt.value === currentLanguage.value);
+  return option?.label || t('settings.langZhCN');
 });
 
 const settings = reactive({
   displayMode: currentMode,
   fontSize: 16,
-  autoStart: true,
   messageNotify: false,
-  restoreTabs: true,
-  showBookmarkBar: false,
   noteFimCompletion: appStore.noteFimCompletion
 });
 
@@ -378,7 +487,7 @@ const selectBackupDir = async () => {
       await saveBackupConfig();
     }
   } catch (e) {
-    alert('选择目录失败: ' + e);
+    alert(t('settings.selectDirFailed') + ': ' + e);
   }
 };
 
@@ -390,10 +499,10 @@ const handleBackup = async () => {
     if (result.success) {
       backupConfig.lastBackupAt = new Date().toISOString();
     } else if (!result.canceled) {
-      alert('备份失败: ' + (result.error || '未知错误'));
+      alert(t('settings.backupFailed') + ': ' + (result.error || t('settings.unknownError')));
     }
   } catch (e) {
-    alert('备份失败: ' + e);
+    alert(t('settings.backupFailed') + ': ' + e);
   } finally {
     backupState.backing = false;
   }
@@ -401,18 +510,18 @@ const handleBackup = async () => {
 
 const handleRestore = async () => {
   if (backupState.restoring) return;
-  if (!confirm('恢复数据将覆盖当前所有数据，确定继续吗？')) return;
+  if (!confirm(t('settings.restoreConfirm'))) return;
   backupState.restoring = true;
   try {
     const result = await electronService.invoke('backup-restore');
     if (result.success) {
-      alert('恢复成功，应用将刷新以加载恢复的数据');
+      alert(t('settings.restoreSuccess'));
       window.location.reload();
     } else if (!result.canceled) {
-      alert('恢复失败: ' + (result.error || '未知错误'));
+      alert(t('settings.restoreFailed') + ': ' + (result.error || t('settings.unknownError')));
     }
   } catch (e) {
-    alert('恢复失败: ' + e);
+    alert(t('settings.restoreFailed') + ': ' + e);
   } finally {
     backupState.restoring = false;
   }
@@ -444,13 +553,13 @@ const ragConfig = reactive({
 
 const ragStats = ref({});
 
-const KB_TYPE_LABELS = {
-  personal: '个人知识库',
-  local: '本地知识库'
-};
+const KB_TYPE_LABELS = computed(() => ({
+  personal: t('settings.kbPersonal'),
+  local: t('settings.kbLocal')
+}));
 
 function kbTypeLabel(kbType) {
-  return KB_TYPE_LABELS[kbType] || kbType;
+  return KB_TYPE_LABELS.value[kbType] || kbType;
 }
 
 const ragProgressKbLabel = computed(() => {
@@ -493,8 +602,8 @@ const loadRagStats = async () => {
 const handleRagUpdate = async () => {
   if (ragState.updating) return;
   ragState.updating = true;
-  ragState.progress = '准备中...';
-  ragState.progressText = '进度';
+  ragState.progress = t('settings.preparing');
+  ragState.progressText = t('settings.progress');
 
   // 监听进度事件（on 返回 unsubscribe 函数）
   let unsubProgress = null;
@@ -513,13 +622,13 @@ const handleRagUpdate = async () => {
   try {
     const result = await electronService.invoke('rag-manual-update', {});
     if (result && result.success) {
-      ragState.progress = '完成';
+      ragState.progress = t('settings.complete');
       await loadRagStats();
     } else {
-      ragState.progress = '失败: ' + (result?.error || '未知错误');
+      ragState.progress = t('settings.failed') + ': ' + (result?.error || t('settings.unknownError'));
     }
   } catch (e) {
-    ragState.progress = '失败: ' + e.message;
+    ragState.progress = t('settings.failed') + ': ' + e.message;
   } finally {
     ragState.updating = false;
     // 5 秒后清空进度
@@ -541,6 +650,24 @@ const selectTheme = (value) => {
   showThemeDropdown.value = false;
 };
 
+const toggleLangDropdown = () => {
+  showLangDropdown.value = !showLangDropdown.value;
+};
+
+const selectLanguage = async (value) => {
+  currentLanguage.value = value;
+  appStore.setLanguage(value);
+  setI18nLanguage(value);
+  showLangDropdown.value = false;
+  try {
+    const config = await electronService.invoke('get-config');
+    if (config) {
+      config.language = value;
+      await electronService.invoke('save-config', config);
+    }
+  } catch (_e) {}
+};
+
 const saveNoteFimCompletion = async () => {
   appStore.setNoteFimCompletion(settings.noteFimCompletion);
   try {
@@ -556,12 +683,16 @@ const handleClickOutside = (event) => {
   if (themeSelectRef.value && !themeSelectRef.value.contains(event.target)) {
     showThemeDropdown.value = false;
   }
+  if (langSelectRef.value && !langSelectRef.value.contains(event.target)) {
+    showLangDropdown.value = false;
+  }
 };
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   initTheme();
   settings.displayMode = currentMode.value;
+  currentLanguage.value = appStore.language || 'zh-CN';
   loadBackupConfig();
   loadRagConfig();
   loadRagStats();
@@ -573,10 +704,71 @@ onUnmounted(() => {
 
 onDeactivated(() => {
   showThemeDropdown.value = false;
+  showLangDropdown.value = false;
 });
 
 const goToModelSettings = () => {
   router.push('/settings/model');
+};
+
+// ========== 关于 / 功能介绍 / 帮助与反馈 ==========
+const HELP_URL = 'https://github.com/cheney-plus/happy-friday-electron';
+
+const showAboutModal = ref(false);
+const showFeaturesModal = ref(false);
+const showAuthorModal = ref(false);
+
+const appVersion = ref('1.6.1(0712)');
+
+const aboutLogo = computed(() => {
+  return appliedTheme.value === 'dark'
+    ? new URL('@/assets/images/friday-b.png', import.meta.url).href
+    : new URL('@/assets/images/friday-w.png', import.meta.url).href;
+});
+
+const features = computed(() => [
+  {
+    title: t('settings.featureSmartNote'),
+    desc: t('settings.featureSmartNoteDesc'),
+    icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line>'
+  },
+  {
+    title: t('settings.featureRag'),
+    desc: t('settings.featureRagDesc'),
+    icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>'
+  },
+  {
+    title: t('settings.featureAiAssistant'),
+    desc: t('settings.featureAiAssistantDesc'),
+    icon: '<circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line>'
+  },
+  {
+    title: t('settings.featureMultiModel'),
+    desc: t('settings.featureMultiModelDesc'),
+    icon: '<path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path>'
+  },
+  {
+    title: t('settings.featureBackup'),
+    desc: t('settings.featureBackupDesc'),
+    icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>'
+  },
+  {
+    title: t('settings.featureAgent'),
+    desc: t('settings.featureAgentDesc'),
+    icon: '<rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line>'
+  }
+]);
+
+const openHelpUrl = () => {
+  electronService.invoke('open-external', HELP_URL);
+};
+
+const checkForUpdate = () => {
+  electronService.invoke('open-external', `${HELP_URL}/releases`);
+};
+
+const openAuthorHomepage = () => {
+  electronService.invoke('open-external', 'https://chenjie.blog.csdn.net');
 };
 </script>
 
@@ -621,7 +813,6 @@ const goToModelSettings = () => {
 .group-content {
   background-color: var(--bg-secondary);
   border-radius: 10px;
-  overflow: hidden;
 }
 
 .setting-item {
@@ -841,16 +1032,6 @@ const goToModelSettings = () => {
   transform: translateX(20px);
 }
 
-.shortcut-key {
-  font-size: 13px;
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
-  padding: 5px 12px;
-  border-radius: 6px;
-  font-family: inherit;
-  letter-spacing: 0.3px;
-}
-
 .item-link {
   display: flex;
   align-items: center;
@@ -882,20 +1063,6 @@ const goToModelSettings = () => {
 
 .arrow-icon {
   color: var(--text-tertiary);
-  flex-shrink: 0;
-}
-
-.import-action {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.red-dot {
-  width: 8px;
-  height: 8px;
-  background-color: #ef4444;
-  border-radius: 50%;
   flex-shrink: 0;
 }
 
@@ -983,32 +1150,427 @@ const goToModelSettings = () => {
   color: #f59e0b;
 }
 
-.footer-links {
+/* 作者介绍弹窗 */
+.author-modal {
+  position: relative;
+  background-color: var(--bg-primary);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+  animation: infoSlideUp 0.25s ease;
+  overflow: hidden;
+}
+
+.author-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border-radius: 8px;
+  transition: background-color 0.15s;
+}
+
+.author-modal-close:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Banner 头部 */
+.author-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px 24px;
+  overflow: hidden;
+}
+
+.author-banner-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+}
+
+.author-banner-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.1) 0%, transparent 40%);
+}
+
+.author-avatar-lg {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.author-name-lg {
+  position: relative;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 12px;
+  letter-spacing: 0.5px;
+}
+
+.author-badges {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.author-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  font-size: 12px;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* 内容区 */
+.author-content {
+  padding: 22px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.author-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.author-block-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.author-block-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.author-icon-research {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+.author-icon-hobby {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+}
+
+.author-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0;
+  padding-left: 36px;
+}
+
+.author-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-left: 36px;
+}
+
+.pub-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.pub-tag-aaai {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+}
+
+.pub-tag-ccf {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.author-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0 -24px;
+}
+
+/* 主页按钮 */
+.author-homepage-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 28px 0 12px;
-  flex-wrap: wrap;
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #10b981, #3b82f6);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
 }
 
-.footer-link {
-  font-size: 13px;
+.author-homepage-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+}
+
+.author-homepage-btn:active {
+  transform: translateY(0);
+}
+
+/* 关于 / 功能介绍 弹窗 */
+.info-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: infoFadeIn 0.2s ease;
+}
+
+@keyframes infoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.info-modal-container {
+  position: relative;
+  background-color: var(--bg-primary);
+  border-radius: 14px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  animation: infoSlideUp 0.25s ease;
+  overflow: hidden;
+}
+
+.info-modal-wide {
+  max-width: 580px;
+}
+
+@keyframes infoSlideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.info-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-tertiary);
-  text-decoration: none;
   transition: color 0.15s;
+  border-radius: 4px;
+  z-index: 1;
 }
 
-.footer-link:hover {
-  color: var(--text-secondary);
+.info-modal-close:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
-.footer-divider {
+.info-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.info-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* 关于弹窗内容 */
+.about-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 28px 28px;
+  text-align: center;
+}
+
+.about-logo {
+  margin-bottom: 16px;
+}
+
+.about-logo-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 16px;
+}
+
+.about-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.about-version {
   font-size: 13px;
   color: var(--text-tertiary);
+  margin: 0 0 18px;
+}
+
+.about-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.about-links {
+  display: flex;
+  gap: 16px;
+}
+
+.about-link {
+  font-size: 13px;
+  color: #10b981;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.about-link:hover {
+  opacity: 0.8;
+}
+
+/* 功能介绍弹窗内容 */
+.features-modal-body {
+  padding: 12px 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.feature-item {
+  display: flex;
+  gap: 14px;
+  padding: 14px 14px;
+  border-radius: 10px;
+  transition: background-color 0.15s;
+}
+
+.feature-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.feature-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10b981;
+}
+
+.feature-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.feature-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.feature-desc {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
 }
 
 [data-theme='dark'] .theme-dropdown-menu {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .info-modal-container {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .author-modal {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
 </style>

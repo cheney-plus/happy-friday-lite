@@ -4,5 +4,16 @@
     "cancel": "Cancel",
     "save": "Save",
     "delete": "Delete"
+  },
+  "user": {
+    "name": "Master",
+    "online": "Online",
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "quickTheme": "Theme",
+    "quickLanguage": "Language",
+    "settings": "Settings",
+    "about": "About Happy Friday"
   }
 }

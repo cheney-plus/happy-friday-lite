@@ -4,5 +4,16 @@
     "cancel": "取消",
     "save": "保存",
     "delete": "删除"
+  },
+  "user": {
+    "name": "主人",
+    "online": "在线",
+    "greetingMorning": "早上好",
+    "greetingAfternoon": "下午好",
+    "greetingEvening": "晚上好",
+    "quickTheme": "主题模式",
+    "quickLanguage": "语言",
+    "settings": "设置",
+    "about": "关于 Happy Friday"
   }
 }
