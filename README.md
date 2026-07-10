@@ -37,7 +37,29 @@
 
 ## 🖼️ 截图
 
-> TODO: 添加应用截图
+### Friday 智能助手
+
+![Friday 智能助手首页](docs/resource/PixPin_2026-07-11_03-30-42.png)
+
+![Friday 对话与代码执行](docs/resource/PixPin_2026-07-11_03-31-58.png)
+
+### 知识库
+
+![知识库文件卡片](docs/resource/PixPin_2026-07-11_03-35-42.png)
+
+![知识库分类与检索](docs/resource/PixPin_2026-07-11_03-36-03.png)
+
+### 笔记
+
+![笔记富文本编辑](docs/resource/PixPin_2026-07-11_03-35-27.png)
+
+### 日程
+
+![日程日历](docs/resource/PixPin_2026-07-11_03-37-05.png)
+
+### 设置
+
+![设置与功能介绍](docs/resource/PixPin_2026-07-11_03-37-31.png)
 
 ## 🚀 快速开始
 
