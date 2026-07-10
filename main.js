@@ -77,8 +77,12 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  const dataDir = await ensureDataDir()
+  // 1. 先创建窗口，让 splash 立即显示（窗口加载 index.html 与主进程初始化并行）
   createWindow()
+
+  // 2. 初始化数据目录与数据库（sql.js WASM 加载），期间 splash 持续显示
+  //    渲染进程加载 JS bundle + Vue mount 通常比此处更慢，IPC 注册会先于首次 invoke 完成
+  const dataDir = await ensureDataDir()
 
   console.log('[Main] Registering IPC commands...')
   try {
@@ -88,7 +92,7 @@ app.whenReady().then(async () => {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
   }
 
-  // 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
+  // 3. 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
   try {
     kbWatcherHandle = startKnowledgeWatcher(mainWindow, dataDir)
   } catch (e) {
@@ -107,18 +111,19 @@ app.whenReady().then(async () => {
     return { success: true }
   })
 
-  // 初始化 Python 运行时环境（异步，不阻塞窗口显示）
-  // macOS 优先检测系统 Python，其他平台使用打包 Python
+  // 4. 以下均为非阻塞初始化，不等待完成
+  // Python 运行时（macOS 优先检测系统 Python，其他平台使用打包 Python）
   initPythonEnv().catch(e => console.error('[Main] ❌ Python env init failed:', e))
 
-  // 初始化 RAG 模块（注册任务处理器、启动队列、可选启动时自动更新）
-  try {
-    const { initRag } = await import('./src-electron/rag/triggers.js')
-    await initRag((channel, data) => mainWindow.webContents.send(channel, data))
-    console.log('[Main] ✅ RAG module initialized')
-  } catch (error) {
-    console.error('[Main] ❌ Failed to initialize RAG:', error)
-  }
+  // RAG 模块（注册任务处理器、启动队列、可选启动时自动更新）——非阻塞，避免拖慢主流程
+  import('./src-electron/rag/triggers.js')
+    .then(({ initRag }) => initRag((channel, data) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, data)
+      }
+    }))
+    .then(() => console.log('[Main] ✅ RAG module initialized'))
+    .catch(error => console.error('[Main] ❌ Failed to initialize RAG:', error))
 
   // 启动后检查自动备份（异步，不阻塞窗口）
   checkAutoBackup().catch(e => console.error('[Main] Auto backup check failed:', e))

@@ -6,7 +6,7 @@
       <main class="main-content">
         <div class="content-wrapper">
           <router-view v-slot="{ Component }">
-            <keep-alive>
+            <keep-alive :max="8">
               <component :is="Component" :key="route.fullPath" />
             </keep-alive>
           </router-view>

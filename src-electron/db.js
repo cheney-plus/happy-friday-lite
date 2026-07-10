@@ -49,11 +49,30 @@ function runSql(sql, params = []) {
   db.run(sql, params)
 }
 
-function saveDb() {
+// 持久化：将内存数据库导出并同步写入磁盘
+function persistDb() {
+  if (!db) return
   const data = db.export()
   const buffer = Buffer.from(data)
   const dbPath = path.join(dataDir, 'friday.db')
   fs.writeFileSync(dbPath, buffer)
+}
+
+// 防抖写入：多次写操作合并为一次磁盘 IO，避免每次 INSERT/UPDATE 都全量导出+同步写盘
+// 数据始终安全保留在内存中，flushDb()/closeDb() 会在退出或备份前强制落盘
+let saveTimer = null
+let dirty = false
+const SAVE_DEBOUNCE_MS = 200
+
+function saveDb() {
+  dirty = true
+  if (saveTimer) return
+  saveTimer = setTimeout(() => {
+    saveTimer = null
+    if (!dirty || !db) return
+    dirty = false
+    persistDb()
+  }, SAVE_DEBOUNCE_MS)
 }
 
 async function initDatabase() {
@@ -316,14 +335,26 @@ export async function initDb() {
 
 // 确保数据库内容写入磁盘（备份前调用）
 export function flushDb() {
-  if (db) {
-    saveDb()
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (dirty && db) {
+    dirty = false
+    persistDb()
   }
 }
 
 export function closeDb() {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
   if (db) {
-    saveDb()
+    if (dirty) {
+      dirty = false
+      persistDb()
+    }
     db.close()
     db = null
   }
@@ -644,7 +675,6 @@ export function deleteScheduleEvent(eventId) {
 }
 
 export function createNotebook(name, description) {
-  console.log('[DB] Creating notebook:', { name, description })
   const now = nowISO()
   const id = generateId()
   db.run(
@@ -659,13 +689,11 @@ export function createNotebook(name, description) {
     createdAt: now,
     updatedAt: now
   }
-  console.log('[DB] Created notebook:', notebook)
   return notebook
 }
 
 export function getNotebooks() {
   const notebooks = queryAll('SELECT * FROM notebooks ORDER BY updatedAt DESC')
-  console.log('[DB] Fetched notebooks:', notebooks.length, 'items')
   return notebooks
 }
 
@@ -674,7 +702,6 @@ export function getNotebook(notebookId) {
 }
 
 export function updateNotebook(notebookId, name, description) {
-  console.log('[DB] Updating notebook:', { notebookId, name, description })
   const now = nowISO()
   db.run(
     'UPDATE notebooks SET name = ?, description = ?, updatedAt = ? WHERE id = ?',
