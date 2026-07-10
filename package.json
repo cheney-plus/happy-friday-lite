@@ -2,6 +2,8 @@
   "name": "happy-friday-lite",
   "version": "1.0.0",
   "description": "Happy Friday Lite - Electron + Vue3",
+  "author": "Chen Jie <chenjie.plus@qq.com>",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "main": "main.js",
   "type": "module",
   "scripts": {

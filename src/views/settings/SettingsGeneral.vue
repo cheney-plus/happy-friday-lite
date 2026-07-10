@@ -318,6 +318,13 @@
                 </svg>
                 杭州某城商行
               </span>
+              <a class="author-badge author-badge-link" @click="openAuthorEmail">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                chenjie.plus@qq.com
+              </a>
             </div>
           </div>
 
@@ -769,6 +776,10 @@ const checkForUpdate = () => {
 
 const openAuthorHomepage = () => {
   electronService.invoke('open-external', 'https://chenjie.blog.csdn.net');
+};
+
+const openAuthorEmail = () => {
+  electronService.invoke('open-external', 'mailto:chenjie.plus@qq.com');
 };
 </script>
 
@@ -1257,6 +1268,15 @@ const openAuthorHomepage = () => {
   font-size: 12px;
   color: #fff;
   font-weight: 500;
+}
+
+.author-badge-link {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.author-badge-link:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 /* 内容区 */
