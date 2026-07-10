@@ -214,15 +214,24 @@ function fromZvecDoc(zDoc) {
   }
 }
 
+// 单次 embed+insert 的批次大小，与 embedDocuments 内部的 API 批次对齐
+// 这样单批失败（API 重试耗尽后）最多只丢 10 个块，且不浪费已成功的 embedding 工作
+const EMBED_INSERT_BATCH = 10
+
 /**
  * 向指定知识库添加子块文档（向量）
  *
  * 为避免同一文件重复索引产生重复向量，会先按 source 删除该文件已有的旧向量，
- * 再统一 embedding 并批量插入。插入后立即可检索（暂存于临时索引），无需 optimize。
+ * 再分批 embedding 并插入。插入后立即可检索（暂存于临时索引），无需 optimize。
+ *
+ * 大文件（如数百页 PDF 会产生数千子块）采用分批 embed+insert 策略：
+ *   - 避免将全部向量一次性堆积在内存中导致 OOM
+ *   - 每批独立 try/catch：单批 embedding 或插入失败只跳过该批，不影响其余批次
+ *   - embedDocuments 内部已带指数退避重试，重试耗尽才视为该批失败
  *
  * @param {string} kbType
  * @param {Array} childDocs - Document 数组，metadata 中含 docId 指向父块
- * @returns {Promise<number>} 实际插入的文档数
+ * @returns {Promise<number>} 实际插入的文档数（可能小于 childDocs.length）
  */
 export async function addDocuments(kbType, childDocs) {
   if (!childDocs || childDocs.length === 0) return 0
@@ -239,21 +248,39 @@ export async function addDocuments(kbType, childDocs) {
     }
   }
 
-  // 2. 批量 embedding
+  // 2. 分批 embedding + 插入，每批独立容错
   const embeddings = await getEmbeddings()
-  const texts = childDocs.map(d => d.pageContent || '')
-  const vectors = await embeddings.embedDocuments(texts)
+  let totalInserted = 0
+  let totalSkipped = 0
+  const totalBatches = Math.ceil(childDocs.length / EMBED_INSERT_BATCH)
 
-  // 3. 构造 Zvec 文档并批量插入
-  const zDocs = childDocs.map((doc, i) => toZvecDoc(doc, kbType, vectors[i]))
-  const results = collection.insertSync(zDocs)
-  const failed = Array.isArray(results) ? results.filter(r => !r.ok) : []
-  if (failed.length > 0) {
-    console.warn(`[RAG] ${failed.length}/${results.length} docs failed to insert`)
+  for (let i = 0; i < childDocs.length; i += EMBED_INSERT_BATCH) {
+    const batchIdx = Math.floor(i / EMBED_INSERT_BATCH)
+    const batch = childDocs.slice(i, i + EMBED_INSERT_BATCH)
+    try {
+      const texts = batch.map(d => d.pageContent || '')
+      // embedDocuments 内部按 10 条/批调用 API，并带指数退避重试
+      const vectors = await embeddings.embedDocuments(texts)
+
+      const zDocs = batch.map((doc, j) => toZvecDoc(doc, kbType, vectors[j]))
+      const results = collection.insertSync(zDocs)
+      const failed = Array.isArray(results) ? results.filter(r => !r.ok) : []
+      const inserted = (Array.isArray(results) ? results.length : 0) - failed.length
+      totalInserted += inserted
+      totalSkipped += failed.length
+
+      if (failed.length > 0) {
+        console.warn(`[RAG] Batch ${batchIdx + 1}/${totalBatches}: ${failed.length}/${results.length} docs failed to insert`)
+      }
+    } catch (e) {
+      // 单批 embedding 或插入失败：跳过该批，继续处理后续批次
+      totalSkipped += batch.length
+      console.warn(`[RAG] Batch ${batchIdx + 1}/${totalBatches} (offset ${i}, ${batch.length} chunks) failed: ${e.message}, skipping`)
+    }
   }
 
-  console.log(`[RAG] Inserted ${results.length - failed.length}/${childDocs.length} docs into zvec (kb=${kbType})`)
-  return results.length - failed.length
+  console.log(`[RAG] Inserted ${totalInserted}/${childDocs.length} docs into zvec (kb=${kbType}, skipped: ${totalSkipped})`)
+  return totalInserted
 }
 
 /**

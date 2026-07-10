@@ -250,6 +250,9 @@
       @event-right-click="onPanelEventRightClick"
       @toggle-complete="toggleEventComplete"
     />
+
+    <!-- Friday 日程助理 -->
+    <FridayAssistant v-model:visible="showAssistant" />
   </div>
 </template>
 
@@ -262,6 +265,7 @@ import ScheduleTaskList from './ScheduleTaskList.vue';
 import EventFormModal from './components/EventFormModal.vue';
 import EventContextMenu from './components/EventContextMenu.vue';
 import MoreEventsPanel from './components/MoreEventsPanel.vue';
+import FridayAssistant from './components/FridayAssistant.vue';
 import { getHolidayForDate } from './utils/lunarCalendar';
 import {
   useCalendarHelpers,
@@ -287,6 +291,7 @@ const viewYear = ref(new Date().getFullYear());
 const viewMonth = ref(new Date().getMonth());
 const weekOffset = ref(0);
 const weekScrollRef = ref(null);
+const showAssistant = ref(false);
 
 const views = computed(() => [
   { key: 'month', label: t('schedule.month') },
@@ -895,7 +900,7 @@ async function onModalSave(eventData) {
 }
 
 function openAIAssistant() {
-  alert('Friday AI 助理功能即将上线！');
+  showAssistant.value = !showAssistant.value;
 }
 
 // ========== 右键菜单 ==========
@@ -1012,6 +1017,7 @@ onDeactivated(() => {
   contextMenuVisible.value = false;
   morePanelVisible.value = false;
   showViewDropdown.value = false;
+  showAssistant.value = false;
 });
 </script>
 

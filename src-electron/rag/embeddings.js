@@ -57,6 +57,11 @@ function getEmbeddingModelConfig() {
   }
 }
 
+// 单次 Embedding API 请求超时时间（毫秒）
+const EMBEDDING_HTTP_TIMEOUT = 60_000
+// 最大重试次数（不含首次请求）
+const EMBEDDING_MAX_RETRIES = 3
+
 /**
  * 通过 HTTPS 调用 Embedding API
  * 兼容 OpenAI /embeddings 接口格式
@@ -111,6 +116,11 @@ function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
       })
     })
 
+    // 超时保护：防止大文件请求或网络异常导致无限挂起
+    req.setTimeout(EMBEDDING_HTTP_TIMEOUT, () => {
+      req.destroy(new Error(`Embedding API timeout after ${EMBEDDING_HTTP_TIMEOUT / 1000}s`))
+    })
+
     req.on('error', (err) => {
       reject(new Error(`Embedding API request error: ${err.message}`))
     })
@@ -118,6 +128,28 @@ function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
     req.write(body)
     req.end()
   })
+}
+
+/**
+ * 带重试的 Embedding API 调用
+ * 大文件会产生大量 embedding 请求，单次瞬时失败（限流、网络抖动）不应导致整文件索引失败。
+ * 采用指数退避重试策略。
+ */
+async function callEmbeddingApiWithRetry(baseUrl, apiKey, modelName, texts, rawUrl) {
+  let lastError
+  for (let attempt = 0; attempt <= EMBEDDING_MAX_RETRIES; attempt++) {
+    try {
+      return await callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl)
+    } catch (e) {
+      lastError = e
+      if (attempt < EMBEDDING_MAX_RETRIES) {
+        const delay = 1000 * Math.pow(2, attempt) // 1s, 2s, 4s
+        console.warn(`[RAG] Embedding API attempt ${attempt + 1} failed: ${e.message}, retrying in ${delay}ms...`)
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
+  }
+  throw lastError
 }
 
 /**
@@ -162,7 +194,7 @@ class HttpApiEmbeddings {
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize)
-      const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, batch, this.rawUrl)
+      const embeddings = await callEmbeddingApiWithRetry(this.baseUrl, this.apiKey, this.modelName, batch, this.rawUrl)
       allEmbeddings.push(...embeddings)
     }
 
@@ -177,7 +209,7 @@ class HttpApiEmbeddings {
    * @returns {Promise<number[]>}
    */
   async embedQuery(text) {
-    const embeddings = await callEmbeddingApi(this.baseUrl, this.apiKey, this.modelName, [text], this.rawUrl)
+    const embeddings = await callEmbeddingApiWithRetry(this.baseUrl, this.apiKey, this.modelName, [text], this.rawUrl)
     // L2 归一化，与 embedDocuments 保持一致
     return normalizeVector(embeddings[0])
   }
