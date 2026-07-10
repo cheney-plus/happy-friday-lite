@@ -256,12 +256,25 @@ function httpsGet(url, { headers = {}, timeout = 30000 } = {}) {
 }
 
 /**
+ * 获取 GitHub API 认证 token（CI 环境通过 GITHUB_TOKEN 提升速率限制）
+ * - 优先 GITHUB_TOKEN，其次 GH_TOKEN
+ * - 未认证请求速率限制为 60/h（CI 共享 IP 极易耗尽），认证后提升至 1000/h
+ */
+function getGithubToken() {
+  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ''
+}
+
+/**
  * 获取 JSON（自动跟随重定向）
+ * 对 api.github.com 请求自动附加认证 header 以规避速率限制
  */
 async function fetchJson(url) {
-  const res = await httpsGet(url, {
-    headers: { 'User-Agent': 'happy-friday-python-downloader', Accept: 'application/vnd.github+json' }
-  })
+  const headers = { 'User-Agent': 'happy-friday-python-downloader', Accept: 'application/vnd.github+json' }
+  const token = getGithubToken()
+  if (token && url.includes('api.github.com')) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  const res = await httpsGet(url, { headers })
   const chunks = []
   for await (const chunk of res) {
     chunks.push(chunk)

@@ -67,6 +67,8 @@ jobs:
 
       - name: Download Python runtime (${{ matrix.platform-key }})
         run: node python/download-python.js --platform ${{ matrix.platform-key }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify Python runtime
         run: |
@@ -126,6 +128,8 @@ jobs:
 
       - name: Download Python runtime (win32-x64)
         run: node python/download-python.js --platform win32-x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify Python runtime
         run: |
@@ -202,6 +206,8 @@ jobs:
 
       - name: Download Python runtime (${{ matrix.platform-key }})
         run: node python/download-python.js --platform ${{ matrix.platform-key }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify Python runtime
         run: |
