@@ -148,11 +148,16 @@ function useSuggestion(text) {
 }
 
 function loadModelConfig() {
+  // 系统默认模型：返回最小标志对象，后端 resolveModelConfig 会注入真实配置
+  const DEFAULT_MODEL_ID = 'system-default-qwen';
+  const selectedId = localStorage.getItem('happy-friday-selected-model');
+  if (selectedId === DEFAULT_MODEL_ID) {
+    return { id: DEFAULT_MODEL_ID, isDefault: true };
+  }
   try {
     const stored = localStorage.getItem('happy-friday-custom-models');
     if (stored) {
       const models = JSON.parse(stored);
-      const selectedId = localStorage.getItem('happy-friday-selected-model');
       let model = selectedId ? models.find(m => m.id === selectedId) : null;
       if (!model && models.length > 0) model = models[0];
       return model || null;

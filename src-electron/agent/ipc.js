@@ -40,6 +40,7 @@ import {
   emitApprovalRequest
 } from './humanInTheLoop.js'
 import { createThread, touchThread, loadMemoriesToStore, syncStoreToSQLite } from './memory.js'
+import { resolveModelConfig } from '../defaultModel.js'
 
 const log = createLogger('IPC')
 
@@ -104,7 +105,9 @@ export function registerAgentCommands(mainWindow) {
         : message
 
       // 4. 创建带上下文的 Agent
-      const modelConfig = { ...model, enableThinking: enableThinking || false }
+      // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
+      const effectiveModel = resolveModelConfig(model)
+      const modelConfig = { ...effectiveModel, enableThinking: enableThinking || false }
       const runtimeCtx = {
         mainWindow,
         requestId,

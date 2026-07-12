@@ -207,6 +207,10 @@ const modelSettings = ref({
 
 const customModels = ref([]);
 
+// 系统默认模型（不含 API Key，仅用于展示）
+const DEFAULT_MODEL_ID = 'system-default-qwen';
+const defaultModel = ref(null);
+
 // ========== Agent 模式：@ 附件 ==========
 let attachmentIdCounter = 0;
 const attachments = ref([]);
@@ -260,20 +264,37 @@ const loadCustomModels = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       customModels.value = JSON.parse(stored);
-      const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
-      if (selectedId && customModels.value.find(m => m.id === selectedId)) {
+    }
+    const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
+    if (selectedId) {
+      if (customModels.value.find(m => m.id === selectedId)) {
+        modelSettings.value.modelId = selectedId;
+      } else if (selectedId === DEFAULT_MODEL_ID) {
         modelSettings.value.modelId = selectedId;
       } else if (customModels.value.length > 0) {
         modelSettings.value.modelId = customModels.value[0].id;
       } else {
         modelSettings.value.modelId = '';
       }
+    } else if (customModels.value.length > 0) {
+      modelSettings.value.modelId = customModels.value[0].id;
     } else {
-      customModels.value = [];
       modelSettings.value.modelId = '';
     }
   } catch (error) {
     console.error('Failed to load custom models:', error);
+  }
+};
+
+// 从后端加载系统默认模型信息
+const loadDefaultModel = async () => {
+  try {
+    const result = await window.electronAPI?.invoke('get-default-model');
+    if (result && result.model) {
+      defaultModel.value = result.model;
+    }
+  } catch (e) {
+    console.error('Failed to load default model:', e);
   }
 };
 
@@ -288,15 +309,31 @@ const providerIcons = {
 };
 
 const modelList = computed(() => {
-  return customModels.value.map(model => ({
-    id: model.id,
-    name: `${model.providerLabel} ${model.modelName}`,
-    embeddingName: model.embeddingModelName || '',
-    icon: providerIcons[model.provider] || providerIcons.other
-  }));
+  const list = [];
+  if (defaultModel.value) {
+    list.push({
+      id: defaultModel.value.id,
+      name: `${defaultModel.value.providerLabel} ${defaultModel.value.modelName}`,
+      embeddingName: defaultModel.value.embeddingModelName || '',
+      icon: providerIcons[defaultModel.value.provider] || providerIcons.other
+    });
+  }
+  for (const model of customModels.value) {
+    list.push({
+      id: model.id,
+      name: `${model.providerLabel} ${model.modelName}`,
+      embeddingName: model.embeddingModelName || '',
+      icon: providerIcons[model.provider] || providerIcons.other
+    });
+  }
+  return list;
 });
 
 const currentModelName = computed(() => {
+  if (defaultModel.value && modelSettings.value.modelId === defaultModel.value.id) {
+    const thinkLabel = modelSettings.value.thinkMode === 'deep' ? '· 深度' : '· 快速';
+    return `${defaultModel.value.modelName} ${thinkLabel}`;
+  }
   const model = customModels.value.find(m => m.id === modelSettings.value.modelId);
   if (!model) return '选择模型';
   const thinkLabel = modelSettings.value.thinkMode === 'deep' ? '· 深度' : '· 快速';
@@ -383,7 +420,11 @@ const handleSend = () => {
   const text = inputText.value.trim();
   if (!text || props.disabled) return;
 
-  const selectedModel = customModels.value.find(m => m.id === modelSettings.value.modelId);
+  // 查找选中的模型：可能是自定义模型或系统默认模型
+  let selectedModel = customModels.value.find(m => m.id === modelSettings.value.modelId);
+  if (!selectedModel && defaultModel.value && modelSettings.value.modelId === defaultModel.value.id) {
+    selectedModel = { id: defaultModel.value.id, isDefault: true };
+  }
   if (!selectedModel) return;
 
   emit('ask', {
@@ -409,6 +450,7 @@ const handleSend = () => {
 onMounted(() => {
   document.addEventListener('scroll', closeAllDropdowns, true);
   loadCustomModels();
+  loadDefaultModel();
 });
 
 onUnmounted(() => {
@@ -421,6 +463,7 @@ onActivated(() => {
     textareaRef.value.style.height = 'auto';
   }
   loadCustomModels();
+  loadDefaultModel();
 });
 </script>
 

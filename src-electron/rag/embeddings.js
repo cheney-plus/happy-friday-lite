@@ -3,6 +3,7 @@ import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { loadConfig, getDataDir } from '../config.js'
+import { getDefaultModelConfig, isDefaultModelAvailable } from '../defaultModel.js'
 
 let cachedEmbeddings = null
 let cachedModelId = null
@@ -15,6 +16,7 @@ const EMBEDDING_SIG_FILE = 'embedding_model_sig.txt'
 /**
  * 从 config.json 中读取首选模型配置，获取 Embedding 模型信息
  * Embedding 模型配置来自模型设置中的自定义模型
+ * 如果没有自定义模型，回退到系统默认模型（需有试用次数）
  */
 function getEmbeddingModelConfig() {
   const config = loadConfig()
@@ -35,8 +37,19 @@ function getEmbeddingModelConfig() {
     selectedModel = customModels[0]
   }
 
+  // 回退到系统默认模型（需有试用次数）
   if (!selectedModel) {
-    throw new Error('RAG: 未配置模型，请先在模型设置中添加模型并配置 Embedding 模型名称')
+    if (!isDefaultModelAvailable()) {
+      throw new Error('RAG: 系统默认模型试用次数已用尽，请在模型设置中添加自己的模型并配置 Embedding 模型名称')
+    }
+    const defaultModel = getDefaultModelConfig()
+    return {
+      apiKey: defaultModel.apiKey,
+      baseUrl: defaultModel.baseUrl,
+      embeddingModelName: defaultModel.embeddingModelName,
+      modelId: defaultModel.id,
+      rawUrl: defaultModel.provider === 'other'
+    }
   }
 
   if (!selectedModel.embeddingModelName) {

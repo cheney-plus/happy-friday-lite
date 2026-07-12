@@ -12,21 +12,40 @@
         <div class="group-content">
           <div class="setting-item">
             <span class="item-label">首选模型</span>
-            <div v-if="customModels.length > 0" class="model-select-wrapper" ref="modelSelectRef">
-              <div class="model-select-trigger" @click="toggleModelDropdown">
+            <div class="model-select-wrapper" ref="modelSelectRef">
+              <div
+                :class="['model-select-trigger', { 'no-selection': !selectedModelData, 'highlight-pulse': !selectedModelData }]"
+                @click="toggleModelDropdown"
+              >
                 <div v-if="selectedModelData" class="selected-model-info">
                   <img :src="selectedModelData.providerIcon" :alt="selectedModelData.providerLabel" class="model-provider-icon" />
                   <div class="selected-model-text">
                     <span>{{ selectedModelData.providerLabel }} {{ selectedModelData.modelName }}</span>
+                    <span v-if="selectedModelData.isDefault" class="default-badge">系统默认</span>
                     <span v-if="selectedModelData.embeddingModelName" class="selected-embedding-label">Embedding: {{ selectedModelData.embeddingModelName }}</span>
                   </div>
                 </div>
+                <span v-else class="select-hint-text">点击选择模型</span>
                 <svg class="model-select-arrow" :class="{ expanded: showModelDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </div>
             </div>
-            <span v-else class="no-model-hint">请先添加模型</span>
+          </div>
+          <div v-if="defaultModelTrial && selectedModelData?.isDefault" class="trial-info-bar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>免费试用剩余 {{ defaultModelTrial.remaining }} / {{ defaultModelTrial.limit }} 次，超过后请添加自己的模型</span>
+          </div>
+          <div v-if="defaultModelTrial && !defaultModelTrial.available && (!selectedModelData || selectedModelData.isDefault)" class="trial-info-bar trial-exhausted">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="15" y1="9" x2="9" y2="15"></line>
+              <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
+            <span>免费试用次数已用尽，请添加自己的模型</span>
           </div>
         </div>
       </div>
@@ -188,6 +207,33 @@
     <Teleport to="body">
       <div v-if="showModelDropdown" class="model-dropdown-overlay" :style="dropdownPosition" ref="modelDropdownRef">
         <div class="model-dropdown-menu">
+          <!-- 系统默认模型 -->
+          <div
+            v-if="defaultModelInfo"
+            :class="['model-dropdown-item', { active: selectedModel === defaultModelInfo.id, disabled: defaultModelTrial && !defaultModelTrial.available }]"
+            @click="selectModel(defaultModelInfo)"
+          >
+            <div class="model-item-content">
+              <img :src="getModelProviderIcon(defaultModelInfo.provider)" :alt="defaultModelInfo.providerLabel" class="model-item-icon" />
+              <div class="model-item-text">
+                <div class="model-item-name">
+                  {{ defaultModelInfo.providerLabel }} {{ defaultModelInfo.modelName }}
+                  <span class="default-badge">系统默认</span>
+                </div>
+                <div class="model-item-desc">
+                  {{ getModelDescription(defaultModelInfo) }}
+                  <span class="model-item-embedding">· Embedding: {{ defaultModelInfo.embeddingModelName }}</span>
+                  <span v-if="defaultModelTrial" class="model-item-trial">· 剩余 {{ defaultModelTrial.remaining }} 次</span>
+                </div>
+              </div>
+            </div>
+            <div class="model-item-actions">
+              <svg v-if="selectedModel === defaultModelInfo.id" class="check-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+          </div>
+          <!-- 自定义模型 -->
           <div
             v-for="model in customModels"
             :key="model.id"
@@ -259,6 +305,10 @@ const providerSelectRef = ref(null);
 const modelSelectRef = ref(null);
 const modelDropdownRef = ref(null);
 
+// 系统默认模型信息（不含 API Key）+ 试用状态
+const defaultModelInfo = ref(null);
+const defaultModelTrial = ref(null);
+
 const providerList = [
   { value: 'doubao', label: '豆包', icon: new URL('@/assets/images/豆包.png', import.meta.url).href, baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
   { value: 'qwen', label: '千问', icon: new URL('@/assets/images/千问.png', import.meta.url).href, baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
@@ -288,6 +338,13 @@ const customModels = ref([]);
 
 const selectedModelData = computed(() => {
   if (!selectedModel.value) return null;
+  // 检查是否为系统默认模型
+  if (defaultModelInfo.value && selectedModel.value === defaultModelInfo.value.id) {
+    return {
+      ...defaultModelInfo.value,
+      providerIcon: getModelProviderIcon(defaultModelInfo.value.provider)
+    };
+  }
   const model = customModels.value.find(m => m.id === selectedModel.value);
   if (!model) return null;
   return {
@@ -318,6 +375,10 @@ const toggleModelDropdown = () => {
 };
 
 const selectModel = (model) => {
+  // 试用次数用尽的默认模型不允许选择
+  if (model.isDefault && defaultModelTrial.value && !defaultModelTrial.value.available) {
+    return;
+  }
   selectedModel.value = model.id;
   showModelDropdown.value = false;
   localStorage.setItem('happy-friday-selected-model', model.id);
@@ -341,7 +402,14 @@ const executeDelete = () => {
   syncModelsToConfig();
 
   if (selectedModel.value === targetId) {
-    selectedModel.value = customModels.value.length > 0 ? customModels.value[0].id : '';
+    // 删除首选后：优先选第一个自定义模型，没有则回退到默认模型（若有试用次数）
+    if (customModels.value.length > 0) {
+      selectedModel.value = customModels.value[0].id;
+    } else if (defaultModelInfo.value && defaultModelTrial.value && defaultModelTrial.value.available) {
+      selectedModel.value = defaultModelInfo.value.id;
+    } else {
+      selectedModel.value = '';
+    }
     localStorage.setItem('happy-friday-selected-model', selectedModel.value);
   }
 
@@ -383,8 +451,24 @@ const handleClickOutside = (event) => {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
+  loadDefaultModelInfo();
   loadCustomModels();
 });
+
+// 从后端加载系统默认模型信息（不含 API Key）和试用状态
+const loadDefaultModelInfo = async () => {
+  try {
+    const result = await electronService.invoke('get-default-model');
+    if (result && result.model) {
+      defaultModelInfo.value = result.model;
+    }
+    if (result && result.trial) {
+      defaultModelTrial.value = result.trial;
+    }
+  } catch (e) {
+    console.error('Failed to load default model info:', e);
+  }
+};
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
@@ -404,12 +488,25 @@ const loadCustomModels = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       customModels.value = JSON.parse(stored);
-      const savedSelected = localStorage.getItem('happy-friday-selected-model');
-      if (savedSelected && customModels.value.find(m => m.id === savedSelected)) {
+    }
+    const savedSelected = localStorage.getItem('happy-friday-selected-model');
+    if (savedSelected) {
+      // 已保存的首选模型：可能是自定义模型或系统默认模型
+      if (customModels.value.find(m => m.id === savedSelected)) {
+        selectedModel.value = savedSelected;
+      } else if (defaultModelInfo.value && savedSelected === defaultModelInfo.value.id) {
         selectedModel.value = savedSelected;
       } else if (customModels.value.length > 0) {
         selectedModel.value = customModels.value[0].id;
+      } else {
+        selectedModel.value = '';
       }
+    } else if (customModels.value.length > 0) {
+      // 没有保存首选，但有自定义模型：选第一个
+      selectedModel.value = customModels.value[0].id;
+    } else {
+      // 没有自定义模型，也没有保存首选：不自动选（下拉框高亮提示用户选择）
+      selectedModel.value = '';
     }
   } catch (error) {
     console.error('Failed to load custom models:', error);
@@ -505,6 +602,9 @@ const handleSave = () => {
 
     customModels.value.push(newModel);
     saveCustomModels();
+    // 新增模型后自动选为首选模型
+    selectedModel.value = newModel.id;
+    localStorage.setItem('happy-friday-selected-model', newModel.id);
     syncModelsToConfig();
     closeModal();
   }
@@ -614,6 +714,84 @@ const handleSave = () => {
 
 .model-select-trigger:hover {
   background-color: var(--bg-hover);
+}
+
+/* 未选择首选模型时：高亮边框 + 脉冲动画，引导用户点击 */
+.model-select-trigger.no-selection {
+  border-color: var(--accent-color, #3b82f6);
+  background-color: var(--bg-primary);
+  animation: highlightPulse 2s ease-in-out infinite;
+}
+
+.model-select-trigger.no-selection:hover {
+  border-color: var(--accent-color, #3b82f6);
+  background-color: var(--bg-hover);
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0);
+  }
+}
+
+.select-hint-text {
+  font-size: 14px;
+  color: var(--accent-color, #3b82f6);
+  font-weight: 500;
+}
+
+.default-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.trial-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background-color: rgba(59, 130, 246, 0.06);
+  border-top: 1px solid var(--border-color);
+}
+
+.trial-info-bar svg {
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.trial-info-bar.trial-exhausted {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.06);
+}
+
+.trial-info-bar.trial-exhausted svg {
+  color: #ef4444;
+}
+
+.model-item-trial {
+  color: #3b82f6;
+  opacity: 0.8;
+}
+
+.model-dropdown-item.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.model-dropdown-item.disabled:hover {
+  background-color: transparent;
 }
 
 .selected-model-info {

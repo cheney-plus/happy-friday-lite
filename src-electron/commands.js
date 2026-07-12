@@ -12,6 +12,11 @@ import { createBackup, restoreBackup } from './backup.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
+import {
+  getDefaultModelInfo,
+  getTrialStatus,
+  resolveModelConfig
+} from './defaultModel.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -92,6 +97,21 @@ export function registerCommands(mainWindow) {
     return result
   })
 
+  // ========== 系统默认模型 ==========
+
+  // 获取默认模型信息（不含 API Key）+ 试用状态
+  ipcMain.handle('get-default-model', () => {
+    return {
+      model: getDefaultModelInfo(),
+      trial: getTrialStatus()
+    }
+  })
+
+  // 单独获取试用状态
+  ipcMain.handle('get-trial-status', () => {
+    return getTrialStatus()
+  })
+
   ipcMain.handle('get-platform', () => {
     return process.platform
   })
@@ -164,6 +184,9 @@ export function registerCommands(mainWindow) {
     let isNewSession = false
     let userMessageId = null
 
+    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
+    const effectiveModel = resolveModelConfig(model)
+
     try {
       if (!currentSessionId) {
         const session = db.createSession(message.slice(0, 20) || '新对话')
@@ -182,7 +205,7 @@ export function registerCommands(mainWindow) {
       db.updateSessionTimestamp(currentSessionId)
 
       if (isNewSession) {
-        const modelClone = { ...model }
+        const modelClone = { ...effectiveModel }
         const sessionIdClone = currentSessionId
         const userMsgClone = message
         setImmediate(async () => {
@@ -233,8 +256,8 @@ export function registerCommands(mainWindow) {
 
       try {
         const result = ragConfig
-          ? await streamChatWithRagAgent(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken, ragConfig)
-          : await streamChat(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken)
+          ? await streamChatWithRagAgent(mainWindow, allMessages, effectiveModel, requestId, currentSessionId, enableThinking || false, cancelToken, ragConfig)
+          : await streamChat(mainWindow, allMessages, effectiveModel, requestId, currentSessionId, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
       } catch (e) {
@@ -271,6 +294,9 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('chat_without_memory', async (_event, args) => {
     const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
+    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
+    const effectiveModel = resolveModelConfig(model)
+
     try {
       const appConfig = loadConfig()
       // 如果有 @ 引用附件，将用户消息替换为 LLM 完整格式（含引用内容）
@@ -296,8 +322,8 @@ export function registerCommands(mainWindow) {
 
       try {
         const result = ragConfig
-          ? await streamChatWithRagAgent(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken, ragConfig)
-          : await streamChat(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken)
+          ? await streamChatWithRagAgent(mainWindow, messages, effectiveModel, requestId, null, enableThinking || false, cancelToken, ragConfig)
+          : await streamChat(mainWindow, messages, effectiveModel, requestId, null, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
       } catch (e) {
@@ -442,6 +468,9 @@ export function registerCommands(mainWindow) {
       throw new Error(`Invalid note AI action: ${action}`)
     }
 
+    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
+    const effectiveModel = resolveModelConfig(model)
+
     const cancelToken = cancelTokens.insert(requestId)
 
     let fullContent = ''
@@ -452,7 +481,7 @@ export function registerCommands(mainWindow) {
         action,
         noteContent,
         selectedText,
-        model,
+        effectiveModel,
         requestId,
         cancelToken,
         userInstruction
@@ -481,10 +510,13 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('note_fim_completion', async (_event, args) => {
     const { requestId, model, prefix, suffix } = args
 
+    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
+    const effectiveModel = resolveModelConfig(model)
+
     const cancelToken = cancelTokens.insert(requestId)
 
     try {
-      const result = await fimCompletion(model, prefix, suffix, cancelToken)
+      const result = await fimCompletion(effectiveModel, prefix, suffix, cancelToken)
       cancelTokens.remove(requestId)
 
       mainWindow.webContents.send(NOTE_FIM_RESULT, {
