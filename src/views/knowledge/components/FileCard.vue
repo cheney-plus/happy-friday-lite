@@ -1,27 +1,35 @@
 <template>
-  <div class="file-card" @click="$emit('open', file)" @dblclick="$emit('open', file)" @contextmenu.prevent.stop="$emit('contextmenu', $event)">
-    <!-- 索引状态指示器（仅对非文件夹文件显示） -->
+  <div
+    class="file-card"
+    @click="$emit('open', file)"
+    @dblclick="$emit('open', file)"
+    @contextmenu.prevent.stop="$emit('contextmenu', $event)"
+  >
+    <!-- 索引状态指示器（仅对可索引的非文件夹文件显示，工作区不显示） -->
     <div
-      v-if="!file.isDirectory && indexStatus !== null"
+      v-if="!file.isDirectory && indexStatus && indexStatus !== 'excluded'"
       class="index-status-indicator"
       :class="indexStatusClass"
       :title="indexStatusTitle"
     ></div>
+
+    <!-- 文件预览区 -->
     <div class="file-preview">
       <div class="file-type-icon" :class="file.type">
         <component :is="getFileIconComponent(file.type)" />
       </div>
+      <!-- 文件夹数量徽章 -->
+      <span v-if="file.isDirectory && file.count" class="folder-count-badge">{{ file.count }}</span>
     </div>
+
+    <!-- 文件信息 -->
     <div class="file-info">
-      <h3 class="file-name">{{ file.name }}</h3>
+      <h3 class="file-name" :title="file.name">{{ file.name }}</h3>
       <div class="file-meta">
-        <div class="meta-left">
-          <span class="meta-type" :class="file.type">{{ getTypeLabel(file.type) }}</span>
-          <span v-if="file.isDirectory && file.count" class="meta-count">{{ file.count }}</span>
-        </div>
-        <div class="meta-right">
-          <span v-if="file.modifiedTime" class="meta-date">{{ formatDate(file.modifiedTime) }}</span>
-        </div>
+        <span class="meta-type" :class="file.type">{{ getTypeLabel(file.type) }}</span>
+        <span v-if="file.size && !file.isDirectory" class="meta-sep">·</span>
+        <span v-if="file.size && !file.isDirectory" class="meta-size">{{ formatSize(file.size) }}</span>
+        <span v-if="file.modifiedTime" class="meta-date">{{ formatDate(file.modifiedTime) }}</span>
       </div>
     </div>
   </div>
@@ -58,7 +66,17 @@ function formatDate(isoString) {
   return (d.getMonth() + 1) + '/' + d.getDate();
 }
 
-// RAG 索引状态: null=未知/文件夹, 'success'=已索引(绿), 'pending'/'processing'=处理中(黄), 'failed'=失败(红), 其他=未索引(红)
+function formatSize(size) {
+  if (size == null || size === '') return '';
+  const bytes = Number(size);
+  if (isNaN(bytes)) return '';
+  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return bytes + ' B';
+}
+
+// RAG 索引状态
 const indexStatus = ref(null);
 
 const indexStatusClass = computed(() => {
@@ -85,6 +103,8 @@ const indexStatusTitle = computed(() => {
       return '索引中';
     case 'failed':
       return '索引失败';
+    case 'excluded':
+      return '';
     default:
       return '未索引';
   }
@@ -92,7 +112,7 @@ const indexStatusTitle = computed(() => {
 
 async function loadIndexStatus() {
   if (props.file.isDirectory || !props.file.path) {
-    indexStatus.value = null;
+    indexStatus.value = '';
     return;
   }
   try {
@@ -100,10 +120,10 @@ async function loadIndexStatus() {
     if (!api) return;
     const result = await api.invoke('rag-get-file-status', { filePath: props.file.path });
     if (result && result.success) {
-      indexStatus.value = result.status;
+      indexStatus.value = result.status || 'not-indexed';
     }
   } catch (e) {
-    // 静默失败，不影响卡片显示
+    // 静默失败
   }
 }
 
@@ -111,39 +131,53 @@ onMounted(loadIndexStatus);
 watch(() => props.file.path, loadIndexStatus);
 watch(() => props.ragRefreshKey, loadIndexStatus);
 
-// 暴露刷新方法，供父组件在索引完成后调用
 defineExpose({
   refreshStatus: loadIndexStatus
 });
 </script>
 
 <style scoped lang="scss">
+// 文件类型颜色（图标背景使用半透明，文字使用纯色）
+$type-colors: (
+  folder:   #1560F7,
+  markdown: #4CAF50,
+  pdf:      #F44336,
+  txt:      #9E9E9E,
+  excel:    #4CAF50,
+  word:     #2196F3,
+  note:     #FFC107,
+  ppt:      #FF9800,
+  epub:     #9C27B0,
+  html:     #00BCD4,
+  xml:      #607D8B,
+  json:     #FF9800,
+  unknown:  #90A4AE
+);
+
 .file-card {
   width: 140px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 8px 8px;
   cursor: pointer;
-  transition: all 0.25s ease;
-  background: var(--bg-primary);
+  transition: background 0.2s ease;
+  background: transparent;
   display: flex;
   flex-direction: column;
   position: relative;
 
-  // RAG 索引状态指示器（右上角）
+  // 索引状态指示器（右上角小圆点）
   .index-status-indicator {
     position: absolute;
     top: 8px;
     right: 8px;
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    z-index: 1;
-    box-shadow: 0 0 0 2px var(--bg-primary);
+    z-index: 2;
+    transition: opacity 0.2s;
 
-    &.status-success {
-      background: #10b981;
-    }
+    &.status-success { background: #10b981; }
 
     &.status-processing {
       background: #f59e0b;
@@ -151,20 +185,21 @@ defineExpose({
     }
 
     &.status-failed,
-    &.status-not-indexed {
-      background: #ef4444;
-    }
+    &.status-not-indexed { background: #cbd5e1; }
   }
 
   @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    50% { opacity: 0.3; }
   }
 
   &:hover {
-    border-color: var(--text-tertiary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    transform: translateY(-3px);
+    background: var(--bg-hover);
+  }
+
+  &:active {
+    background: var(--bg-active);
+    transition-duration: 0.06s;
   }
 
   .file-preview {
@@ -172,47 +207,62 @@ defineExpose({
     align-items: center;
     justify-content: center;
     height: 60px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    position: relative;
 
     .file-type-icon {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 56px;
-      height: 56px;
-      border-radius: 12px;
-      transition: all 0.25s ease;
+      width: 50px;
+      height: 50px;
+      border-radius: 13px;
+      transition: transform 0.2s ease;
 
-      &.folder { background: #E3F2FD; color: #1560F7; }
-      &.markdown { background: #E8F5E9; color: #4CAF50; }
-      &.pdf { background: #FFEBEE; color: #F44336; }
-      &.txt { background: #F5F5F5; color: #9E9E9E; }
-      &.excel { background: #E8F5E9; color: #4CAF50; }
-      &.word { background: #E3F2FD; color: #2196F3; }
-      &.note { background: #FFF8E1; color: #FFC107; }
-      &.ppt { background: #FFF3E0; color: #FF9800; }
-      &.epub { background: #F3E5F5; color: #9C27B0; }
-      &.html { background: #E0F7FA; color: #00BCD4; }
-      &.xml { background: #ECEFF1; color: #607D8B; }
-      &.json { background: #FFF3E0; color: #FF9800; }
-      &.unknown { background: #ECEFF1; color: #90A4AE; }
+      @each $type, $color in $type-colors {
+        &.#{$type} {
+          background: rgba($color, 0.1);
+          color: $color;
+        }
+      }
+    }
+
+    // 文件夹数量徽章
+    .folder-count-badge {
+      position: absolute;
+      bottom: 0;
+      right: calc(50% - 28px);
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-primary);
+      border-radius: 8px;
+      font-size: 9.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      box-shadow: 0 0 0 1px var(--border-color);
+      z-index: 2;
     }
   }
 
   &:hover .file-type-icon {
-    transform: scale(1.08);
+    transform: scale(1.05);
   }
 
   .file-info {
     flex: 1;
     display: flex;
     flex-direction: column;
+    gap: 2px;
 
     .file-name {
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--text-primary);
-      margin: 0 0 6px 0;
+      margin: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
@@ -222,49 +272,56 @@ defineExpose({
       line-height: 1.4;
       text-align: center;
       word-break: break-all;
-      min-height: 35px;
+      min-height: 33px;
     }
 
     .file-meta {
-      margin-top: auto;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      gap: 6px;
-      font-size: 11px;
+      justify-content: center;
+      gap: 4px;
+      font-size: 10px;
       color: var(--text-tertiary);
-
-      .meta-left {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .meta-right {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex-shrink: 0;
-      }
-
-      .meta-date { color: var(--text-tertiary); }
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
 
       .meta-type {
-        &.folder { color: #1560F7; }
-        &.markdown { color: #4CAF50; }
-        &.pdf { color: #F44336; }
-        &.txt { color: #9E9E9E; }
-        &.excel { color: #4CAF50; }
-        &.word { color: #2196F3; }
-        &.note { color: #FFC107; }
-        &.ppt { color: #FF9800; }
-        &.epub { color: #9C27B0; }
-        &.html { color: #00BCD4; }
-        &.xml { color: #607D8B; }
-        &.json { color: #FF9800; }
-        &.unknown { color: #90A4AE; }
+        font-weight: 500;
+
+        @each $type, $color in $type-colors {
+          &.#{$type} { color: $color; }
+        }
       }
+
+      .meta-sep {
+        opacity: 0.45;
+      }
+
+      .meta-size,
+      .meta-date {
+        color: var(--text-tertiary);
+      }
+    }
+  }
+}
+
+// 深色模式适配
+[data-theme='dark'] {
+  .file-card {
+    .file-preview {
+      .file-type-icon {
+        @each $type, $color in $type-colors {
+          &.#{$type} {
+            background: rgba($color, 0.15);
+          }
+        }
+      }
+    }
+
+    .index-status-indicator {
+      &.status-failed,
+      &.status-not-indexed { background: #4b5563; }
     }
   }
 }

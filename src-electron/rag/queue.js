@@ -1,4 +1,5 @@
 import * as db from '../db.js'
+import { deleteBySource } from './vectorstore.js'
 
 /**
  * 基于 SQLite file_status 表的串行任务队列
@@ -7,19 +8,22 @@ import * as db from '../db.js'
  * - 使用 file_status 表的 index_status 字段标记任务状态：pending / processing / success / failed
  * - 文件路径 (kb_type + file_path) 作为去重 Key，同一文件同时只有一个任务
  * - 串行处理：每次只取一个 pending 任务，处理完成后再取下一个
- * - 5 分钟轮询检查 + 入队时立即触发一次检查
+ * - 仅在入队时立即触发处理（无定时轮询，向量化完全由用户手动触发）
+ * - 支持取消当前任务（用户点击"停止"时），取消后清理已插入的向量
  */
 
-// 任务处理器函数类型：(task) => Promise<void>
+// 任务处理器函数类型：(task, options) => Promise<void>
 let taskHandler = null
 let onTaskComplete = null
+let onProgressCb = null
 let processing = false
-let pollTimer = null
-const POLL_INTERVAL = 5 * 60 * 1000 // 5 分钟
+
+// 取消标志：用户点击"停止"时置为 true，任务处理器检测后提前退出
+let cancelRequested = false
 
 /**
  * 注册任务处理器
- * @param {(task: {kbType: string, filePath: string, lastModified: string}) => Promise<void>} handler
+ * @param {(task: {kbType: string, filePath: string, lastModified: string}, options: {onProgress: Function, isCancelled: Function}) => Promise<void>} handler
  */
 export function setTaskHandler(handler) {
   taskHandler = handler
@@ -31,6 +35,25 @@ export function setTaskHandler(handler) {
  */
 export function setOnTaskComplete(callback) {
   onTaskComplete = callback
+}
+
+/**
+ * 注册进度回调（用于向前端发送实时进度）
+ * @param {(data: object) => void} callback
+ */
+export function setOnProgress(callback) {
+  onProgressCb = callback
+}
+
+/**
+ * 取消当前正在处理的任务
+ * 设置 cancelRequested 标志，任务处理器会在下一个检查点退出
+ */
+export function cancelCurrentTask() {
+  if (processing) {
+    cancelRequested = true
+    console.log('[RAG Queue] Cancel requested by user')
+  }
 }
 
 /**
@@ -113,20 +136,46 @@ async function processOne() {
   if (!task) return
 
   processing = true
+  cancelRequested = false
   // 标记为 processing
   db.updateFileStatus(task.kbType, task.filePath, 'processing')
+  console.log(`[RAG Queue] Task started: ${task.filePath}`)
+
+  // 通知前端开始处理
+  if (onProgressCb) {
+    onProgressCb({ phase: 'start', file: task.filePath, kbType: task.kbType })
+  }
 
   try {
-    await taskHandler(task)
-    db.updateFileStatus(task.kbType, task.filePath, 'success')
-    console.log(`[RAG Queue] Task success: ${task.filePath}`)
-    if (onTaskComplete) onTaskComplete(task, 'success')
+    await taskHandler(task, {
+      onProgress: (data) => {
+        if (onProgressCb) {
+          onProgressCb({ ...data, file: task.filePath, kbType: task.kbType })
+        }
+      },
+      isCancelled: () => cancelRequested
+    })
+
+    if (cancelRequested) {
+      // 用户取消：清理已插入的向量、父块和状态记录
+      console.log(`[RAG Queue] Task cancelled, cleaning up: ${task.filePath}`)
+      db.deleteFileStatus(task.kbType, task.filePath)
+      db.deleteParentDocsBySourcePath(task.filePath)
+      await deleteBySource(task.filePath)
+      console.log(`[RAG Queue] Cleanup done for cancelled task: ${task.filePath}`)
+      if (onTaskComplete) onTaskComplete(task, 'cancelled')
+    } else {
+      db.updateFileStatus(task.kbType, task.filePath, 'success')
+      console.log(`[RAG Queue] Task success: ${task.filePath}`)
+      if (onTaskComplete) onTaskComplete(task, 'success')
+    }
   } catch (e) {
     console.error(`[RAG Queue] Task failed: ${task.filePath}`, e)
     db.updateFileStatus(task.kbType, task.filePath, 'failed')
     if (onTaskComplete) onTaskComplete(task, 'failed')
   } finally {
     processing = false
+    cancelRequested = false
     // 处理完一个任务后，立即尝试处理下一个（串行）
     setImmediate(processNext)
   }
@@ -150,35 +199,6 @@ function scheduleImmediateProcess() {
     immediateTimer = null
     processNext().catch(e => console.error('[RAG Queue] Immediate process error:', e))
   }, 100)
-}
-
-/**
- * 启动队列轮询
- * 每隔 5 分钟检查一次是否有新的任务需要处理
- */
-export function startQueue() {
-  stopQueue()
-  // 立即处理一次（应用启动时）
-  scheduleImmediateProcess()
-  // 定时轮询
-  pollTimer = setInterval(() => {
-    processNext().catch(e => console.error('[RAG Queue] Poll process error:', e))
-  }, POLL_INTERVAL)
-  console.log(`[RAG Queue] Started, polling every ${POLL_INTERVAL / 1000}s`)
-}
-
-/**
- * 停止队列轮询
- */
-export function stopQueue() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-  if (immediateTimer) {
-    clearTimeout(immediateTimer)
-    immediateTimer = null
-  }
 }
 
 /**

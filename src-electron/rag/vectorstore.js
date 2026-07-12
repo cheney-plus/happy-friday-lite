@@ -228,12 +228,15 @@ const EMBED_INSERT_BATCH = 10
  *   - 避免将全部向量一次性堆积在内存中导致 OOM
  *   - 每批独立 try/catch：单批 embedding 或插入失败只跳过该批，不影响其余批次
  *   - embedDocuments 内部已带指数退避重试，重试耗尽才视为该批失败
+ *   - 支持取消：每批处理前检查 isCancelled()，取消后提前返回（队列负责清理已插入的向量）
  *
  * @param {string} kbType
  * @param {Array} childDocs - Document 数组，metadata 中含 docId 指向父块
+ * @param {(currentChunk: number, totalChunks: number) => void} [onProgress] - 分块处理进度回调
+ * @param {() => boolean} [isCancelled] - 取消检查函数，返回 true 时提前终止
  * @returns {Promise<number>} 实际插入的文档数（可能小于 childDocs.length）
  */
-export async function addDocuments(kbType, childDocs) {
+export async function addDocuments(kbType, childDocs, onProgress = null, isCancelled = null) {
   if (!childDocs || childDocs.length === 0) return 0
 
   const collection = await loadStore()
@@ -243,6 +246,7 @@ export async function addDocuments(kbType, childDocs) {
   if (sources.length > 0) {
     try {
       collection.deleteByFilterSync(sourcesOrFilter(sources))
+      console.log(`[RAG] Deleted old vectors for ${sources.length} source(s)`)
     } catch (e) {
       console.warn(`[RAG] deleteByFilter for sources failed (ignored):`, e.message)
     }
@@ -252,9 +256,17 @@ export async function addDocuments(kbType, childDocs) {
   const embeddings = await getEmbeddings()
   let totalInserted = 0
   let totalSkipped = 0
-  const totalBatches = Math.ceil(childDocs.length / EMBED_INSERT_BATCH)
+  const totalChunks = childDocs.length
+  const totalBatches = Math.ceil(totalChunks / EMBED_INSERT_BATCH)
+  console.log(`[RAG] Starting embedding: ${totalChunks} chunks, ${totalBatches} batches (kb=${kbType})`)
 
   for (let i = 0; i < childDocs.length; i += EMBED_INSERT_BATCH) {
+    // 取消检查点：每批处理前检查
+    if (isCancelled && isCancelled()) {
+      console.log(`[RAG] Cancelled at batch ${Math.floor(i / EMBED_INSERT_BATCH) + 1}/${totalBatches}, inserted so far: ${totalInserted}`)
+      break
+    }
+
     const batchIdx = Math.floor(i / EMBED_INSERT_BATCH)
     const batch = childDocs.slice(i, i + EMBED_INSERT_BATCH)
     try {
@@ -269,6 +281,8 @@ export async function addDocuments(kbType, childDocs) {
       totalInserted += inserted
       totalSkipped += failed.length
 
+      console.log(`[RAG] Batch ${batchIdx + 1}/${totalBatches}: inserted ${inserted}/${batch.length} (total: ${totalInserted}/${totalChunks})`)
+
       if (failed.length > 0) {
         console.warn(`[RAG] Batch ${batchIdx + 1}/${totalBatches}: ${failed.length}/${results.length} docs failed to insert`)
       }
@@ -277,9 +291,21 @@ export async function addDocuments(kbType, childDocs) {
       totalSkipped += batch.length
       console.warn(`[RAG] Batch ${batchIdx + 1}/${totalBatches} (offset ${i}, ${batch.length} chunks) failed: ${e.message}, skipping`)
     }
+
+    // 通知分块进度
+    if (onProgress) {
+      onProgress(Math.min(i + EMBED_INSERT_BATCH, totalChunks), totalChunks)
+    }
   }
 
-  console.log(`[RAG] Inserted ${totalInserted}/${childDocs.length} docs into zvec (kb=${kbType}, skipped: ${totalSkipped})`)
+  console.log(`[RAG] Embedding done: inserted ${totalInserted}/${childDocs.length} (kb=${kbType}, skipped: ${totalSkipped})`)
+
+  // 若有子块但全部插入失败，抛出异常使调用方标记任务为 failed
+  // 单批失败仍容错跳过，但全部失败说明存在系统性问题（如 API 不可用、模型配置错误）
+  if (totalInserted === 0 && childDocs.length > 0 && !(isCancelled && isCancelled())) {
+    throw new Error(`向量化失败：${childDocs.length} 个子块全部未插入（跳过 ${totalSkipped} 个），请检查 Embedding 模型配置与网络连接`)
+  }
+
   return totalInserted
 }
 

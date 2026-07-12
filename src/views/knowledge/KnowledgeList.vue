@@ -109,6 +109,18 @@
       :y="fileItemContextMenu.y"
       @close="hideFileItemContextMenu"
     >
+      <div
+        v-if="canBuildIndex(fileItemContextMenu.item)"
+        class="context-menu-item"
+        @mousedown="handleBuildIndex"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+        </svg>
+        <span>构建索引</span>
+      </div>
       <div class="context-menu-item" @mousedown="handleRenameFile">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -172,11 +184,50 @@
 
     <!-- 功能开发中提示 -->
     <FeatureModal :visible="showModal" @close="showModal = false" />
+
+    <!-- 构建索引进度弹窗 -->
+    <div v-if="buildIndexState.visible" class="build-index-overlay">
+      <div class="build-index-modal">
+        <div class="build-index-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+          <span>构建索引</span>
+        </div>
+        <div class="build-index-body">
+          <div class="build-index-file" :title="buildIndexState.fileName">{{ buildIndexState.fileName }}</div>
+          <div class="build-index-status" :class="buildIndexState.status">
+            <span v-if="buildIndexState.status === 'processing'" class="loading-dot"></span>
+            {{ buildIndexStatusText }}
+          </div>
+          <div v-if="buildIndexState.phase === 'embedding' && buildIndexState.totalChunks > 0" class="build-index-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: buildIndexProgressPercent + '%' }"></div>
+            </div>
+            <div class="progress-text">{{ buildIndexState.currentChunk }}/{{ buildIndexState.totalChunks }}</div>
+          </div>
+        </div>
+        <div class="build-index-footer">
+          <button
+            v-if="buildIndexState.status === 'processing'"
+            class="btn-stop"
+            @click="handleStopBuildIndex"
+          >停止</button>
+          <button
+            v-else
+            class="btn-close"
+            @click="handleCloseBuildIndex"
+          >关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { SidebarIcon } from './components/icons';
 import KbSidebar from './components/KbSidebar.vue';
 import KbMainContent from './components/KbMainContent.vue';
@@ -197,6 +248,35 @@ const deleteConfirmMessage = ref('');
 const pendingDeleteItem = ref(null);
 const pendingDeleteCategoryId = ref('');
 const pendingDeleteFile = ref(null);
+
+// 构建索引进度弹窗状态
+const buildIndexState = reactive({
+  visible: false,
+  fileName: '',
+  filePath: '',
+  phase: '',         // start / loading / chunking / embedding / done / cancelled / failed
+  currentChunk: 0,
+  totalChunks: 0,
+  status: ''         // processing / success / cancelled / failed
+});
+
+const buildIndexStatusText = computed(() => {
+  switch (buildIndexState.phase) {
+    case 'start': return '准备中...';
+    case 'loading': return '加载文档中...';
+    case 'chunking': return '文档分块中...';
+    case 'embedding': return '向量化中...';
+    case 'done': return '索引完成';
+    case 'cancelled': return '已停止，索引已清理';
+    case 'failed': return '索引失败';
+    default: return '处理中...';
+  }
+});
+
+const buildIndexProgressPercent = computed(() => {
+  if (buildIndexState.totalChunks === 0) return 0;
+  return Math.round((buildIndexState.currentChunk / buildIndexState.totalChunks) * 100);
+});
 
 const sidebar = useSidebar();
 
@@ -323,6 +403,58 @@ function handleRenameFile() {
   }
 }
 
+// 判断文件是否可以构建索引（非文件夹 + 非工作区）
+function canBuildIndex(item) {
+  return item && !item.isDirectory && currentCategoryId.value !== 'agent';
+}
+
+// 右键"构建索引"：手动触发单个文件的向量化，弹窗显示进度
+function handleBuildIndex() {
+  const item = fileItemContextMenu.item;
+  hideFileItemContextMenu();
+  if (!item || !item.path) return;
+
+  // 立即弹出进度弹窗
+  buildIndexState.visible = true;
+  buildIndexState.fileName = item.name;
+  buildIndexState.filePath = item.path;
+  buildIndexState.phase = 'start';
+  buildIndexState.currentChunk = 0;
+  buildIndexState.totalChunks = 0;
+  buildIndexState.status = 'processing';
+
+  electronService.invoke('rag-build-index', { filePath: item.path })
+    .catch(e => console.error('[RAG] build-index failed:', e));
+}
+
+// 停止构建索引：取消当前任务，后端会清理已插入的向量
+function handleStopBuildIndex() {
+  electronService.invoke('rag-stop-build-index')
+    .catch(e => console.error('[RAG] stop-build-index failed:', e));
+}
+
+// 关闭进度弹窗（仅在任务完成/停止/失败后可用）
+function handleCloseBuildIndex() {
+  buildIndexState.visible = false;
+}
+
+// rag-build-progress 事件处理：更新弹窗进度
+function onBuildProgress(data) {
+  if (!buildIndexState.visible || data.file !== buildIndexState.filePath) return;
+  if (data.phase) buildIndexState.phase = data.phase;
+  if (data.currentChunk !== undefined) buildIndexState.currentChunk = data.currentChunk;
+  if (data.totalChunks !== undefined) buildIndexState.totalChunks = data.totalChunks;
+}
+
+// rag-task-complete 事件处理：任务完成/取消/失败时更新弹窗状态
+function onBuildTaskComplete(data) {
+  if (!buildIndexState.visible || data.filePath !== buildIndexState.filePath) return;
+  buildIndexState.status = data.status;
+  if (data.status === 'success') buildIndexState.phase = 'done';
+  else if (data.status === 'cancelled') buildIndexState.phase = 'cancelled';
+  else buildIndexState.phase = 'failed';
+}
+
 function handleDeleteFile() {
   const item = fileItemContextMenu.item;
   hideFileItemContextMenu();
@@ -416,6 +548,8 @@ function debouncedReloadCategories() {
 }
 
 let unsubKbDirChanged = null;
+let unsubBuildProgress = null;
+let unsubBuildTaskComplete = null;
 
 onMounted(async () => {
   await loadDataDir();
@@ -465,6 +599,11 @@ onMounted(async () => {
         debouncedReloadCategories();
       }
     });
+
+    // 订阅构建索引进度事件
+    unsubBuildProgress = window.electronAPI.on('rag-build-progress', onBuildProgress);
+    // 订阅构建索引完成事件
+    unsubBuildTaskComplete = window.electronAPI.on('rag-task-complete', onBuildTaskComplete);
   }
 });
 
@@ -480,6 +619,14 @@ onBeforeUnmount(() => {
   if (unsubKbDirChanged) {
     unsubKbDirChanged();
     unsubKbDirChanged = null;
+  }
+  if (unsubBuildProgress) {
+    unsubBuildProgress();
+    unsubBuildProgress = null;
+  }
+  if (unsubBuildTaskComplete) {
+    unsubBuildTaskComplete();
+    unsubBuildTaskComplete = null;
   }
 });
 </script>
@@ -552,6 +699,138 @@ onBeforeUnmount(() => {
     &:hover {
       background: rgba(229, 57, 53, 0.08);
     }
+  }
+}
+
+// 构建索引进度弹窗
+.build-index-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.build-index-modal {
+  width: 360px;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  user-select: none;
+}
+
+.build-index-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.build-index-body {
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.build-index-file {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.build-index-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &.success { color: #10b981; }
+  &.cancelled { color: #f59e0b; }
+  &.failed { color: #ef4444; }
+}
+
+.loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  animation: build-index-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes build-index-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.build-index-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-bar {
+  height: 6px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+.build-index-footer {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-stop, .btn-close {
+  padding: 6px 16px;
+  font-size: 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-stop {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.2);
+  }
+}
+
+.btn-close {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+
+  &:hover {
+    background: var(--bg-active);
   }
 }
 </style>

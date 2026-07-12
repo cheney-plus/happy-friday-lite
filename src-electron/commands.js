@@ -976,23 +976,39 @@ export function registerCommands(mainWindow) {
 
   // ========== RAG 知识检索相关命令 ==========
 
-  // 触发时机1：文件上传/导入时入队索引
-  ipcMain.handle('rag-trigger-file-upload', async (_event, args) => {
-    const { filePaths } = args
-    if (!filePaths || !Array.isArray(filePaths)) {
-      return { success: false, error: 'filePaths required' }
+  // 手动构建单个文件的向量索引（右键"构建索引"）
+  // 强制重新索引，即使已索引过也会重新构建
+  // 进度通过 rag-build-progress 事件实时推送，完成/取消通过 rag-task-complete 通知
+  ipcMain.handle('rag-build-index', async (_event, args) => {
+    const { filePath } = args
+    if (!filePath) {
+      return { success: false, error: 'filePath required' }
     }
     try {
-      const { triggerOnFilesUpload } = await import('./rag/triggers.js')
-      const count = triggerOnFilesUpload(filePaths)
-      return { success: true, enqueued: count }
+      const { triggerOnFileUpload } = await import('./rag/triggers.js')
+      const enqueued = triggerOnFileUpload(filePath)
+      return { success: true, enqueued }
     } catch (e) {
-      console.error('[RAG] trigger-file-upload error:', e)
+      console.error('[RAG] build-index error:', e)
       return { success: false, error: e.message }
     }
   })
 
-  // 触发时机3：手动触发知识库检索更新（内存重建覆盖）
+  // 停止当前正在进行的索引任务（用户点击"停止"按钮）
+  // 取消后队列会清理已插入的向量和状态记录
+  ipcMain.handle('rag-stop-build-index', async () => {
+    try {
+      const { stopBuildIndex } = await import('./rag/triggers.js')
+      stopBuildIndex()
+      return { success: true }
+    } catch (e) {
+      console.error('[RAG] stop-build-index error:', e)
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 手动触发知识库检索更新（设置页"更新索引"按钮）
+  // 批量重建：清理已删除文件向量 + 重新索引未索引/已变更文件
   ipcMain.handle('rag-manual-update', async (_event, args) => {
     const { kbType } = args || {}
     try {
@@ -1010,13 +1026,18 @@ export function registerCommands(mainWindow) {
   })
 
   // 获取单个文件的索引状态
+  // 返回值：'pending'/'processing'/'success'/'failed'（已入队或已索引）
+  //         'not-indexed'（可索引但尚未建立索引）
+  //         'excluded'（工作区/不可索引，不显示状态指示器）
   ipcMain.handle('rag-get-file-status', async (_event, args) => {
     const { filePath } = args
     if (!filePath) return { success: false, error: 'filePath required' }
     try {
-      const { getFileIndexStatus } = await import('./rag/index.js')
+      const { getFileIndexStatus, inferKbType } = await import('./rag/index.js')
+      const kbType = inferKbType(filePath)
+      if (!kbType) return { success: true, status: 'excluded' }
       const status = getFileIndexStatus(filePath)
-      return { success: true, status: status ? status.index_status : null }
+      return { success: true, status: status ? status.index_status : 'not-indexed' }
     } catch (e) {
       return { success: false, error: e.message }
     }

@@ -557,11 +557,7 @@ async function handleUpload(type) {
         }
       }
       emit('refresh');
-      // 触发 RAG 索引（异步，不阻塞 UI）；工作区不参与向量化
-      if (copiedPaths.length > 0 && props.currentCategoryId !== 'agent') {
-        api.invoke('rag-trigger-file-upload', { filePaths: copiedPaths })
-          .catch(e => console.error('[RAG] trigger upload failed:', e));
-      }
+      // 上传后不自动向量化，由用户右键"构建索引"手动触发
     } else if (type === 'folder') {
       const folderPath = await api.invoke('open-file-dialog', {
         properties: ['openDirectory']
@@ -575,11 +571,7 @@ async function handleUpload(type) {
       });
       console.log('[Upload] copy folder result:', result);
       emit('refresh');
-      // 触发 RAG 索引（异步，不阻塞 UI）；工作区不参与向量化
-      if (result && result.success && result.path && props.currentCategoryId !== 'agent') {
-        api.invoke('rag-trigger-file-upload', { filePaths: [result.path] })
-          .catch(e => console.error('[RAG] trigger folder upload failed:', e));
-      }
+      // 上传后不自动向量化，由用户右键"构建索引"手动触发
     } else if (type === 'note') {
       showNoteDialog.value = true;
     } else if (type === 'webpage') {
@@ -632,11 +624,7 @@ async function confirmNoteUpload(selectedNotes) {
     }
     closeNoteDialog();
     emit('refresh');
-    // 触发 RAG 索引；工作区不参与向量化
-    if (savedPaths.length > 0 && props.currentCategoryId !== 'agent') {
-      api.invoke('rag-trigger-file-upload', { filePaths: savedPaths })
-        .catch(e => console.error('[RAG] trigger note upload failed:', e));
-    }
+    // 上传后不自动向量化，由用户右键"构建索引"手动触发
   } catch (e) {
     console.error('[Upload note] error:', e);
     uploadErrorMsg.value = `笔记保存失败：${e.message}`;
@@ -711,11 +699,7 @@ ${article.content}
     if (result.success) {
       closeWebpageDialog();
       emit('refresh');
-      // 触发 RAG 索引；工作区不参与向量化
-      if (props.currentCategoryId !== 'agent') {
-        api.invoke('rag-trigger-file-upload', { filePaths: [result.path] })
-          .catch(e => console.error('[RAG] trigger webpage upload failed:', e));
-      }
+      // 上传后不自动向量化，由用户右键"构建索引"手动触发
     } else {
       uploadErrorMsg.value = `网页保存失败：${result.error}`;
       showUploadError.value = true;
@@ -873,7 +857,7 @@ function formatSize(file) {
   return bytes + ' B';
 }
 
-// RAG 索引状态刷新：当队列任务完成或手动更新完成时，刷新文件卡片状态
+// RAG 索引状态刷新：当队列任务开始/完成或手动更新完成时，刷新文件卡片状态
 const ragRefreshKey = ref(0);
 
 function onRagTaskComplete() {
@@ -882,9 +866,16 @@ function onRagTaskComplete() {
 function onRagUpdateDone() {
   ragRefreshKey.value++;
 }
+// 任务开始时立即刷新，让 FileCard 显示 'processing' 状态（橙色脉冲圆点）
+function onRagBuildProgress(data) {
+  if (data && data.phase === 'start') {
+    ragRefreshKey.value++;
+  }
+}
 
 let unsubRagTaskComplete = null;
 let unsubRagUpdateDone = null;
+let unsubRagBuildProgress = null;
 
 onMounted(() => {
   document.addEventListener('click', closeSortMenu);
@@ -892,6 +883,7 @@ onMounted(() => {
   if (window.electronAPI) {
     unsubRagTaskComplete = window.electronAPI.on('rag-task-complete', onRagTaskComplete);
     unsubRagUpdateDone = window.electronAPI.on('rag-update-done', onRagUpdateDone);
+    unsubRagBuildProgress = window.electronAPI.on('rag-build-progress', onRagBuildProgress);
   }
 });
 
@@ -900,6 +892,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeUploadMenu);
   if (unsubRagTaskComplete) unsubRagTaskComplete();
   if (unsubRagUpdateDone) unsubRagUpdateDone();
+  if (unsubRagBuildProgress) unsubRagBuildProgress();
 });
 </script>
 

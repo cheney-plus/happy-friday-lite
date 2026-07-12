@@ -99,9 +99,11 @@ function scanIndexableFiles(dirPath) {
 /**
  * 处理单个文件的索引任务（任务队列的 handler）
  * @param {{kbType: string, filePath: string, lastModified: string}} task
+ * @param {{onProgress: Function, isCancelled: Function}} [options] - 进度回调与取消检查
  */
-export async function processFileTask(task) {
+export async function processFileTask(task, options = {}) {
   const { kbType, filePath, lastModified } = task
+  const { onProgress, isCancelled } = options
 
   if (!fs.existsSync(filePath)) {
     // 文件已被删除，清理状态、父块和向量
@@ -115,11 +117,23 @@ export async function processFileTask(task) {
   console.log(`[RAG] Processing file: ${filePath}`)
 
   // 1. 加载文档
+  if (onProgress) onProgress({ phase: 'loading' })
+  console.log(`[RAG] Loading document: ${filePath}`)
   const rawDocs = await loadDocument(filePath, db)
+  console.log(`[RAG] Loaded ${rawDocs.length} raw docs from: ${filePath}`)
 
   // 2. 分块
+  if (onProgress) onProgress({ phase: 'chunking' })
+  console.log(`[RAG] Chunking document: ${filePath}`)
   const fileType = path.extname(filePath).toLowerCase().slice(1)
   const { parentDocs, childDocs } = await splitDocuments(rawDocs, fileType)
+  console.log(`[RAG] Chunked: ${parentDocs.length} parent docs, ${childDocs.length} child chunks`)
+
+  // 取消检查点
+  if (isCancelled && isCancelled()) {
+    console.log(`[RAG] Cancelled before embedding: ${filePath}`)
+    return
+  }
 
   // 3. 删除该文件旧的父块（如果是重新索引）
   db.deleteParentDocsBySourcePath(filePath)
@@ -132,8 +146,23 @@ export async function processFileTask(task) {
   // 5. 子块向量化后存入 Zvec collection
   // addDocuments 内部会先按 source 删除旧向量，再 embedding 并插入新向量
   const insertedCount = childDocs.length > 0
-    ? await addDocuments(kbType, childDocs)
+    ? await addDocuments(kbType, childDocs, (currentChunk, totalChunks) => {
+        if (onProgress) {
+          onProgress({ phase: 'embedding', currentChunk, totalChunks })
+        }
+      }, isCancelled)
     : 0
+
+  // 取消检查：addDocuments 可能在中途被取消
+  if (isCancelled && isCancelled()) {
+    console.log(`[RAG] Cancelled during embedding: ${filePath}`)
+    return
+  }
+
+  // 兜底校验：addDocuments 已在全部失败时抛错，此处防御性检查避免误标 success
+  if (childDocs.length > 0 && insertedCount === 0) {
+    throw new Error(`文件分块后产生 ${childDocs.length} 个子块，但全部向量化失败`)
+  }
 
   // 6. 记录子块数量，用于 getVectorCount 统计
   db.setFileChunkCount(kbType, filePath, insertedCount)
@@ -153,7 +182,7 @@ export async function processFileTask(task) {
  *   未变更文件的向量原位保留在共享 collection 中，无需迁移。
  *
  * @param {string} kbType - 知识库类型
- * @param {(progress: {current: number, total: number, file: string}) => void} onProgress - 进度回调
+ * @param {(progress: {phase: string, current?: number, total?: number, file?: string, fileName?: string, kbType: string, chunks?: number, parents?: number, error?: string, deletedCount?: number}) => void} onProgress - 进度回调
  * @returns {Promise<{total: number, changed: number, unchanged: number, failed: number}>}
  */
 export async function rebuildKbStore(kbType, onProgress = null) {
@@ -192,6 +221,11 @@ export async function rebuildKbStore(kbType, onProgress = null) {
 
   console.log(`[RAG] Changed: ${changedFiles.length}, Deleted: ${deletedFiles.length}`)
 
+  // 通知扫描完成 & 变更文件数量
+  if (onProgress) {
+    onProgress({ phase: 'scanned', total: allFiles.length, changedCount: changedFiles.length, deletedCount: deletedFiles.length, kbType })
+  }
+
   // 3. 处理已删除文件：清理向量、状态和父块
   for (const filePath of deletedFiles) {
     db.deleteFileStatus(kbType, filePath)
@@ -204,8 +238,10 @@ export async function rebuildKbStore(kbType, onProgress = null) {
   const total = changedFiles.length
   for (let i = 0; i < changedFiles.length; i++) {
     const file = changedFiles[i]
+    const fileName = path.basename(file.filePath)
+    // 通知开始索引此文件
     if (onProgress) {
-      onProgress({ current: i + 1, total, file: file.filePath })
+      onProgress({ phase: 'indexing', current: i + 1, total, file: file.filePath, fileName, kbType })
     }
     try {
       const rawDocs = await loadDocument(file.filePath, db)
@@ -218,23 +254,52 @@ export async function rebuildKbStore(kbType, onProgress = null) {
         db.insertParentDocsBatch(parentDocs)
       }
 
-      // 向量化（addDocuments 内部按 source 删旧插新）
+      // 向量化（addDocuments 内部按 source 删旧插新），传递分块进度回调
       const insertedCount = childDocs.length > 0
-        ? await addDocuments(kbType, childDocs)
+        ? await addDocuments(kbType, childDocs, (currentChunk, totalChunks) => {
+            if (onProgress) {
+              onProgress({
+                phase: 'indexing',
+                current: i + 1,
+                total,
+                file: file.filePath,
+                fileName,
+                kbType,
+                currentChunk,
+                totalChunks
+              })
+            }
+          })
         : 0
+
+      // 兜底校验：若有子块但全部插入失败
+      if (childDocs.length > 0 && insertedCount === 0) {
+        throw new Error(`分块 ${childDocs.length} 块但全部向量化失败`)
+      }
 
       // 更新状态和子块数量
       db.upsertFileStatus(kbType, file.filePath, file.lastModified, 'success')
       db.setFileChunkCount(kbType, file.filePath, insertedCount)
+
+      // 通知此文件索引完成（含分块数）
+      if (onProgress) {
+        onProgress({ phase: 'indexed', current: i + 1, total, file: file.filePath, fileName, kbType, chunks: insertedCount, parents: parentDocs.length })
+      }
     } catch (e) {
       console.error(`[RAG] Failed to index ${file.filePath}:`, e.message)
       db.upsertFileStatus(kbType, file.filePath, file.lastModified, 'failed')
       failedCount++
+      if (onProgress) {
+        onProgress({ phase: 'failed', current: i + 1, total, file: file.filePath, fileName, kbType, error: e.message })
+      }
     }
   }
 
   // 5. 批量插入后优化 HNSW 索引，提升后续检索性能
   if (changedFiles.length > 0 || deletedFiles.length > 0) {
+    if (onProgress) {
+      onProgress({ phase: 'optimizing', kbType })
+    }
     await optimizeCollection()
   }
 

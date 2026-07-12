@@ -171,14 +171,17 @@
               {{ ragState.updating ? t('settings.updating') : t('settings.updateIndex') }}
             </button>
           </div>
-          <div v-if="ragState.progress" class="setting-item">
-            <span class="item-label">{{ ragProgressKbLabel }}</span>
-            <span class="item-link">{{ ragState.progress }}</span>
-          </div>
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.autoUpdateOnStartup') }}</span>
-            <div class="item-toggle">
-              <input type="checkbox" v-model="ragConfig.autoUpdateOnStartup" @change="saveRagConfig" />
+          <div v-if="ragState.progress || ragState.updating" class="setting-item rag-progress-item">
+            <div class="rag-progress-content">
+              <div class="rag-progress-main">
+                <span class="item-label">{{ ragProgressMainLabel }}</span>
+                <span class="item-link">{{ ragState.progress }}</span>
+              </div>
+              <div class="rag-progress-detail" v-if="ragState.fileName">
+                <span class="rag-progress-file" :title="ragState.fileName">{{ ragState.fileName }}</span>
+                <span class="rag-progress-meta" v-if="ragState.totalChunks > 0">· {{ ragState.currentChunk }}/{{ ragState.totalChunks }} {{ t('settings.chunks') }}</span>
+                <span class="rag-progress-meta rag-progress-failed" v-if="ragState.failedCount > 0">· {{ t('settings.failed') }} {{ ragState.failedCount }}</span>
+              </div>
             </div>
           </div>
           <div class="setting-item rag-stats-row">
@@ -551,11 +554,16 @@ const formatBackupTime = (iso) => {
 const ragState = reactive({
   updating: false,
   progress: '',
-  progressText: ''
-});
-
-const ragConfig = reactive({
-  autoUpdateOnStartup: true
+  progressText: '',
+  fileName: '',
+  currentChunk: 0,
+  totalChunks: 0,
+  kbIndex: 0,
+  kbCount: 0,
+  current: 0,
+  total: 0,
+  failedCount: 0,
+  phase: ''
 });
 
 const ragStats = ref({});
@@ -569,31 +577,15 @@ function kbTypeLabel(kbType) {
   return KB_TYPE_LABELS.value[kbType] || kbType;
 }
 
-const ragProgressKbLabel = computed(() => {
-  const kb = ragState.progressText;
-  return kb ? kbTypeLabel(kb) : '';
+// 进度主标签：知识库名称（第几个/共几个）
+const ragProgressMainLabel = computed(() => {
+  if (!ragState.progressText) return t('settings.preparing');
+  const label = kbTypeLabel(ragState.progressText);
+  if (ragState.kbCount > 0) {
+    return `${label}（${ragState.kbIndex}/${ragState.kbCount}）`;
+  }
+  return label;
 });
-
-const loadRagConfig = async () => {
-  try {
-    const cfg = await electronService.invoke('get-config');
-    if (cfg && cfg.rag) {
-      ragConfig.autoUpdateOnStartup = cfg.rag.autoUpdateOnStartup !== false;
-    }
-  } catch (e) {
-    console.error('加载 RAG 配置失败:', e);
-  }
-};
-
-const saveRagConfig = async () => {
-  try {
-    const cfg = await electronService.invoke('get-config');
-    cfg.rag = { ...cfg.rag, ...ragConfig };
-    await electronService.invoke('save-config', cfg);
-  } catch (e) {
-    console.error('保存 RAG 配置失败:', e);
-  }
-};
 
 const loadRagStats = async () => {
   try {
@@ -610,15 +602,69 @@ const handleRagUpdate = async () => {
   if (ragState.updating) return;
   ragState.updating = true;
   ragState.progress = t('settings.preparing');
-  ragState.progressText = t('settings.progress');
+  ragState.progressText = '';
+  ragState.fileName = '';
+  ragState.currentChunk = 0;
+  ragState.totalChunks = 0;
+  ragState.kbIndex = 0;
+  ragState.kbCount = 0;
+  ragState.current = 0;
+  ragState.total = 0;
+  ragState.failedCount = 0;
+  ragState.phase = 'preparing';
 
   // 监听进度事件（on 返回 unsubscribe 函数）
   let unsubProgress = null;
   let unsubDone = null;
   if (window.electronAPI) {
     unsubProgress = window.electronAPI.on('rag-update-progress', (progress) => {
-      ragState.progressText = `${progress.kbType || ''}`;
-      ragState.progress = `${progress.current}/${progress.total}`;
+      ragState.progressText = progress.kbType || '';
+      ragState.kbIndex = progress.kbIndex || 0;
+      ragState.kbCount = progress.kbCount || 0;
+
+      switch (progress.phase) {
+        case 'scanned':
+          ragState.phase = 'scanned';
+          ragState.total = progress.changedCount || 0;
+          ragState.fileName = '';
+          ragState.totalChunks = 0;
+          if ((progress.changedCount || 0) === 0) {
+            ragState.progress = t('settings.noChanges');
+          } else {
+            ragState.progress = `${t('settings.scanned')} ${progress.total || 0} · ${t('settings.pending')} ${progress.changedCount || 0}`;
+          }
+          break;
+        case 'indexing':
+          ragState.phase = 'indexing';
+          ragState.current = progress.current || 0;
+          ragState.total = progress.total || 0;
+          ragState.fileName = progress.fileName || '';
+          ragState.currentChunk = progress.currentChunk || 0;
+          ragState.totalChunks = progress.totalChunks || 0;
+          ragState.progress = `${progress.current || 0}/${progress.total || 0}`;
+          break;
+        case 'indexed':
+          ragState.phase = 'indexed';
+          ragState.current = progress.current || 0;
+          ragState.total = progress.total || 0;
+          ragState.fileName = progress.fileName || '';
+          ragState.progress = `${progress.current || 0}/${progress.total || 0}`;
+          break;
+        case 'failed':
+          ragState.phase = 'failed';
+          ragState.failedCount = (ragState.failedCount || 0) + 1;
+          ragState.current = progress.current || 0;
+          ragState.total = progress.total || 0;
+          ragState.fileName = progress.fileName || '';
+          ragState.progress = `${progress.current || 0}/${progress.total || 0}`;
+          break;
+        case 'optimizing':
+          ragState.phase = 'optimizing';
+          ragState.fileName = '';
+          ragState.totalChunks = 0;
+          ragState.progress = t('settings.optimizing');
+          break;
+      }
     });
     unsubDone = window.electronAPI.on('rag-update-done', () => {
       if (unsubProgress) unsubProgress();
@@ -629,19 +675,35 @@ const handleRagUpdate = async () => {
   try {
     const result = await electronService.invoke('rag-manual-update', {});
     if (result && result.success) {
-      ragState.progress = t('settings.complete');
+      const failedTotal = Object.values(result.results || {}).reduce((s, r) => s + (r.failed || 0), 0);
+      const changedTotal = Object.values(result.results || {}).reduce((s, r) => s + (r.changed || 0), 0);
+      if (failedTotal > 0) {
+        ragState.progress = `${t('settings.complete')} · ${t('settings.failed')}: ${failedTotal}/${changedTotal}`;
+      } else if (changedTotal === 0) {
+        ragState.progress = t('settings.noChanges');
+      } else {
+        ragState.progress = `${t('settings.complete')} · ${changedTotal}`;
+      }
+      ragState.phase = 'done';
+      ragState.fileName = '';
+      ragState.totalChunks = 0;
       await loadRagStats();
     } else {
       ragState.progress = t('settings.failed') + ': ' + (result?.error || t('settings.unknownError'));
+      ragState.phase = 'error';
     }
   } catch (e) {
     ragState.progress = t('settings.failed') + ': ' + e.message;
+    ragState.phase = 'error';
   } finally {
     ragState.updating = false;
     // 5 秒后清空进度
     setTimeout(() => {
       ragState.progress = '';
       ragState.progressText = '';
+      ragState.fileName = '';
+      ragState.phase = '';
+      ragState.totalChunks = 0;
     }, 5000);
   }
 };
@@ -701,7 +763,6 @@ onMounted(() => {
   settings.displayMode = currentMode.value;
   currentLanguage.value = appStore.language || 'zh-CN';
   loadBackupConfig();
-  loadRagConfig();
   loadRagStats();
 });
 
@@ -1158,6 +1219,48 @@ const openAuthorEmail = () => {
 
 .rag-stat-chip.has-issues .rag-stat-detail,
 .rag-stat-chip.has-issues .rag-stat-vectors {
+  color: #f59e0b;
+}
+
+/* RAG 索引进度 */
+.rag-progress-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.rag-progress-content {
+  width: 100%;
+}
+
+.rag-progress-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rag-progress-detail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.rag-progress-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.rag-progress-meta {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rag-progress-failed {
   color: #f59e0b;
 }
 
