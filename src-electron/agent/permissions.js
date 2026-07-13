@@ -14,7 +14,7 @@
  *      通过 interruptOn + when 回调在 humanInTheLoop.js 中实现路径级审批。
  *
  * 规则评估顺序（首条匹配决定结果）：
- *   1. /SKILL/**      读 allow / 写 deny    Skill 文件由前端管理，Agent 不可直接修改
+ *   1. /SKILL/**      读写 allow            Skill 文件，Agent 可创建/修改技能
  *   2. /memories/**   读写 allow            跨会话记忆，Agent 自我成长
  *   3. /SANDBOX/**    读写 allow            Agent 工作区，所有生成文件均存放于此
  *   4. /**（write）   deny                  兜底：禁止在根目录其他位置写入，防止污染
@@ -26,17 +26,12 @@
  */
 export function buildPermissions() {
   return [
-    // 1. SKILL 目录：Agent 只读，禁止直接写入（保护技能文件）
-    //    写操作需通过前端管理界面，或通过 interruptOn 走审批流程
+    // 1. SKILL 目录：Agent 可读写，支持通过 Agent 创建/修改技能文件
+    //    SKILL 文件也可通过前端管理界面维护
     {
-      operations: ['read'],
+      operations: ['read', 'write'],
       paths: ['/SKILL/**'],
       mode: 'allow'
-    },
-    {
-      operations: ['write'],
-      paths: ['/SKILL/**'],
-      mode: 'deny'
     },
 
     // 2. /memories/ 路由：跨会话记忆存储，读写允许

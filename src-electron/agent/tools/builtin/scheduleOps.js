@@ -10,7 +10,7 @@
  * 优先级取值：urgent（紧急）/ important（重要）/ minor（次要）
  */
 
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { registerTool } from '../registry.js'
 
 // 优先级枚举（与 src/store/modules/schedule.js EVENT_PRIORITIES 保持一致）

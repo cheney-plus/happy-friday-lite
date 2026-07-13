@@ -390,6 +390,10 @@ const tabStore = useTabStore();
 
 const noteEditorRef = ref(null);
 const currentFolder = ref('all');
+
+// Agent 写笔记工具完成后需要刷新列表
+const NOTE_WRITE_TOOLS = ['create_note', 'update_note'];
+let unlistenAgentToolResult = null;
 const folderMenuVisible = ref(false);
 const folderTriggerRef = ref(null);
 const tocVisible = ref(false);
@@ -1057,10 +1061,27 @@ onMounted(async () => {
   if (noteStore.notes.length > 0 && !noteStore.currentNoteId) {
     noteStore.selectNote(noteStore.notes[0].id);
   }
+
+  // 监听 agent 工具调用结果，写笔记操作完成后刷新列表
+  unlistenAgentToolResult = electronService.listen('agent-tool-result', async (event) => {
+    const data = event.payload;
+    if (data.status !== 'success') return;
+    if (!NOTE_WRITE_TOOLS.includes(data.toolName)) return;
+    // 按当前文件夹过滤刷新
+    if (currentFolder.value === 'all') {
+      await noteStore.fetchNotes();
+    } else {
+      await noteStore.fetchNotes(null, currentFolder.value);
+    }
+  });
 });
 
 onBeforeUnmount(async () => {
   document.removeEventListener('click', handleClickOutside);
+  if (unlistenAgentToolResult) {
+    unlistenAgentToolResult();
+    unlistenAgentToolResult = null;
+  }
   await noteStore.flushPendingSave();
   clearAllChatSessions();
 });

@@ -112,12 +112,15 @@ const bubbleVisible = ref(false);
 const bubbleContent = ref('');
 
 let activeRequestId = null;
-let sessionId = localStorage.getItem('schedule-assistant-session-id') || '';
+// 注意：不再复用旧 sessionId —— 旧会话历史中可能包含 AI 幻觉数据，会污染后续对话
+// 每次组件加载时使用空 sessionId，由后端创建新会话
+let sessionId = '';
 let unlistenChunk = null;
 let unlistenDone = null;
 let unlistenError = null;
 let unlistenApproval = null;
 let unlistenToolResult = null;
+let unlistenToolCall = null;
 
 // 需要刷新日历的日程写操作工具
 const SCHEDULE_WRITE_TOOLS = ['create_event', 'update_event', 'delete_event'];
@@ -178,13 +181,28 @@ async function handleSend() {
     return;
   }
 
-  // 构造日程管理专用指令
+  // 构造日程管理专用指令（注入当前系统时间，便于解析"今天/明天/下周X/本周"等相对时间）
+  const now = new Date();
+  const currentDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const weekday = now.toLocaleString('zh-CN', { weekday: 'long' });
+  const fullDateTime = now.toLocaleString('zh-CN', { hour12: false });
+
   const scheduleMessage = `[你是日程管理专用助手，仅处理日程相关事务（查询/创建/修改/删除日程），请使用 list_events / create_event / update_event / delete_event 工具完成。
 
+当前系统时间：${fullDateTime} ${weekday}（日期：${currentDate}，时间：${currentTime}）
+
+【强制规则——违反将导致严重错误】
+1. **禁止凭空回答**：回答任何关于日程的问题前，必须先调用 list_events 工具查询，只能基于工具返回的真实数据回答。严禁根据历史对话记忆或猜测来回答。
+2. **禁止假创建**：创建日程时必须调用 create_event 工具，未调用工具不得声称"已创建"。工具返回成功后才算创建完成。
+3. **如实汇报**：如果 list_events 返回空结果，必须告知用户"当前没有日程"，不得编造日程条目。
+4. **不得自行展开**：list_events 返回的跨日日程（start ≠ end）是一条日程，不得拆分为多条单日日程汇报。
+
 行为准则：
-1. 当用户未明确指定具体时间时，默认创建为全天事件（不传 startTime / endTime，allDay 设为 true），不要追问用户。
-2. 尽量根据上下文合理推断用户意图，直接执行操作，不要频繁向用户确认或追问。
-3. 仅在信息严重缺失导致无法执行时才询问用户，且一次问清所有需要的信息。]\n\n${text}`;
+1. 解析用户提到的相对时间（如"今天/明天/后天/大后天/下周X/本周/下月"等）时，必须基于上述当前系统时间计算出对应的 YYYY-MM-DD 日期，再传入工具的 startDate / endDate 参数。例如：若今天是 ${currentDate}，则"明天"为次日日期。
+2. 当用户未明确指定具体时间时，默认创建为全天事件（不传 startTime / endTime，allDay 设为 true），不要追问用户。
+3. 尽量根据上下文合理推断用户意图，直接执行操作，不要频繁向用户确认或追问。
+4. 仅在信息严重缺失导致无法执行时才询问用户，且一次问清所有需要的信息。]\n\n${text}`;
 
   inputText.value = '';
 
@@ -193,6 +211,7 @@ async function handleSend() {
   bubbleContent.value = '';
 
   activeRequestId = `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  console.log('[ScheduleAssistant] 发送 agent-invoke, requestId:', activeRequestId, 'model:', model.modelName || model.id);
 
   try {
     await electronService.invoke('agent-invoke', {
@@ -235,12 +254,14 @@ function copyContent() {
 onMounted(() => {
   unlistenChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
+    console.log('[ScheduleAssistant] chat-chunk: requestId=', data.requestId, 'active=', activeRequestId, 'contentLen=', data.content?.length);
     if (data.requestId !== activeRequestId) return;
     bubbleContent.value += data.content;
   });
 
   unlistenDone = electronService.listen('chat-done', (event) => {
     const data = event.payload;
+    console.log('[ScheduleAssistant] chat-done: requestId=', data.requestId, 'active=', activeRequestId, 'fullContentLen=', data.fullContent?.length);
     if (data.requestId !== activeRequestId) return;
     isStreaming.value = false;
     if (data.fullContent) {
@@ -248,11 +269,13 @@ onMounted(() => {
     }
     if (data.sessionId) {
       sessionId = data.sessionId;
-      localStorage.setItem('schedule-assistant-session-id', sessionId);
+      // 不再持久化 sessionId，避免复用包含幻觉数据的旧会话
     }
     if (!bubbleContent.value) {
       bubbleVisible.value = false;
     }
+    // 兜底刷新：agent 完成后统一重新加载日程，防止遗漏 agent-tool-result 事件
+    scheduleStore.loadEvents();
   });
 
   unlistenError = electronService.listen('chat-error', (event) => {
@@ -265,15 +288,24 @@ onMounted(() => {
   // 所有工具调用默认自动批准，无需用户审批
   unlistenApproval = electronService.listen('agent-tool-approval', (event) => {
     const data = event.payload;
+    console.log('[ScheduleAssistant] agent-tool-approval:', data.toolName, 'requestId:', data.requestId, 'active:', activeRequestId);
     if (data.requestId !== activeRequestId) return;
+    console.log('[ScheduleAssistant] 自动批准工具:', data.toolName);
     electronService.invoke('agent-tool-approval-resume', {
       requestId: data.requestId,
       decision: { type: 'approve' },
     });
   });
 
+  // 监听工具调用开始事件（诊断用）
+  unlistenToolCall = electronService.listen('agent-tool-call', (event) => {
+    const data = event.payload;
+    console.log('[ScheduleAssistant] agent-tool-call:', data.toolName, 'args:', JSON.stringify(data.arguments));
+  });
+
   unlistenToolResult = electronService.listen('agent-tool-result', (event) => {
     const data = event.payload;
+    console.log('[ScheduleAssistant] agent-tool-result:', data.toolName, 'status:', data.status);
     if (data.requestId !== activeRequestId) return;
     // 日程写操作完成后刷新日历
     if (SCHEDULE_WRITE_TOOLS.includes(data.toolName)) {
@@ -288,6 +320,7 @@ onUnmounted(() => {
   if (unlistenError) unlistenError();
   if (unlistenApproval) unlistenApproval();
   if (unlistenToolResult) unlistenToolResult();
+  if (unlistenToolCall) unlistenToolCall();
 });
 
 // 面板打开时聚焦输入框

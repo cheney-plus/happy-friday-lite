@@ -88,7 +88,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-stop',
       'agent-tool-approval-resume',
       'agent-list-tools',
-      'agent-list-skills'
+      'agent-list-skills',
+      'get-default-model',
+      'get-trial-status'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

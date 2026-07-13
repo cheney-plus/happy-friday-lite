@@ -25,7 +25,7 @@ const _TAG = 'e26765e76924568dabcbe2f342fe2c82'
 // 默认模型配置（不含 API Key）
 export const DEFAULT_MODEL_ID = 'system-default-qwen'
 const DEFAULT_MODEL_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-const DEFAULT_CHAT_MODEL = 'qwen3.7-plus'
+const DEFAULT_CHAT_MODEL = 'qwen-plus'
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-v4'
 
 // 免费试用次数上限

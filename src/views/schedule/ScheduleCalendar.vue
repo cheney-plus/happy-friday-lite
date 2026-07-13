@@ -257,7 +257,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted, watch, onDeactivated } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, onDeactivated, onActivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useScheduleStore, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
@@ -1018,6 +1018,11 @@ onDeactivated(() => {
   morePanelVisible.value = false;
   showViewDropdown.value = false;
   showAssistant.value = false;
+});
+
+// keep-alive 重新激活时刷新日程数据（onMounted 仅首次挂载时执行一次）
+onActivated(() => {
+  scheduleStore.loadEvents();
 });
 </script>
 

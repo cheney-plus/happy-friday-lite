@@ -7,7 +7,7 @@
  * 只读，无需审批。
  */
 
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { registerTool } from '../registry.js'
 
 // ========== get_current_time ==========

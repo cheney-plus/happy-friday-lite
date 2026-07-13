@@ -350,6 +350,12 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
         if (eventType === 'on_chat_model_stream') {
           const chunk = data?.chunk
           if (chunk) {
+            // 诊断日志：打印 chunk.content 的类型和工具调用信息
+            const contentType = typeof chunk.content
+            const hasToolCalls = !!(chunk.tool_calls?.length || chunk.additional_kwargs?.tool_calls?.length)
+            if (hasToolCalls) {
+              log.info(`on_chat_model_stream: tool_calls chunk (content type=${contentType})`)
+            }
             // 正文内容
             const content = typeof chunk.content === 'string'
               ? chunk.content
