@@ -12,13 +12,21 @@ import { createBackup, restoreBackup } from './backup.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
-import {
-  getDefaultModelInfo,
-  getTrialStatus,
-  resolveModelConfig
-} from './defaultModel.js'
 
 const cancelTokens = new CancellationTokens()
+
+/**
+ * 校验模型配置：确保用户已配置自己的大模型
+ * 若未配置或配置不完整，抛出错误提示用户前往设置
+ * @param {Object} model 前端传入的模型配置
+ * @returns {Object} 可用于 LLM 调用的模型配置
+ */
+function validateModelConfig(model) {
+  if (!model || !model.apiKey || !model.modelName || !model.baseUrl) {
+    throw new Error('未配置大模型，请在设置中添加自己的模型')
+  }
+  return model
+}
 
 // 扫描 KB 根目录下所有 .note 文件，返回匹配 noteId 的文件路径列表
 function findNoteRefFiles(noteId) {
@@ -97,21 +105,6 @@ export function registerCommands(mainWindow) {
     return result
   })
 
-  // ========== 系统默认模型 ==========
-
-  // 获取默认模型信息（不含 API Key）+ 试用状态
-  ipcMain.handle('get-default-model', () => {
-    return {
-      model: getDefaultModelInfo(),
-      trial: getTrialStatus()
-    }
-  })
-
-  // 单独获取试用状态
-  ipcMain.handle('get-trial-status', () => {
-    return getTrialStatus()
-  })
-
   ipcMain.handle('get-platform', () => {
     return process.platform
   })
@@ -184,8 +177,8 @@ export function registerCommands(mainWindow) {
     let isNewSession = false
     let userMessageId = null
 
-    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
-    const effectiveModel = resolveModelConfig(model)
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
 
     try {
       if (!currentSessionId) {
@@ -294,8 +287,8 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('chat_without_memory', async (_event, args) => {
     const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
-    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
-    const effectiveModel = resolveModelConfig(model)
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
 
     try {
       const appConfig = loadConfig()
@@ -468,8 +461,8 @@ export function registerCommands(mainWindow) {
       throw new Error(`Invalid note AI action: ${action}`)
     }
 
-    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
-    const effectiveModel = resolveModelConfig(model)
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
 
     const cancelToken = cancelTokens.insert(requestId)
 
@@ -510,8 +503,8 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('note_fim_completion', async (_event, args) => {
     const { requestId, model, prefix, suffix } = args
 
-    // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
-    const effectiveModel = resolveModelConfig(model)
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
 
     const cancelToken = cancelTokens.insert(requestId)
 

@@ -151,12 +151,7 @@ function useSuggestion(text) {
 }
 
 function loadModelConfig() {
-  // 系统默认模型：返回最小标志对象，后端 resolveModelConfig 会注入真实配置
-  const DEFAULT_MODEL_ID = 'system-default-qwen';
   const selectedId = localStorage.getItem('happy-friday-selected-model');
-  if (selectedId === DEFAULT_MODEL_ID) {
-    return { id: DEFAULT_MODEL_ID, isDefault: true };
-  }
   try {
     const stored = localStorage.getItem('happy-friday-custom-models');
     if (stored) {
@@ -177,7 +172,7 @@ async function handleSend() {
 
   const model = loadModelConfig();
   if (!model) {
-    showBubble('请先在 Friday 对话页面中配置 AI 模型。');
+    showBubble('未配置大模型，请先在设置中添加自己的模型。');
     return;
   }
 

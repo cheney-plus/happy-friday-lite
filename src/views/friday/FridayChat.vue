@@ -397,10 +397,6 @@ const modelSettings = ref({
 
 const customModels = ref([]);
 
-// 系统默认模型（不含 API Key，仅用于展示）
-const DEFAULT_MODEL_ID = 'system-default-qwen';
-const defaultModel = ref(null);
-
 const STORAGE_KEY = 'happy-friday-custom-models';
 const SELECTED_MODEL_KEY = 'happy-friday-selected-model';
 
@@ -413,8 +409,6 @@ const loadCustomModels = () => {
     const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
     if (selectedId) {
       if (customModels.value.find(m => m.id === selectedId)) {
-        modelSettings.value.modelId = selectedId;
-      } else if (selectedId === DEFAULT_MODEL_ID) {
         modelSettings.value.modelId = selectedId;
       } else if (customModels.value.length > 0) {
         modelSettings.value.modelId = customModels.value[0].id;
@@ -431,18 +425,6 @@ const loadCustomModels = () => {
   }
 };
 
-// 从后端加载系统默认模型信息
-const loadDefaultModel = async () => {
-  try {
-    const result = await window.electronAPI?.invoke('get-default-model');
-    if (result && result.model) {
-      defaultModel.value = result.model;
-    }
-  } catch (e) {
-    console.error('Failed to load default model:', e);
-  }
-};
-
 const providerIcons = {
   doubao: new URL('@/assets/images/豆包.png', import.meta.url).href,
   qwen: new URL('@/assets/images/千问.png', import.meta.url).href,
@@ -455,16 +437,6 @@ const providerIcons = {
 
 const modelList = computed(() => {
   const list = [];
-  // 系统默认模型放在列表首位
-  if (defaultModel.value) {
-    list.push({
-      id: defaultModel.value.id,
-      name: `${defaultModel.value.providerLabel} ${defaultModel.value.modelName}`,
-      embeddingName: defaultModel.value.embeddingModelName || '',
-      icon: providerIcons[defaultModel.value.provider] || providerIcons.other,
-      badge: '默认'
-    });
-  }
   // 自定义模型
   for (const model of customModels.value) {
     list.push({
@@ -678,11 +650,6 @@ const selectModel = (modelId) => {
 };
 
 const currentModelName = computed(() => {
-  // 检查是否为系统默认模型
-  if (defaultModel.value && modelSettings.value.modelId === defaultModel.value.id) {
-    const thinkLabel = modelSettings.value.thinkMode === 'deep' ? `· ${t('friday.thinkDeep')}` : `· ${t('friday.thinkFast')}`;
-    return `${defaultModel.value.modelName} ${thinkLabel}`;
-  }
   const model = customModels.value.find(m => m.id === modelSettings.value.modelId);
   if (!model) return t('friday.selectModel');
   const thinkLabel = modelSettings.value.thinkMode === 'deep' ? `· ${t('friday.thinkDeep')}` : `· ${t('friday.thinkFast')}`;
@@ -734,13 +701,14 @@ const handleSend = async () => {
   const text = inputText.value.trim();
   if (!text) return;
 
-  // 查找选中的模型：可能是自定义模型或系统默认模型
-  let selectedModel = customModels.value.find(m => m.id === modelSettings.value.modelId);
-  if (!selectedModel && defaultModel.value && modelSettings.value.modelId === defaultModel.value.id) {
-    selectedModel = { id: defaultModel.value.id, isDefault: true };
-  }
+  // 查找选中的自定义模型
+  const selectedModel = customModels.value.find(m => m.id === modelSettings.value.modelId);
 
-  if (!selectedModel) return;
+  if (!selectedModel) {
+    alert('未配置大模型，请先在设置中添加自己的模型');
+    router.push('/settings/model');
+    return;
+  }
 
   // 所有模式统一支持 @ 引用笔记/知识库文件
   // - note / kb-file：直接将内容注入到首条用户消息中（LLM 上下文 10k 字符）
@@ -812,7 +780,6 @@ const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
 onMounted(() => {
   document.addEventListener('scroll', closeAllDropdowns, true);
   loadCustomModels();
-  loadDefaultModel();
   loadKbListFromDisk();
 });
 

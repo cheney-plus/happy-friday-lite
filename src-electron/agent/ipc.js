@@ -40,9 +40,21 @@ import {
   emitApprovalRequest
 } from './humanInTheLoop.js'
 import { createThread, touchThread, loadMemoriesToStore, syncStoreToSQLite } from './memory.js'
-import { resolveModelConfig } from '../defaultModel.js'
 
 const log = createLogger('IPC')
+
+/**
+ * 校验模型配置：确保用户已配置自己的大模型
+ * 若未配置或配置不完整，抛出错误提示用户前往设置
+ * @param {Object} model 前端传入的模型配置
+ * @returns {Object} 可用于 LLM 调用的模型配置
+ */
+function validateModelConfig(model) {
+  if (!model || !model.apiKey || !model.modelName || !model.baseUrl) {
+    throw new Error('未配置大模型，请在设置中添加自己的模型')
+  }
+  return model
+}
 
 // 取消令牌管理
 const cancelTokens = new CancellationTokens()
@@ -105,8 +117,8 @@ export function registerAgentCommands(mainWindow) {
         : message
 
       // 4. 创建带上下文的 Agent
-      // 解析模型配置：默认模型需检查试用次数并注入真实 API Key
-      const effectiveModel = resolveModelConfig(model)
+      // 校验模型配置：确保用户已配置自己的大模型
+      const effectiveModel = validateModelConfig(model)
       const modelConfig = { ...effectiveModel, enableThinking: enableThinking || false }
       const runtimeCtx = {
         mainWindow,
