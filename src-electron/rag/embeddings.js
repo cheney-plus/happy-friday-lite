@@ -78,14 +78,28 @@ const EMBEDDING_MAX_RETRIES = 3
 /**
  * 通过 HTTPS 调用 Embedding API
  * 兼容 OpenAI /embeddings 接口格式
+ * 多模态 Embedding 模型（如 doubao-embedding-vision-251215）使用 /embeddings/multimodal 端点，
+ * 输入格式为 [{type: "text", text: "..."}]
  */
 function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
-  const fullUrl = rawUrl ? baseUrl : `${baseUrl.replace(/\/+$/, '')}/embeddings`
+  const isMultimodal = /vision/i.test(modelName)
+
+  let fullUrl
+  if (rawUrl) {
+    fullUrl = baseUrl
+  } else if (isMultimodal) {
+    fullUrl = `${baseUrl.replace(/\/+$/, '')}/embeddings/multimodal`
+  } else {
+    fullUrl = `${baseUrl.replace(/\/+$/, '')}/embeddings`
+  }
   const url = new URL(fullUrl)
 
+  // 多模态端点每次调用仅返回单个向量，故每次只发送 texts[0]
   const body = JSON.stringify({
     model: modelName,
-    input: texts
+    input: isMultimodal
+      ? [{ type: 'text', text: texts[0] }]
+      : texts
   })
 
   const isHttps = url.protocol === 'https:'
@@ -118,10 +132,18 @@ function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
             reject(new Error(`Embedding API error: ${parsed.error.message || JSON.stringify(parsed.error)}`))
             return
           }
-          // 按 index 排序确保顺序正确
-          const embeddings = (parsed.data || [])
-            .sort((a, b) => a.index - b.index)
-            .map(item => item.embedding)
+          let embeddings
+          if (Array.isArray(parsed.data)) {
+            // 标准 OpenAI 格式：data 为数组 [{index, embedding}]
+            embeddings = parsed.data
+              .sort((a, b) => a.index - b.index)
+              .map(item => item.embedding)
+          } else if (parsed.data && parsed.data.embedding) {
+            // 多模态格式：data 为单个对象 {embedding, object}
+            embeddings = [parsed.data.embedding]
+          } else {
+            embeddings = []
+          }
           resolve(embeddings)
         } catch (e) {
           reject(new Error(`Embedding API parse error: ${e.message}`))
@@ -201,8 +223,8 @@ class HttpApiEmbeddings {
   async embedDocuments(texts) {
     if (!texts || texts.length === 0) return []
 
-    // 分批处理，每批最多 10 条（部分 API 如千问限制 batch size ≤ 10）
-    const batchSize = 10
+    // 多模态模型每次调用仅返回单个向量，batch size 必须为 1
+    const batchSize = /vision/i.test(this.modelName) ? 1 : 10
     const allEmbeddings = []
 
     for (let i = 0; i < texts.length; i += batchSize) {
