@@ -99,6 +99,87 @@
         </div>
       </div>
 
+      <!-- Python 环境 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.pythonEnv') }}</div>
+        <div class="group-content">
+          <!-- 当前状态 -->
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.pythonStatus') }}</span>
+            <span class="item-link" :class="{ 'python-ok': pythonState.available, 'python-warn': !pythonState.available }">
+              <template v-if="pythonState.loading">…</template>
+              <template v-else-if="!pythonState.available && pythonState.reason === 'not_configured'">
+                {{ t('settings.pythonNotConfigured') }}
+              </template>
+              <template v-else-if="!pythonState.available">
+                {{ t('settings.pythonUnavailable') }}
+              </template>
+              <template v-else>
+                {{ t('settings.pythonReady') }} · {{ pythonState.version }}
+              </template>
+            </span>
+          </div>
+          <!-- 已配置路径 -->
+          <div class="setting-item clickable" @click="selectPythonFile">
+            <span class="item-label">{{ t('settings.pythonPath') }}</span>
+            <span class="item-link">
+              {{ pythonState.configured ? shortenPath(pythonState.configured) : t('settings.pythonPathHint') }}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </span>
+          </div>
+          <!-- 自动检测 -->
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.pythonAutoDetect') }}</span>
+            <button
+              class="action-btn"
+              :disabled="pythonState.detecting"
+              @click="autoDetectPython"
+            >
+              {{ pythonState.detecting ? t('settings.pythonDetecting') : t('settings.pythonAutoDetectBtn') }}
+            </button>
+          </div>
+          <!-- 校验依赖 -->
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.pythonVerifyDeps') }}</span>
+            <button
+              class="action-btn"
+              :disabled="pythonState.verifying"
+              @click="verifyPythonDeps"
+            >
+              {{ pythonState.verifying ? t('settings.pythonVerifying') : t('settings.pythonVerifyBtn') }}
+            </button>
+          </div>
+          <!-- 依赖缺失提示 -->
+          <div v-if="pythonState.missingDeps && pythonState.missingDeps.length > 0" class="setting-item python-deps-item">
+            <div class="python-deps-warn">
+              {{ t('settings.pythonMissingDeps') }}（{{ pythonState.missingDeps.length }}）：
+              <span class="python-deps-list">{{ pythonState.missingDeps.join(', ') }}</span>
+            </div>
+          </div>
+          <!-- 一键配置环境（安装依赖） -->
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.pythonInstallDeps') }}</span>
+            <button
+              class="primary-btn"
+              :disabled="pythonState.installing || !pythonState.available"
+              @click="installPythonDeps"
+            >
+              {{ pythonState.installing ? t('settings.pythonInstalling') : t('settings.pythonInstallBtn') }}
+            </button>
+          </div>
+          <!-- 安装输出 -->
+          <div v-if="pythonState.installLog" class="setting-item python-log-item">
+            <pre class="python-log">{{ pythonState.installLog }}</pre>
+            <button v-if="!pythonState.installing" class="text-btn" @click="pythonState.installLog = ''">{{ t('settings.pythonClearLog') }}</button>
+          </div>
+          <!-- 帮助提示 -->
+          <div class="setting-item python-help-item">
+            <span class="item-label"></span>
+            <span class="item-link python-help-text">{{ t('settings.pythonHelpText') }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 数据备份 -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.backup') }}</div>
@@ -550,6 +631,136 @@ const formatBackupTime = (iso) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+// ========== Python 环境 ==========
+const pythonState = reactive({
+  loading: false,
+  detecting: false,
+  verifying: false,
+  installing: false,
+  available: false,
+  reason: '',
+  configured: null,
+  path: null,
+  version: null,
+  missingDeps: [],
+  installLog: ''
+});
+
+let unsubInstallStdout = null;
+let unsubInstallStderr = null;
+
+const loadPythonStatus = async () => {
+  pythonState.loading = true;
+  try {
+    const st = await electronService.invoke('python-status');
+    pythonState.available = !!st.available;
+    pythonState.reason = st.reason || '';
+    pythonState.configured = st.configured || null;
+    pythonState.path = st.path || null;
+    pythonState.version = st.version || null;
+  } catch (e) {
+    console.error('加载 Python 状态失败:', e);
+  } finally {
+    pythonState.loading = false;
+  }
+};
+
+const autoDetectPython = async () => {
+  if (pythonState.detecting) return;
+  pythonState.detecting = true;
+  try {
+    const result = await electronService.invoke('python-autodetect');
+    if (result.ok) {
+      // 写回配置并刷新状态
+      await electronService.invoke('python-set-path', { path: result.path });
+      await loadPythonStatus();
+      alert(t('settings.pythonDetectOk') + ': ' + result.path);
+    } else {
+      alert(t('settings.pythonDetectFail'));
+    }
+  } catch (e) {
+    alert(t('settings.pythonDetectFail') + ': ' + e);
+  } finally {
+    pythonState.detecting = false;
+  }
+};
+
+const selectPythonFile = async () => {
+  try {
+    const result = await electronService.invoke('python-select-file');
+    if (!result.success) return;
+    if (!result.ok) {
+      const go = confirm(t('settings.pythonInvalidVersion'));
+      if (!go) return;
+    }
+    await electronService.invoke('python-set-path', { path: result.path });
+    await loadPythonStatus();
+  } catch (e) {
+    alert(t('settings.pythonSelectFail') + ': ' + e);
+  }
+};
+
+const verifyPythonDeps = async () => {
+  if (pythonState.verifying) return;
+  if (!pythonState.available) {
+    alert(t('settings.pythonVerifyNoPython'));
+    return;
+  }
+  pythonState.verifying = true;
+  pythonState.missingDeps = [];
+  try {
+    const result = await electronService.invoke('python-verify', { path: pythonState.path });
+    if (result.ok) {
+      alert(t('settings.pythonVerifyOk'));
+      pythonState.missingDeps = [];
+    } else if (result.reason === 'missing_deps') {
+      pythonState.missingDeps = result.missingDeps || [];
+      alert(t('settings.pythonMissingDeps') + '（' + (result.missingDeps || []).length + '）');
+    } else {
+      alert(t('settings.pythonVerifyFail'));
+    }
+  } catch (e) {
+    alert(t('settings.pythonVerifyFail') + ': ' + e);
+  } finally {
+    pythonState.verifying = false;
+  }
+};
+
+const installPythonDeps = async () => {
+  if (pythonState.installing) return;
+  if (!pythonState.available) {
+    alert(t('settings.pythonVerifyNoPython'));
+    return;
+  }
+  if (!confirm(t('settings.pythonInstallConfirm'))) return;
+  pythonState.installing = true;
+  pythonState.installLog = '';
+  // 订阅流式输出
+  if (window.electronAPI) {
+    unsubInstallStdout = window.electronAPI.on('python-install-stdout', (data) => {
+      pythonState.installLog += data;
+    });
+    unsubInstallStderr = window.electronAPI.on('python-install-stderr', (data) => {
+      pythonState.installLog += data;
+    });
+  }
+  try {
+    const result = await electronService.invoke('python-install-deps', { path: pythonState.path });
+    if (result.success) {
+      pythonState.installLog += '\n✅ ' + t('settings.pythonInstallOk');
+      pythonState.missingDeps = [];
+    } else {
+      pythonState.installLog += '\n❌ ' + (result.error || t('settings.pythonInstallFail'));
+    }
+  } catch (e) {
+    pythonState.installLog += '\n❌ ' + e.message;
+  } finally {
+    pythonState.installing = false;
+    if (unsubInstallStdout) { unsubInstallStdout(); unsubInstallStdout = null; }
+    if (unsubInstallStderr) { unsubInstallStderr(); unsubInstallStderr = null; }
+  }
+};
+
 // ========== RAG 知识检索 ==========
 const ragState = reactive({
   updating: false,
@@ -764,10 +975,13 @@ onMounted(() => {
   currentLanguage.value = appStore.language || 'zh-CN';
   loadBackupConfig();
   loadRagStats();
+  loadPythonStatus();
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
+  if (unsubInstallStdout) { unsubInstallStdout(); unsubInstallStdout = null; }
+  if (unsubInstallStderr) { unsubInstallStderr(); unsubInstallStderr = null; }
 });
 
 onDeactivated(() => {
@@ -1695,5 +1909,62 @@ const openAuthorEmail = () => {
 
 [data-theme='dark'] .author-modal {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+/* Python 环境设置区块 */
+.python-ok {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.python-warn {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.python-deps-item .python-deps-warn {
+  color: #f59e0b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.python-deps-list {
+  color: var(--text-secondary, #6b7280);
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.python-log-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.python-log {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.python-help-item {
+  align-items: flex-start;
+}
+
+.python-help-text {
+  color: var(--text-secondary, #6b7280);
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 360px;
+  text-align: right;
 }
 </style>

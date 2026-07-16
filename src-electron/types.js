@@ -13,6 +13,9 @@ export function defaultConfig() {
       autoDir: null,
       maxKeep: 7
     },
-    rag: {}
+    rag: {},
+    python: {
+      path: null
+    }
   }
 }

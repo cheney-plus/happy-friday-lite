@@ -7,6 +7,15 @@ import * as db from './db.js'
 import { streamChat, streamChatWithRagAgent, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
 import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
+import {
+  getPythonStatus,
+  autoDetectPythonSync,
+  setPythonPath,
+  checkPythonPath,
+  verifyPythonDeps,
+  installPythonDeps,
+  invalidatePythonCache
+} from './python-env.js'
 import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
@@ -930,6 +939,72 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('python-get-path', () => {
     return getPythonPath()
+  })
+
+  // 获取 Python 环境状态（配置路径 / 解析路径 / 版本 / 是否可用）
+  ipcMain.handle('python-status', async () => {
+    return await getPythonStatus()
+  })
+
+  // 自动检测系统 Python，不写回配置，仅返回检测结果
+  ipcMain.handle('python-autodetect', async () => {
+    const detected = autoDetectPythonSync()
+    if (!detected) {
+      return { ok: false, path: null, version: null }
+    }
+    const check = checkPythonPath(detected)
+    return { ok: check.ok, path: detected, version: check.version, reason: check.reason }
+  })
+
+  // 设置 Python 路径（写回配置并刷新缓存）；传 null/空串清除配置
+  ipcMain.handle('python-set-path', async (_event, args) => {
+    const target = (args && typeof args === 'object') ? args.path : args
+    await setPythonPath(target || null)
+    return { success: true, path: target || null }
+  })
+
+  // 弹出文件选择对话框，让用户选择 Python 可执行文件
+  ipcMain.handle('python-select-file', async () => {
+    const isWin = process.platform === 'win32'
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择 Python 可执行文件',
+      properties: ['openFile'],
+      filters: isWin
+        ? [{ name: 'Python 可执行文件', extensions: ['exe'] }]
+        : [{ name: '所有文件', extensions: ['*'] }]
+    })
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    const selected = result.filePaths[0]
+    const check = checkPythonPath(selected)
+    return { success: true, path: selected, ok: check.ok, version: check.version, reason: check.reason }
+  })
+
+  // 校验依赖库是否齐全
+  ipcMain.handle('python-verify', async (_event, args) => {
+    const target = args && args.path ? args.path : undefined
+    return await verifyPythonDeps(target)
+  })
+
+  // 一键安装依赖（pip install -r requirements.txt），流式输出到前端
+  ipcMain.handle('python-install-deps', async (_event, args) => {
+    const target = args && args.path ? args.path : undefined
+    try {
+      const result = await installPythonDeps(target, {
+        onStdout: (data) => mainWindow.webContents.send('python-install-stdout', data),
+        onStderr: (data) => mainWindow.webContents.send('python-install-stderr', data)
+      })
+      return { success: result.exitCode === 0, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }
+    } catch (e) {
+      return { success: false, exitCode: -1, stdout: '', stderr: e.message, error: e.message }
+    }
+  })
+
+  // 清除 Python 路径缓存（设置页面在切换路径后可调用以强制重新解析）
+  ipcMain.handle('python-invalidate-cache', async () => {
+    invalidatePythonCache()
+    return { success: true }
   })
 
   // ========== 数据备份 ==========

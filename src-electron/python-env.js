@@ -2,46 +2,32 @@
  * Python 环境管理
  * ===============
  *
- * 负责在应用启动时检测和准备 Python 运行时。
+ * 不再在制品中内置 Python 运行时，改由用户在系统中安装 Python，
+ * 应用通过以下策略解析可用的 Python 可执行文件：
  *
- * 优先级：
- *   1. macOS 系统 Python（如果存在且包含 requirements.txt 中所有依赖库）
- *   2. 打包的嵌入式 Python（从 resourcesPath 解压到 userData，可写）
- *   3. 开发环境的 Python（项目根目录/python/python-{platform}/）
- *   4. 系统 PATH 中的 python3 / python（最后兜底）
+ *   1. 用户在设置中显式指定的 python.path（优先级最高）
+ *   2. 自动检测系统 Python（PATH 中的 python3/python 及常见安装位置）
+ *      - 若检测到，会自动写入 config.python.path（满足"非开发者无感配置"）
+ *   3. 以上均失败 → 返回 null，调用方应提示用户前往设置配置 Python
  *
- * 平台策略：
- *   - macOS：优先使用系统 Python（Homebrew/系统自带），否则使用打包 Python
- *   - Windows/Linux：仅使用打包 Python（不检查系统 Python，因发行版差异大）
- *
- * 打包 Python 的工作流程：
- *   1. 构建时：download-python.js 下载 python-build-standalone 并安装 requirements.txt 依赖
- *   2. electron-builder 通过 extraResources 将 Python 目录打包进制品
- *   3. 运行时：首次启动时将 Python 从 resourcesPath 复制到 userData（可写目录）
- *   4. 后续启动：检测版本标记，版本一致则跳过复制
- *
- * 缓存策略：
- *   - 解析结果缓存至 {userData}/python/.python-env.json
- *   - 缓存包含 appVersion，版本变化时重新解析
- *   - 缓存中的 pythonPath 不存在时也会重新解析
+ * 依赖库（requirements.txt）由设置中的"一键配置环境"功能通过
+ * `<python> -m pip install -r requirements.txt` 安装到用户的环境中。
  */
 
-import { app } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { spawnSync } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
+import { loadConfig, saveConfig } from './config.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// 平台标识
-const PLATFORM_KEY = `${process.platform}-${process.arch}`
-const DIR_NAME = `python-${PLATFORM_KEY}`
-const EXE_NAME = process.platform === 'win32' ? 'python.exe' : 'python3'
+// requirements.txt 路径（与 src-electron 同级的 python/ 目录）
+const REQUIREMENTS_PATH = path.resolve(__dirname, '..', 'python', 'requirements.txt')
 
-// 系统 Python 需要的依赖库 import 名称（与 requirements.txt 对应）
-// 注意：pip 包名与 import 名不同，此处用 import 名
+// 需要校验的依赖库 import 名（与 requirements.txt 对应）
+// pip 包名与 import 名不同，此处用 import 名进行校验
 const REQUIRED_IMPORTS = [
   'requests',    // requests
   'bs4',         // beautifulsoup4
@@ -64,15 +50,16 @@ const REQUIRED_IMPORTS = [
   'jieba',       // jieba
   'sympy',       // sympy
   'markitdown'   // markitdown[all]
-].join(', ')
+]
 
-let cachedPythonPath = null
+// 缓存状态：undefined=尚未初始化, null=未配置/未检测到, string=可执行文件路径
+let cachedPythonPath = undefined
 let initPromise = null
 
 /**
  * 初始化 Python 环境
- * 在应用启动时调用，检测并准备 Python 运行时
- * @returns {Promise<string>} Python 可执行文件路径
+ * 在应用启动时调用：读取用户配置，缺失时尝试自动检测并回写配置
+ * @returns {Promise<string|null>} Python 可执行文件路径，未配置返回 null
  */
 export function initPythonEnv() {
   if (!initPromise) {
@@ -81,260 +68,340 @@ export function initPythonEnv() {
   return initPromise
 }
 
+async function doInit() {
+  console.log('[Python] 初始化 Python 环境...')
+
+  // 数据目录尚未就绪时直接返回，避免 loadConfig 抛错
+  let config
+  try {
+    config = loadConfig()
+  } catch (e) {
+    console.warn('[Python] 配置尚未就绪，跳过初始化:', e.message)
+    cachedPythonPath = null
+    return null
+  }
+
+  // 1. 优先使用用户配置的路径
+  const configured = config?.python?.path
+  if (configured) {
+    const version = getVersion(configured)
+    if (version) {
+      cachedPythonPath = configured
+      console.log(`[Python] ✓ 使用已配置的 Python: ${configured} (${version})`)
+      return cachedPythonPath
+    }
+    console.warn(`[Python] 已配置的 Python 不可用: ${configured}`)
+  }
+
+  // 2. 自动检测系统 Python
+  const detected = autoDetectPythonSync()
+  if (detected) {
+    cachedPythonPath = detected
+    // 自动写回配置（满足"非开发者无感配置"）
+    try {
+      const cfg = loadConfig()
+      cfg.python = cfg.python || {}
+      cfg.python.path = detected
+      saveConfig(cfg)
+      console.log(`[Python] ✓ 自动检测到 Python 并已写入配置: ${detected}`)
+    } catch (e) {
+      console.warn(`[Python] 自动检测到 ${detected}，但写回配置失败: ${e.message}`)
+    }
+    return detected
+  }
+
+  cachedPythonPath = null
+  console.warn('[Python] ⚠ 未检测到 Python 运行时，请在设置中配置 Python 路径')
+  return null
+}
+
 /**
  * 获取 Python 可执行文件路径
- * 若尚未初始化，会自动触发初始化
- * @returns {Promise<string>}
+ * 若尚未初始化会自动触发初始化
+ * @returns {Promise<string|null>} 未配置时返回 null
  */
 export async function getPythonPath() {
-  if (!cachedPythonPath) {
+  if (cachedPythonPath === undefined) {
     await initPythonEnv()
   }
   return cachedPythonPath
 }
 
-async function doInit() {
-  console.log('[Python] 开始初始化 Python 环境...')
-
-  const cacheFile = getCacheFilePath()
-
-  // 1. 尝试从缓存读取
-  const cached = readCache(cacheFile)
-  if (cached && fs.existsSync(cached.pythonPath)) {
-    console.log(`[Python] 使用缓存的 Python: ${cached.pythonPath} (source: ${cached.source})`)
-    cachedPythonPath = cached.pythonPath
-    return cachedPythonPath
-  }
-
-  // 2. 重新解析
-  let pythonPath = null
-  let source = null
-
-  // 2a. macOS: 检查系统 Python
-  if (process.platform === 'darwin') {
-    const systemPython = checkSystemPython()
-    if (systemPython) {
-      pythonPath = systemPython
-      source = 'system'
-      console.log(`[Python] ✓ 使用系统 Python: ${pythonPath}`)
-    } else {
-      console.log('[Python] 系统 Python 不可用或缺少依赖，回退到打包 Python')
-    }
-  }
-
-  // 2b. 使用打包的 Python（解压到 userData）
-  if (!pythonPath && app.isPackaged) {
-    pythonPath = resolvePackagedPython()
-    source = 'packaged'
-    if (pythonPath) {
-      console.log(`[Python] ✓ 使用打包 Python: ${pythonPath}`)
-    }
-  }
-
-  // 2c. 开发环境：项目根目录下的 Python
-  if (!pythonPath && !app.isPackaged) {
-    pythonPath = resolveDevPython()
-    source = 'dev'
-    if (pythonPath) {
-      console.log(`[Python] ✓ 使用开发环境 Python: ${pythonPath}`)
-    }
-  }
-
-  // 2d. 最后兜底：系统 PATH 中的 python3 / python
-  if (!pythonPath) {
-    pythonPath = process.platform === 'win32' ? 'python' : 'python3'
-    source = 'fallback'
-    console.warn(`[Python] ⚠ 未找到合适的 Python 运行时，兜底使用: ${pythonPath}`)
-    console.warn('[Python]   请运行 `npm run python:download` 下载嵌入式 Python 运行时')
-  }
-
-  // 3. 写入缓存
-  writeCache(cacheFile, { pythonPath, source })
-
-  cachedPythonPath = pythonPath
-  console.log('[Python] 初始化完成')
-  return pythonPath
+/**
+ * 同步获取已缓存的 Python 路径（不触发初始化）
+ * 供同步调用方使用；若尚未初始化返回 undefined
+ * @returns {string|null|undefined}
+ */
+export function getCachedPythonPath() {
+  return cachedPythonPath
 }
 
 /**
- * 获取缓存文件路径
+ * 清除缓存（路径变更后调用，强制下次重新解析）
  */
-function getCacheFilePath() {
-  const dataDir = app.getPath('userData')
-  return path.join(dataDir, 'python', '.python-env.json')
+export function invalidatePythonCache() {
+  cachedPythonPath = undefined
+  initPromise = null
 }
 
 /**
- * 读取缓存
- * @returns {{ pythonPath: string, source: string } | null}
+ * 设置用户指定的 Python 路径并写回配置
+ * @param {string|null} pythonPath
+ * @returns {Promise<boolean>}
  */
-function readCache(cacheFile) {
+export async function setPythonPath(pythonPath) {
+  const trimmed = (pythonPath || '').trim()
+  cachedPythonPath = trimmed || null
   try {
-    if (!fs.existsSync(cacheFile)) return null
-    const content = fs.readFileSync(cacheFile, 'utf-8')
-    const data = JSON.parse(content)
-    // 应用版本变化时缓存失效
-    if (data.appVersion !== app.getVersion()) {
-      console.log('[Python] 缓存因版本变化失效，重新解析')
-      return null
-    }
-    return data
+    const cfg = loadConfig()
+    cfg.python = cfg.python || {}
+    cfg.python.path = cachedPythonPath
+    saveConfig(cfg)
   } catch (e) {
-    return null
+    console.warn('[Python] 写回配置失败:', e.message)
   }
+  return true
 }
 
 /**
- * 写入缓存
+ * 自动检测系统 Python（同步）
+ * 检查 PATH 中的 python3/python 以及常见安装位置
+ * @returns {string|null} 返回第一个可用的 Python 3.x 路径
  */
-function writeCache(cacheFile, { pythonPath, source }) {
-  try {
-    const dir = path.dirname(cacheFile)
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true })
-    }
-    const data = {
-      appVersion: app.getVersion(),
-      pythonPath,
-      source,
-      updatedAt: Date.now()
-    }
-    fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2), 'utf-8')
-  } catch (e) {
-    console.warn(`[Python] 写入缓存失败: ${e.message}`)
-  }
-}
+export function autoDetectPythonSync() {
+  const names = process.platform === 'win32'
+    ? ['python', 'python3', 'py']
+    : ['python3', 'python']
 
-/**
- * 检查系统 Python（仅 macOS）
- * 验证 python3 是否存在且包含 requirements.txt 中所有依赖库
- * @returns {string | null} Python 可执行文件路径，不可用返回 null
- */
-function checkSystemPython() {
-  if (process.platform !== 'darwin') return null
-
-  // 1. 查找 python3
-  const which = spawnSync('which', ['python3'], { encoding: 'utf-8' })
-  if (which.status !== 0) return null
-
-  const pythonPath = which.stdout.trim()
-  if (!pythonPath) return null
-
-  // 2. 检查版本（需要 Python 3.x）
-  const versionResult = spawnSync(pythonPath, ['--version'], { encoding: 'utf-8' })
-  if (versionResult.status !== 0) return null
-
-  const versionStr = (versionResult.stdout || versionResult.stderr || '').trim()
-  if (!versionStr.startsWith('Python 3.')) {
-    console.log(`[Python] 系统 Python 版本不满足要求: ${versionStr}`)
-    return null
-  }
-
-  // 3. 检查依赖库是否齐全
-  const checkResult = spawnSync(
-    pythonPath,
-    ['-c', `import ${REQUIRED_IMPORTS}`],
-    { encoding: 'utf-8', timeout: 15000 }
-  )
-
-  if (checkResult.status !== 0) {
-    const err = (checkResult.stderr || '').trim()
-    const lastLine = err.split('\n').filter(Boolean).slice(-1)[0] || ''
-    console.log(`[Python] 系统 Python 缺少依赖库: ${lastLine}`)
-    return null
-  }
-
-  return pythonPath
-}
-
-/**
- * 解析打包的 Python 路径
- * 首次使用时从 resourcesPath 复制到 userData（可写目录）
- * @returns {string | null}
- */
-function resolvePackagedPython() {
-  if (!app.isPackaged) return null
-
-  const sourceDir = path.join(process.resourcesPath, 'python', DIR_NAME)
-  const destDir = path.join(app.getPath('userData'), 'python', DIR_NAME)
-  const exePath = getExePath(destDir)
-
-  // 检查源目录是否存在
-  if (!fs.existsSync(sourceDir)) {
-    console.warn(`[Python] 打包 Python 源目录不存在: ${sourceDir}`)
-    console.warn('[Python] 请确认构建时已执行 `npm run python:download`')
-    return null
-  }
-
-  // 检查是否需要复制（通过版本标记判断）
-  const versionFile = path.join(destDir, '.app-version')
-  const currentVersion = app.getVersion()
-
-  let needCopy = true
-  if (fs.existsSync(destDir) && fs.existsSync(versionFile) && fs.existsSync(exePath)) {
-    const extractedVersion = fs.readFileSync(versionFile, 'utf-8').trim()
-    if (extractedVersion === currentVersion) {
-      needCopy = false
-      console.log(`[Python] 打包 Python 已解压（版本 ${currentVersion}），跳过复制`)
+  // 1. PATH 中的可执行文件
+  for (const name of names) {
+    const found = findOnPath(name)
+    if (found) {
+      const v = getVersion(found)
+      if (v && /Python 3\./.test(v)) return found
     }
   }
 
-  if (needCopy) {
-    console.log('[Python] 正在解压打包 Python 到用户数据目录...')
-    console.log(`[Python]   源:   ${sourceDir}`)
-    console.log(`[Python]   目标: ${destDir}`)
-
-    // 清理旧目录
-    if (fs.existsSync(destDir)) {
-      fs.rmSync(destDir, { recursive: true, force: true })
-    }
-
+  // 2. 常见安装位置
+  const commonDirs = getCommonInstallDirs()
+  for (const dir of commonDirs) {
+    if (!dir || !fs.existsSync(dir)) continue
+    let entries = []
     try {
-      // 复制整个目录（fs.cpSync 在 Node.js 16.7+ 可用）
-      fs.cpSync(sourceDir, destDir, { recursive: true })
-      fs.writeFileSync(versionFile, currentVersion, 'utf-8')
-      console.log('[Python] 解压完成')
-    } catch (e) {
-      console.error(`[Python] 解压失败: ${e.message}`)
-      // 回退：尝试直接使用源目录（只读）
-      const sourceExePath = getExePath(sourceDir)
-      if (fs.existsSync(sourceExePath)) {
-        console.warn(`[Python] 回退到直接使用源目录（只读）: ${sourceExePath}`)
-        return sourceExePath
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch (_e) {
+      continue
+    }
+    for (const entry of entries) {
+      const candidate = process.platform === 'win32'
+        ? path.join(dir, entry.name, 'python.exe')
+        : path.join(dir, entry.name)
+      if (fs.existsSync(candidate)) {
+        const v = getVersion(candidate)
+        if (v && /Python 3\./.test(v)) return candidate
       }
-      return null
     }
   }
 
-  return exePath
+  return null
 }
 
 /**
- * 解析开发环境的 Python 路径
- * 项目根目录/python/python-{platform}/bin/python3
- * @returns {string | null}
+ * 返回常见 Python 安装目录（用于扫描子目录）
+ * - Windows：%LOCALAPPDATA%\Programs\Python、%ProgramFiles%\Python
+ * - macOS：/usr/local/bin、/opt/homebrew/bin
+ * - Linux：/usr/local/bin、/usr/bin
  */
-function resolveDevPython() {
-  const projectRoot = path.resolve(__dirname, '..')
-  const devPath = path.join(projectRoot, 'python', DIR_NAME, 'bin', EXE_NAME)
-  if (fs.existsSync(devPath)) {
-    return devPath
+function getCommonInstallDirs() {
+  if (process.platform === 'win32') {
+    const dirs = []
+    if (process.env.LOCALAPPDATA) dirs.push(path.join(process.env.LOCALAPPDATA, 'Programs', 'Python'))
+    if (process.env['ProgramFiles']) dirs.push(path.join(process.env['ProgramFiles'], 'Python'))
+    if (process.env['ProgramFiles(x86)']) dirs.push(path.join(process.env['ProgramFiles(x86)'], 'Python'))
+    return dirs
   }
-  // Windows 开发环境（无 bin/ 子目录）
-  const winDevPath = path.join(projectRoot, 'python', DIR_NAME, EXE_NAME)
-  if (fs.existsSync(winDevPath)) {
-    return winDevPath
+  if (process.platform === 'darwin') {
+    return ['/usr/local/bin', '/opt/homebrew/bin']
+  }
+  return ['/usr/local/bin', '/usr/bin']
+}
+
+/**
+ * 在 PATH 中查找可执行文件
+ * @param {string} name
+ * @returns {string|null} 绝对路径或 null
+ */
+function findOnPath(name) {
+  const cmd = process.platform === 'win32' ? 'where' : 'which'
+  try {
+    const r = spawnSync(cmd, [name], { encoding: 'utf-8', timeout: 5000 })
+    if (r.status === 0) {
+      const out = (r.stdout || '').trim().split(/\r?\n/)[0].trim()
+      if (out && fs.existsSync(out)) return out
+    }
+  } catch (_e) {
+    // ignore
   }
   return null
 }
 
 /**
- * 根据平台获取 Python 可执行文件路径
- * @param {string} dir Python 根目录
+ * 获取 Python 版本字符串
+ * @param {string} pythonPath
+ * @returns {string|null}
+ */
+function getVersion(pythonPath) {
+  try {
+    const r = spawnSync(pythonPath, ['--version'], { encoding: 'utf-8', timeout: 10000 })
+    if (r.status !== 0) return null
+    return (r.stdout || r.stderr || '').trim()
+  } catch (_e) {
+    return null
+  }
+}
+
+/**
+ * 校验给定 Python 路径的可用性（不检查依赖库）
+ * @param {string} pythonPath
+ * @returns {{ ok: boolean, path: string, version: string|null, reason: string }}
+ */
+export function checkPythonPath(pythonPath) {
+  if (!pythonPath || !fs.existsSync(pythonPath)) {
+    return { ok: false, path: pythonPath || '', version: null, reason: 'not_found' }
+  }
+  const version = getVersion(pythonPath)
+  if (!version || !/Python 3\./.test(version)) {
+    return { ok: false, path: pythonPath, version, reason: 'invalid_version' }
+  }
+  return { ok: true, path: pythonPath, version, reason: 'ok' }
+}
+
+/**
+ * 获取当前 Python 环境状态（轻量，不检查依赖）
+ * 用于设置页面展示
+ * @returns {Promise<{configured: string|null, path: string|null, version: string|null, available: boolean, reason: string}>}
+ */
+export async function getPythonStatus() {
+  let configured = null
+  try {
+    const cfg = loadConfig()
+    configured = cfg?.python?.path || null
+  } catch (_e) {
+    // ignore
+  }
+
+  const resolved = await getPythonPath()
+  if (!resolved) {
+    return {
+      configured,
+      path: null,
+      version: null,
+      available: false,
+      reason: configured ? 'invalid' : 'not_configured'
+    }
+  }
+  const check = checkPythonPath(resolved)
+  return {
+    configured,
+    path: resolved,
+    version: check.version,
+    available: check.ok,
+    reason: check.reason
+  }
+}
+
+/**
+ * 校验 Python 依赖库是否齐全
+ * @param {string} [pythonPath] 不传则使用已缓存的路径
+ * @returns {Promise<{ok: boolean, path: string|null, version: string|null, missingDeps: string[], reason: string}>}
+ */
+export async function verifyPythonDeps(pythonPath) {
+  const target = pythonPath || (await getPythonPath())
+  if (!target) {
+    return { ok: false, path: null, version: null, missingDeps: [], reason: 'not_configured' }
+  }
+  const check = checkPythonPath(target)
+  if (!check.ok) {
+    return { ok: false, path: target, version: check.version, missingDeps: [], reason: check.reason }
+  }
+
+  // 先用单次组合 import 快速判定（全部存在则一次成功）
+  const combined = spawnSync(
+    target,
+    ['-c', `import ${REQUIRED_IMPORTS.join(', ')}`],
+    { encoding: 'utf-8', timeout: 30000 }
+  )
+  if (combined.status === 0) {
+    return { ok: true, path: target, version: check.version, missingDeps: [], reason: 'ok' }
+  }
+
+  // 组合失败 → 逐个检测以列出缺失项
+  const missing = []
+  for (const imp of REQUIRED_IMPORTS) {
+    const r = spawnSync(target, ['-c', `import ${imp}`], { encoding: 'utf-8', timeout: 15000 })
+    if (r.status !== 0) missing.push(imp)
+  }
+  return {
+    ok: false,
+    path: target,
+    version: check.version,
+    missingDeps: missing,
+    reason: 'missing_deps'
+  }
+}
+
+/**
+ * 通过 pip 安装 requirements.txt 依赖（流式输出）
+ * @param {string} [pythonPath] 不传则使用已缓存的路径
+ * @param {Object} [callbacks]
+ * @param {function(string):void} [callbacks.onStdout]
+ * @param {function(string):void} [callbacks.onStderr]
+ * @returns {Promise<{exitCode: number, stdout: string, stderr: string}>}
+ */
+export function installPythonDeps(pythonPath, callbacks = {}) {
+  const { onStdout, onStderr } = callbacks
+  return new Promise(async (resolve, reject) => {
+    const target = pythonPath || await getPythonPath()
+    if (!target) {
+      reject(new Error('未配置 Python 环境，请先在设置中指定 Python 路径'))
+      return
+    }
+    if (!fs.existsSync(REQUIREMENTS_PATH)) {
+      reject(new Error(`找不到依赖清单: ${REQUIREMENTS_PATH}`))
+      return
+    }
+
+    const args = ['-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '-r', REQUIREMENTS_PATH]
+    const proc = spawn(target, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' }
+    })
+
+    let stdout = ''
+    let stderr = ''
+    proc.stdout.on('data', (d) => {
+      const s = d.toString('utf-8')
+      stdout += s
+      if (onStdout) onStdout(s)
+    })
+    proc.stderr.on('data', (d) => {
+      const s = d.toString('utf-8')
+      stderr += s
+      if (onStderr) onStderr(s)
+    })
+    proc.on('error', (err) => reject(err))
+    proc.on('close', (code) => {
+      // 安装成功后刷新缓存，使后续调用使用最新状态
+      invalidatePythonCache()
+      resolve({ exitCode: code || 0, stdout, stderr })
+    })
+  })
+}
+
+/**
+ * 获取 requirements.txt 路径
  * @returns {string}
  */
-function getExePath(dir) {
-  return process.platform === 'win32'
-    ? path.join(dir, EXE_NAME)
-    : path.join(dir, 'bin', EXE_NAME)
+export function getRequirementsPath() {
+  return REQUIREMENTS_PATH
 }

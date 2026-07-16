@@ -65,19 +65,6 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Download Python runtime (${{ matrix.platform-key }})
-        run: node python/download-python.js --platform ${{ matrix.platform-key }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Python runtime
-        run: |
-          echo "=== Python 目录结构 ==="
-          ls -la python/python-${{ matrix.platform-key }}/
-          echo "=== Python 版本 ==="
-          python/python-${{ matrix.platform-key }}/bin/python3 --version
-        shell: bash
-
       - name: Build frontend
         run: npm run build
         env:
@@ -125,19 +112,6 @@ jobs:
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
-
-      - name: Download Python runtime (win32-x64)
-        run: node python/download-python.js --platform win32-x64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Python runtime
-        run: |
-          echo "=== Python 目录结构 ==="
-          ls -la python/python-win32-x64/
-          echo "=== Python 版本 ==="
-          python/python-win32-x64/python.exe --version
-        shell: bash
 
       - name: Build frontend
         run: npm run build
@@ -203,23 +177,6 @@ jobs:
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
-
-      - name: Download Python runtime (${{ matrix.platform-key }})
-        run: node python/download-python.js --platform ${{ matrix.platform-key }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Python runtime
-        run: |
-          echo "=== Python 目录结构 ==="
-          ls -la python/python-${{ matrix.platform-key }}/
-          echo "=== Python 版本 ==="
-          if [ "${{ matrix.platform-key }}" = "darwin-x64" ]; then
-            arch -x86_64 python/python-${{ matrix.platform-key }}/bin/python3 --version
-          else
-            python/python-${{ matrix.platform-key }}/bin/python3 --version
-          fi
-        shell: bash
 
       - name: Build frontend
         run: npm run build

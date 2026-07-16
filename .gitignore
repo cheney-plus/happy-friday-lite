@@ -40,10 +40,11 @@ coverage/
 # App data
 app-data/
 
-# Python runtime (downloaded via download-python.js)
-# 仅忽略各平台运行时目录，保留 python/ 下的脚本与配置
+# Python（项目仅保留 requirements.txt，由用户在系统侧安装 Python 与依赖）
+# 忽略历史下载的 Python 运行时目录，仅保留 requirements.txt
 python/python-*/
 python/.cache/
+python/__pycache__/
 
 # Temporary files
 *.tmp
