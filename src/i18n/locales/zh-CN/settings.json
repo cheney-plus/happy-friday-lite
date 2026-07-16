@@ -97,13 +97,5 @@
   "pythonVerifyOk": "依赖库齐全，Python 环境可用",
   "pythonVerifyFail": "校验失败",
   "pythonVerifyNoPython": "请先配置有效的 Python 路径",
-  "pythonMissingDeps": "缺失依赖库",
-  "pythonInstallDeps": "一键配置环境",
-  "pythonInstallBtn": "安装依赖库",
-  "pythonInstalling": "安装中...",
-  "pythonInstallConfirm": "将使用 pip 安装 requirements.txt 中的依赖库到当前 Python 环境，可能需要较长时间，是否继续？",
-  "pythonInstallOk": "依赖库安装完成",
-  "pythonInstallFail": "依赖库安装失败",
-  "pythonClearLog": "清空日志",
-  "pythonHelpText": "提示：应用不再内置 Python，请在系统中安装 Python 3.x。点击「自动检测」可一键发现并配置；若未安装，请前往 python.org 下载安装后回到此处配置，再点击「一键配置环境」安装所需依赖库。"
+  "pythonMissingDeps": "缺失依赖库"
 }

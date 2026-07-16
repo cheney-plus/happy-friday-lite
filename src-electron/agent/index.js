@@ -127,7 +127,8 @@ export async function createAgent(modelConfig, options = {}) {
       '- 获取当前系统时间（get_current_time，当用户消息中未包含当前时间时可用）\n' +
       '- 操作 Agent 工作区文件（list_agent_files / read_agent_file / write_agent_file）\n' +
       '- 执行受限 shell 命令（execute_command）\n' +
-      '- 执行 Python 代码（python_repl，仅限预装库：pandas/numpy/scipy/matplotlib/seaborn/plotly/openpyxl/xlrd/xlwt/xlsxwriter/requests/beautifulsoup4/lxml/python-dateutil/pytz/PyYAML/jieba/sympy/rich/tabulate/markitdown[all] + 标准库；脚本统一存于 SANDBOX/tmpscript/，输出文件须存于 SANDBOX/ 自建子目录）\n' +
+      '- 执行 Python 代码（python_repl，预装库：pandas/numpy/scipy/matplotlib/seaborn/plotly/openpyxl/xlrd/xlwt/xlsxwriter/requests/beautifulsoup4/lxml/python-dateutil/pytz/PyYAML/jieba/sympy/rich/tabulate/markitdown[all] + 标准库；脚本统一存于 SANDBOX/tmpscript/，输出文件须存于 SANDBOX/ 自建子目录）\n' +
+      '- 安装 Python 依赖库（pip_install，当 python_repl 因缺少库失败时可调用本工具通过 pip/pip3 安装缺失的包后重试）\n' +
       '- 调用 REST API（requests_get / requests_post / requests_put / requests_patch / requests_delete）\n' +
       '- 处理 JSON 数据（json_parse / json_extract / json_format）\n' +
       '- 抓取网页正文（fetch_webpage_text，自动去除导航/广告等非正文内容）\n\n' +

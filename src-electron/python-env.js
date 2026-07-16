@@ -2,21 +2,23 @@
  * Python 环境管理
  * ===============
  *
- * 不再在制品中内置 Python 运行时，改由用户在系统中安装 Python，
- * 应用通过以下策略解析可用的 Python 可执行文件：
+ * 由用户在系统中安装 Python，应用通过以下策略解析可用的 Python 可执行文件：
  *
  *   1. 用户在设置中显式指定的 python.path（优先级最高）
  *   2. 自动检测系统 Python（PATH 中的 python3/python 及常见安装位置）
  *      - 若检测到，会自动写入 config.python.path（满足"非开发者无感配置"）
  *   3. 以上均失败 → 返回 null，调用方应提示用户前往设置配置 Python
  *
- * 依赖库（requirements.txt）由设置中的"一键配置环境"功能通过
- * `<python> -m pip install -r requirements.txt` 安装到用户的环境中。
+ * 依赖库（requirements.txt）由 Agent 的 pip_install 工具安装到用户的环境中。
+ * pip 命令解析策略（优先级从高到低）：
+ *   1. `<python> -m pip`（确保安装到目标 Python 环境，推荐）
+ *   2. PATH 中的 pip3 可执行文件
+ *   3. PATH 中的 pip 可执行文件
  */
 
 import fs from 'fs'
 import path from 'path'
-import { spawn, spawnSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { loadConfig, saveConfig } from './config.js'
 
@@ -351,51 +353,50 @@ export async function verifyPythonDeps(pythonPath) {
 }
 
 /**
- * 通过 pip 安装 requirements.txt 依赖（流式输出）
- * @param {string} [pythonPath] 不传则使用已缓存的路径
- * @param {Object} [callbacks]
- * @param {function(string):void} [callbacks.onStdout]
- * @param {function(string):void} [callbacks.onStderr]
- * @returns {Promise<{exitCode: number, stdout: string, stderr: string}>}
+ * 解析可用的 pip 命令
+ *
+ * 优先级（确保依赖安装到正确的 Python 环境）：
+ *   1. `<python> -m pip` —— 与目标 Python 绑定，最可靠
+ *   2. PATH 中的 pip3 可执行文件
+ *   3. PATH 中的 pip 可执行文件
+ *
+ * @param {string} pythonPath 目标 Python 可执行文件路径
+ * @returns {{command: string, preArgs: string[], source: string}|null}
+ *   - command: 要 spawn 的可执行文件
+ *   - preArgs: pip 子命令前的参数（如 ['-m', 'pip'] 或 []）
+ *   - source: 用于日志的可读来源描述
  */
-export function installPythonDeps(pythonPath, callbacks = {}) {
-  const { onStdout, onStderr } = callbacks
-  return new Promise(async (resolve, reject) => {
-    const target = pythonPath || await getPythonPath()
-    if (!target) {
-      reject(new Error('未配置 Python 环境，请先在设置中指定 Python 路径'))
-      return
+export function resolvePipCommand(pythonPath) {
+  // 1. 优先 <python> -m pip
+  if (pythonPath) {
+    const r = spawnSync(pythonPath, ['-m', 'pip', '--version'], {
+      encoding: 'utf-8',
+      timeout: 10000
+    })
+    if (r.status === 0) {
+      return { command: pythonPath, preArgs: ['-m', 'pip'], source: `${pythonPath} -m pip` }
     }
-    if (!fs.existsSync(REQUIREMENTS_PATH)) {
-      reject(new Error(`找不到依赖清单: ${REQUIREMENTS_PATH}`))
-      return
+  }
+
+  // 2. 回退 pip3
+  const pip3Path = findOnPath('pip3')
+  if (pip3Path) {
+    const r = spawnSync(pip3Path, ['--version'], { encoding: 'utf-8', timeout: 10000 })
+    if (r.status === 0) {
+      return { command: pip3Path, preArgs: [], source: `pip3 (${pip3Path})` }
     }
+  }
 
-    const args = ['-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '-r', REQUIREMENTS_PATH]
-    const proc = spawn(target, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' }
-    })
+  // 3. 回退 pip
+  const pipPath = findOnPath('pip')
+  if (pipPath) {
+    const r = spawnSync(pipPath, ['--version'], { encoding: 'utf-8', timeout: 10000 })
+    if (r.status === 0) {
+      return { command: pipPath, preArgs: [], source: `pip (${pipPath})` }
+    }
+  }
 
-    let stdout = ''
-    let stderr = ''
-    proc.stdout.on('data', (d) => {
-      const s = d.toString('utf-8')
-      stdout += s
-      if (onStdout) onStdout(s)
-    })
-    proc.stderr.on('data', (d) => {
-      const s = d.toString('utf-8')
-      stderr += s
-      if (onStderr) onStderr(s)
-    })
-    proc.on('error', (err) => reject(err))
-    proc.on('close', (code) => {
-      // 安装成功后刷新缓存，使后续调用使用最新状态
-      invalidatePythonCache()
-      resolve({ exitCode: code || 0, stdout, stderr })
-    })
-  })
+  return null
 }
 
 /**

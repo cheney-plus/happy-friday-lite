@@ -97,13 +97,5 @@
   "pythonVerifyOk": "All dependencies are present. Python environment is ready.",
   "pythonVerifyFail": "Verification failed",
   "pythonVerifyNoPython": "Please configure a valid Python path first",
-  "pythonMissingDeps": "Missing dependencies",
-  "pythonInstallDeps": "One-click Setup",
-  "pythonInstallBtn": "Install Dependencies",
-  "pythonInstalling": "Installing...",
-  "pythonInstallConfirm": "This will install the dependencies from requirements.txt into your Python environment via pip. It may take a while. Continue?",
-  "pythonInstallOk": "Dependencies installed successfully",
-  "pythonInstallFail": "Failed to install dependencies",
-  "pythonClearLog": "Clear Log",
-  "pythonHelpText": "Tip: The app no longer bundles Python. Please install Python 3.x on your system. Click \"Auto Detect\" to find and configure it automatically. If not installed, download it from python.org, then return here to configure it and click \"One-click Setup\" to install the required dependencies."
+  "pythonMissingDeps": "Missing dependencies"
 }

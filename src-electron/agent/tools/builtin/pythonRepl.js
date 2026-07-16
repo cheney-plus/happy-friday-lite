@@ -10,7 +10,7 @@
  *   - 优先使用用户在「设置 → 通用 → Python 环境」中指定的系统 Python 路径
  *   - 未配置时自动检测系统 Python（PATH / 常见安装位置），检测到则自动写回配置
  *   - 均不可用时返回 null，工具需提示用户前往设置完成配置
- *   - 依赖库由用户通过设置中的"一键配置环境"功能安装到其 Python 环境
+ *   - 依赖库可通过 pip_install 工具安装到用户的 Python 环境
  *
  * 工作目录与脚本策略：
  *   - 脚本文件：统一保存到 {agentRootDir}/SANDBOX/tmpscript/，扩展名 .py，执行后保留不删除；
@@ -148,9 +148,8 @@ async function handler(args, ctx) {
       '⚠️ 未配置 Python 环境，无法执行 Python 代码。\n\n' +
       '请在「设置 → 通用 → Python 环境」中：\n' +
       '1. 点击「自动检测」尝试发现系统已安装的 Python；或\n' +
-      '2. 点击「选择文件」手动指定系统 Python 可执行文件路径；\n' +
-      '3. 完成后点击「一键配置环境」安装所需依赖库。\n\n' +
-      '配置完成后重试本操作。'
+      '2. 点击「选择文件」手动指定系统 Python 可执行文件路径。\n\n' +
+      '配置完成后重试本操作。如需安装依赖库，可使用 pip_install 工具。'
     )
   }
 
@@ -245,6 +244,13 @@ async function handler(args, ctx) {
       if (stderr) output += `stderr:\n${stderr}\n`
       if (exitCode !== 0) {
         output += `\n（进程退出码：${exitCode}）`
+      }
+
+      // 检测到缺失模块时，提示 LLM 使用 pip_install 工具安装
+      if (/ModuleNotFoundError|ImportError|No module named/i.test(stderr)) {
+        const m = stderr.match(/No module named ['"]([^'"]+)['"]/i)
+        const pkgHint = m ? `（如 "${m[1]}"）` : ''
+        output += `\n💡 检测到缺失 Python 依赖库${pkgHint}。可调用 pip_install 工具安装缺失的包后重试。`
       }
 
       // 截断最终输出

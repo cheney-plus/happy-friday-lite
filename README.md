@@ -97,9 +97,9 @@ npm run electron:build:arm64
 
 构建产物输出至 `release/` 目录。
 
-> 说明：本应用不再内置 Python 运行时。用户首次启动后，请在「设置 → 通用 → Python 环境」中：
+> 说明：请在「设置 → 通用 → Python 环境」中配置 Python 环境：
 > 1. 点击「自动检测」自动发现系统已安装的 Python；或手动选择 Python 可执行文件路径；
-> 2. 点击「一键配置环境」安装所需依赖库（基于 `python/requirements.txt`）。
+> 2. 缺失的依赖库可由 AI 助手通过对话自动安装（基于 `python/requirements.txt`，通过 pip/pip3 安装）。
 
 ## 📦 下载安装
 

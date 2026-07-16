@@ -34,6 +34,9 @@ import './builtin/calculator.js'
 // Python 代码执行工具（使用项目内置 Python 运行时）
 import './builtin/pythonRepl.js'
 
+// Python 包安装工具（通过 pip/pip3 安装第三方库，含 ensurepip 引导）
+import './builtin/pipInstall.js'
+
 // HTTP 请求工具（GET/POST/PUT/DELETE/PATCH）
 import './builtin/httpRequests.js'
 

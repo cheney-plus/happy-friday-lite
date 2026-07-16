@@ -149,34 +149,6 @@
               {{ pythonState.verifying ? t('settings.pythonVerifying') : t('settings.pythonVerifyBtn') }}
             </button>
           </div>
-          <!-- 依赖缺失提示 -->
-          <div v-if="pythonState.missingDeps && pythonState.missingDeps.length > 0" class="setting-item python-deps-item">
-            <div class="python-deps-warn">
-              {{ t('settings.pythonMissingDeps') }}（{{ pythonState.missingDeps.length }}）：
-              <span class="python-deps-list">{{ pythonState.missingDeps.join(', ') }}</span>
-            </div>
-          </div>
-          <!-- 一键配置环境（安装依赖） -->
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.pythonInstallDeps') }}</span>
-            <button
-              class="primary-btn"
-              :disabled="pythonState.installing || !pythonState.available"
-              @click="installPythonDeps"
-            >
-              {{ pythonState.installing ? t('settings.pythonInstalling') : t('settings.pythonInstallBtn') }}
-            </button>
-          </div>
-          <!-- 安装输出 -->
-          <div v-if="pythonState.installLog" class="setting-item python-log-item">
-            <pre class="python-log">{{ pythonState.installLog }}</pre>
-            <button v-if="!pythonState.installing" class="text-btn" @click="pythonState.installLog = ''">{{ t('settings.pythonClearLog') }}</button>
-          </div>
-          <!-- 帮助提示 -->
-          <div class="setting-item python-help-item">
-            <span class="item-label"></span>
-            <span class="item-link python-help-text">{{ t('settings.pythonHelpText') }}</span>
-          </div>
         </div>
       </div>
 
@@ -636,18 +608,13 @@ const pythonState = reactive({
   loading: false,
   detecting: false,
   verifying: false,
-  installing: false,
   available: false,
   reason: '',
   configured: null,
   path: null,
   version: null,
-  missingDeps: [],
-  installLog: ''
+  missingDeps: []
 });
-
-let unsubInstallStdout = null;
-let unsubInstallStderr = null;
 
 const loadPythonStatus = async () => {
   pythonState.loading = true;
@@ -715,7 +682,7 @@ const verifyPythonDeps = async () => {
       pythonState.missingDeps = [];
     } else if (result.reason === 'missing_deps') {
       pythonState.missingDeps = result.missingDeps || [];
-      alert(t('settings.pythonMissingDeps') + '（' + (result.missingDeps || []).length + '）');
+      alert(t('settings.pythonMissingDeps') + '（' + (result.missingDeps || []).length + '）：' + (result.missingDeps || []).join(', '));
     } else {
       alert(t('settings.pythonVerifyFail'));
     }
@@ -723,41 +690,6 @@ const verifyPythonDeps = async () => {
     alert(t('settings.pythonVerifyFail') + ': ' + e);
   } finally {
     pythonState.verifying = false;
-  }
-};
-
-const installPythonDeps = async () => {
-  if (pythonState.installing) return;
-  if (!pythonState.available) {
-    alert(t('settings.pythonVerifyNoPython'));
-    return;
-  }
-  if (!confirm(t('settings.pythonInstallConfirm'))) return;
-  pythonState.installing = true;
-  pythonState.installLog = '';
-  // 订阅流式输出
-  if (window.electronAPI) {
-    unsubInstallStdout = window.electronAPI.on('python-install-stdout', (data) => {
-      pythonState.installLog += data;
-    });
-    unsubInstallStderr = window.electronAPI.on('python-install-stderr', (data) => {
-      pythonState.installLog += data;
-    });
-  }
-  try {
-    const result = await electronService.invoke('python-install-deps', { path: pythonState.path });
-    if (result.success) {
-      pythonState.installLog += '\n✅ ' + t('settings.pythonInstallOk');
-      pythonState.missingDeps = [];
-    } else {
-      pythonState.installLog += '\n❌ ' + (result.error || t('settings.pythonInstallFail'));
-    }
-  } catch (e) {
-    pythonState.installLog += '\n❌ ' + e.message;
-  } finally {
-    pythonState.installing = false;
-    if (unsubInstallStdout) { unsubInstallStdout(); unsubInstallStdout = null; }
-    if (unsubInstallStderr) { unsubInstallStderr(); unsubInstallStderr = null; }
   }
 };
 
@@ -980,8 +912,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
-  if (unsubInstallStdout) { unsubInstallStdout(); unsubInstallStdout = null; }
-  if (unsubInstallStderr) { unsubInstallStderr(); unsubInstallStderr = null; }
 });
 
 onDeactivated(() => {
@@ -1920,51 +1850,5 @@ const openAuthorEmail = () => {
 .python-warn {
   color: #ef4444;
   font-weight: 500;
-}
-
-.python-deps-item .python-deps-warn {
-  color: #f59e0b;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.python-deps-list {
-  color: var(--text-secondary, #6b7280);
-  font-family: 'SF Mono', 'Consolas', monospace;
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.python-log-item {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.python-log {
-  background: #1e1e1e;
-  color: #d4d4d4;
-  padding: 12px;
-  border-radius: 6px;
-  font-family: 'SF Mono', 'Consolas', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  max-height: 240px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
-}
-
-.python-help-item {
-  align-items: flex-start;
-}
-
-.python-help-text {
-  color: var(--text-secondary, #6b7280);
-  font-size: 12px;
-  line-height: 1.6;
-  max-width: 360px;
-  text-align: right;
 }
 </style>

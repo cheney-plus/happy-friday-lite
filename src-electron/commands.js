@@ -13,7 +13,6 @@ import {
   setPythonPath,
   checkPythonPath,
   verifyPythonDeps,
-  installPythonDeps,
   invalidatePythonCache
 } from './python-env.js'
 import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
@@ -985,20 +984,6 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('python-verify', async (_event, args) => {
     const target = args && args.path ? args.path : undefined
     return await verifyPythonDeps(target)
-  })
-
-  // 一键安装依赖（pip install -r requirements.txt），流式输出到前端
-  ipcMain.handle('python-install-deps', async (_event, args) => {
-    const target = args && args.path ? args.path : undefined
-    try {
-      const result = await installPythonDeps(target, {
-        onStdout: (data) => mainWindow.webContents.send('python-install-stdout', data),
-        onStderr: (data) => mainWindow.webContents.send('python-install-stderr', data)
-      })
-      return { success: result.exitCode === 0, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }
-    } catch (e) {
-      return { success: false, exitCode: -1, stdout: '', stderr: e.message, error: e.message }
-    }
   })
 
   // 清除 Python 路径缓存（设置页面在切换路径后可调用以强制重新解析）
