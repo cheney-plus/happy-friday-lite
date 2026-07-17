@@ -70,6 +70,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      - name: Pre-build install & clean (target arch bindings only)
+        run: |
+          node scripts/prebuild-install.mjs ${{ matrix.arch }}
+          node scripts/prebuild-clean.mjs ${{ matrix.arch }}
+
       - name: Build Electron app (Linux ${{ matrix.arch }})
         run: npx electron-builder --linux ${{ matrix.arch-flag }}
         env:
@@ -83,7 +88,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
-          path: release/*.AppImage
+          path: 
+            - release/*.AppImage
+            - release/*.deb
           if-no-files-found: error
           retention-days: 30
 
@@ -117,6 +124,11 @@ jobs:
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Pre-build install & clean (target arch bindings only)
+        run: |
+          node scripts/prebuild-install.mjs x64
+          node scripts/prebuild-clean.mjs x64
 
       - name: Build Electron app (Windows x64)
         run: npx electron-builder --win --x64
@@ -182,6 +194,11 @@ jobs:
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Pre-build install & clean (target arch bindings only)
+        run: |
+          node scripts/prebuild-install.mjs ${{ matrix.arch }}
+          node scripts/prebuild-clean.mjs ${{ matrix.arch }}
 
       - name: Build Electron app (macOS ${{ matrix.arch }})
         run: npx electron-builder --mac ${{ matrix.arch-flag }}
