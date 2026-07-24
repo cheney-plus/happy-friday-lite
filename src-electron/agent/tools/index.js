@@ -46,5 +46,8 @@ import './builtin/jsonOps.js'
 // 网页正文抓取工具
 import './builtin/webpageScraper.js'
 
+// 文件转 Markdown 工具（PDF/Word/PPT/Excel/HTML/CSV/JSON/XML/EPub → Markdown，支持 PDF OCR）
+import './builtin/markitdown.js'
+
 // 用户可在下方追加自定义工具导入：
 // import './builtin/myCustomTool.js'

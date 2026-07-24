@@ -34,3 +34,7 @@ sympy
 
 # MarkItDown - 文件转 Markdown（支持 PDF/Word/PPT/Excel/图片OCR/HTML 等）
 markitdown[all]
+
+# OCR 支持（用于扫描版 PDF 的 Tesseract OCR 识别，需系统安装 tesseract）
+pytesseract
+PyMuPDF
