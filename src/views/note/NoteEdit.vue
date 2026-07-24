@@ -90,25 +90,29 @@ const moreMenuVisible = ref(false);
 const moreMenuStyle = reactive({ left: '0px', top: '0px' });
 
 const onEditorChange = (content) => {
+  noteContent.value = content;
   const plainText = extractPlainText(content);
+  const normalizedText = plainText.replace(/\s+/g, ' ').trim();
+
   const firstLine = (plainText.split('\n').find(line => line.trim() !== '') || '').trim();
   noteTitle.value = firstLine ? (firstLine.length > 20 ? firstLine.substring(0, 20) : firstLine) : '新建笔记';
 
-  updateStats(content);
+  updateStats(normalizedText);
   isSaved.value = false;
-  scheduleSave();
+  scheduleSave(normalizedText);
 };
 
-const updateStats = (content) => {
-  const text = extractPlainText(content).replace(/\s+/g, ' ').trim();
-  wordCount.value = text ? text.split(/\s+/).filter(Boolean).length : 0;
-  charCount.value = text.length;
+const updateStats = (normalizedText) => {
+  wordCount.value = normalizedText ? normalizedText.split(/\s+/).filter(Boolean).length : 0;
+  charCount.value = normalizedText.length;
 };
 
-const scheduleSave = () => {
+const scheduleSave = (normalizedText) => {
   const id = noteId.value;
   if (!id) return;
-  const contentText = extractPlainText(noteContent.value).replace(/\s+/g, ' ').trim();
+  const contentText = normalizedText !== undefined
+    ? normalizedText
+    : extractPlainText(noteContent.value).replace(/\s+/g, ' ').trim();
   noteStore.scheduleSave(id, noteTitle.value, noteContent.value, contentText);
   isSaved.value = false;
 };
@@ -175,7 +179,7 @@ onMounted(async () => {
     if (note) {
       noteTitle.value = note.title;
       noteContent.value = note.content;
-      updateStats(noteContent.value);
+      updateStats(extractPlainText(noteContent.value).replace(/\s+/g, ' ').trim());
     }
   }
 });

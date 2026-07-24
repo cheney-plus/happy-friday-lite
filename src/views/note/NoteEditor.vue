@@ -264,7 +264,7 @@
       </div>
     </div>
 
-    <NoteBubbleMenu v-if="editor" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @interpret="handleBubbleInterpret" @refine="handleBubbleRefine" @polish="handleBubblePolish" @expand="handleBubbleExpand" @openInChat="handleOpenInChat" />
+    <NoteBubbleMenu v-if="editor" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
 
     <div v-if="!tocVisible" class="toc-btn" @click="emit('toggle-toc')">
       <span class="toc-char">目</span>
@@ -492,10 +492,7 @@ import KbDirSelectDialog from '@/views/knowledge/components/KbDirSelectDialog.vu
 import { useAppStore } from '@/store';
 import { marked } from 'marked';
 
-marked.setOptions({
-  gfm: true,
-  breaks: false,
-});
+const EDITOR_MARKED_OPTIONS = { gfm: true, breaks: false };
 
 const appStore = useAppStore();
 
@@ -876,30 +873,11 @@ const closeAISidebar = () => {
   }, 250);
 };
 
-const handleBubbleAIWrite = (text, command) => {
-  console.log('BubbleMenu - AI 帮写 is not yet implemented:', text, '指令:', command);
+const handleBubbleAIWrite = () => {
   openAIWrite();
 };
 
-const handleBubbleInterpret = (text) => {
-  console.log('BubbleMenu - 解读 is not yet implemented:', text);
-};
-
-const handleBubbleRefine = (text) => {
-  console.log('BubbleMenu - 精炼 is not yet implemented:', text);
-};
-
-const handleBubblePolish = (text) => {
-  console.log('BubbleMenu - 润色 is not yet implemented:', text);
-};
-
-const handleBubbleExpand = (text) => {
-  console.log('BubbleMenu - 扩写 is not yet implemented:', text);
-};
-
 const handleOpenInChat = (text, from, to) => {
-  console.log('BubbleMenu - 对话中打开:', text, from, to);
-  
   if (!showAISidebar.value) {
     currentSessionId.value = '';
     chatMessages.value = [];
@@ -1262,7 +1240,7 @@ function handleChatAction(type, index) {
 
     if (editor.value) {
       const endPos = editor.value.state.doc.content.size;
-      const htmlContent = marked.parse(content);
+      const htmlContent = marked.parse(content, EDITOR_MARKED_OPTIONS);
       editor.value.chain().focus().insertContentAt(endPos - 1, htmlContent).run();
       showChatSaveToast('已追加到笔记末尾');
     } else {
@@ -1270,7 +1248,6 @@ function handleChatAction(type, index) {
     }
     return;
   }
-  console.log('Chat action:', type, index);
 }
 
 function checkSidebarScrollPosition() {
@@ -1504,39 +1481,29 @@ const editor = useEditor({
 
       const text = event.clipboardData.getData('text/plain');
       const html = event.clipboardData.getData('text/html');
-      
-      console.log('📋 粘贴事件触发:', { 
-        text: text?.substring(0, 100), 
-        hasHtml: !!html,
-        htmlPreview: html?.substring(0, 200)
-      });
 
       if (!text) return false;
 
       if (html && isRichHtml(html)) {
-        console.log('🌐 检测到富文本 HTML，使用默认处理');
         return false;
       }
 
       try {
-        console.log('📝 开始 Markdown 解析...');
         event.preventDefault();
         event.stopPropagation();
-        
+
         const processedText = preprocessMarkdownTables(text);
-        let parsedHtml = marked.parse(processedText);
-        
+        let parsedHtml = marked.parse(processedText, EDITOR_MARKED_OPTIONS);
+
         parsedHtml = fixEmptyTableCells(parsedHtml);
-        console.log('✅ Markdown 解析结果:', parsedHtml?.substring(0, 300));
-        
+
         if (editor.value) {
           editor.value.chain().focus().insertContent(parsedHtml).run();
-          console.log('✅ 内容已插入编辑器');
         }
-        
+
         return true;
       } catch (error) {
-        console.error('❌ Markdown 解析失败:', error);
+        console.error('Markdown 解析失败:', error);
         return false;
       }
     },

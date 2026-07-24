@@ -381,7 +381,7 @@ import { clearAllChatSessions } from '@/utils/chatSessionCache';
 import { useTabStore } from '@/store/modules/tabs';
 import { marked } from 'marked';
 
-marked.setOptions({ breaks: true, gfm: true });
+const LIST_MARKED_OPTIONS = { breaks: true, gfm: true };
 
 const { t } = useI18n();
 const noteStore = useNoteStore();
@@ -569,12 +569,6 @@ const formatTime = (dateStr) => {
   }
 };
 
-const getContentPreview = (contentText) => {
-  const text = contentText.trim();
-  if (!text) return '无附加文本';
-  return text.length > 30 ? text.slice(0, 30) + '...' : text;
-};
-
 const getNotebookName = (notebookId) => {
   if (!notebookId) return '未分类';
   const notebook = notebookStore.notebooks.find(nb => nb.id === notebookId);
@@ -700,7 +694,7 @@ const processFiles = async (files) => {
     try {
       const markdownContent = await readFileAsText(file);
       const title = parseMarkdownTitle(markdownContent);
-      const htmlContent = marked.parse(markdownContent);
+      const htmlContent = marked.parse(markdownContent, LIST_MARKED_OPTIONS);
       const contentText = extractPlainText(htmlContent).replace(/\s+/g, ' ').trim();
 
       const note = await noteStore.importNote(null, notebookId, title, htmlContent, contentText);
@@ -724,10 +718,6 @@ const processFiles = async (files) => {
   if (fileInputRef.value) {
     fileInputRef.value.value = '';
   }
-};
-
-const toggleImportOtherMenu = () => {
-  console.log('Toggle import other menu');
 };
 
 const onEditorChange = (content) => {
@@ -888,7 +878,6 @@ const showNotebookSubmenu = async () => {
   await nextTick();
   const menuEl = document.querySelector('.context-menu');
   if (menuEl) {
-    const rect = menuEl.getBoundingClientRect();
     const menuItemEl = menuEl.querySelector('.has-submenu');
     if (menuItemEl) {
       const itemRect = menuItemEl.getBoundingClientRect();
@@ -949,32 +938,16 @@ const confirmCreateNotebook = async () => {
   const name = newNotebookName.value.trim();
   if (!name) return;
 
-  console.log('[NoteList] Creating new notebook and binding note:', {
-    notebookName: name,
-    targetNoteId: createNotebookTargetNoteId.value
-  });
-
   try {
     const notebook = await notebookStore.createNotebook(name);
-    console.log('[NoteList] Notebook created:', notebook);
 
     if (notebook) {
       if (createNotebookTargetNoteId.value) {
-        console.log('[NoteList] Binding note to new notebook:', {
-          noteId: createNotebookTargetNoteId.value,
-          notebookId: notebook.id,
-          notebookName: notebook.name
-        });
         await moveNoteToNotebook(createNotebookTargetNoteId.value, notebook.id);
-        console.log('[NoteList] ✅ Note successfully bound to new notebook');
-      } else {
-        console.warn('[NoteList] No target note to bind');
       }
-    } else {
-      console.error('[NoteList] ❌ Failed to create notebook - returned null');
     }
   } catch (error) {
-    console.error('[NoteList] ❌ Error in confirmCreateNotebook:', error);
+    console.error('[NoteList] Error in confirmCreateNotebook:', error);
   }
 
   closeCreateNotebookDialog();
@@ -988,7 +961,6 @@ const moveToNotebook = async (notebookId) => {
 };
 
 const moveNoteToNotebook = async (noteId, notebookId) => {
-  console.log('[NoteList] Moving note to notebook:', { noteId, notebookId })
   const note = noteStore.notes.find(n => n.id === noteId);
   if (note) {
     await electronService.invoke('update_note', {
@@ -1000,9 +972,6 @@ const moveNoteToNotebook = async (noteId, notebookId) => {
     });
     note.notebookId = notebookId;
     note.updatedAt = new Date().toISOString();
-    console.log('[NoteList] Note moved successfully:', { noteId, notebookId })
-  } else {
-    console.error('[NoteList] Note not found:', noteId)
   }
 };
 
@@ -1035,7 +1004,7 @@ const handleAction = async (action) => {
   if (action === 'delete' && contextMenu.targetNoteId) {
     await noteStore.deleteNote(contextMenu.targetNoteId);
   } else if (action === 'addToKnowledge') {
-    console.log('Add to knowledge feature is not yet implemented');
+    // 暂未实现
   } else if (action === 'createNewNotebook') {
     openCreateNotebookDialog();
   } else if (action === 'duplicate') {
