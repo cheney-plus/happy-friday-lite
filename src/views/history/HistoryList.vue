@@ -36,13 +36,23 @@
         <p class="state-text">{{ t('history.loading') }}</p>
       </div>
 
-      <!-- 空状态 -->
-      <div v-else-if="allSessions.length === 0" class="state-wrap">
+      <!-- 空状态（没有任何历史记录） -->
+      <div v-else-if="allSessions.length === 0 && !hasMore" class="state-wrap">
         <svg class="state-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
         <p class="state-title">{{ t('history.empty') }}</p>
         <p class="state-text">{{ t('history.emptyDesc') }}</p>
+      </div>
+
+      <!-- 最近 3 个月无对话，但存在更早的历史 -->
+      <div v-else-if="allSessions.length === 0 && hasMore" class="state-wrap">
+        <svg class="state-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <p class="state-title">{{ t('history.noRecent') }}</p>
+        <p class="state-text">{{ t('history.noRecentDesc') }}</p>
       </div>
 
       <!-- 无搜索结果 -->
@@ -145,6 +155,21 @@
           </div>
         </div>
       </div>
+
+      <!-- 加载更早的历史记录 -->
+      <div v-if="hasMore && !loading" class="load-more-wrap">
+        <button
+          class="load-more-btn"
+          :disabled="loadingMore"
+          @click="loadMore"
+        >
+          <span v-if="loadingMore" class="load-more-spinner"></span>
+          <span>{{ loadingMore ? t('history.loadMoreLoading') : t('history.loadMore') }}</span>
+        </button>
+      </div>
+      <div v-else-if="!hasMore && !loading && allSessions.length > 0" class="load-more-hint">
+        {{ t('history.noMoreHistory') }}
+      </div>
     </div>
     </div>
 
@@ -240,11 +265,24 @@ const router = useRouter();
 const { t } = useI18n();
 
 const loading = ref(false);
+const loadingMore = ref(false);
 const allSessions = ref([]);
 const searchQuery = ref('');
 const activeMenuId = ref(null);
 const selectedIds = ref(new Set());
 const multiSelectMode = ref(false);
+
+// 分页：每次加载 3 个月的历史记录
+const MONTHS_PER_PAGE = 3;
+const loadedMonths = ref(MONTHS_PER_PAGE);
+const hasMore = ref(false);
+
+// 计算「months 个月前」的 ISO 时间字符串
+const getMonthsAgoISO = (months) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString();
+};
 
 const contextMenu = ref({
   visible: false,
@@ -267,17 +305,54 @@ const deleteModal = ref({
 
 const renameInputRef = ref(null);
 
-// 加载所有会话（含统计信息）
+// 加载最近 3 个月的会话（含统计信息）
 const loadSessions = async () => {
   loading.value = true;
   try {
-    const result = await electronService.invoke('get_sessions_with_stats');
-    allSessions.value = result || [];
+    const startDate = getMonthsAgoISO(MONTHS_PER_PAGE);
+    const result = await electronService.invoke('get_sessions_with_stats', { startDate });
+    allSessions.value = result?.sessions || [];
+    hasMore.value = !!result?.hasMore;
+    loadedMonths.value = MONTHS_PER_PAGE;
   } catch (err) {
     console.error('Failed to load sessions:', err);
     allSessions.value = [];
+    hasMore.value = false;
   } finally {
     loading.value = false;
+  }
+};
+
+// 加载更早的 3 个月历史记录
+const loadMore = async () => {
+  if (loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  try {
+    const previousMonths = loadedMonths.value;
+    const newLoadedMonths = previousMonths + MONTHS_PER_PAGE;
+    const newStartDate = getMonthsAgoISO(newLoadedMonths);
+    const endDate = getMonthsAgoISO(previousMonths);
+    const result = await electronService.invoke('get_sessions_with_stats', {
+      startDate: newStartDate,
+      endDate
+    });
+    const newSessions = result?.sessions || [];
+    // 合并并去重
+    const existingIds = new Set(allSessions.value.map(s => s.id));
+    const merged = [...allSessions.value];
+    for (const s of newSessions) {
+      if (!existingIds.has(s.id)) {
+        merged.push(s);
+      }
+    }
+    merged.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+    allSessions.value = merged;
+    loadedMonths.value = newLoadedMonths;
+    hasMore.value = !!result?.hasMore;
+  } catch (err) {
+    console.error('Failed to load more sessions:', err);
+  } finally {
+    loadingMore.value = false;
   }
 };
 
@@ -736,6 +811,55 @@ onUnmounted(() => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ========== 加载更多 ========== */
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 8px;
+}
+
+.load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: var(--bg-primary);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.load-more-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.load-more-hint {
+  text-align: center;
+  padding: 16px 0 8px;
+  font-size: 12.5px;
+  color: var(--text-tertiary);
 }
 
 /* ========== 分组列表 ========== */
