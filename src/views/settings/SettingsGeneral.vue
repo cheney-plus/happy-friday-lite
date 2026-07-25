@@ -127,26 +127,15 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </span>
           </div>
-          <!-- 自动检测 -->
+          <!-- 自动检测（含依赖校验） -->
           <div class="setting-item">
             <span class="item-label">{{ t('settings.pythonAutoDetect') }}</span>
             <button
               class="action-btn"
-              :disabled="pythonState.detecting"
+              :disabled="detectBusy"
               @click="autoDetectPython"
             >
-              {{ pythonState.detecting ? t('settings.pythonDetecting') : t('settings.pythonAutoDetectBtn') }}
-            </button>
-          </div>
-          <!-- 校验依赖 -->
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.pythonVerifyDeps') }}</span>
-            <button
-              class="action-btn"
-              :disabled="pythonState.verifying"
-              @click="verifyPythonDeps"
-            >
-              {{ pythonState.verifying ? t('settings.pythonVerifying') : t('settings.pythonVerifyBtn') }}
+              {{ detectBtnLabel }}
             </button>
           </div>
         </div>
@@ -437,6 +426,51 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- 通用提示弹窗（替代原生 alert/confirm） -->
+    <Teleport to="body">
+      <Transition name="appdlg-fade">
+        <div v-if="dialog.visible" class="appdlg-overlay" @click.self="handleDialogCancel">
+          <Transition name="appdlg-scale">
+            <div v-if="dialog.visible" class="appdlg-card" :class="`is-${dialog.type}`" role="dialog" aria-modal="true">
+              <div class="appdlg-icon">
+                <svg v-if="dialog.type === 'success'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <svg v-else-if="dialog.type === 'error'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="15" y1="9" x2="9" y2="15"></line>
+                  <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+                <svg v-else-if="dialog.type === 'warning'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <svg v-else-if="dialog.type === 'confirm'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <svg v-else width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              </div>
+              <h3 class="appdlg-title">{{ dialogTitle }}</h3>
+              <p v-if="dialog.message" class="appdlg-message">{{ dialog.message }}</p>
+              <div v-if="dialog.details" class="appdlg-details">{{ dialog.details }}</div>
+              <div class="appdlg-actions">
+                <button v-if="dialog.type === 'confirm'" class="appdlg-btn appdlg-cancel" @click="handleDialogCancel">{{ dialog.cancelText }}</button>
+                <button class="appdlg-btn appdlg-confirm" @click="handleDialogConfirm">{{ dialog.confirmText }}</button>
+              </div>
+            </div>
+          </Transition>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -495,6 +529,64 @@ const settings = reactive({
   noteFimCompletion: appStore.noteFimCompletion
 });
 
+// ========== 通用提示弹窗（替代原生 alert/confirm） ==========
+const dialog = reactive({
+  visible: false,
+  type: 'info', // success | error | warning | info | confirm
+  title: '',
+  message: '',
+  details: '',
+  confirmText: '',
+  cancelText: '',
+  _resolve: null
+});
+
+const dialogTitle = computed(() => {
+  if (dialog.title) return dialog.title;
+  switch (dialog.type) {
+    case 'success': return t('settings.dialogSuccessTitle');
+    case 'error': return t('settings.dialogErrorTitle');
+    case 'confirm': return t('settings.dialogConfirmTitle');
+    case 'warning':
+    case 'info':
+    default: return t('settings.dialogWarningTitle');
+  }
+});
+
+const showDialog = (options) => new Promise((resolve) => {
+  Object.assign(dialog, {
+    visible: true,
+    type: options.type || 'info',
+    title: options.title || '',
+    message: options.message || '',
+    details: options.details || '',
+    confirmText: options.confirmText || t('settings.dialogConfirm'),
+    cancelText: options.cancelText || t('settings.dialogCancel'),
+    _resolve: resolve
+  });
+});
+
+const closeDialog = (result) => {
+  dialog.visible = false;
+  const resolve = dialog._resolve;
+  dialog._resolve = null;
+  if (resolve) resolve(result);
+};
+
+const handleDialogConfirm = () => closeDialog(true);
+const handleDialogCancel = () => closeDialog(false);
+
+const notifySuccess = (message, options = {}) => showDialog({ ...options, type: 'success', message });
+const notifyError = (message, options = {}) => showDialog({ ...options, type: 'error', message });
+const notifyWarning = (message, options = {}) => showDialog({ ...options, type: 'warning', message });
+const confirmDialog = (message, options = {}) => showDialog({
+  ...options,
+  type: 'confirm',
+  message,
+  confirmText: options.confirmText || t('settings.dialogConfirm'),
+  cancelText: options.cancelText || t('settings.dialogCancel')
+});
+
 // 备份状态
 const backupState = reactive({
   backing: false,
@@ -550,7 +642,7 @@ const selectBackupDir = async () => {
       await saveBackupConfig();
     }
   } catch (e) {
-    alert(t('settings.selectDirFailed') + ': ' + e);
+    await notifyError(t('settings.selectDirFailed') + ': ' + e);
   }
 };
 
@@ -562,10 +654,10 @@ const handleBackup = async () => {
     if (result.success) {
       backupConfig.lastBackupAt = new Date().toISOString();
     } else if (!result.canceled) {
-      alert(t('settings.backupFailed') + ': ' + (result.error || t('settings.unknownError')));
+      await notifyError(t('settings.backupFailed') + ': ' + (result.error || t('settings.unknownError')));
     }
   } catch (e) {
-    alert(t('settings.backupFailed') + ': ' + e);
+    await notifyError(t('settings.backupFailed') + ': ' + e);
   } finally {
     backupState.backing = false;
   }
@@ -573,18 +665,19 @@ const handleBackup = async () => {
 
 const handleRestore = async () => {
   if (backupState.restoring) return;
-  if (!confirm(t('settings.restoreConfirm'))) return;
+  const go = await confirmDialog(t('settings.restoreConfirm'));
+  if (!go) return;
   backupState.restoring = true;
   try {
     const result = await electronService.invoke('backup-restore');
     if (result.success) {
-      alert(t('settings.restoreSuccess'));
+      await notifySuccess(t('settings.restoreSuccess'));
       window.location.reload();
     } else if (!result.canceled) {
-      alert(t('settings.restoreFailed') + ': ' + (result.error || t('settings.unknownError')));
+      await notifyError(t('settings.restoreFailed') + ': ' + (result.error || t('settings.unknownError')));
     }
   } catch (e) {
-    alert(t('settings.restoreFailed') + ': ' + e);
+    await notifyError(t('settings.restoreFailed') + ': ' + e);
   } finally {
     backupState.restoring = false;
   }
@@ -616,6 +709,14 @@ const pythonState = reactive({
   missingDeps: []
 });
 
+// 自动检测按钮：检测中或校验依赖中均禁用，标签随状态切换
+const detectBusy = computed(() => pythonState.detecting || pythonState.verifying);
+const detectBtnLabel = computed(() => {
+  if (pythonState.verifying) return t('settings.pythonVerifying');
+  if (pythonState.detecting) return t('settings.pythonDetecting');
+  return t('settings.pythonAutoDetectBtn');
+});
+
 const loadPythonStatus = async () => {
   pythonState.loading = true;
   try {
@@ -632,23 +733,60 @@ const loadPythonStatus = async () => {
   }
 };
 
+// 校验依赖：返回 { ok, missingDeps, error }。仅在 Python 可用时调用
+const verifyPythonDepsInternal = async () => {
+  if (!pythonState.available) {
+    return { ok: false, skipped: true };
+  }
+  try {
+    const result = await electronService.invoke('python-verify', { path: pythonState.path });
+    if (result.ok) {
+      pythonState.missingDeps = [];
+      return { ok: true };
+    }
+    if (result.reason === 'missing_deps') {
+      const missing = result.missingDeps || [];
+      pythonState.missingDeps = missing;
+      return { ok: false, missingDeps: missing };
+    }
+    return { ok: false, error: t('settings.pythonVerifyFail') };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+};
+
+// 自动检测 Python：检测成功后顺带校验基本依赖；未检测到则不校验
 const autoDetectPython = async () => {
-  if (pythonState.detecting) return;
+  if (detectBusy.value) return;
   pythonState.detecting = true;
   try {
     const result = await electronService.invoke('python-autodetect');
-    if (result.ok) {
-      // 写回配置并刷新状态
-      await electronService.invoke('python-set-path', { path: result.path });
-      await loadPythonStatus();
-      alert(t('settings.pythonDetectOk') + ': ' + result.path);
+    if (!result.ok) {
+      // 未检测到 Python，不校验依赖
+      await notifyWarning(t('settings.pythonDetectFail'));
+      return;
+    }
+    // 写回配置并刷新状态
+    await electronService.invoke('python-set-path', { path: result.path });
+    await loadPythonStatus();
+    // Python 已就绪，继续校验基本依赖
+    pythonState.detecting = false;
+    pythonState.verifying = true;
+    const depResult = await verifyPythonDepsInternal();
+    if (depResult.ok) {
+      await notifySuccess(t('settings.pythonDetectOkDepsOk'), { details: result.path });
+    } else if (depResult.missingDeps && depResult.missingDeps.length) {
+      await notifyWarning(t('settings.pythonDetectOkDepsMissing'), {
+        details: `${t('settings.pythonMissingDeps')}（${depResult.missingDeps.length}）：${depResult.missingDeps.join(', ')}`
+      });
     } else {
-      alert(t('settings.pythonDetectFail'));
+      await notifyWarning(t('settings.pythonDetectOkDepsFail'), { details: result.path });
     }
   } catch (e) {
-    alert(t('settings.pythonDetectFail') + ': ' + e);
+    await notifyError(t('settings.pythonDetectFail') + ': ' + e);
   } finally {
     pythonState.detecting = false;
+    pythonState.verifying = false;
   }
 };
 
@@ -657,39 +795,13 @@ const selectPythonFile = async () => {
     const result = await electronService.invoke('python-select-file');
     if (!result.success) return;
     if (!result.ok) {
-      const go = confirm(t('settings.pythonInvalidVersion'));
+      const go = await confirmDialog(t('settings.pythonInvalidVersion'));
       if (!go) return;
     }
     await electronService.invoke('python-set-path', { path: result.path });
     await loadPythonStatus();
   } catch (e) {
-    alert(t('settings.pythonSelectFail') + ': ' + e);
-  }
-};
-
-const verifyPythonDeps = async () => {
-  if (pythonState.verifying) return;
-  if (!pythonState.available) {
-    alert(t('settings.pythonVerifyNoPython'));
-    return;
-  }
-  pythonState.verifying = true;
-  pythonState.missingDeps = [];
-  try {
-    const result = await electronService.invoke('python-verify', { path: pythonState.path });
-    if (result.ok) {
-      alert(t('settings.pythonVerifyOk'));
-      pythonState.missingDeps = [];
-    } else if (result.reason === 'missing_deps') {
-      pythonState.missingDeps = result.missingDeps || [];
-      alert(t('settings.pythonMissingDeps') + '（' + (result.missingDeps || []).length + '）：' + (result.missingDeps || []).join(', '));
-    } else {
-      alert(t('settings.pythonVerifyFail'));
-    }
-  } catch (e) {
-    alert(t('settings.pythonVerifyFail') + ': ' + e);
-  } finally {
-    pythonState.verifying = false;
+    await notifyError(t('settings.pythonSelectFail') + ': ' + e);
   }
 };
 
@@ -900,8 +1012,21 @@ const handleClickOutside = (event) => {
   }
 };
 
+// 弹窗快捷键：Enter 确认 / Esc 取消
+const handleKeydown = (e) => {
+  if (!dialog.visible) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    handleDialogCancel();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    handleDialogConfirm();
+  }
+};
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
+  document.addEventListener('keydown', handleKeydown);
   initTheme();
   settings.displayMode = currentMode.value;
   currentLanguage.value = appStore.language || 'zh-CN';
@@ -912,6 +1037,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener('keydown', handleKeydown);
 });
 
 onDeactivated(() => {
@@ -1850,5 +1976,202 @@ const openAuthorEmail = () => {
 .python-warn {
   color: #ef4444;
   font-weight: 500;
+}
+
+/* 通用提示弹窗（替代原生 alert/confirm） */
+.appdlg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.appdlg-card {
+  background: var(--bg-primary);
+  border-radius: 18px;
+  padding: 30px 30px 22px;
+  width: 400px;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.18),
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    0 0 0 1px var(--border-color);
+}
+
+.appdlg-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+.appdlg-card.is-success .appdlg-icon {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0.07));
+  color: #10b981;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.12);
+}
+
+.appdlg-card.is-error .appdlg-icon {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(239, 68, 68, 0.07));
+  color: #ef4444;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.12);
+}
+
+.appdlg-card.is-warning .appdlg-icon,
+.appdlg-card.is-confirm .appdlg-icon {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(245, 158, 11, 0.07));
+  color: #f59e0b;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.12);
+}
+
+.appdlg-card.is-info .appdlg-icon {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(59, 130, 246, 0.07));
+  color: #3b82f6;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.12);
+}
+
+.appdlg-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.appdlg-message {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.65;
+  margin: 0;
+  padding: 0 8px;
+  word-break: break-word;
+}
+
+.appdlg-details {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-height: 120px;
+  overflow-y: auto;
+  word-break: break-all;
+  white-space: pre-wrap;
+  font-family: inherit;
+}
+
+.appdlg-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.appdlg-btn {
+  flex: 1;
+  padding: 11px 0;
+  border: none;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+.appdlg-cancel {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.appdlg-cancel:hover {
+  background: var(--bg-active);
+}
+
+.appdlg-btn:active {
+  transform: scale(0.97);
+}
+
+.appdlg-confirm {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+}
+
+.appdlg-confirm:hover {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+.is-error .appdlg-confirm {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+}
+.is-error .appdlg-confirm:hover {
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.35);
+}
+
+.is-warning .appdlg-confirm {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
+}
+.is-warning .appdlg-confirm:hover {
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+}
+
+.is-confirm .appdlg-confirm {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+}
+.is-confirm .appdlg-confirm:hover {
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
+}
+
+[data-theme='dark'] .appdlg-card {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border-color);
+}
+
+.appdlg-fade-enter-active,
+.appdlg-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.appdlg-fade-enter-from,
+.appdlg-fade-leave-to {
+  opacity: 0;
+}
+
+.appdlg-scale-enter-active {
+  transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.appdlg-scale-leave-active {
+  transition: all 0.16s ease;
+}
+.appdlg-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.9) translateY(8px);
+}
+.appdlg-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(4px);
 }
 </style>

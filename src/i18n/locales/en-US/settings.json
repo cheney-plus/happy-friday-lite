@@ -91,11 +91,16 @@
   "pythonDetectFail": "No Python detected. Please install Python or select the path manually.",
   "pythonSelectFail": "Failed to select Python",
   "pythonInvalidVersion": "The selected file is not a valid Python 3 executable. Use this path anyway?",
-  "pythonVerifyDeps": "Verify Dependencies",
-  "pythonVerifyBtn": "Verify Dependencies",
-  "pythonVerifying": "Verifying...",
-  "pythonVerifyOk": "All dependencies are present. Python environment is ready.",
+  "pythonVerifying": "Verifying dependencies...",
   "pythonVerifyFail": "Verification failed",
-  "pythonVerifyNoPython": "Please configure a valid Python path first",
-  "pythonMissingDeps": "Missing dependencies"
+  "pythonMissingDeps": "Missing dependencies",
+  "pythonDetectOkDepsOk": "Python detected and auto-configured. All dependencies are present.",
+  "pythonDetectOkDepsMissing": "Python detected and auto-configured, but some dependencies are missing",
+  "pythonDetectOkDepsFail": "Python detected and auto-configured, but dependency verification failed",
+  "dialogConfirm": "OK",
+  "dialogCancel": "Cancel",
+  "dialogSuccessTitle": "Success",
+  "dialogErrorTitle": "Error",
+  "dialogWarningTitle": "Notice",
+  "dialogConfirmTitle": "Confirm"
 }
