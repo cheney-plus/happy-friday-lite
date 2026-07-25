@@ -23,6 +23,8 @@
   "backupNow": "Backup Now",
   "createBackup": "Create Backup",
   "backing": "Backing up...",
+  "backupPacking": "Packing files",
+  "backupCompressing": "Compressing archive",
   "restoreData": "Restore Data",
   "restoreFromBackup": "Restore from Backup",
   "restoring": "Restoring...",

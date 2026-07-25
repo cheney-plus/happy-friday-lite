@@ -15,7 +15,7 @@ import {
   verifyPythonDeps,
   invalidatePythonCache
 } from './python-env.js'
-import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
+import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT, BACKUP_PROGRESS } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
@@ -1008,7 +1008,12 @@ export function registerCommands(mainWindow) {
       return { success: false, canceled: true }
     }
 
-    const backupResult = await createBackup(result.filePath, false)
+    // 压缩在 worker 线程中执行，主进程将进度推送给渲染进程
+    const backupResult = await createBackup(result.filePath, false, (p) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(BACKUP_PROGRESS, p)
+      }
+    })
     // 手动备份成功后也更新 lastBackupAt
     if (backupResult.success) {
       try {

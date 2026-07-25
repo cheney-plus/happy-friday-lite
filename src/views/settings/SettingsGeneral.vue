@@ -155,6 +155,20 @@
               {{ backupState.backing ? t('settings.backing') : t('settings.createBackup') }}
             </button>
           </div>
+          <div v-if="backupProgress.active" class="setting-item backup-progress-item">
+            <div class="backup-progress-content">
+              <div class="backup-progress-main">
+                <span class="item-label">{{ backupProgressLabel }}</span>
+                <span class="item-link">{{ backupProgress.compressing ? '' : (backupProgressPercent + '%') }}</span>
+              </div>
+              <div class="backup-progress-bar">
+                <div class="backup-progress-fill" :style="{ width: backupProgressPercent + '%' }"></div>
+              </div>
+              <div v-if="backupProgress.name && !backupProgress.compressing" class="backup-progress-file" :title="backupProgress.name">
+                {{ backupProgress.name }}
+              </div>
+            </div>
+          </div>
           <div class="setting-item">
             <span class="item-label">{{ t('settings.restoreData') }}</span>
             <button
@@ -492,6 +506,7 @@ const showThemeDropdown = ref(false);
 const themeSelectRef = ref(null);
 const showLangDropdown = ref(false);
 const langSelectRef = ref(null);
+let unsubBackupProgress = null;
 
 const themeOptions = computed(() => [
   { value: 'light', label: t('settings.themeLight') },
@@ -601,6 +616,41 @@ const backupConfig = reactive({
   maxKeep: 7
 });
 
+// 备份进度（由主进程 worker 推送的事件驱动）
+const backupProgress = reactive({
+  active: false,
+  current: 0,
+  total: 0,
+  name: '',
+  compressing: false
+});
+
+const backupProgressPercent = computed(() => {
+  if (backupProgress.compressing) return 100;
+  if (!backupProgress.total) return 0;
+  return Math.min(100, Math.round((backupProgress.current / backupProgress.total) * 100));
+});
+
+const backupProgressLabel = computed(() => {
+  if (backupProgress.compressing) return t('settings.backupCompressing');
+  if (backupProgress.total > 0) {
+    return `${t('settings.backupPacking')} ${backupProgress.current}/${backupProgress.total}`;
+  }
+  return t('settings.backing');
+});
+
+const handleBackupProgress = (p) => {
+  if (!p) return;
+  if (p.compressing) {
+    backupProgress.compressing = true;
+  } else {
+    backupProgress.compressing = false;
+    backupProgress.current = p.current || 0;
+    backupProgress.total = p.total || 0;
+    backupProgress.name = p.name || '';
+  }
+};
+
 const loadBackupConfig = async () => {
   try {
     const cfg = await electronService.invoke('backup-get-config');
@@ -649,6 +699,11 @@ const selectBackupDir = async () => {
 const handleBackup = async () => {
   if (backupState.backing) return;
   backupState.backing = true;
+  backupProgress.active = true;
+  backupProgress.current = 0;
+  backupProgress.total = 0;
+  backupProgress.name = '';
+  backupProgress.compressing = false;
   try {
     const result = await electronService.invoke('backup-create');
     if (result.success) {
@@ -660,6 +715,8 @@ const handleBackup = async () => {
     await notifyError(t('settings.backupFailed') + ': ' + e);
   } finally {
     backupState.backing = false;
+    // 稍后隐藏进度条
+    setTimeout(() => { backupProgress.active = false; }, 1200);
   }
 };
 
@@ -1033,11 +1090,16 @@ onMounted(() => {
   loadBackupConfig();
   loadRagStats();
   loadPythonStatus();
+  // 订阅备份进度事件（主进程 worker 推送）
+  if (window.electronAPI) {
+    unsubBackupProgress = window.electronAPI.on('backup-progress', handleBackupProgress);
+  }
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
   document.removeEventListener('keydown', handleKeydown);
+  if (unsubBackupProgress) unsubBackupProgress();
 });
 
 onDeactivated(() => {
@@ -1976,6 +2038,50 @@ const openAuthorEmail = () => {
 .python-warn {
   color: #ef4444;
   font-weight: 500;
+}
+
+/* 备份进度条 */
+.backup-progress-item {
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 4px;
+}
+
+.backup-progress-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.backup-progress-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.backup-progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.backup-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  transition: width 0.25s ease;
+}
+
+.backup-progress-file {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: inherit;
 }
 
 /* 通用提示弹窗（替代原生 alert/confirm） */

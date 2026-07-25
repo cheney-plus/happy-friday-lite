@@ -121,6 +121,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'chat-error',
       'session-title-updated',
       'config-changed',
+      'backup-progress',
       'note-ai-chunk',
       'note-ai-done',
       'note-ai-error',

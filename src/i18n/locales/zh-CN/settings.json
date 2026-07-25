@@ -23,6 +23,8 @@
   "backupNow": "立即备份",
   "createBackup": "创建备份",
   "backing": "备份中...",
+  "backupPacking": "打包文件",
+  "backupCompressing": "压缩归档中",
   "restoreData": "恢复数据",
   "restoreFromBackup": "从备份恢复",
   "restoring": "恢复中...",
