@@ -157,15 +157,14 @@
       </div>
 
       <!-- 加载更早的历史记录 -->
-      <div v-if="hasMore && !loading" class="load-more-wrap">
-        <button
-          class="load-more-btn"
-          :disabled="loadingMore"
-          @click="loadMore"
-        >
-          <span v-if="loadingMore" class="load-more-spinner"></span>
-          <span>{{ loadingMore ? t('history.loadMoreLoading') : t('history.loadMore') }}</span>
-        </button>
+      <div
+        v-if="hasMore && !loading"
+        class="load-more-hint"
+        :class="{ 'is-loading': loadingMore }"
+        @click="loadMore"
+      >
+        <span v-if="loadingMore" class="load-more-spinner"></span>
+        <span>{{ loadingMore ? t('history.loadMoreLoading') : t('history.loadMore') }}</span>
       </div>
       <div v-else-if="!hasMore && !loading && allSessions.length > 0" class="load-more-hint">
         {{ t('history.noMoreHistory') }}
@@ -273,7 +272,7 @@ const selectedIds = ref(new Set());
 const multiSelectMode = ref(false);
 
 // 分页：每次加载 3 个月的历史记录
-const MONTHS_PER_PAGE = 3;
+const MONTHS_PER_PAGE = 1;
 const loadedMonths = ref(MONTHS_PER_PAGE);
 const hasMore = ref(false);
 
@@ -814,52 +813,36 @@ onUnmounted(() => {
 }
 
 /* ========== 加载更多 ========== */
-.load-more-wrap {
-  display: flex;
-  justify-content: center;
-  padding: 16px 0 8px;
-}
-
-.load-more-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 20px;
-  font-size: 13.5px;
-  font-family: inherit;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.load-more-btn:hover:not(:disabled) {
-  background: var(--bg-primary);
-  border-color: var(--accent-color);
-  color: var(--accent-color);
-}
-
-.load-more-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.load-more-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--accent-color);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
 .load-more-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   text-align: center;
   padding: 16px 0 8px;
   font-size: 12.5px;
   color: var(--text-tertiary);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.load-more-hint:hover {
+  color: var(--accent-color);
+}
+
+.load-more-hint.is-loading {
+  cursor: default;
+  pointer-events: none;
+}
+
+.load-more-spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 
 /* ========== 分组列表 ========== */
