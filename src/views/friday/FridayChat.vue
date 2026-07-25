@@ -745,10 +745,10 @@ onDeactivated(() => {
 });
 
 onActivated(() => {
-  inputText.value = '';
-  if (textareaRef.value) {
-    textareaRef.value.style.height = 'auto';
-  }
+  // 保留输入框文字，仅重新计算高度以适配恢复后的内容
+  nextTick(() => {
+    autoResize();
+  });
   loadCustomModels();
 });
 
