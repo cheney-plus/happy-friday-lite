@@ -28,7 +28,7 @@
       <div class="file-meta">
         <span class="meta-type" :class="file.type">{{ getTypeLabel(file.type) }}</span>
         <span v-if="file.size && !file.isDirectory" class="meta-sep">·</span>
-        <span v-if="file.size && !file.isDirectory" class="meta-size">{{ formatSize(file.size) }}</span>
+        <span v-if="file.size && !file.isDirectory" class="meta-size">{{ formatFileSize(file.size) }}</span>
         <span v-if="file.modifiedTime" class="meta-date">{{ formatDate(file.modifiedTime) }}</span>
       </div>
     </div>
@@ -37,8 +37,7 @@
 
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue';
-import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
-import { FILE_TYPE_LABELS } from '../constants';
+import { getFileIconComponent, getTypeLabel, formatDate, formatFileSize } from '../utils';
 
 const props = defineProps({
   file: { type: Object, required: true },
@@ -46,35 +45,6 @@ const props = defineProps({
 });
 
 defineEmits(['open', 'contextmenu']);
-
-function getFileIconComponent(type) {
-  return FILE_ICON_MAP[type] || UnknownFileIcon;
-}
-
-function getTypeLabel(type) {
-  return FILE_TYPE_LABELS[type] || '文件';
-}
-
-function formatDate(isoString) {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) {
-    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-  }
-  return (d.getMonth() + 1) + '/' + d.getDate();
-}
-
-function formatSize(size) {
-  if (size == null || size === '') return '';
-  const bytes = Number(size);
-  if (isNaN(bytes)) return '';
-  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
-  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
-  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
-  return bytes + ' B';
-}
 
 // RAG 索引状态
 const indexStatus = ref(null);

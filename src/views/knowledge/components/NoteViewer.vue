@@ -26,6 +26,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { formatRelativeTime as formatTime } from '../utils';
 
 const props = defineProps({
   filePath: { type: String, required: true }
@@ -79,21 +80,6 @@ async function loadNote() {
     error.value = '加载笔记失败: ' + (e.message || e);
     loading.value = false;
   }
-}
-
-function formatTime(isoString) {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  const now = new Date();
-  const diffMs = now - d;
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMs / 3600000);
-  const diffDay = Math.floor(diffMs / 86400000);
-  if (diffMin < 1) return '刚刚';
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  if (diffHour < 24) return `${diffHour}小时前`;
-  if (diffDay < 7) return `${diffDay}天前`;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 onMounted(() => {

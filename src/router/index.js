@@ -11,11 +11,6 @@ export const routes = [
     component: () => import('@/views/knowledge/KnowledgeList.vue')
   },
   {
-    path: '/knowledge/:id',
-    name: 'knowledge-detail',
-    component: () => import('@/views/knowledge/KnowledgeDetail.vue')
-  },
-  {
     path: '/file-viewer',
     name: 'file-viewer',
     component: () => import('@/views/knowledge/FileViewerPage.vue')

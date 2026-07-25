@@ -1,8 +1,8 @@
 import { ref, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTabStore } from '@/store';
-import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile } from '../constants';
-import { FILE_ICON_MAP, UnknownFileIcon } from '../components/icons';
+import { isAllowedFile } from '../constants';
+import { getFileType } from '../utils';
 
 // 可在应用内查看的文件类型（拥有对应的查看器组件）
 // 其余格式（图片、Word/Excel/PPT 等）均使用系统默认应用打开
@@ -45,33 +45,6 @@ export function useFileSystem() {
     });
   });
 
-  function getFileType(fileName) {
-    const ext = fileName.split('.').pop().toLowerCase();
-    for (const [type, exts] of Object.entries(FILE_TYPE_MAP)) {
-      if (exts.includes(ext)) return type;
-    }
-    return 'unknown';
-  }
-
-  function getFileIconComponent(type) {
-    return FILE_ICON_MAP[type] || UnknownFileIcon;
-  }
-
-  function getTypeLabel(type) {
-    return FILE_TYPE_LABELS[type] || '文件';
-  }
-
-  function formatDate(isoString) {
-    if (!isoString) return '';
-    const d = new Date(isoString);
-    const now = new Date();
-    const isToday = d.toDateString() === now.toDateString();
-    if (isToday) {
-      return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-    }
-    return (d.getMonth() + 1) + '/' + d.getDate();
-  }
-
   async function loadDataDir() {
     if (!api) return;
     try {
@@ -94,15 +67,18 @@ export function useFileSystem() {
           ...entry,
           type: entry.isDirectory ? 'folder' : getFileType(entry.name)
         }));
-      for (const file of files.value) {
-        if (file.isDirectory) {
-          try {
-            const subEntries = await api.invoke('kb-read-dir', { dirPath: file.path });
-            file.count = subEntries.filter(isVisible).length + '项';
-          } catch {
-            file.count = '0项';
-          }
-        }
+
+      // 并发获取各子目录的项目数，避免串行 N+1 IPC 调用带来的延迟
+      const folders = files.value.filter(f => f.isDirectory);
+      if (folders.length > 0) {
+        const counts = await Promise.all(
+          folders.map(f =>
+            api.invoke('kb-read-dir', { dirPath: f.path })
+              .then(subEntries => subEntries.filter(isVisible).length + '项')
+              .catch(() => '0项')
+          )
+        );
+        folders.forEach((f, i) => { f.count = counts[i]; });
       }
     } catch (e) {
       console.error('Failed to read directory:', e);
@@ -338,8 +314,6 @@ export function useFileSystem() {
     currentPath,
     kbRootPath,
     files,
-    navigationHistory,
-    historyIndex,
     showNewFolderDialog,
     newFolderName,
     newFolderInputRef,
@@ -350,12 +324,7 @@ export function useFileSystem() {
     canGoBack,
     canGoForward,
     pathSegments,
-    getFileType,
-    getFileIconComponent,
-    getTypeLabel,
-    formatDate,
     loadDataDir,
-    readDirectory,
     navigateTo,
     selectKnowledgeBaseDir,
     goBack,

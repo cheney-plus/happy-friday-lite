@@ -182,9 +182,6 @@
       @cancel="cancelDelete"
     />
 
-    <!-- 功能开发中提示 -->
-    <FeatureModal :visible="showModal" @close="showModal = false" />
-
     <!-- 构建索引进度弹窗 -->
     <div v-if="buildIndexState.visible" class="build-index-overlay">
       <div class="build-index-modal">
@@ -235,14 +232,12 @@ import KbContextMenu from './components/KbContextMenu.vue';
 import NewFolderDialog from './components/NewFolderDialog.vue';
 import CreateKbDialog from './components/CreateKbDialog.vue';
 import ConfirmDialog from './components/ConfirmDialog.vue';
-import FeatureModal from './components/FeatureModal.vue';
 import { electronService } from '@/services/electron';
 import { useSidebar } from './composables/useSidebar';
 import { useFileSystem } from './composables/useFileSystem';
 import { useKnowledgeBase } from './composables/useKnowledgeBase';
 import { useContextMenu } from './composables/useContextMenu';
 
-const showModal = ref(false);
 const showDeleteConfirm = ref(false);
 const deleteConfirmMessage = ref('');
 const pendingDeleteItem = ref(null);
