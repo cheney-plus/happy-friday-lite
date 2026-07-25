@@ -120,7 +120,6 @@ let unlistenDone = null;
 let unlistenError = null;
 let unlistenApproval = null;
 let unlistenToolResult = null;
-let unlistenToolCall = null;
 
 // 需要刷新日历的日程写操作工具
 const SCHEDULE_WRITE_TOOLS = ['create_event', 'update_event', 'delete_event'];
@@ -206,7 +205,6 @@ async function handleSend() {
   bubbleContent.value = '';
 
   activeRequestId = `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  console.log('[ScheduleAssistant] 发送 agent-invoke, requestId:', activeRequestId, 'model:', model.modelName || model.id);
 
   try {
     await electronService.invoke('agent-invoke', {
@@ -249,14 +247,12 @@ function copyContent() {
 onMounted(() => {
   unlistenChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
-    console.log('[ScheduleAssistant] chat-chunk: requestId=', data.requestId, 'active=', activeRequestId, 'contentLen=', data.content?.length);
     if (data.requestId !== activeRequestId) return;
     bubbleContent.value += data.content;
   });
 
   unlistenDone = electronService.listen('chat-done', (event) => {
     const data = event.payload;
-    console.log('[ScheduleAssistant] chat-done: requestId=', data.requestId, 'active=', activeRequestId, 'fullContentLen=', data.fullContent?.length);
     if (data.requestId !== activeRequestId) return;
     isStreaming.value = false;
     if (data.fullContent) {
@@ -283,24 +279,15 @@ onMounted(() => {
   // 所有工具调用默认自动批准，无需用户审批
   unlistenApproval = electronService.listen('agent-tool-approval', (event) => {
     const data = event.payload;
-    console.log('[ScheduleAssistant] agent-tool-approval:', data.toolName, 'requestId:', data.requestId, 'active:', activeRequestId);
     if (data.requestId !== activeRequestId) return;
-    console.log('[ScheduleAssistant] 自动批准工具:', data.toolName);
     electronService.invoke('agent-tool-approval-resume', {
       requestId: data.requestId,
       decision: { type: 'approve' },
     });
   });
 
-  // 监听工具调用开始事件（诊断用）
-  unlistenToolCall = electronService.listen('agent-tool-call', (event) => {
-    const data = event.payload;
-    console.log('[ScheduleAssistant] agent-tool-call:', data.toolName, 'args:', JSON.stringify(data.arguments));
-  });
-
   unlistenToolResult = electronService.listen('agent-tool-result', (event) => {
     const data = event.payload;
-    console.log('[ScheduleAssistant] agent-tool-result:', data.toolName, 'status:', data.status);
     if (data.requestId !== activeRequestId) return;
     // 日程写操作完成后刷新日历
     if (SCHEDULE_WRITE_TOOLS.includes(data.toolName)) {
@@ -315,7 +302,6 @@ onUnmounted(() => {
   if (unlistenError) unlistenError();
   if (unlistenApproval) unlistenApproval();
   if (unlistenToolResult) unlistenToolResult();
-  if (unlistenToolCall) unlistenToolCall();
 });
 
 // 面板打开时聚焦输入框

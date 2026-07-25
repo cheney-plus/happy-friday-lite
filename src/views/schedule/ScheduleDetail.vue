@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted, onDeactivated } from 'vue';
+import { ref, reactive, computed, nextTick, onMounted, onActivated, onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useScheduleStore, EVENT_COLORS, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
@@ -227,10 +227,17 @@ async function toggleStatus() {
   await scheduleStore.updateEvent(eventId.value, { completed: !event.value.completed });
 }
 
-onMounted(() => {
+// 直接进入详情页时 store 可能尚未加载事件，先加载再判断，避免误跳转
+onMounted(async () => {
+  await scheduleStore.loadEvents();
   if (!event.value) {
     goBack();
   }
+});
+
+// keep-alive 重新激活时刷新数据，确保编辑/删除后状态一致
+onActivated(() => {
+  scheduleStore.loadEvents();
 });
 
 onDeactivated(() => {

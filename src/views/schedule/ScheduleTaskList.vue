@@ -176,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useScheduleStore } from '@/store/modules/schedule';
@@ -194,33 +194,32 @@ const sortDropdownRef = ref(null);
 
 const allEvents = computed(() => scheduleStore.events);
 
-const now = new Date();
+// 响应式"当前时间"，keep-alive 重激活时刷新，避免周/月筛选范围陈旧
+const now = ref(new Date());
 
-function getWeekRange() {
-  const d = new Date();
+function toLocalDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const weekRange = computed(() => {
+  const d = now.value;
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   const monday = new Date(d);
   monday.setDate(d.getDate() + diff);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  return {
-    start: monday.toISOString().split('T')[0],
-    end: sunday.toISOString().split('T')[0],
-  };
-}
+  return { start: toLocalDateStr(monday), end: toLocalDateStr(sunday) };
+});
 
-function getMonthRange() {
-  const y = now.getFullYear();
-  const m = now.getMonth();
+const monthRange = computed(() => {
+  const y = now.value.getFullYear();
+  const m = now.value.getMonth();
   return {
-    start: new Date(y, m, 1).toISOString().split('T')[0],
-    end: new Date(y, m + 1, 0).toISOString().split('T')[0],
+    start: toLocalDateStr(new Date(y, m, 1)),
+    end: toLocalDateStr(new Date(y, m + 1, 0)),
   };
-}
-
-const weekRange = getWeekRange();
-const monthRange = getMonthRange();
+});
 
 const completedCount = computed(() => allEvents.value.filter(e => e.completed).length);
 const uncompletedCount = computed(() => allEvents.value.filter(e => !e.completed).length);
@@ -367,6 +366,12 @@ function onDocClick(e) {
 
 onMounted(() => {
   document.addEventListener('click', onDocClick);
+});
+
+// keep-alive 重激活时刷新当前时间与事件，避免周/月范围陈旧
+onActivated(() => {
+  now.value = new Date();
+  scheduleStore.loadEvents();
 });
 
 onUnmounted(() => {

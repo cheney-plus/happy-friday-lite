@@ -71,8 +71,8 @@
                 <template v-if="cell.day === 1">{{ getMonthDayLabel(cell.date) }}</template>
                 <template v-else>{{ cell.day }}</template>
               </div>
-              <div v-if="getHolidayForDate(cell.date)" :class="['cell-holiday', { 'lunar-holiday': getHolidayForDate(cell.date)?.isLunar }]">
-                {{ getHolidayForDate(cell.date)?.holiday }}
+              <div v-if="monthHolidayByDate.get(cell.date)" :class="['cell-holiday', { 'lunar-holiday': monthHolidayByDate.get(cell.date)?.isLunar }]">
+                {{ monthHolidayByDate.get(cell.date)?.holiday }}
               </div>
             </div>
             <div class="cell-events" :style="{ marginTop: getMultiDayBarOffset(cell.date) + 'px' }">
@@ -149,7 +149,7 @@
             </div>
           </div>
         </div>
-        <div class="wk-scroll" ref="weekScrollRef" @scroll="onWeekScroll">
+        <div class="wk-scroll" ref="weekScrollRef">
           <div class="wk-body" :style="{ height: totalDayHeight + 'px' }">
             <div class="wk-gutter-times">
               <div v-for="h in 24" :key="h" class="wk-gutter-hour" :style="{ top: ((h - 1) * hourPx) + 'px' }">
@@ -396,6 +396,30 @@ const monthGridCells = computed(() => {
   return cells;
 });
 
+// 预计算月视图各格事件数据（一次 store 调用，避免模板与计算属性中重复查询）
+const monthEventsByDate = computed(() => {
+  const map = new Map();
+  for (const cell of monthGridCells.value) {
+    map.set(cell.date, scheduleStore.getEventsForDateRange(cell.date, cell.date));
+  }
+  return map;
+});
+
+const monthSingleDayEventsByDate = computed(() => {
+  const map = new Map();
+  for (const [date, events] of monthEventsByDate.value) {
+    map.set(date, events.filter(e => e.start === e.end));
+  }
+  return map;
+});
+
+// 日期 → 格子索引映射，替代 O(n) 的 findIndex
+const monthCellIndexByDate = computed(() => {
+  const map = new Map();
+  monthGridCells.value.forEach((c, i) => map.set(c.date, i));
+  return map;
+});
+
 // ========== 跨日日程条 ==========
 const multiDayEventBars = computed(() => {
   const cells = monthGridCells.value;
@@ -403,10 +427,10 @@ const multiDayEventBars = computed(() => {
 
   const firstDate = cells[0].date;
   const lastDate = cells[cells.length - 1].date;
+  const indexByDate = monthCellIndexByDate.value;
 
   const multiDayEvents = new Map();
-  for (const cell of cells) {
-    const events = getEventsForDate(cell.date);
+  for (const events of monthEventsByDate.value.values()) {
     for (const evt of events) {
       if (evt.start !== evt.end && !multiDayEvents.has(evt.id)) {
         multiDayEvents.set(evt.id, evt);
@@ -422,9 +446,9 @@ const multiDayEventBars = computed(() => {
     if (startDate < firstDate) startDate = firstDate;
     if (endDate > lastDate) endDate = lastDate;
 
-    const startIdx = cells.findIndex(c => c.date === startDate);
-    const endIdx = cells.findIndex(c => c.date === endDate);
-    if (startIdx === -1 || endIdx === -1) continue;
+    const startIdx = indexByDate.get(startDate);
+    const endIdx = indexByDate.get(endDate);
+    if (startIdx === undefined || endIdx === undefined) continue;
 
     const startRow = Math.floor(startIdx / 7);
     const endRow = Math.floor(endIdx / 7);
@@ -495,39 +519,56 @@ const visibleMultiDayEventBars = computed(() =>
 );
 
 /**
- * 计算某格的跨日程条偏移量。
- * 仅对实际覆盖该格的色条计算偏移 —— 未被覆盖的格子不留空白，
- * 单日程 item 从顶部开始排列，充分利用空间。
+ * 预计算各格的跨日程条占用情况（一次扫描，避免模板逐格调用时 O(n²) 重复扫描）。
+ * barSlotByDate: 覆盖该格的可见色条最大 slot（决定单日程偏移）
+ * hiddenBarCountByDate: 覆盖该格但被隐藏的色条数（slot 超出可见范围）
  */
-function getMultiDayBarOffset(date) {
+const monthCellBarMeta = computed(() => {
   const cells = monthGridCells.value;
-  const idx = cells.findIndex(c => c.date === date);
-  if (idx === -1) return 0;
-  const row = Math.floor(idx / 7);
-  const col = idx % 7;
-  let maxSlot = -1;
-  for (const bar of visibleMultiDayEventBars.value) {
-    if (bar.row === row && bar.startCol <= col && bar.endCol >= col) {
-      if (bar.slot > maxSlot) maxSlot = bar.slot;
-    }
-  }
-  return (maxSlot + 1) * ITEM_LINE_H;
-}
+  const visibleBars = visibleMultiDayEventBars.value;
+  const allBars = multiDayEventBars.value;
+  const maxSlot = maxVisibleBarSlot.value;
 
-/** 覆盖该格的可见跨日程条占用的 slot 行数（用于兜底计算） */
-function getRowBarSlotCount(date) {
-  const cells = monthGridCells.value;
-  const idx = cells.findIndex(c => c.date === date);
-  if (idx === -1) return 0;
-  const row = Math.floor(idx / 7);
-  const col = idx % 7;
-  let maxSlot = -1;
-  for (const bar of visibleMultiDayEventBars.value) {
-    if (bar.row === row && bar.startCol <= col && bar.endCol >= col && bar.slot > maxSlot) {
-      maxSlot = bar.slot;
+  const barSlotByDate = new Map();
+  const hiddenBarCountByDate = new Map();
+
+  for (const bar of visibleBars) {
+    for (let col = bar.startCol; col <= bar.endCol; col++) {
+      const idx = bar.row * 7 + col;
+      const date = cells[idx]?.date;
+      if (!date) continue;
+      const cur = barSlotByDate.get(date);
+      if (cur === undefined || bar.slot > cur) barSlotByDate.set(date, bar.slot);
     }
   }
-  return maxSlot + 1;
+
+  for (const bar of allBars) {
+    if (bar.slot <= maxSlot) continue;
+    for (let col = bar.startCol; col <= bar.endCol; col++) {
+      const idx = bar.row * 7 + col;
+      const date = cells[idx]?.date;
+      if (!date) continue;
+      hiddenBarCountByDate.set(date, (hiddenBarCountByDate.get(date) || 0) + 1);
+    }
+  }
+
+  return { barSlotByDate, hiddenBarCountByDate };
+});
+
+// 预计算各格节日（避免模板中对同一日期重复调用 lunar 计算）
+const monthHolidayByDate = computed(() => {
+  const map = new Map();
+  for (const cell of monthGridCells.value) {
+    map.set(cell.date, getHolidayForDate(cell.date));
+  }
+  return map;
+});
+
+/** 计算某格的跨日程条偏移量（基于预计算映射，O(1)） */
+function getMultiDayBarOffset(date) {
+  const slot = monthCellBarMeta.value.barSlotByDate.get(date);
+  if (slot === undefined) return 0;
+  return (slot + 1) * ITEM_LINE_H;
 }
 
 /**
@@ -538,7 +579,7 @@ function getVisibleSingleDayCount(date) {
   const barOffset = getMultiDayBarOffset(date);
   if (rowHeight.value === 0) {
     // ResizeObserver 尚未触发时的兜底
-    return Math.max(0, MAX_VISIBLE_ITEMS - getRowBarSlotCount(date));
+    return Math.max(0, MAX_VISIBLE_ITEMS - barOffset / ITEM_LINE_H);
   }
   const available = rowHeight.value - CELL_PADDING_Y - DATE_HEADER_H - barOffset;
   const fit = Math.floor(available / ITEM_LINE_H);
@@ -547,28 +588,15 @@ function getVisibleSingleDayCount(date) {
 
 /** 被隐藏的单日程数量 */
 function getHiddenSingleDayCount(date) {
-  const singles = getSingleDayEventsForDate(date);
+  const singles = monthSingleDayEventsByDate.value.get(date) || [];
   const visible = getVisibleSingleDayCount(date);
   return Math.max(0, singles.length - visible);
 }
 
-/** 被隐藏的跨日程条数量（slot 超出可见范围且覆盖该格） */
-function getHiddenBarCountForDate(date) {
-  const cells = monthGridCells.value;
-  const idx = cells.findIndex(c => c.date === date);
-  if (idx === -1) return 0;
-  const row = Math.floor(idx / 7);
-  const col = idx % 7;
-  return multiDayEventBars.value.filter(bar =>
-    bar.row === row &&
-    bar.startCol <= col && bar.endCol >= col &&
-    bar.slot > maxVisibleBarSlot.value
-  ).length;
-}
-
 /** 格子中被隐藏的日程总数（单日程 + 跨日程条），用于 +n 显示 */
 function getHiddenEventCount(date) {
-  return getHiddenSingleDayCount(date) + getHiddenBarCountForDate(date);
+  const hiddenBars = monthCellBarMeta.value.hiddenBarCountByDate.get(date) || 0;
+  return getHiddenSingleDayCount(date) + hiddenBars;
 }
 
 /** 格子是否需要显示 +n */
@@ -660,8 +688,6 @@ function updateNowY() {
   nowY.value = (now.getHours() * 60 + now.getMinutes()) / 60 * hourPx;
 }
 
-function onWeekScroll() {}
-
 function scrollToNow() {
   if (!weekScrollRef.value) return;
   const now = new Date();
@@ -671,8 +697,29 @@ function scrollToNow() {
 }
 
 // ========== 年视图 ==========
+// 预计算本年度有事件的日期集合（单次扫描 events，避免年视图 504 次 store 调用）
+const yearEventDates = computed(() => {
+  const year = viewYear.value;
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  const set = new Set();
+  for (const e of scheduleStore.events) {
+    if (e.end < yearStart || e.start > yearEnd) continue;
+    const start = e.start < yearStart ? yearStart : e.start;
+    const end = e.end > yearEnd ? yearEnd : e.end;
+    const d = new Date(start + 'T00:00:00');
+    const endMs = new Date(end + 'T00:00:00').getTime();
+    while (d.getTime() <= endMs) {
+      set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      d.setDate(d.getDate() + 1);
+    }
+  }
+  return set;
+});
+
 const yearMonths = computed(() => {
   const year = viewYear.value;
+  const eventDates = yearEventDates.value;
   const months = [];
   for (let m = 0; m < 12; m++) {
     const firstDay = getFirstDayOfWeek(year, m);
@@ -686,8 +733,7 @@ const yearMonths = computed(() => {
     }
     for (let day = 1; day <= daysInMonth; day++) {
       const date = formatDate(year, m, day);
-      const events = scheduleStore.getEventsForDateRange(date, date);
-      cells.push({ day, isCurrentMonth: true, isToday: isTodayStr(date), hasEvent: events.length > 0 });
+      cells.push({ day, isCurrentMonth: true, isToday: isTodayStr(date), hasEvent: eventDates.has(date) });
     }
     const remaining = 42 - cells.length;
     for (let day = 1; day <= remaining; day++) {
@@ -703,8 +749,9 @@ function getEventsForDate(date) {
   return scheduleStore.getEventsForDateRange(date, date);
 }
 
+// 月视图优先使用预计算映射（O(1)），避免每个格子在模板渲染时重复调用 store
 function getSingleDayEventsForDate(date) {
-  return getEventsForDate(date).filter(e => e.start === e.end);
+  return monthSingleDayEventsByDate.value.get(date) || getEventsForDate(date).filter(e => e.start === e.end);
 }
 
 // 优先级标识：仅 urgent / minor 用强色圆点区分，important 用淡色保持视觉简洁
