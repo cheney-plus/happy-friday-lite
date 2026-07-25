@@ -334,7 +334,6 @@
 import { ref, computed, watch, onMounted, onUnmounted, onDeactivated, onActivated, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { electronService } from '@/services/electron';
 import { useAppStore } from '@/store';
 import ChatHistoryDrawer from '@/components/chat/ChatHistoryDrawer.vue';
 import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue';
@@ -407,19 +406,8 @@ const loadCustomModels = () => {
       customModels.value = JSON.parse(stored);
     }
     const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
-    if (selectedId) {
-      if (customModels.value.find(m => m.id === selectedId)) {
-        modelSettings.value.modelId = selectedId;
-      } else if (customModels.value.length > 0) {
-        modelSettings.value.modelId = customModels.value[0].id;
-      } else {
-        modelSettings.value.modelId = '';
-      }
-    } else if (customModels.value.length > 0) {
-      modelSettings.value.modelId = customModels.value[0].id;
-    } else {
-      modelSettings.value.modelId = '';
-    }
+    const exists = customModels.value.some(m => m.id === selectedId);
+    modelSettings.value.modelId = exists ? selectedId : (customModels.value[0]?.id || '');
   } catch (error) {
     console.error('Failed to load custom models:', error);
   }
@@ -450,73 +438,35 @@ const modelList = computed(() => {
   return list;
 });
 
-const toggleModeDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showModeDropdown.value = !showModeDropdown.value;
-  showModelDropdown.value = false;
-  showKbDropdown.value = false;
-  showLinkDropdown.value = false;
-  if (showModeDropdown.value) {
-    modeDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
+// 下拉菜单配置：name -> { show, style }
+const dropdownRefs = {
+  mode: { show: showModeDropdown, style: modeDropdownStyle },
+  model: { show: showModelDropdown, style: modelDropdownStyle },
+  kb: { show: showKbDropdown, style: kbDropdownStyle },
+  link: { show: showLinkDropdown, style: linkDropdownStyle }
 };
 
-const toggleModelDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showModelDropdown.value = !showModelDropdown.value;
-  showModeDropdown.value = false;
-  showKbDropdown.value = false;
-  showLinkDropdown.value = false;
-  if (showModelDropdown.value) {
-    modelDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
+// 通用下拉切换：再次点击已打开的下拉可关闭，否则打开目标并关闭其余
+const toggleDropdown = (name, event) => {
+  const target = dropdownRefs[name];
+  if (!target) return;
+  const wasOpen = target.show.value;
+  Object.values(dropdownRefs).forEach(ref => { ref.show.value = false; });
+  if (wasOpen) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  target.show.value = true;
+  target.style.value = {
+    position: 'fixed',
+    top: rect.bottom + 8 + 'px',
+    left: rect.left + 'px',
+    zIndex: '9999'
+  };
 };
 
-const toggleKbDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showKbDropdown.value = !showKbDropdown.value;
-  showModeDropdown.value = false;
-  showModelDropdown.value = false;
-  showLinkDropdown.value = false;
-  if (showKbDropdown.value) {
-    kbDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
-};
-
-const toggleLinkDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showLinkDropdown.value = !showLinkDropdown.value;
-  showModeDropdown.value = false;
-  showModelDropdown.value = false;
-  showKbDropdown.value = false;
-  if (showLinkDropdown.value) {
-    linkDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
-};
+const toggleModeDropdown = (event) => toggleDropdown('mode', event);
+const toggleModelDropdown = (event) => toggleDropdown('model', event);
+const toggleKbDropdown = (event) => toggleDropdown('kb', event);
+const toggleLinkDropdown = (event) => toggleDropdown('link', event);
 
 const openNoteSelect = () => {
   showLinkDropdown.value = false;
@@ -779,7 +729,7 @@ const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
 
 onMounted(() => {
   document.addEventListener('scroll', closeAllDropdowns, true);
-  loadCustomModels();
+  // loadCustomModels() 由 onActivated 统一触发（keep-alive 首次挂载时 onActivated 也会执行）
   loadKbListFromDisk();
 });
 
@@ -849,7 +799,7 @@ const autoResize = () => {
 };
 
 const handleFeatureClick = (id) => {
-  console.log(`Feature "${id}" is not yet implemented`);
+  // TODO: 各特性入口待实现
 };
 </script>
 
@@ -1742,9 +1692,6 @@ const handleFeatureClick = (id) => {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 14px;
   min-width: 100px;
-}
-
-.feature-card:hover {
 }
 
 .feature-icon-wrap {
