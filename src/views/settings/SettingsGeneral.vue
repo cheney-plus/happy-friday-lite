@@ -1118,7 +1118,7 @@ const showAboutModal = ref(false);
 const showFeaturesModal = ref(false);
 const showAuthorModal = ref(false);
 
-const appVersion = ref('1.6.1(0712)');
+const appVersion = ref('1.7.0');
 
 const aboutLogo = computed(() => {
   return appliedTheme.value === 'dark'
