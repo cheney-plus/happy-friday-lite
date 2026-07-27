@@ -41,7 +41,8 @@ const __dirname = path.dirname(__filename)
 // 内置技能源目录：项目根目录下的 public/skills/
 // 开发环境：{项目根}/public/skills/
 // 打包环境：{app根}/public/skills/（需在 electron-builder files 中包含）
-const BUILTIN_SKILLS_SRC_DIR = path.resolve(__dirname, '..', '..', '..', 'public', 'skills')
+// skills.js 位于 {项目根}/src-electron/agent/，故需上溯 2 级到达项目根
+const BUILTIN_SKILLS_SRC_DIR = path.resolve(__dirname, '..', '..', 'public', 'skills')
 
 /**
  * 获取 SKILL 目录路径
