@@ -16,8 +16,8 @@
             <div v-for="(att, idx) in attachments" :key="att.id" class="attachment-tag" :class="'tag-' + att.type">
               <span class="tag-icon-wrap">
                 <svg v-if="att.type === 'kb'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="4"></circle>
-                  <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                 </svg>
                 <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -79,8 +79,8 @@
 
               <button v-if="currentMode !== 'agent'" class="action-btn icon-only" @click.stop="toggleKbDropdown($event)" :title="t('friday.referenceKb')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="4"></circle>
-                  <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                 </svg>
               </button>
 
@@ -117,16 +117,16 @@
 
           <div v-if="showKbDropdown" class="dropdown-overlay" :style="kbDropdownStyle" @click.stop>
             <div class="dropdown-panel kb-dropdown">
-              <div v-if="kbList.length === 0" class="kb-empty">{{ t('friday.kbEmpty') }}</div>
+              <div v-if="selectableKbList.length === 0" class="kb-empty">{{ t('friday.kbEmpty') }}</div>
               <template v-else>
                 <div class="kb-item" @click="selectKnowledgeBase(t('friday.allKb'), null)">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-item-icon-fallback">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                   </svg>
                   <span class="kb-item-name">{{ t('friday.allKb') }}</span>
                 </div>
-                <template v-for="category in kbList" :key="category.id">
+                <template v-for="category in selectableKbList" :key="category.id">
                   <div v-if="category.items.length > 0" class="kb-category">
                     <div class="kb-category-name">{{ category.name }}</div>
                   <div
@@ -137,8 +137,8 @@
                   >
                     <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="kb-item-icon" :src="coverOptions[item.coverIndex]" alt="" />
                     <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-item-icon-fallback">
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                     </svg>
                     <span class="kb-item-name">{{ item.name }}</span>
                   </div>
@@ -263,7 +263,7 @@
                   <div class="sidebar-label">{{ t('friday.kb') }}</div>
                   <div class="kb-file-list">
                     <div
-                      v-for="category in kbList"
+                      v-for="category in selectableKbList"
                       :key="category.id"
                       class="kb-file-category"
                     >
@@ -277,8 +277,8 @@
                       >
                         <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="kb-file-icon" :src="coverOptions[item.coverIndex]" alt="" />
                         <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-file-icon-fallback">
-                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                         </svg>
                         <span class="kb-file-name">{{ item.name }}</span>
                       </div>
@@ -366,6 +366,9 @@ const linkDropdownStyle = ref({});
 
 // 知识库列表
 const kbList = ref(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)));
+
+// 可选择的知识库列表（排除 Agent 智能体目录）
+const selectableKbList = computed(() => kbList.value.filter(c => c.id !== 'agent'));
 
 // 知识库文件选择相关
 const selectedKbForFile = ref('');
@@ -1443,22 +1446,22 @@ const handleFeatureClick = (id) => {
   max-width: 280px;
   max-height: 360px;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px;
 }
 
 .kb-empty {
-  padding: 16px 12px;
+  padding: 12px 8px;
   font-size: 13px;
   color: var(--text-tertiary);
   text-align: center;
 }
 
 .kb-category {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .kb-category-name {
-  padding: 6px 10px 4px;
+  padding: 4px 8px 2px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-tertiary);
@@ -1469,15 +1472,19 @@ const handleFeatureClick = (id) => {
 .kb-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background 0.12s ease;
 }
 
 .kb-item:hover {
   background: var(--bg-hover);
+}
+
+.kb-item:hover .kb-item-icon-fallback {
+  color: #10b981;
 }
 
 .kb-item-icon {
@@ -1493,6 +1500,7 @@ const handleFeatureClick = (id) => {
   height: 18px;
   color: var(--text-tertiary);
   flex-shrink: 0;
+  transition: color 0.12s ease;
 }
 
 .kb-item-name {
