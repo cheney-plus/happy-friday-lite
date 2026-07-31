@@ -97,7 +97,7 @@
         <Teleport to="body">
           <div v-if="showLinkDropdown" class="dropdown-overlay" :style="linkDropdownStyle" @click.stop>
             <div class="dropdown-panel link-dropdown">
-              <div class="link-menu-item" @click="openNoteSelect">
+              <div class="link-menu-item item-note" @click="openNoteSelect">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                   <polyline points="14 2 14 8 20 8"></polyline>
@@ -106,7 +106,7 @@
                 </svg>
                 <span>{{ t('friday.selectNote') }}</span>
               </div>
-              <div class="link-menu-item" @click="openKbFileSelect">
+              <div class="link-menu-item item-kb-file" @click="openKbFileSelect">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
@@ -1185,6 +1185,11 @@ const handleFeatureClick = (id) => {
   svg {
     color: var(--text-secondary);
     flex-shrink: 0;
+    transition: color 0.12s ease;
+  }
+
+  &:hover svg {
+    color: #f59e0b;
   }
 }
 
