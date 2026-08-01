@@ -17,7 +17,7 @@ export const SearchIcon = IconWrapper('<circle cx="11" cy="11" r="8"/><line x1="
 export const ChevronIcon = IconWrapper('<polyline points="9 18 15 12 9 6"/>', 12);
 export const PlusIcon = IconWrapper('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 14);
 export const FolderOpenIcon = IconWrapper('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>', 14);
-export const BookIcon = IconWrapper('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', 16);
+export const BookIcon = IconWrapper('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>', 16);
 export const FolderIcon = defineComponent({
   props: { size: { type: Number, default: 36 } },
   render() {

@@ -12,8 +12,11 @@
         <div class="group-content">
           <div class="setting-item">
             <span class="item-label">首选模型</span>
-            <div v-if="customModels.length > 0" class="model-select-wrapper" ref="modelSelectRef">
-              <div class="model-select-trigger" @click="toggleModelDropdown">
+            <div class="model-select-wrapper" ref="modelSelectRef">
+              <div
+                :class="['model-select-trigger', { 'no-selection': !selectedModelData, 'highlight-pulse': !selectedModelData }]"
+                @click="toggleModelDropdown"
+              >
                 <div v-if="selectedModelData" class="selected-model-info">
                   <img :src="selectedModelData.providerIcon" :alt="selectedModelData.providerLabel" class="model-provider-icon" />
                   <div class="selected-model-text">
@@ -21,12 +24,12 @@
                     <span v-if="selectedModelData.embeddingModelName" class="selected-embedding-label">Embedding: {{ selectedModelData.embeddingModelName }}</span>
                   </div>
                 </div>
+                <span v-else class="select-hint-text">点击选择模型</span>
                 <svg class="model-select-arrow" :class="{ expanded: showModelDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </div>
             </div>
-            <span v-else class="no-model-hint">请先添加模型</span>
           </div>
         </div>
       </div>
@@ -188,6 +191,7 @@
     <Teleport to="body">
       <div v-if="showModelDropdown" class="model-dropdown-overlay" :style="dropdownPosition" ref="modelDropdownRef">
         <div class="model-dropdown-menu">
+          <!-- 自定义模型 -->
           <div
             v-for="model in customModels"
             :key="model.id"
@@ -341,7 +345,12 @@ const executeDelete = () => {
   syncModelsToConfig();
 
   if (selectedModel.value === targetId) {
-    selectedModel.value = customModels.value.length > 0 ? customModels.value[0].id : '';
+    // 删除首选后：优先选第一个自定义模型，没有则置空
+    if (customModels.value.length > 0) {
+      selectedModel.value = customModels.value[0].id;
+    } else {
+      selectedModel.value = '';
+    }
     localStorage.setItem('happy-friday-selected-model', selectedModel.value);
   }
 
@@ -404,12 +413,23 @@ const loadCustomModels = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       customModels.value = JSON.parse(stored);
-      const savedSelected = localStorage.getItem('happy-friday-selected-model');
-      if (savedSelected && customModels.value.find(m => m.id === savedSelected)) {
+    }
+    const savedSelected = localStorage.getItem('happy-friday-selected-model');
+    if (savedSelected) {
+      // 已保存的首选模型：仅匹配自定义模型
+      if (customModels.value.find(m => m.id === savedSelected)) {
         selectedModel.value = savedSelected;
       } else if (customModels.value.length > 0) {
         selectedModel.value = customModels.value[0].id;
+      } else {
+        selectedModel.value = '';
       }
+    } else if (customModels.value.length > 0) {
+      // 没有保存首选，但有自定义模型：选第一个
+      selectedModel.value = customModels.value[0].id;
+    } else {
+      // 没有自定义模型，也没有保存首选：不自动选（下拉框高亮提示用户选择）
+      selectedModel.value = '';
     }
   } catch (error) {
     console.error('Failed to load custom models:', error);
@@ -505,6 +525,9 @@ const handleSave = () => {
 
     customModels.value.push(newModel);
     saveCustomModels();
+    // 新增模型后自动选为首选模型
+    selectedModel.value = newModel.id;
+    localStorage.setItem('happy-friday-selected-model', newModel.id);
     syncModelsToConfig();
     closeModal();
   }
@@ -614,6 +637,45 @@ const handleSave = () => {
 
 .model-select-trigger:hover {
   background-color: var(--bg-hover);
+}
+
+/* 未选择首选模型时：高亮边框 + 脉冲动画，引导用户点击 */
+.model-select-trigger.no-selection {
+  border-color: var(--accent-color, #3b82f6);
+  background-color: var(--bg-primary);
+  animation: highlightPulse 2s ease-in-out infinite;
+}
+
+.model-select-trigger.no-selection:hover {
+  border-color: var(--accent-color, #3b82f6);
+  background-color: var(--bg-hover);
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0);
+  }
+}
+
+.select-hint-text {
+  font-size: 14px;
+  color: var(--accent-color, #3b82f6);
+  font-weight: 500;
+}
+
+.default-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .selected-model-info {

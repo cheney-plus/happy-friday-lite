@@ -43,6 +43,19 @@ import { createThread, touchThread, loadMemoriesToStore, syncStoreToSQLite } fro
 
 const log = createLogger('IPC')
 
+/**
+ * 校验模型配置：确保用户已配置自己的大模型
+ * 若未配置或配置不完整，抛出错误提示用户前往设置
+ * @param {Object} model 前端传入的模型配置
+ * @returns {Object} 可用于 LLM 调用的模型配置
+ */
+function validateModelConfig(model) {
+  if (!model || !model.apiKey || !model.modelName || !model.baseUrl) {
+    throw new Error('未配置大模型，请在设置中添加自己的模型')
+  }
+  return model
+}
+
 // 取消令牌管理
 const cancelTokens = new CancellationTokens()
 
@@ -104,7 +117,9 @@ export function registerAgentCommands(mainWindow) {
         : message
 
       // 4. 创建带上下文的 Agent
-      const modelConfig = { ...model, enableThinking: enableThinking || false }
+      // 校验模型配置：确保用户已配置自己的大模型
+      const effectiveModel = validateModelConfig(model)
+      const modelConfig = { ...effectiveModel, enableThinking: enableThinking || false }
       const runtimeCtx = {
         mainWindow,
         requestId,
@@ -347,6 +362,12 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
         if (eventType === 'on_chat_model_stream') {
           const chunk = data?.chunk
           if (chunk) {
+            // 诊断日志：打印 chunk.content 的类型和工具调用信息
+            const contentType = typeof chunk.content
+            const hasToolCalls = !!(chunk.tool_calls?.length || chunk.additional_kwargs?.tool_calls?.length)
+            if (hasToolCalls) {
+              log.info(`on_chat_model_stream: tool_calls chunk (content type=${contentType})`)
+            }
             // 正文内容
             const content = typeof chunk.content === 'string'
               ? chunk.content

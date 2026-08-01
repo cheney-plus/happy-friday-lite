@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, powerSaveBlocker } from 'electron'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import fs from 'fs'
@@ -14,6 +14,16 @@ const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 
+// 禁止渲染进程后台化，避免窗口失焦/被遮挡时被系统挂起，切回时卡顿
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+
+// macOS：禁用窗口遮挡检测，避免被遮挡窗口进入 AppNap 低功耗状态
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+}
+
 if (isDev) {
   app.commandLine.appendSwitch('disable-gpu-sandbox')
   app.commandLine.appendSwitch('no-sandbox')
@@ -23,6 +33,7 @@ if (isDev) {
 
 let mainWindow = null
 let kbWatcherHandle = null
+let powerBlockerId = null
 
 async function ensureDataDir() {
   const dataDir = isDev
@@ -56,6 +67,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.cjs')
     },
     ...(isMac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 12, y: 12 } } : { frame: false }),
@@ -79,6 +91,12 @@ function createWindow() {
 app.whenReady().then(async () => {
   // 1. 先创建窗口，让 splash 立即显示（窗口加载 index.html 与主进程初始化并行）
   createWindow()
+
+  // 阻止操作系统将应用挂起
+  // - macOS：阻止 AppNap 导致的进程冻结
+  // - Windows：阻止 Power Throttling 对后台进程的 CPU 限流
+  // - Linux：通过 D-Bus inhibit 阻止桌面环境挂起应用
+  powerBlockerId = powerSaveBlocker.start('prevent-app-suspension')
 
   // 2. 初始化数据目录与数据库（sql.js WASM 加载），期间 splash 持续显示
   //    渲染进程加载 JS bundle + Vue mount 通常比此处更慢，IPC 注册会先于首次 invoke 完成
@@ -139,6 +157,10 @@ app.on('window-all-closed', function () {
   if (kbWatcherHandle) {
     kbWatcherHandle.close()
     kbWatcherHandle = null
+  }
+  if (powerBlockerId !== null && powerSaveBlocker.isStarted(powerBlockerId)) {
+    powerSaveBlocker.stop(powerBlockerId)
+    powerBlockerId = null
   }
   closeDb()
   if (process.platform !== 'darwin') {

@@ -390,9 +390,23 @@ export function getSessions() {
   return queryAll('SELECT * FROM sessions ORDER BY updatedAt DESC')
 }
 
-export function getSessionsWithStats() {
-  const sessions = queryAll('SELECT * FROM sessions ORDER BY updatedAt DESC')
-  return sessions.map(s => {
+export function getSessionsWithStats(startDate, endDate) {
+  let sql, params
+  if (startDate && endDate) {
+    sql = 'SELECT * FROM sessions WHERE updatedAt >= ? AND updatedAt < ? ORDER BY updatedAt DESC'
+    params = [startDate, endDate]
+  } else if (startDate) {
+    sql = 'SELECT * FROM sessions WHERE updatedAt >= ? ORDER BY updatedAt DESC'
+    params = [startDate]
+  } else if (endDate) {
+    sql = 'SELECT * FROM sessions WHERE updatedAt < ? ORDER BY updatedAt DESC'
+    params = [endDate]
+  } else {
+    sql = 'SELECT * FROM sessions ORDER BY updatedAt DESC'
+    params = []
+  }
+
+  const sessions = queryAll(sql, params).map(s => {
     const stats = queryOne(
       'SELECT COUNT(*) as messageCount FROM messages WHERE sessionId = ?',
       [s.id]
@@ -407,6 +421,18 @@ export function getSessionsWithStats() {
       preview: firstUserMsg ? firstUserMsg.content : ''
     }
   })
+
+  // 是否还存在更早的会话（用于前端“查看更多”）
+  let hasMore = false
+  if (startDate) {
+    const older = queryOne(
+      'SELECT COUNT(*) as count FROM sessions WHERE updatedAt < ?',
+      [startDate]
+    )
+    hasMore = !!(older && older.count > 0)
+  }
+
+  return { sessions, hasMore }
 }
 
 export function getSession(sessionId) {

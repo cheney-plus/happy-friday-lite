@@ -88,9 +88,6 @@ npm run electron:dev
 ### 构建发布包
 
 ```bash
-# 下载 Python 运行时（首次构建需要）
-npm run python:download
-
 # 构建当前平台安装包
 npm run electron:build
 
@@ -99,6 +96,10 @@ npm run electron:build:arm64
 ```
 
 构建产物输出至 `release/` 目录。
+
+> 说明：请在「设置 → 通用 → Python 环境」中配置 Python 环境：
+> 1. 点击「自动检测」自动发现系统已安装的 Python；或手动选择 Python 可执行文件路径；
+> 2. 缺失的依赖库可由 AI 助手通过对话自动安装（基于 `python/requirements.txt`，通过 pip/pip3 安装）。
 
 ## 📦 下载安装
 

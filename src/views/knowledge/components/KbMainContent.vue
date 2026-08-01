@@ -31,7 +31,7 @@
           <div v-if="searchVisible" class="search-inline">
             <input
               ref="searchInputRef"
-              v-model="searchQuery"
+              v-model="fileSearchQuery"
               class="search-input"
               placeholder="搜索文件..."
               @keydown.escape="closeSearch"
@@ -175,13 +175,7 @@
         <span class="col-size">{{ formatSize(file) }}</span>
         <span class="col-time">{{ formatTime(file.modifiedTime) }}</span>
       </div>
-      <div v-if="searchResults.length === 0" class="empty-folder">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <p>未找到匹配的文件</p>
-      </div>
+      <EmptyState v-if="searchResults.length === 0" variant="search" message="未找到匹配的文件" />
     </div>
 
     <!-- 正常文件视图 -->
@@ -209,19 +203,8 @@
           <span class="col-size">{{ formatSize(file) }}</span>
           <span class="col-time">{{ formatTime(file.modifiedTime) }}</span>
         </div>
-        <div v-if="filteredFiles.length === 0 && files.length > 0" class="empty-folder">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <p>未找到匹配的文件</p>
-        </div>
-        <div v-if="files.length === 0" class="empty-folder">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <p>此文件夹为空</p>
-        </div>
+        <EmptyState v-if="filteredFiles.length === 0 && files.length > 0" variant="search" message="未找到匹配的文件" />
+        <EmptyState v-if="files.length === 0" message="此文件夹为空" />
       </template>
 
       <!-- 宫格视图 -->
@@ -234,25 +217,15 @@
           @open="$emit('open-file', $event)"
           @contextmenu="$emit('show-file-item-context-menu', $event, file)"
         />
-        <div v-if="filteredFiles.length === 0 && files.length > 0" class="empty-folder">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <p>未找到匹配的文件</p>
-        </div>
-        <div v-if="files.length === 0" class="empty-folder">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <p>此文件夹为空</p>
-        </div>
+        <EmptyState v-if="filteredFiles.length === 0 && files.length > 0" variant="search" message="未找到匹配的文件" />
+        <EmptyState v-if="files.length === 0" message="此文件夹为空" />
+
       </template>
     </div>
     <div class="empty-state" v-else>
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
       </svg>
       <h2>选择一个知识库</h2>
       <p>从左侧选择或创建一个知识库开始</p>
@@ -348,13 +321,14 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import FileCard from './FileCard.vue';
+import EmptyState from './EmptyState.vue';
 import KbQuestionBox from './KbQuestionBox.vue';
 import KbChatDialog from './KbChatDialog.vue';
 import KbAgentChatDialog from './KbAgentChatDialog.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
 import SelectNoteDialog from './SelectNoteDialog.vue';
-import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
-import { FILE_TYPE_MAP, FILE_TYPE_LABELS, isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
+import { isAllowedFile, ALLOWED_EXTENSIONS } from '../constants';
+import { getFileType, getFileIconComponent, getTypeLabel, formatFileSize } from '../utils';
 import { Readability } from '@mozilla/readability';
 
 // 转义 HTML 文本，防止标题/URL 中的特殊字符破坏文档结构
@@ -365,6 +339,29 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// 视图偏好持久化：在 localStorage 中保留用户的视图模式与排序选择
+const VIEW_PREFS_KEY = 'happy-friday-kb-view-prefs';
+function loadViewPrefs() {
+  try {
+    const raw = localStorage.getItem(VIEW_PREFS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+function saveViewPrefs() {
+  try {
+    localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify({
+      viewMode: viewMode.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value
+    }));
+  } catch (e) {
+    // 静默失败：持久化仅作体验优化，不应阻塞用户操作
+  }
 }
 
 const props = defineProps({
@@ -390,16 +387,21 @@ const emit = defineEmits([
 ]);
 
 const searchVisible = ref(false);
-const searchQuery = ref('');
+const fileSearchQuery = ref('');
 const searchInputRef = ref(null);
 const searchResults = ref([]);
-const isSearching = computed(() => searchQuery.value.trim().length > 0);
+const isSearching = computed(() => fileSearchQuery.value.trim().length > 0);
 let searchTimer = null;
-const viewMode = ref('grid');
+// 从 localStorage 恢复用户上次的视图偏好；首次访问或读取失败时回退到默认值
+const savedViewPrefs = loadViewPrefs();
+const viewMode = ref(savedViewPrefs?.viewMode || 'grid');
 const showSortMenu = ref(false);
 const sortWrapperRef = ref(null);
-const sortBy = ref('name');
-const sortOrder = ref('asc');
+const sortBy = ref(savedViewPrefs?.sortBy || 'name');
+const sortOrder = ref(savedViewPrefs?.sortOrder || 'asc');
+
+// 视图偏好变化时持久化
+watch([viewMode, sortBy, sortOrder], saveViewPrefs);
 
 const isFolderView = computed(() => props.pathSegments && props.pathSegments.length > 1);
 
@@ -427,7 +429,7 @@ function handleAsk(payload) {
   // 加载模型配置
   const model = loadModelConfig(payload?.modelId);
   if (!model) {
-    console.error('No model configured for chat');
+    alert('未配置大模型，请先在设置中添加自己的模型');
     return;
   }
 
@@ -721,8 +723,8 @@ function closeUploadMenu(e) {
 
 const filteredFiles = computed(() => {
   let result = props.files;
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.trim().toLowerCase();
+  if (fileSearchQuery.value.trim()) {
+    const query = fileSearchQuery.value.trim().toLowerCase();
     result = result.filter(file => file.name.toLowerCase().includes(query));
   }
   const sorted = [...result].sort((a, b) => {
@@ -759,13 +761,13 @@ function toggleSearch() {
       searchInputRef.value?.focus();
     });
   } else {
-    searchQuery.value = '';
+    fileSearchQuery.value = '';
   }
 }
 
 function closeSearch() {
   searchVisible.value = false;
-  searchQuery.value = '';
+  fileSearchQuery.value = '';
   searchResults.value = [];
 }
 
@@ -774,18 +776,9 @@ function handleSearchBlur() {
   setTimeout(closeSearch, 200);
 }
 
-// 根据文件名获取文件类型
-function getFileType(fileName) {
-  const ext = fileName.split('.').pop().toLowerCase();
-  for (const [type, exts] of Object.entries(FILE_TYPE_MAP)) {
-    if (exts.includes(ext)) return type;
-  }
-  return 'unknown';
-}
-
 // 防抖递归搜索
 function performSearch() {
-  const query = searchQuery.value.trim();
+  const query = fileSearchQuery.value.trim();
   if (!query) {
     searchResults.value = [];
     return;
@@ -811,7 +804,7 @@ function performSearch() {
   });
 }
 
-watch(searchQuery, () => {
+watch(fileSearchQuery, () => {
   if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(performSearch, 250);
 });
@@ -819,14 +812,6 @@ watch(searchQuery, () => {
 function handleSearchResultClick(file) {
   closeSearch();
   emit('open-search-result', file);
-}
-
-function getFileIconComponent(type) {
-  return FILE_ICON_MAP[type] || UnknownFileIcon;
-}
-
-function getTypeLabel(type) {
-  return FILE_TYPE_LABELS[type] || '文件';
 }
 
 function formatTime(isoString) {
@@ -847,14 +832,7 @@ function formatTime(isoString) {
 
 function formatSize(file) {
   if (!file || file.isDirectory) return '-';
-  const size = file.size;
-  if (size == null || size === '') return '-';
-  const bytes = Number(size);
-  if (isNaN(bytes)) return '-';
-  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
-  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
-  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
-  return bytes + ' B';
+  return formatFileSize(file.size) || '-';
 }
 
 // RAG 索引状态刷新：当队列任务开始/完成或手动更新完成时，刷新文件卡片状态
@@ -888,6 +866,11 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  // 清理防抖定时器，避免组件卸载后仍触发搜索
+  if (searchTimer) {
+    clearTimeout(searchTimer);
+    searchTimer = null;
+  }
   document.removeEventListener('click', closeSortMenu);
   document.removeEventListener('click', closeUploadMenu);
   if (unsubRagTaskComplete) unsubRagTaskComplete();
@@ -1307,32 +1290,13 @@ onBeforeUnmount(() => {
         }
       }
 
-      .empty-folder {
+      // EmptyState 组件在 list 模式下需占满整行
+      :deep(.empty-folder) {
         grid-column: auto;
         flex: 1;
         align-items: center;
         justify-content: center;
         padding: 40px 0;
-      }
-    }
-
-    .empty-folder {
-      grid-column: 1 / -1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 20px;
-      color: var(--text-tertiary);
-
-      svg {
-        margin-bottom: 12px;
-        opacity: 0.4;
-      }
-
-      p {
-        font-size: 14px;
-        margin: 0;
       }
     }
   }

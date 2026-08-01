@@ -9,7 +9,7 @@
       <div class="ai-output-backdrop" @mousedown="handleBackdropMouseDown"></div>
       <div class="ai-output-panel" :class="{ 'is-dark': isDark }" @mousedown.stop.prevent>
       <div class="ai-output-header">
-        <span class="ai-output-title">{{ getActionTitle() }}</span>
+        <span class="ai-output-title">{{ actionTitle }}</span>
         <button class="ai-output-close" @click="closeAIOutput" title="关闭">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -34,7 +34,7 @@
               <polyline points="9 12 11 14 15 10"></polyline>
             </svg>
           </span>
-          <span class="char-count">已生成{{ getCharCount() }}字</span>
+          <span class="char-count">已生成{{ charCount }}字</span>
         </div>
 
         <div class="footer-right">
@@ -261,7 +261,7 @@ import { BubbleMenu } from '@tiptap/vue-3/menus';
 import { marked } from 'marked';
 import { electronService } from '../../services/electron.js';
 
-marked.setOptions({ breaks: true, gfm: true });
+const AI_MARKED_OPTIONS = { breaks: true, gfm: true };
 
 const props = defineProps({
   editor: Object,
@@ -269,7 +269,7 @@ const props = defineProps({
   noteContent: String
 });
 
-const emit = defineEmits(['aiWrite', 'interpret', 'refine', 'polish', 'expand', 'openInChat', 'replaceText', 'insertText']);
+const emit = defineEmits(['aiWrite', 'openInChat', 'replaceText', 'insertText']);
 
 const showAIPanel = ref(false);
 const showCommandMenu = ref(false);
@@ -285,7 +285,6 @@ const showAIOutput = ref(false);
 const aiOutputContent = ref('');
 const currentAction = ref('');
 const isStreaming = ref(false);
-const streamingTimer = ref(null);
 const outputPanelPosition = ref('bottom');
 const outputPanelStyle = ref({});
 
@@ -312,14 +311,9 @@ const handleBackdropMouseDown = (event) => {
   event.stopImmediatePropagation();
 };
 
-const handleBackdropClick = (event) => {
-  event.preventDefault();
-  event.stopPropagation();
-};
-
 const renderedOutput = computed(() => {
   if (!aiOutputContent.value) return '';
-  return marked.parse(aiOutputContent.value);
+  return marked.parse(aiOutputContent.value, AI_MARKED_OPTIONS);
 });
 
 const getSelectedText = () => {
@@ -327,7 +321,7 @@ const getSelectedText = () => {
   return props.editor.state.doc.textBetween(from, to, ' ');
 };
 
-const getActionTitle = () => {
+const actionTitle = computed(() => {
   const titleMap = {
     'interpret': '快速解读',
     'refine': '精炼内容',
@@ -341,29 +335,12 @@ const getActionTitle = () => {
     'generate_table': '生成表格',
     'custom': 'AI 帮写'
   };
-  return titleMap[currentAction.value] || COMMAND_TITLE_MAP[currentAction.value] || 'AI 处理';
-};
+  return titleMap[currentAction.value] || 'AI 处理';
+});
 
-const getActionHint = () => {
-  const hintMap = {
-    'interpret': '解读思路',
-    'refine': '精炼思路',
-    'polish': '润色思路',
-    'expand': '扩写思路',
-    'translate': '翻译思路',
-    'summarize': '总结思路',
-    'continue_write': '续写思路',
-    'fix_grammar': '修正思路',
-    'generate_plan': '规划思路',
-    'generate_table': '整理思路',
-    'custom': '处理思路'
-  };
-  return hintMap[currentAction.value] || '处理思路';
-};
-
-const getCharCount = () => {
+const charCount = computed(() => {
   return aiOutputContent.value.replace(/\s/g, '').length;
-};
+});
 
 let activeNoteAIRequestId = '';
 let savedSelectionFrom = 0;
@@ -375,12 +352,12 @@ let unlistenNoteAIDone = null;
 let unlistenNoteAIError = null;
 
 function loadModelConfig() {
+  const selectedId = localStorage.getItem('happy-friday-selected-model');
   try {
     const raw = localStorage.getItem('happy-friday-custom-models');
     if (raw) {
       const models = JSON.parse(raw);
       let model = null;
-      const selectedId = localStorage.getItem('happy-friday-selected-model');
       model = selectedId ? models.find(m => m.id === selectedId) : models[0];
       if (!model && models.length > 0) model = models[0];
       return model || null;
@@ -416,14 +393,9 @@ function cleanupNoteAIListeners() {
 }
 
 const startStreaming = async (action, userInstruction) => {
-  if (streamingTimer.value) {
-    clearTimeout(streamingTimer.value);
-    streamingTimer.value = null;
-  }
-
   savedUserInstruction = userInstruction || '';
   closeAIPanel();
-  
+
   const { from, to } = props.editor.state.selection;
   savedSelectionFrom = from;
   savedSelectionTo = to;
@@ -467,7 +439,7 @@ const startStreaming = async (action, userInstruction) => {
   const model = loadModelConfig();
   if (!model) {
     isStreaming.value = false;
-    aiOutputContent.value = '❌ 未找到模型配置，请先在设置中配置模型。';
+    aiOutputContent.value = '❌ 未配置大模型，请先在设置中添加自己的模型。';
     return;
   }
 
@@ -493,10 +465,6 @@ const startStreaming = async (action, userInstruction) => {
 };
 
 const closeAIOutput = async () => {
-  if (streamingTimer.value) {
-    clearTimeout(streamingTimer.value);
-    streamingTimer.value = null;
-  }
   if (isStreaming.value && activeNoteAIRequestId) {
     try {
       await electronService.invoke('stop_note_ai', { requestId: activeNoteAIRequestId });
@@ -520,12 +488,8 @@ const resetAIPanel = async () => {
     currentCommand.value = '';
     selectedText.value = '';
   }
-  
+
   if (showAIOutput.value) {
-    if (streamingTimer.value) {
-      clearTimeout(streamingTimer.value);
-      streamingTimer.value = null;
-    }
     if (isStreaming.value && activeNoteAIRequestId) {
       try {
         await electronService.invoke('stop_note_ai', { requestId: activeNoteAIRequestId });
@@ -609,15 +573,6 @@ const COMMAND_ACTION_MAP = {
   '生成表格': 'generate_table'
 };
 
-const COMMAND_TITLE_MAP = {
-  'translate': '翻译',
-  'summarize': '总结',
-  'continue_write': '续写',
-  'fix_grammar': '语法修正',
-  'generate_plan': '生成任务计划',
-  'generate_table': '生成表格'
-};
-
 const selectCommand = (command) => {
   showCommandMenu.value = false;
   const action = COMMAND_ACTION_MAP[command];
@@ -648,28 +603,24 @@ const handleSend = () => {
 const handleInterpret = () => {
   const text = getSelectedText();
   savedSelectedText.value = text;
-  emit('interpret', text);
   startStreaming('interpret');
 };
 
 const handleRefine = () => {
   const text = getSelectedText();
   savedSelectedText.value = text;
-  emit('refine', text);
   startStreaming('refine');
 };
 
 const handlePolish = () => {
   const text = getSelectedText();
   savedSelectedText.value = text;
-  emit('polish', text);
   startStreaming('polish');
 };
 
 const handleExpand = () => {
   const text = getSelectedText();
   savedSelectedText.value = text;
-  emit('expand', text);
   startStreaming('expand');
 };
 
@@ -722,12 +673,6 @@ const applyAIMark = (from, to, markType, attrs) => {
   const { tr } = props.editor.state;
   const mark = markType.create(attrs);
   tr.addMark(from, to, mark);
-  props.editor.view.dispatch(tr);
-};
-
-const removeAIMark = (from, to, markType) => {
-  const { tr } = props.editor.state;
-  tr.removeMark(from, to, markType);
   props.editor.view.dispatch(tr);
 };
 
@@ -844,61 +789,11 @@ const handleOpenInChat = () => {
 
 const handleClickOutside = (event) => {
   if (isJustOpened.value) return;
-  
+
   const target = event.target;
-  if (showCommandMenu && !target.closest('.command-dropdown')) {
+  if (showCommandMenu.value && !target.closest('.command-dropdown')) {
     showCommandMenu.value = false;
   }
-};
-
-const isCursorInTable = () => {
-  if (!props.editor) return false;
-  
-  const { state } = props.editor;
-  const { from, to } = state.selection;
-  
-  if (from === to) {
-    const $pos = state.doc.resolve(from);
-    for (let depth = $pos.depth; depth >= 0; depth--) {
-      const node = $pos.node(depth);
-      if (node.type.name === 'table' || node.type.name === 'tableRow') {
-        return true;
-      }
-    }
-  } else {
-    const $from = state.doc.resolve(from);
-    const $to = state.doc.resolve(to);
-    
-    for (let depth = $from.depth; depth >= 0; depth--) {
-      const node = $from.node(depth);
-      if (node.type.name === 'table' || node.type.name === 'tableRow') {
-        return true;
-      }
-    }
-    
-    for (let depth = $to.depth; depth >= 0; depth--) {
-      const node = $to.node(depth);
-      if (node.type.name === 'table' || node.type.name === 'tableRow') {
-        return true;
-      }
-    }
-  }
-  
-  return false;
-};
-
-const parseMarkdownForTable = (markdownText) => {
-  if (!markdownText) return '';
-  
-  let html = marked.parse(markdownText);
-  
-  html = html
-    .replace(/<td\s*([^>]*)>\s*<\/td>/gi, '<td $1>&nbsp;</td>')
-    .replace(/<th\s*([^>]*)>\s*<\/th>/gi, '<th $1>&nbsp;</th>')
-    .replace(/<td><\/td>/gi, '<td>&nbsp;</td>')
-    .replace(/<th><\/th>/gi, '<th>&nbsp;</td>');
-  
-  return html;
 };
 
 const prepareAIContentForInsertion = (content, actionType) => {
@@ -907,9 +802,7 @@ const prepareAIContentForInsertion = (content, actionType) => {
   const htmlRenderActions = ['generate_plan', 'generate_table', 'custom'];
 
   if (htmlRenderActions.includes(actionType)) {
-    console.log(`🤖 结构化 AI 内容 (${actionType})，将按 Markdown 渲染为 HTML`);
-
-    let html = marked.parse(content);
+    let html = marked.parse(content, AI_MARKED_OPTIONS);
 
     html = html
       .replace(/<td\s*([^>]*)>\s*<\/td>/gi, '<td $1>&nbsp;</td>')
@@ -917,12 +810,9 @@ const prepareAIContentForInsertion = (content, actionType) => {
       .replace(/<td><\/td>/gi, '<td>&nbsp;</td>')
       .replace(/<th><\/th>/gi, '<th>&nbsp;</th>');
 
-    console.log('✅ Markdown 渲染结果:', html?.substring(0, 200));
-
     return html;
   }
 
-  console.log(`📝 文本处理 (${actionType})，保持原文`);
   return content;
 };
 

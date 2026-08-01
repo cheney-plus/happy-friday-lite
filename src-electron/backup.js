@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { Worker } from 'worker_threads'
 import AdmZip from 'adm-zip'
 import { flushDb, closeDb, initDb } from './db.js'
 import { loadConfig, saveConfig, getDataDir } from './config.js'
@@ -11,39 +12,56 @@ function generateBackupName() {
   return `friday-backup-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.zip`
 }
 
-// 递归收集目录下所有文件
-function collectFiles(dir, baseDir) {
-  const results = []
-  let entries
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true })
-  } catch (e) {
-    return results
-  }
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    const relPath = path.relative(baseDir, fullPath)
-    if (entry.isDirectory()) {
-      results.push({ path: fullPath, relPath, isDirectory: true })
-      results.push(...collectFiles(fullPath, baseDir))
-    } else {
-      results.push({ path: fullPath, relPath, isDirectory: false })
+/**
+ * 在 worker 线程中执行 zip 压缩，避免阻塞主进程。
+ * @param {string} dataDir
+ * @param {string} zipPath
+ * @param {(p:{current:number,total:number,name?:string,compressing?:boolean})=>void} [onProgress]
+ * @returns {Promise<{success:boolean,path?:string,error?:string}>}
+ */
+function runBackupWorker(dataDir, zipPath, onProgress) {
+  return new Promise((resolve) => {
+    const worker = new Worker(new URL('./backup-worker.js', import.meta.url), {
+      workerData: { dataDir, zipPath }
+    })
+    let settled = false
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      worker.terminate().catch(() => {})
+      resolve(result)
     }
-  }
-  return results
+    worker.on('message', (msg) => {
+      if (!msg || typeof msg !== 'object') return
+      if (msg.type === 'progress' && onProgress) {
+        onProgress({ current: msg.current, total: msg.total, name: msg.name })
+      } else if (msg.type === 'compressing' && onProgress) {
+        onProgress({ compressing: true })
+      } else if (msg.type === 'done') {
+        finish(msg.success
+          ? { success: true, path: msg.path }
+          : { success: false, error: msg.error })
+      }
+    })
+    worker.on('error', (err) => finish({ success: false, error: err?.message || String(err) }))
+    worker.on('exit', (code) => {
+      if (code !== 0) finish({ success: false, error: `worker exited with code ${code}` })
+    })
+  })
 }
 
 /**
  * 创建备份
  * @param {string} destPath - 目标 zip 文件路径（或目录）
  * @param {boolean} isAutoDir - destPath 是否为目录（自动备份场景）
+ * @param {(p:{current:number,total:number,name?:string,compressing?:boolean})=>void} [onProgress] 进度回调
  * @returns {Promise<{success: boolean, path?: string, error?: string}>}
  */
-export async function createBackup(destPath, isAutoDir = false) {
+export async function createBackup(destPath, isAutoDir = false, onProgress = null) {
   const dataDir = getDataDir()
   if (!dataDir) return { success: false, error: '数据目录未初始化' }
 
-  // 确保数据库落盘
+  // 确保数据库落盘（必须在主进程中完成，使 zip 内容一致）
   flushDb()
 
   try {
@@ -57,22 +75,11 @@ export async function createBackup(destPath, isAutoDir = false) {
       zipPath = path.join(destPath, generateBackupName())
     }
 
-    const zip = new AdmZip()
-    const files = collectFiles(dataDir, dataDir)
-
-    for (const file of files) {
-      if (file.isDirectory) {
-        // adm-zip 会自动处理空目录，跳过
-        continue
-      }
-      // 排除临时/锁文件
-      if (file.relPath.endsWith('.lock') || file.relPath.endsWith('-wal') || file.relPath.endsWith('-shm')) {
-        continue
-      }
-      zip.addLocalFile(file.path, path.dirname(file.relPath) === '.' ? '' : path.dirname(file.relPath))
+    // 在 worker 线程中执行收集与压缩，主进程保持响应
+    const workerResult = await runBackupWorker(dataDir, zipPath, onProgress)
+    if (!workerResult.success) {
+      return workerResult
     }
-
-    zip.writeZip(zipPath)
 
     // 自动备份：清理旧备份
     if (isAutoDir) {

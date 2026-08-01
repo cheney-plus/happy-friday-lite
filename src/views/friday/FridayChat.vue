@@ -16,8 +16,8 @@
             <div v-for="(att, idx) in attachments" :key="att.id" class="attachment-tag" :class="'tag-' + att.type">
               <span class="tag-icon-wrap">
                 <svg v-if="att.type === 'kb'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="4"></circle>
-                  <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                 </svg>
                 <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -79,8 +79,8 @@
 
               <button v-if="currentMode !== 'agent'" class="action-btn icon-only" @click.stop="toggleKbDropdown($event)" :title="t('friday.referenceKb')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="4"></circle>
-                  <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                 </svg>
               </button>
 
@@ -97,7 +97,7 @@
         <Teleport to="body">
           <div v-if="showLinkDropdown" class="dropdown-overlay" :style="linkDropdownStyle" @click.stop>
             <div class="dropdown-panel link-dropdown">
-              <div class="link-menu-item" @click="openNoteSelect">
+              <div class="link-menu-item item-note" @click="openNoteSelect">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                   <polyline points="14 2 14 8 20 8"></polyline>
@@ -106,7 +106,7 @@
                 </svg>
                 <span>{{ t('friday.selectNote') }}</span>
               </div>
-              <div class="link-menu-item" @click="openKbFileSelect">
+              <div class="link-menu-item item-kb-file" @click="openKbFileSelect">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
@@ -117,16 +117,16 @@
 
           <div v-if="showKbDropdown" class="dropdown-overlay" :style="kbDropdownStyle" @click.stop>
             <div class="dropdown-panel kb-dropdown">
-              <div v-if="kbList.length === 0" class="kb-empty">{{ t('friday.kbEmpty') }}</div>
+              <div v-if="selectableKbList.length === 0" class="kb-empty">{{ t('friday.kbEmpty') }}</div>
               <template v-else>
                 <div class="kb-item" @click="selectKnowledgeBase(t('friday.allKb'), null)">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-item-icon-fallback">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                   </svg>
                   <span class="kb-item-name">{{ t('friday.allKb') }}</span>
                 </div>
-                <template v-for="category in kbList" :key="category.id">
+                <template v-for="category in selectableKbList" :key="category.id">
                   <div v-if="category.items.length > 0" class="kb-category">
                     <div class="kb-category-name">{{ category.name }}</div>
                   <div
@@ -137,8 +137,8 @@
                   >
                     <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="kb-item-icon" :src="coverOptions[item.coverIndex]" alt="" />
                     <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-item-icon-fallback">
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                     </svg>
                     <span class="kb-item-name">{{ item.name }}</span>
                   </div>
@@ -263,7 +263,7 @@
                   <div class="sidebar-label">{{ t('friday.kb') }}</div>
                   <div class="kb-file-list">
                     <div
-                      v-for="category in kbList"
+                      v-for="category in selectableKbList"
                       :key="category.id"
                       class="kb-file-category"
                     >
@@ -277,8 +277,8 @@
                       >
                         <img v-if="item.coverIndex != null && coverOptions[item.coverIndex]" class="kb-file-icon" :src="coverOptions[item.coverIndex]" alt="" />
                         <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="kb-file-icon-fallback">
-                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                         </svg>
                         <span class="kb-file-name">{{ item.name }}</span>
                       </div>
@@ -334,7 +334,6 @@
 import { ref, computed, watch, onMounted, onUnmounted, onDeactivated, onActivated, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { electronService } from '@/services/electron';
 import { useAppStore } from '@/store';
 import ChatHistoryDrawer from '@/components/chat/ChatHistoryDrawer.vue';
 import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue';
@@ -367,6 +366,9 @@ const linkDropdownStyle = ref({});
 
 // 知识库列表
 const kbList = ref(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)));
+
+// 可选择的知识库列表（排除 Agent 智能体目录）
+const selectableKbList = computed(() => kbList.value.filter(c => c.id !== 'agent'));
 
 // 知识库文件选择相关
 const selectedKbForFile = ref('');
@@ -405,18 +407,10 @@ const loadCustomModels = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       customModels.value = JSON.parse(stored);
-      const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
-      if (selectedId && customModels.value.find(m => m.id === selectedId)) {
-        modelSettings.value.modelId = selectedId;
-      } else if (customModels.value.length > 0) {
-        modelSettings.value.modelId = customModels.value[0].id;
-      } else {
-        modelSettings.value.modelId = '';
-      }
-    } else {
-      customModels.value = [];
-      modelSettings.value.modelId = '';
     }
+    const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
+    const exists = customModels.value.some(m => m.id === selectedId);
+    modelSettings.value.modelId = exists ? selectedId : (customModels.value[0]?.id || '');
   } catch (error) {
     console.error('Failed to load custom models:', error);
   }
@@ -433,82 +427,49 @@ const providerIcons = {
 };
 
 const modelList = computed(() => {
-  return customModels.value.map(model => ({
-    id: model.id,
-    name: `${model.providerLabel} ${model.modelName}`,
-    embeddingName: model.embeddingModelName || '',
-    icon: providerIcons[model.provider] || providerIcons.other,
-    badge: ''
-  }));
+  const list = [];
+  // 自定义模型
+  for (const model of customModels.value) {
+    list.push({
+      id: model.id,
+      name: `${model.providerLabel} ${model.modelName}`,
+      embeddingName: model.embeddingModelName || '',
+      icon: providerIcons[model.provider] || providerIcons.other,
+      badge: ''
+    });
+  }
+  return list;
 });
 
-const toggleModeDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showModeDropdown.value = !showModeDropdown.value;
-  showModelDropdown.value = false;
-  showKbDropdown.value = false;
-  showLinkDropdown.value = false;
-  if (showModeDropdown.value) {
-    modeDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
+// 下拉菜单配置：name -> { show, style }
+const dropdownRefs = {
+  mode: { show: showModeDropdown, style: modeDropdownStyle },
+  model: { show: showModelDropdown, style: modelDropdownStyle },
+  kb: { show: showKbDropdown, style: kbDropdownStyle },
+  link: { show: showLinkDropdown, style: linkDropdownStyle }
 };
 
-const toggleModelDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showModelDropdown.value = !showModelDropdown.value;
-  showModeDropdown.value = false;
-  showKbDropdown.value = false;
-  showLinkDropdown.value = false;
-  if (showModelDropdown.value) {
-    modelDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
+// 通用下拉切换：再次点击已打开的下拉可关闭，否则打开目标并关闭其余
+const toggleDropdown = (name, event) => {
+  const target = dropdownRefs[name];
+  if (!target) return;
+  const wasOpen = target.show.value;
+  Object.values(dropdownRefs).forEach(ref => { ref.show.value = false; });
+  if (wasOpen) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  target.show.value = true;
+  target.style.value = {
+    position: 'fixed',
+    top: rect.bottom + 8 + 'px',
+    left: rect.left + 'px',
+    zIndex: '9999'
+  };
 };
 
-const toggleKbDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showKbDropdown.value = !showKbDropdown.value;
-  showModeDropdown.value = false;
-  showModelDropdown.value = false;
-  showLinkDropdown.value = false;
-  if (showKbDropdown.value) {
-    kbDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
-};
-
-const toggleLinkDropdown = (event) => {
-  const btn = event.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  showLinkDropdown.value = !showLinkDropdown.value;
-  showModeDropdown.value = false;
-  showModelDropdown.value = false;
-  showKbDropdown.value = false;
-  if (showLinkDropdown.value) {
-    linkDropdownStyle.value = {
-      position: 'fixed',
-      top: rect.bottom + 8 + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
-};
+const toggleModeDropdown = (event) => toggleDropdown('mode', event);
+const toggleModelDropdown = (event) => toggleDropdown('model', event);
+const toggleKbDropdown = (event) => toggleDropdown('kb', event);
+const toggleLinkDropdown = (event) => toggleDropdown('link', event);
 
 const openNoteSelect = () => {
   showLinkDropdown.value = false;
@@ -693,9 +654,14 @@ const handleSend = async () => {
   const text = inputText.value.trim();
   if (!text) return;
 
+  // 查找选中的自定义模型
   const selectedModel = customModels.value.find(m => m.id === modelSettings.value.modelId);
 
-  if (!selectedModel) return;
+  if (!selectedModel) {
+    alert('未配置大模型，请先在设置中添加自己的模型');
+    router.push('/settings/model');
+    return;
+  }
 
   // 所有模式统一支持 @ 引用笔记/知识库文件
   // - note / kb-file：直接将内容注入到首条用户消息中（LLM 上下文 10k 字符）
@@ -766,7 +732,7 @@ const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
 
 onMounted(() => {
   document.addEventListener('scroll', closeAllDropdowns, true);
-  loadCustomModels();
+  // loadCustomModels() 由 onActivated 统一触发（keep-alive 首次挂载时 onActivated 也会执行）
   loadKbListFromDisk();
 });
 
@@ -782,10 +748,10 @@ onDeactivated(() => {
 });
 
 onActivated(() => {
-  inputText.value = '';
-  if (textareaRef.value) {
-    textareaRef.value.style.height = 'auto';
-  }
+  // 保留输入框文字，仅重新计算高度以适配恢复后的内容
+  nextTick(() => {
+    autoResize();
+  });
   loadCustomModels();
 });
 
@@ -836,7 +802,7 @@ const autoResize = () => {
 };
 
 const handleFeatureClick = (id) => {
-  console.log(`Feature "${id}" is not yet implemented`);
+  // TODO: 各特性入口待实现
 };
 </script>
 
@@ -1219,6 +1185,11 @@ const handleFeatureClick = (id) => {
   svg {
     color: var(--text-secondary);
     flex-shrink: 0;
+    transition: color 0.12s ease;
+  }
+
+  &:hover svg {
+    color: #f59e0b;
   }
 }
 
@@ -1480,22 +1451,22 @@ const handleFeatureClick = (id) => {
   max-width: 280px;
   max-height: 360px;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px;
 }
 
 .kb-empty {
-  padding: 16px 12px;
+  padding: 12px 8px;
   font-size: 13px;
   color: var(--text-tertiary);
   text-align: center;
 }
 
 .kb-category {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .kb-category-name {
-  padding: 6px 10px 4px;
+  padding: 4px 8px 2px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-tertiary);
@@ -1506,15 +1477,19 @@ const handleFeatureClick = (id) => {
 .kb-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background 0.12s ease;
 }
 
 .kb-item:hover {
   background: var(--bg-hover);
+}
+
+.kb-item:hover .kb-item-icon-fallback {
+  color: #10b981;
 }
 
 .kb-item-icon {
@@ -1530,6 +1505,7 @@ const handleFeatureClick = (id) => {
   height: 18px;
   color: var(--text-tertiary);
   flex-shrink: 0;
+  transition: color 0.12s ease;
 }
 
 .kb-item-name {
@@ -1729,9 +1705,6 @@ const handleFeatureClick = (id) => {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 14px;
   min-width: 100px;
-}
-
-.feature-card:hover {
 }
 
 .feature-icon-wrap {

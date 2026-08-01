@@ -1,6 +1,6 @@
 {
   "name": "happy-friday-lite",
-  "version": "1.0.0",
+  "version": "1.7.0",
   "description": "Happy Friday Lite - Electron + Vue3",
   "author": "Chen Jie <chenjie.plus@qq.com>",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -11,12 +11,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run python:download && vite build && electron-builder",
-    "electron:build:arm64": "node scripts/prebuild-arm64.mjs && node scripts/prebuild-python.mjs arm64 && vite build && electron-builder --arm64",
-    "python:download": "node python/download-python.js --mirror",
-    "python:download:all": "node python/download-python.js --all --mirror",
-    "python:download:github": "node python/download-python.js",
-    "python:force": "node python/download-python.js --mirror --force",
+    "electron:build": "node scripts/prebuild-install.mjs x64 && node scripts/prebuild-clean.mjs x64 && vite build && electron-builder --linux --x64 && node scripts/prebuild-install.mjs",
+    "electron:build:arm64": "node scripts/prebuild-install.mjs arm64 && node scripts/prebuild-clean.mjs arm64 && vite build && electron-builder --linux --arm64 && node scripts/prebuild-install.mjs",
+    "electron:build:all": "npm run electron:build && npm run electron:build:arm64",
     "start": "electron .",
     "postinstall": "node scripts/fix-langgraph-sdk.mjs"
   },
@@ -35,13 +32,17 @@
     "mammoth": "^1.12.0",
     "marked": "^18.0.3",
     "officeparser": "^6.1.1",
+    "pptxgenjs": "^4.0.1",
     "sql.js": "^1.14.1",
     "turndown": "^7.2.4",
     "xlsx": "^0.18.5",
     "zod": "^3.24.0"
   },
   "optionalDependencies": {
-    "@zvec/bindings-linux-arm64": "^0.5.0"
+    "@zvec/bindings-darwin-arm64": "^0.5.0",
+    "@zvec/bindings-linux-arm64": "^0.5.0",
+    "@zvec/bindings-linux-x64": "^0.5.0",
+    "@zvec/bindings-win32-x64": "^0.5.0"
   },
   "devDependencies": {
     "@schedule-x/calendar": "^4.5.0",
@@ -81,7 +82,11 @@
     "lucide-vue-next": "^1.0.0",
     "pdfjs-dist": "^6.0.227",
     "pinia": "^3.0.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-icons": "^5.7.0",
     "sass": "^1.99.0",
+    "sharp": "^0.35.3",
     "vite": "^6.0.3",
     "vue": "^3.5.13",
     "vue-i18n": "^11.4.0",
@@ -98,60 +103,155 @@
     "asar": true,
     "asarUnpack": [
       "node_modules/sql.js/dist/sql-wasm.wasm",
-      "node_modules/@zvec/**/*"
+      "node_modules/@zvec/**/*.node",
+      "node_modules/@zvec/**/*.so"
     ],
     "files": [
       "dist/**/*",
       "main.js",
       "preload.cjs",
       "src-electron/**/*",
-      "node_modules/sql.js/**/*"
+      "public/skills/**/*",
+      "python/requirements.txt",
+      "node_modules/sql.js/dist/sql-wasm.js",
+      "node_modules/sql.js/dist/sql-wasm.wasm",
+      "node_modules/sql.js/package.json",
+      "!node_modules/react-icons/**/*",
+      "!node_modules/react/**/*",
+      "!node_modules/react-dom/**/*",
+      "!node_modules/officeparser/node_modules/@napi-rs/**/*",
+      "!node_modules/officeparser/node_modules/pdfjs-dist/**/*",
+      "!node_modules/tesseract.js/**/*",
+      "!node_modules/@napi-rs/**/*",
+      "!node_modules/sharp/**/*",
+      "!node_modules/@img/**/*",
+      "!node_modules/js-tiktoken/dist/**/*.cjs",
+      "!node_modules/sql.js/dist/sql-asm*",
+      "!node_modules/sql.js/dist/*debug*",
+      "!node_modules/sql.js/dist/*browser*",
+      "!node_modules/sql.js/dist/worker.*",
+      "!node_modules/@zvec/**/*.md",
+      "!node_modules/@zvec/**/LICENSE",
+      "!node_modules/handlebars/**/*",
+      "!node_modules/@langchain/classic/agents/**/*",
+      "!node_modules/@langchain/classic/chains/**/*",
+      "!node_modules/@langchain/classic/experimental/**/*",
+      "!node_modules/@langchain/classic/retrievers/**/*",
+      "!node_modules/@langchain/classic/evaluation/**/*",
+      "!node_modules/@langchain/classic/memory/**/*",
+      "!node_modules/@langchain/classic/output_parsers/**/*",
+      "!node_modules/@langchain/classic/tools/**/*",
+      "!node_modules/@langchain/classic/smith/**/*",
+      "!node_modules/@langchain/classic/util/**/*",
+      "!node_modules/@langchain/classic/stores/**/*",
+      "!node_modules/@langchain/classic/storage/**/*",
+      "!node_modules/@langchain/classic/callbacks/**/*",
+      "!node_modules/@langchain/classic/chat_models/**/*",
+      "!node_modules/@langchain/classic/load/**/*",
+      "!node_modules/@langchain/classic/hub/**/*",
+      "!node_modules/@langchain/classic/vectorstores/**/*",
+      "!node_modules/@langchain/classic/embeddings/**/*",
+      "!node_modules/@langchain/classic/schema/**/*",
+      "!node_modules/@langchain/classic/dist/agents/**/*",
+      "!node_modules/@langchain/classic/dist/chains/**/*",
+      "!node_modules/@langchain/classic/dist/experimental/**/*",
+      "!node_modules/@langchain/classic/dist/retrievers/**/*",
+      "!node_modules/@langchain/classic/dist/evaluation/**/*",
+      "!node_modules/@langchain/classic/dist/memory/**/*",
+      "!node_modules/@langchain/classic/dist/output_parsers/**/*",
+      "!node_modules/@langchain/classic/dist/tools/**/*",
+      "!node_modules/@langchain/classic/dist/smith/**/*",
+      "!node_modules/@langchain/classic/dist/util/**/*",
+      "!node_modules/@langchain/classic/dist/stores/**/*",
+      "!node_modules/@langchain/classic/dist/storage/**/*",
+      "!node_modules/@langchain/classic/dist/callbacks/**/*",
+      "!node_modules/@langchain/classic/dist/chat_models/**/*",
+      "!node_modules/@langchain/classic/dist/load/**/*",
+      "!node_modules/@langchain/classic/dist/hub/**/*",
+      "!node_modules/@langchain/classic/dist/vectorstores/**/*",
+      "!node_modules/@langchain/classic/dist/embeddings/**/*",
+      "!node_modules/@langchain/classic/dist/schema/**/*",
+      "!node_modules/@langchain/community/vectorstores/**/*",
+      "!node_modules/@langchain/community/chat_models/**/*",
+      "!node_modules/@langchain/community/llms/**/*",
+      "!node_modules/@langchain/community/embeddings/**/*",
+      "!node_modules/@langchain/community/retrievers/**/*",
+      "!node_modules/@langchain/community/experimental/**/*",
+      "!node_modules/@langchain/community/memory/**/*",
+      "!node_modules/@langchain/community/storage/**/*",
+      "!node_modules/@langchain/community/structured_query/**/*",
+      "!node_modules/@langchain/community/graphs/**/*",
+      "!node_modules/@langchain/community/agents/**/*",
+      "!node_modules/@langchain/community/indexes/**/*",
+      "!node_modules/@langchain/community/caches/**/*",
+      "!node_modules/@langchain/community/stores/**/*",
+      "!node_modules/@langchain/community/document_compressors/**/*",
+      "!node_modules/@langchain/community/document_transformers/**/*",
+      "!node_modules/@langchain/community/chains/**/*",
+      "!node_modules/@langchain/community/load/**/*",
+      "!node_modules/@langchain/community/load.cjs",
+      "!node_modules/@langchain/community/load.d.cts",
+      "!node_modules/@langchain/community/load.d.ts",
+      "!node_modules/@langchain/community/load.js",
+      "!node_modules/@langchain/community/dist/vectorstores/**/*",
+      "!node_modules/@langchain/community/dist/chat_models/**/*",
+      "!node_modules/@langchain/community/dist/llms/**/*",
+      "!node_modules/@langchain/community/dist/embeddings/**/*",
+      "!node_modules/@langchain/community/dist/retrievers/**/*",
+      "!node_modules/@langchain/community/dist/experimental/**/*",
+      "!node_modules/@langchain/community/dist/memory/**/*",
+      "!node_modules/@langchain/community/dist/storage/**/*",
+      "!node_modules/@langchain/community/dist/structured_query/**/*",
+      "!node_modules/@langchain/community/dist/graphs/**/*",
+      "!node_modules/@langchain/community/dist/agents/**/*",
+      "!node_modules/@langchain/community/dist/indexes/**/*",
+      "!node_modules/@langchain/community/dist/caches/**/*",
+      "!node_modules/@langchain/community/dist/stores/**/*",
+      "!node_modules/@langchain/community/dist/document_compressors/**/*",
+      "!node_modules/@langchain/community/dist/document_transformers/**/*",
+      "!node_modules/@langchain/community/dist/chains/**/*",
+      "!node_modules/@langchain/community/dist/load/**/*",
+      "!node_modules/@langchain/community/dist/document_loaders/web/**/*",
+      "!node_modules/**/*.md",
+      "!node_modules/**/*.map",
+      "!node_modules/**/docs/**/*",
+      "!node_modules/**/test/**/*",
+      "!node_modules/**/tests/**/*",
+      "!node_modules/**/__tests__/**/*",
+      "!node_modules/**/*.d.ts",
+      "!node_modules/**/*.d.cts",
+      "!node_modules/**/*.d.mts",
+      "!node_modules/**/*.ts",
+      "!node_modules/**/*.flow",
+      "!node_modules/@langchain/openai/node_modules/openai/src/**/*",
+      "!node_modules/@langchain/openai/node_modules/openai/beta/**/*",
+      "!node_modules/@langchain/openai/node_modules/openai/realtime/**/*",
+      "node_modules/langchain/dist/agents/tests/utils.js",
+      "node_modules/langchain/dist/agents/tests/utils.cjs"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "zh-TW",
+      "en-US",
+      "en-GB",
+      "ja",
+      "ko"
     ],
     "mac": {
       "icon": "build/icons/icon.png",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "dmg"
       ],
       "category": "public.app-category.productivity",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
-      "identity": null,
-      "extraResources": [
-        {
-          "from": "python/python-darwin-${arch}/",
-          "to": "python/python-darwin-${arch}",
-          "filter": [
-            "**/*"
-          ]
-        }
-      ]
+      "identity": null
     },
     "win": {
       "icon": "build/icons/icon.png",
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "nsis"
       ],
-      "artifactName": "${productName}-${version}-win-${arch}.${ext}",
-      "extraResources": [
-        {
-          "from": "python/python-win32-${arch}/",
-          "to": "python/python-win32-${arch}",
-          "filter": [
-            "**/*"
-          ]
-        }
-      ]
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -161,25 +261,11 @@
     "linux": {
       "icon": "build/icons/icon.png",
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "AppImage",
+        "deb"
       ],
       "category": "Utility",
-      "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
-      "extraResources": [
-        {
-          "from": "python/python-linux-${arch}/",
-          "to": "python/python-linux-${arch}",
-          "filter": [
-            "**/*"
-          ]
-        }
-      ]
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     }
   }
 }

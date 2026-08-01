@@ -22,6 +22,9 @@ concurrency:
 jobs:
   # ──────────────────────────────────────────────────────────────────────
   # Linux 构建（x64 + arm64）
+  # arm64 在 x64 runner 上交叉构建：electron-builder 打包 .deb 依赖的 fpm
+  # 仅提供 linux-x86 二进制，无法在 ARM64 主机执行（Exec format error）。
+  # arm64 的原生绑定由 scripts/prebuild-install.mjs 下载预编译版本，无需交叉编译器。
   # ──────────────────────────────────────────────────────────────────────
   build-linux:
     name: Build Linux (${{ matrix.arch }})
@@ -37,7 +40,7 @@ jobs:
             arch-flag: --x64
             platform-key: linux-x64
             artifact-name: HappyFriday-Linux-x64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-latest
             arch: arm64
             arch-flag: --arm64
             platform-key: linux-arm64
@@ -65,23 +68,15 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Download Python runtime (${{ matrix.platform-key }})
-        run: node python/download-python.js --platform ${{ matrix.platform-key }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Python runtime
-        run: |
-          echo "=== Python 目录结构 ==="
-          ls -la python/python-${{ matrix.platform-key }}/
-          echo "=== Python 版本 ==="
-          python/python-${{ matrix.platform-key }}/bin/python3 --version
-        shell: bash
-
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Pre-build install & clean (target arch bindings only)
+        run: |
+          node scripts/prebuild-install.mjs ${{ matrix.arch }}
+          node scripts/prebuild-clean.mjs ${{ matrix.arch }}
 
       - name: Build Electron app (Linux ${{ matrix.arch }})
         run: npx electron-builder --linux ${{ matrix.arch-flag }}
@@ -96,7 +91,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
-          path: release/*.AppImage
+          path: |
+            release/*.AppImage
+            release/*.deb
           if-no-files-found: error
           retention-days: 30
 
@@ -126,23 +123,15 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Download Python runtime (win32-x64)
-        run: node python/download-python.js --platform win32-x64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Python runtime
-        run: |
-          echo "=== Python 目录结构 ==="
-          ls -la python/python-win32-x64/
-          echo "=== Python 版本 ==="
-          python/python-win32-x64/python.exe --version
-        shell: bash
-
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Pre-build install & clean (target arch bindings only)
+        run: |
+          node scripts/prebuild-install.mjs x64
+          node scripts/prebuild-clean.mjs x64
 
       - name: Build Electron app (Windows x64)
         run: npx electron-builder --win --x64
@@ -204,27 +193,15 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Download Python runtime (${{ matrix.platform-key }})
-        run: node python/download-python.js --platform ${{ matrix.platform-key }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Python runtime
-        run: |
-          echo "=== Python 目录结构 ==="
-          ls -la python/python-${{ matrix.platform-key }}/
-          echo "=== Python 版本 ==="
-          if [ "${{ matrix.platform-key }}" = "darwin-x64" ]; then
-            arch -x86_64 python/python-${{ matrix.platform-key }}/bin/python3 --version
-          else
-            python/python-${{ matrix.platform-key }}/bin/python3 --version
-          fi
-        shell: bash
-
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Pre-build install & clean (target arch bindings only)
+        run: |
+          node scripts/prebuild-install.mjs ${{ matrix.arch }}
+          node scripts/prebuild-clean.mjs ${{ matrix.arch }}
 
       - name: Build Electron app (macOS ${{ matrix.arch }})
         run: npx electron-builder --mac ${{ matrix.arch-flag }}

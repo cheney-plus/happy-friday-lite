@@ -34,6 +34,9 @@ import './builtin/calculator.js'
 // Python 代码执行工具（使用项目内置 Python 运行时）
 import './builtin/pythonRepl.js'
 
+// Python 包安装工具（通过 pip/pip3 安装第三方库，含 ensurepip 引导）
+import './builtin/pipInstall.js'
+
 // HTTP 请求工具（GET/POST/PUT/DELETE/PATCH）
 import './builtin/httpRequests.js'
 
@@ -42,6 +45,9 @@ import './builtin/jsonOps.js'
 
 // 网页正文抓取工具
 import './builtin/webpageScraper.js'
+
+// 文件转 Markdown 工具（PDF/Word/PPT/Excel/HTML/CSV/JSON/XML/EPub → Markdown，支持 PDF OCR）
+import './builtin/markitdown.js'
 
 // 用户可在下方追加自定义工具导入：
 // import './builtin/myCustomTool.js'

@@ -4,7 +4,7 @@
       <div class="more-panel" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" @click.stop>
         <div class="more-panel-header">
           <span class="more-panel-date">{{ date }}</span>
-          <span class="more-panel-count">{{ events.length }} 个日程</span>
+          <span class="more-panel-count">{{ t('schedule.eventCount', { count: events.length }) }}</span>
         </div>
         <div class="more-panel-list">
           <div
@@ -30,7 +30,7 @@
               <div class="more-panel-item-meta">
                 <span v-if="event.start !== event.end" class="more-panel-item-range">{{ event.start }} ~ {{ event.end }}</span>
                 <span v-else-if="!event.allDay && event.startTime" class="more-panel-item-time">{{ event.startTime }} - {{ event.endTime }}</span>
-                <span v-else class="more-panel-item-allday">全天</span>
+                <span v-else class="more-panel-item-allday">{{ t('schedule.allDay') }}</span>
               </div>
             </div>
             <button

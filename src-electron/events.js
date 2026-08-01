@@ -1,4 +1,6 @@
 export const CONFIG_CHANGED = 'config-changed'
+// 备份进度：主进程在 worker 线程打包过程中向渲染进程推送进度
+export const BACKUP_PROGRESS = 'backup-progress'
 export const CHAT_CHUNK = 'chat-chunk'
 export const CHAT_REASONING_CHUNK = 'chat-reasoning-chunk'
 export const CHAT_DONE = 'chat-done'

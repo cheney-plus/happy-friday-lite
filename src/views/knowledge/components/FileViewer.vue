@@ -70,7 +70,7 @@ import MarkdownViewer from './MarkdownViewer.vue';
 import NoteViewer from './NoteViewer.vue';
 import HtmlViewer from './HtmlViewer.vue';
 import TextViewer from './TextViewer.vue';
-import { FILE_ICON_MAP, UnknownFileIcon } from './icons';
+import { getFileIconComponent } from '../utils';
 
 const props = defineProps({
   file: { type: Object, required: true }
@@ -88,10 +88,6 @@ const progressPercent = computed(() => {
   if (totalPages.value <= 0) return 0;
   return Math.round((currentPage.value / totalPages.value) * 100);
 });
-
-function getFileIconComponent(type) {
-  return FILE_ICON_MAP[type] || UnknownFileIcon;
-}
 
 function onPageInfo(info) {
   currentPage.value = info.current;

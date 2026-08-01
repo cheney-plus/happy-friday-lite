@@ -112,7 +112,9 @@ const bubbleVisible = ref(false);
 const bubbleContent = ref('');
 
 let activeRequestId = null;
-let sessionId = localStorage.getItem('schedule-assistant-session-id') || '';
+// 注意：不再复用旧 sessionId —— 旧会话历史中可能包含 AI 幻觉数据，会污染后续对话
+// 每次组件加载时使用空 sessionId，由后端创建新会话
+let sessionId = '';
 let unlistenChunk = null;
 let unlistenDone = null;
 let unlistenError = null;
@@ -148,11 +150,11 @@ function useSuggestion(text) {
 }
 
 function loadModelConfig() {
+  const selectedId = localStorage.getItem('happy-friday-selected-model');
   try {
     const stored = localStorage.getItem('happy-friday-custom-models');
     if (stored) {
       const models = JSON.parse(stored);
-      const selectedId = localStorage.getItem('happy-friday-selected-model');
       let model = selectedId ? models.find(m => m.id === selectedId) : null;
       if (!model && models.length > 0) model = models[0];
       return model || null;
@@ -169,17 +171,32 @@ async function handleSend() {
 
   const model = loadModelConfig();
   if (!model) {
-    showBubble('请先在 Friday 对话页面中配置 AI 模型。');
+    showBubble('未配置大模型，请先在设置中添加自己的模型。');
     return;
   }
 
-  // 构造日程管理专用指令
+  // 构造日程管理专用指令（注入当前系统时间，便于解析"今天/明天/下周X/本周"等相对时间）
+  const now = new Date();
+  const currentDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const weekday = now.toLocaleString('zh-CN', { weekday: 'long' });
+  const fullDateTime = now.toLocaleString('zh-CN', { hour12: false });
+
   const scheduleMessage = `[你是日程管理专用助手，仅处理日程相关事务（查询/创建/修改/删除日程），请使用 list_events / create_event / update_event / delete_event 工具完成。
 
+当前系统时间：${fullDateTime} ${weekday}（日期：${currentDate}，时间：${currentTime}）
+
+【强制规则——违反将导致严重错误】
+1. **禁止凭空回答**：回答任何关于日程的问题前，必须先调用 list_events 工具查询，只能基于工具返回的真实数据回答。严禁根据历史对话记忆或猜测来回答。
+2. **禁止假创建**：创建日程时必须调用 create_event 工具，未调用工具不得声称"已创建"。工具返回成功后才算创建完成。
+3. **如实汇报**：如果 list_events 返回空结果，必须告知用户"当前没有日程"，不得编造日程条目。
+4. **不得自行展开**：list_events 返回的跨日日程（start ≠ end）是一条日程，不得拆分为多条单日日程汇报。
+
 行为准则：
-1. 当用户未明确指定具体时间时，默认创建为全天事件（不传 startTime / endTime，allDay 设为 true），不要追问用户。
-2. 尽量根据上下文合理推断用户意图，直接执行操作，不要频繁向用户确认或追问。
-3. 仅在信息严重缺失导致无法执行时才询问用户，且一次问清所有需要的信息。]\n\n${text}`;
+1. 解析用户提到的相对时间（如"今天/明天/后天/大后天/下周X/本周/下月"等）时，必须基于上述当前系统时间计算出对应的 YYYY-MM-DD 日期，再传入工具的 startDate / endDate 参数。例如：若今天是 ${currentDate}，则"明天"为次日日期。
+2. 当用户未明确指定具体时间时，默认创建为全天事件（不传 startTime / endTime，allDay 设为 true），不要追问用户。
+3. 尽量根据上下文合理推断用户意图，直接执行操作，不要频繁向用户确认或追问。
+4. 仅在信息严重缺失导致无法执行时才询问用户，且一次问清所有需要的信息。]\n\n${text}`;
 
   inputText.value = '';
 
@@ -243,11 +260,13 @@ onMounted(() => {
     }
     if (data.sessionId) {
       sessionId = data.sessionId;
-      localStorage.setItem('schedule-assistant-session-id', sessionId);
+      // 不再持久化 sessionId，避免复用包含幻觉数据的旧会话
     }
     if (!bubbleContent.value) {
       bubbleVisible.value = false;
     }
+    // 兜底刷新：agent 完成后统一重新加载日程，防止遗漏 agent-tool-result 事件
+    scheduleStore.loadEvents();
   });
 
   unlistenError = electronService.listen('chat-error', (event) => {

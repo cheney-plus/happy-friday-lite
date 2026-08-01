@@ -260,16 +260,19 @@ const loadCustomModels = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       customModels.value = JSON.parse(stored);
-      const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
-      if (selectedId && customModels.value.find(m => m.id === selectedId)) {
+    }
+    const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
+    if (selectedId) {
+      if (customModels.value.find(m => m.id === selectedId)) {
         modelSettings.value.modelId = selectedId;
       } else if (customModels.value.length > 0) {
         modelSettings.value.modelId = customModels.value[0].id;
       } else {
         modelSettings.value.modelId = '';
       }
+    } else if (customModels.value.length > 0) {
+      modelSettings.value.modelId = customModels.value[0].id;
     } else {
-      customModels.value = [];
       modelSettings.value.modelId = '';
     }
   } catch (error) {
@@ -288,12 +291,16 @@ const providerIcons = {
 };
 
 const modelList = computed(() => {
-  return customModels.value.map(model => ({
-    id: model.id,
-    name: `${model.providerLabel} ${model.modelName}`,
-    embeddingName: model.embeddingModelName || '',
-    icon: providerIcons[model.provider] || providerIcons.other
-  }));
+  const list = [];
+  for (const model of customModels.value) {
+    list.push({
+      id: model.id,
+      name: `${model.providerLabel} ${model.modelName}`,
+      embeddingName: model.embeddingModelName || '',
+      icon: providerIcons[model.provider] || providerIcons.other
+    });
+  }
+  return list;
 });
 
 const currentModelName = computed(() => {
@@ -383,8 +390,12 @@ const handleSend = () => {
   const text = inputText.value.trim();
   if (!text || props.disabled) return;
 
+  // 查找选中的自定义模型
   const selectedModel = customModels.value.find(m => m.id === modelSettings.value.modelId);
-  if (!selectedModel) return;
+  if (!selectedModel) {
+    alert('未配置大模型，请先在设置中添加自己的模型');
+    return;
+  }
 
   emit('ask', {
     question: text,

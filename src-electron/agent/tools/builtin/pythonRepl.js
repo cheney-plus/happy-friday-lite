@@ -7,9 +7,10 @@
  * 支持数据处理、绘图、脚本导入等场景。
  *
  * Python 运行时解析由 src-electron/python-env.js 统一管理：
- *   - macOS：优先使用系统 Python（含全部依赖），否则使用打包 Python
- *   - Windows/Linux：使用打包 Python（从 resourcesPath 解压到 userData）
- *   - 开发环境：项目根目录/python/python-{platform}/bin/python3
+ *   - 优先使用用户在「设置 → 通用 → Python 环境」中指定的系统 Python 路径
+ *   - 未配置时自动检测系统 Python（PATH / 常见安装位置），检测到则自动写回配置
+ *   - 均不可用时返回 null，工具需提示用户前往设置完成配置
+ *   - 依赖库可通过 pip_install 工具安装到用户的 Python 环境
  *
  * 工作目录与脚本策略：
  *   - 脚本文件：统一保存到 {agentRootDir}/SANDBOX/tmpscript/，扩展名 .py，执行后保留不删除；
@@ -140,6 +141,18 @@ async function handler(args, ctx) {
   const pythonPath = await getPythonPath()
   ctx.logger.info(`[python_repl] pythonPath=${pythonPath}`)
 
+  // 未配置 Python 环境 → 返回提示，引导用户前往设置完成配置
+  if (!pythonPath) {
+    ctx.logger.warn('[python_repl] Python 环境未配置，跳过执行')
+    return (
+      '⚠️ 未配置 Python 环境，无法执行 Python 代码。\n\n' +
+      '请在「设置 → 通用 → Python 环境」中：\n' +
+      '1. 点击「自动检测」尝试发现系统已安装的 Python；或\n' +
+      '2. 点击「选择文件」手动指定系统 Python 可执行文件路径。\n\n' +
+      '配置完成后重试本操作。如需安装依赖库，可使用 pip_install 工具。'
+    )
+  }
+
   // SANDBOX 根目录
   const sandboxDir = path.join(ctx.agentRootDir, 'SANDBOX')
   if (!fs.existsSync(sandboxDir)) {
@@ -219,7 +232,7 @@ async function handler(args, ctx) {
     child.on('error', err => {
       clearTimeout(timer)
       ctx.logger.error(`[python_repl] 进程错误: ${err.message}`)
-      resolve(`Python 启动失败: ${err.message}\n（请确认项目已运行 \`npm run python:download\` 下载 Python 运行时）`)
+      resolve(`Python 启动失败: ${err.message}\n（请确认在「设置 → 通用 → Python 环境」中配置了有效的 Python 可执行文件路径）`)
     })
 
     child.on('close', exitCode => {
@@ -231,6 +244,13 @@ async function handler(args, ctx) {
       if (stderr) output += `stderr:\n${stderr}\n`
       if (exitCode !== 0) {
         output += `\n（进程退出码：${exitCode}）`
+      }
+
+      // 检测到缺失模块时，提示 LLM 使用 pip_install 工具安装
+      if (/ModuleNotFoundError|ImportError|No module named/i.test(stderr)) {
+        const m = stderr.match(/No module named ['"]([^'"]+)['"]/i)
+        const pkgHint = m ? `（如 "${m[1]}"）` : ''
+        output += `\n💡 检测到缺失 Python 依赖库${pkgHint}。可调用 pip_install 工具安装缺失的包后重试。`
       }
 
       // 截断最终输出

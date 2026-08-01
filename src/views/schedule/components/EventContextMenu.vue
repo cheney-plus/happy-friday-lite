@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div v-if="visible" class="ctx-overlay" @click="close" @contextmenu.prevent>
-      <div class="ctx-menu" :style="{ left: pos.x + 'px', top: pos.y + 'px' }">
+      <div class="ctx-menu" :style="menuStyle">
         <div v-if="event" class="ctx-item" @click="onToggleComplete">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="event.completed ? 'var(--text-tertiary)' : 'var(--text-secondary)'" stroke-width="2">
             <polyline v-if="!event.completed" points="20 6 9 17 4 12"></polyline>
@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { onDeactivated } from 'vue';
+import { computed, onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -31,6 +31,21 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'toggle-complete', 'view-detail']);
+
+// 钳制菜单位置，避免靠近右/下边缘时溢出视口
+const MENU_MARGIN = 8;
+const MENU_EST_WIDTH = 180;
+const MENU_EST_HEIGHT = 96;
+
+const menuStyle = computed(() => {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let x = props.pos.x;
+  let y = props.pos.y;
+  if (x + MENU_EST_WIDTH > vw - MENU_MARGIN) x = Math.max(MENU_MARGIN, vw - MENU_MARGIN - MENU_EST_WIDTH);
+  if (y + MENU_EST_HEIGHT > vh - MENU_MARGIN) y = Math.max(MENU_MARGIN, vh - MENU_MARGIN - MENU_EST_HEIGHT);
+  return { left: x + 'px', top: y + 'px' };
+});
 
 function close() {
   emit('close');

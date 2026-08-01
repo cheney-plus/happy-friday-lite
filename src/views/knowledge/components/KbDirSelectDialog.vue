@@ -171,12 +171,15 @@ function selectItem(item) {
 }
 
 async function handleConfirm() {
-  if (!selectedPath.value) return;
+  if (!selectedPath.value || saving.value) return;
   saving.value = true;
   emit('confirm', {
     path: selectedPath.value,
     name: selectedName.value
   });
+  // 兜底：父组件未关闭对话框或未触发 visible=false 时，2 秒后自动恢复按钮状态，
+  // 避免"保存中..."永久卡住（watch 会在 visible 切换为 false 时再次重置）。
+  setTimeout(() => { saving.value = false; }, 2000);
 }
 
 watch(() => props.visible, (val) => {

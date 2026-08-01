@@ -247,14 +247,14 @@ function goBack() {
 }
 
 function handleAddToKnowledge() {
-  console.log('Add to knowledge feature is not yet implemented');
+  // TODO: 待实现
 }
 
 function handleAction(action, index) {
   if (action === 'rollback') {
     handleRollback(index);
   } else if (action === 'share') {
-    console.log('Share message feature is not yet implemented');
+    // TODO: 待实现
   } else if (action === 'add') {
     saveMessageToNote(index);
   }
@@ -392,19 +392,29 @@ function scrollToBottomForce() {
 function loadModelConfig(modelId) {
   try {
     const stored = localStorage.getItem('happy-friday-custom-models');
-    if (stored) {
-      const models = JSON.parse(stored);
-      let model = models.find(m => m.id === modelId);
-      if (!model && models.length > 0) {
-        const selectedId = localStorage.getItem('happy-friday-selected-model');
-        model = selectedId ? models.find(m => m.id === selectedId) : models[0];
-      }
-      return model || null;
-    }
+    if (!stored) return null;
+    const models = JSON.parse(stored);
+    const findById = (id) => id ? models.find(m => m.id === id) : null;
+    // 优先 modelId，其次 localStorage 记录的 selectedId，最后回退到首个模型
+    return findById(modelId) || findById(localStorage.getItem('happy-friday-selected-model')) || models[0] || null;
   } catch (e) {
     console.error('Failed to load model config:', e);
+    return null;
   }
-  return null;
+}
+
+// 流式响应公共初始化：重置流式状态、生成新 requestId、滚动到底部
+function startStreaming() {
+  isStreaming.value = true;
+  streamingContent.value = '';
+  streamingReasoning.value = '';
+  // Agent 模式：清空上一轮的时间线段
+  agentSegments.value = [];
+  showScrollDownBtn.value = false;
+  isAtBottom.value = true;
+  scrollToBottom(true);
+  activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  isDoneReceived = false;
 }
 
 async function sendChatMessage(text) {
@@ -415,7 +425,8 @@ async function sendChatMessage(text) {
   const model = loadModelConfig(modelId);
 
   if (!model) {
-    console.error('No model config found');
+    alert('未配置大模型，请先在设置中添加自己的模型');
+    router.push('/settings/model');
     return;
   }
 
@@ -453,24 +464,13 @@ async function sendChatMessage(text) {
   });
 
   inputText.value = '';
-  isStreaming.value = true;
-  streamingContent.value = '';
-  streamingReasoning.value = '';
-  // Agent 模式：清空上一轮的时间线段
-  agentSegments.value = [];
-  showScrollDownBtn.value = false;
-  isAtBottom.value = true;
-  scrollToBottom(true);
-
-  activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  isDoneReceived = false;
+  startStreaming();
 
   try {
     if (mode === 'agent') {
       // Agent 模式：调用 agent-invoke，后端走 Agent Loop（多工具 + HITL）
       // Agent 自主通过 retrieve_knowledge 工具检索，无需前端传 kbName
       // 附件由后端根据 attachments 元数据构造 LLM 提示（Agent 模式只列名称，由工具读取内容）
-      console.log('[Agent] 发起 Agent 调用, requestId=', activeRequestId);
       await electronService.invoke('agent-invoke', {
         requestId: activeRequestId,
         sessionId: currentSessionId.value || '',
@@ -555,16 +555,7 @@ async function triggerAiResponse() {
 
   if (!model) return;
 
-  isStreaming.value = true;
-  streamingContent.value = '';
-  streamingReasoning.value = '';
-  agentSegments.value = [];
-  showScrollDownBtn.value = false;
-  isAtBottom.value = true;
-  scrollToBottom(true);
-
-  activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  isDoneReceived = false;
+  startStreaming();
 
   try {
     if (mode === 'agent') {
@@ -580,6 +571,16 @@ async function triggerAiResponse() {
       await electronService.invoke('chat_with_memory', {
         requestId: activeRequestId,
         sessionId: currentSessionId.value || '',
+        model: model,
+        message: '',
+        enableThinking: route.query.thinkMode === 'deep',
+        kbName: route.query.kbName || '',
+        kbCategoryId: route.query.kbCategoryId || ''
+      });
+    } else {
+      // memoryless 模式：重开会话时按无记忆方式重新生成回复
+      await electronService.invoke('chat_without_memory', {
+        requestId: activeRequestId,
         model: model,
         message: '',
         enableThinking: route.query.thinkMode === 'deep',
@@ -746,7 +747,6 @@ onMounted(async () => {
   unlistenAgentToolCall = electronService.listen('agent-tool-call', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
-    console.log('[Agent] 工具调用:', data.toolName, data.arguments);
     const segs = agentSegments.value;
     // 标记前一个 text 段为非流式（AI 已切换到工具调用）
     const last = segs.length > 0 ? segs[segs.length - 1] : null;
@@ -786,7 +786,6 @@ onMounted(async () => {
   unlistenAgentToolResult = electronService.listen('agent-tool-result', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
-    console.log('[Agent] 工具结果:', data.toolName, data.status);
     const seg = agentSegments.value.find((s) => s.type === 'tool' && s.toolCallId === data.toolCallId);
     if (seg) {
       // execute_command 等非 interruptOn 工具在 handler 内部触发审批，
@@ -805,11 +804,9 @@ onMounted(async () => {
   unlistenAgentApproval = electronService.listen('agent-tool-approval', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
-    console.log('[Agent] 请求审批:', data.toolName);
 
     // 若用户已点击"全部批准"，自动批准后续所有工具调用，不弹窗
     if (autoApproveAll.value) {
-      console.log('[Agent] 自动批准（全部批准模式）:', data.toolName);
       electronService.invoke('agent-tool-approval-resume', {
         requestId: data.requestId,
         decision: { type: 'approve' }
@@ -895,7 +892,6 @@ onDeactivated(() => {
 async function handleApproveTool() {
   if (!pendingApproval.value) return;
   const { requestId } = pendingApproval.value;
-  console.log('[Agent] 用户批准工具调用');
   pendingApproval.value = null;
   try {
     await electronService.invoke('agent-tool-approval-resume', {
@@ -911,7 +907,6 @@ async function handleApproveTool() {
 async function handleApproveAll() {
   if (!pendingApproval.value) return;
   const { requestId } = pendingApproval.value;
-  console.log('[Agent] 用户点击全部批准，后续工具调用将自动批准');
   autoApproveAll.value = true;
   pendingApproval.value = null;
   try {
@@ -928,7 +923,6 @@ async function handleApproveAll() {
 async function handleRejectTool(decision) {
   if (!pendingApproval.value) return;
   const { requestId, toolCallId } = pendingApproval.value;
-  console.log('[Agent] 用户拒绝工具调用:', decision.reason);
   // 更新工具段状态为已拒绝
   const seg = agentSegments.value.find((s) => s.type === 'tool' && s.toolCallId === toolCallId);
   if (seg) {

@@ -7,13 +7,34 @@ import * as db from './db.js'
 import { streamChat, streamChatWithRagAgent, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
 import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
-import { CONFIG_CHANGED, CHAT_DONE, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT } from './events.js'
+import {
+  getPythonStatus,
+  autoDetectPythonSync,
+  setPythonPath,
+  checkPythonPath,
+  verifyPythonDeps,
+  invalidatePythonCache
+} from './python-env.js'
+import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT, BACKUP_PROGRESS } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
 
 const cancelTokens = new CancellationTokens()
+
+/**
+ * 校验模型配置：确保用户已配置自己的大模型
+ * 若未配置或配置不完整，抛出错误提示用户前往设置
+ * @param {Object} model 前端传入的模型配置
+ * @returns {Object} 可用于 LLM 调用的模型配置
+ */
+function validateModelConfig(model) {
+  if (!model || !model.apiKey || !model.modelName || !model.baseUrl) {
+    throw new Error('未配置大模型，请在设置中添加自己的模型')
+  }
+  return model
+}
 
 // 扫描 KB 根目录下所有 .note 文件，返回匹配 noteId 的文件路径列表
 function findNoteRefFiles(noteId) {
@@ -118,8 +139,8 @@ export function registerCommands(mainWindow) {
     return db.getSessions()
   })
 
-  ipcMain.handle('get_sessions_with_stats', () => {
-    return db.getSessionsWithStats()
+  ipcMain.handle('get_sessions_with_stats', (_event, args) => {
+    return db.getSessionsWithStats(args?.startDate, args?.endDate)
   })
 
   ipcMain.handle('get_session', (_event, args) => {
@@ -164,6 +185,9 @@ export function registerCommands(mainWindow) {
     let isNewSession = false
     let userMessageId = null
 
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
+
     try {
       if (!currentSessionId) {
         const session = db.createSession(message.slice(0, 20) || '新对话')
@@ -182,7 +206,7 @@ export function registerCommands(mainWindow) {
       db.updateSessionTimestamp(currentSessionId)
 
       if (isNewSession) {
-        const modelClone = { ...model }
+        const modelClone = { ...effectiveModel }
         const sessionIdClone = currentSessionId
         const userMsgClone = message
         setImmediate(async () => {
@@ -233,8 +257,8 @@ export function registerCommands(mainWindow) {
 
       try {
         const result = ragConfig
-          ? await streamChatWithRagAgent(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken, ragConfig)
-          : await streamChat(mainWindow, allMessages, model, requestId, currentSessionId, enableThinking || false, cancelToken)
+          ? await streamChatWithRagAgent(mainWindow, allMessages, effectiveModel, requestId, currentSessionId, enableThinking || false, cancelToken, ragConfig)
+          : await streamChat(mainWindow, allMessages, effectiveModel, requestId, currentSessionId, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
       } catch (e) {
@@ -271,6 +295,9 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('chat_without_memory', async (_event, args) => {
     const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
+
     try {
       const appConfig = loadConfig()
       // 如果有 @ 引用附件，将用户消息替换为 LLM 完整格式（含引用内容）
@@ -296,8 +323,8 @@ export function registerCommands(mainWindow) {
 
       try {
         const result = ragConfig
-          ? await streamChatWithRagAgent(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken, ragConfig)
-          : await streamChat(mainWindow, messages, model, requestId, null, enableThinking || false, cancelToken)
+          ? await streamChatWithRagAgent(mainWindow, messages, effectiveModel, requestId, null, enableThinking || false, cancelToken, ragConfig)
+          : await streamChat(mainWindow, messages, effectiveModel, requestId, null, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
       } catch (e) {
@@ -442,6 +469,9 @@ export function registerCommands(mainWindow) {
       throw new Error(`Invalid note AI action: ${action}`)
     }
 
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
+
     const cancelToken = cancelTokens.insert(requestId)
 
     let fullContent = ''
@@ -452,7 +482,7 @@ export function registerCommands(mainWindow) {
         action,
         noteContent,
         selectedText,
-        model,
+        effectiveModel,
         requestId,
         cancelToken,
         userInstruction
@@ -481,10 +511,13 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('note_fim_completion', async (_event, args) => {
     const { requestId, model, prefix, suffix } = args
 
+    // 校验模型配置：确保用户已配置自己的大模型
+    const effectiveModel = validateModelConfig(model)
+
     const cancelToken = cancelTokens.insert(requestId)
 
     try {
-      const result = await fimCompletion(model, prefix, suffix, cancelToken)
+      const result = await fimCompletion(effectiveModel, prefix, suffix, cancelToken)
       cancelTokens.remove(requestId)
 
       mainWindow.webContents.send(NOTE_FIM_RESULT, {
@@ -907,6 +940,58 @@ export function registerCommands(mainWindow) {
     return getPythonPath()
   })
 
+  // 获取 Python 环境状态（配置路径 / 解析路径 / 版本 / 是否可用）
+  ipcMain.handle('python-status', async () => {
+    return await getPythonStatus()
+  })
+
+  // 自动检测系统 Python，不写回配置，仅返回检测结果
+  ipcMain.handle('python-autodetect', async () => {
+    const detected = autoDetectPythonSync()
+    if (!detected) {
+      return { ok: false, path: null, version: null }
+    }
+    const check = checkPythonPath(detected)
+    return { ok: check.ok, path: detected, version: check.version, reason: check.reason }
+  })
+
+  // 设置 Python 路径（写回配置并刷新缓存）；传 null/空串清除配置
+  ipcMain.handle('python-set-path', async (_event, args) => {
+    const target = (args && typeof args === 'object') ? args.path : args
+    await setPythonPath(target || null)
+    return { success: true, path: target || null }
+  })
+
+  // 弹出文件选择对话框，让用户选择 Python 可执行文件
+  ipcMain.handle('python-select-file', async () => {
+    const isWin = process.platform === 'win32'
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择 Python 可执行文件',
+      properties: ['openFile'],
+      filters: isWin
+        ? [{ name: 'Python 可执行文件', extensions: ['exe'] }]
+        : [{ name: '所有文件', extensions: ['*'] }]
+    })
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    const selected = result.filePaths[0]
+    const check = checkPythonPath(selected)
+    return { success: true, path: selected, ok: check.ok, version: check.version, reason: check.reason }
+  })
+
+  // 校验依赖库是否齐全
+  ipcMain.handle('python-verify', async (_event, args) => {
+    const target = args && args.path ? args.path : undefined
+    return await verifyPythonDeps(target)
+  })
+
+  // 清除 Python 路径缓存（设置页面在切换路径后可调用以强制重新解析）
+  ipcMain.handle('python-invalidate-cache', async () => {
+    invalidatePythonCache()
+    return { success: true }
+  })
+
   // ========== 数据备份 ==========
 
   // 手动备份：弹出保存对话框，选择保存位置
@@ -923,7 +1008,12 @@ export function registerCommands(mainWindow) {
       return { success: false, canceled: true }
     }
 
-    const backupResult = await createBackup(result.filePath, false)
+    // 压缩在 worker 线程中执行，主进程将进度推送给渲染进程
+    const backupResult = await createBackup(result.filePath, false, (p) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(BACKUP_PROGRESS, p)
+      }
+    })
     // 手动备份成功后也更新 lastBackupAt
     if (backupResult.success) {
       try {

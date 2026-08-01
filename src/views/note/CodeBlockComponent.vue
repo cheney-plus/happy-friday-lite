@@ -4,7 +4,6 @@
       <select
         v-model="selectedLanguage"
         class="language-select"
-        @change="updateLanguage"
       >
         <option value="">auto</option>
         <option value="javascript">JavaScript</option>
@@ -50,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/vue-3';
 
 const props = defineProps({
@@ -59,8 +58,12 @@ const props = defineProps({
   deleteNode: Function
 });
 
-const selectedLanguage = ref('');
 const copied = ref(false);
+
+const selectedLanguage = computed({
+  get: () => props.node.attrs.language || '',
+  set: (val) => props.updateAttributes({ language: val || null })
+});
 
 const lineCount = computed(() => {
   const text = props.node.textContent || '';
@@ -68,20 +71,20 @@ const lineCount = computed(() => {
   return text.split('\n').length;
 });
 
-onMounted(() => {
-  const language = props.node.attrs.language || '';
-  selectedLanguage.value = language;
-});
-
-const updateLanguage = (event) => {
-  const target = event.target;
-  const language = target.value;
-  props.updateAttributes({ language: language || null });
-};
-
-const handleCopy = () => {
+const handleCopy = async () => {
   const text = props.node.textContent || '';
-  navigator.clipboard.writeText(text);
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (_e) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
   copied.value = true;
   setTimeout(() => { copied.value = false; }, 2000);
 };

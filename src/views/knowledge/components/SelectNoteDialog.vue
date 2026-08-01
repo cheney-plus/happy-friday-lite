@@ -154,6 +154,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useNoteStore } from '@/store/modules/note';
 import { useNotebookStore } from '@/store/modules/notebook';
+import { formatRelativeTime as formatTime } from '../utils';
 
 const props = defineProps({
   visible: Boolean,
@@ -229,21 +230,6 @@ function toggleNote(noteId) {
   } else {
     selectedNoteIds.value.push(noteId);
   }
-}
-
-function formatTime(isoString) {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  const now = new Date();
-  const diffMs = now - d;
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMs / 3600000);
-  const diffDay = Math.floor(diffMs / 86400000);
-  if (diffMin < 1) return '刚刚';
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  if (diffHour < 24) return `${diffHour}小时前`;
-  if (diffDay < 7) return `${diffDay}天前`;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function handleConfirm() {
