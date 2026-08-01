@@ -80,8 +80,9 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
       let fullReasoning = ''
 
       res.on('data', (chunk) => {
+        // 兜底：cancel() 已通过 token.abort() => req.destroy() 中止请求，
+        // 这里保留标志检查以防 destroy 尚未触发 'error'/'end' 时及时 resolve
         if (cancelToken && cancelToken.cancelled) {
-          req.destroy()
           resolve({ fullContent, fullReasoning })
           return
         }
@@ -148,11 +149,29 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
       })
 
       res.on('error', (err) => {
+        // cancel() 调用 req.destroy() 会触发此处：视为正常取消，返回部分内容
+        if (cancelToken && cancelToken.cancelled) {
+          resolve({ fullContent, fullReasoning })
+          return
+        }
         reject(AppError.llm(`Stream error: ${err.message}`))
       })
     })
 
+    // 注册即时中止：cancel() 会立即调用 req.destroy()，中断 pending / 思考阶段 / chunk 间隙
+    if (cancelToken) {
+      cancelToken.abort = () => { try { req.destroy() } catch (_e) { /* ignore */ } }
+      if (cancelToken.cancelled) {
+        try { req.destroy() } catch (_e) { /* ignore */ }
+      }
+    }
+
     req.on('error', (err) => {
+      // cancel() 调用 req.destroy() 会触发此处：视为正常取消，返回部分内容
+      if (cancelToken && cancelToken.cancelled) {
+        resolve({ fullContent: '', fullReasoning: '' })
+        return
+      }
       reject(AppError.llm(`Request error: ${err.message}`))
     })
 
@@ -209,12 +228,10 @@ export function fimCompletion(model, prefix, suffix, cancelToken) {
   return new Promise((resolve, reject) => {
     const controller = new AbortController()
 
+    // 统一到 cancelToken.abort 机制：cancel() 会立即 controller.abort()
     if (cancelToken) {
-      Object.defineProperty(cancelToken, '_abortController', {
-        value: controller,
-        configurable: true,
-        writable: true
-      })
+      cancelToken.abort = () => controller.abort()
+      if (cancelToken.cancelled) controller.abort()
     }
 
     const signal = controller.signal
@@ -389,14 +406,32 @@ function buildAgentStreamBody(model, messages, enableThinking) {
  * @returns {Promise<{fullContent, fullReasoning, toolCalls}>}
  */
 async function streamRound(mainWindow, url, body, model, requestId, sessionId, cancelToken) {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${model.apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  })
+  // 用 AbortController 实现抢占式中止：cancel() 会立即 controller.abort()，
+  // 中断 pending 阶段 / chunk 间隙的 fetch，无需等下一个 chunk 到达
+  const controller = new AbortController()
+  if (cancelToken) {
+    cancelToken.abort = () => controller.abort()
+    if (cancelToken.cancelled) controller.abort()
+  }
+
+  let response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${model.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    })
+  } catch (e) {
+    // 取消导致的 abort 视为正常结束，返回部分内容（不发 CHAT_ERROR）
+    if (cancelToken && cancelToken.cancelled) {
+      return { fullContent: '', fullReasoning: '', toolCalls: [] }
+    }
+    throw e
+  }
 
   if (!response.ok) {
     const errorText = await response.text()
@@ -416,77 +451,86 @@ async function streamRound(mainWindow, url, body, model, requestId, sessionId, c
   let fullReasoning = ''
   const toolCallMap = {}
 
-  while (true) {
-    if (cancelToken && cancelToken.cancelled) {
-      try { await reader.cancel() } catch (_e) { /* ignore */ }
-      break
-    }
-
-    const { done, value } = await reader.read()
-    if (done) break
-
-    buffer += decoder.decode(value, { stream: true })
-
-    while (buffer.includes('\n')) {
-      const pos = buffer.indexOf('\n')
-      const line = buffer.slice(0, pos).trim()
-      buffer = buffer.slice(pos + 1)
-
-      if (!line || !line.startsWith('data: ')) continue
-
-      const data = line.slice(6).trim()
-      if (data === '[DONE]') continue
-
-      let parsed = null
-      try {
-        parsed = JSON.parse(data)
-      } catch (_e) {
-        // 忽略 SSE 解析错误
-        continue
+  try {
+    while (true) {
+      if (cancelToken && cancelToken.cancelled) {
+        try { await reader.cancel() } catch (_e) { /* ignore */ }
+        break
       }
 
-      if (parsed.error) {
-        const errorMsg = parsed.error.message || 'Unknown API error'
-        mainWindow.webContents.send(CHAT_ERROR, {
-          requestId,
-          sessionId: sessionId || null,
-          error: errorMsg
-        })
-        throw AppError.llm(errorMsg)
-      }
+      const { done, value } = await reader.read()
+      if (done) break
 
-      const delta = parsed.choices?.[0]?.delta
-      if (!delta) continue
+      buffer += decoder.decode(value, { stream: true })
 
-      if (delta.reasoning_content) {
-        fullReasoning += delta.reasoning_content
-        mainWindow.webContents.send(CHAT_REASONING_CHUNK, {
-          requestId,
-          sessionId: sessionId || null,
-          content: delta.reasoning_content
-        })
-      }
+      while (buffer.includes('\n')) {
+        const pos = buffer.indexOf('\n')
+        const line = buffer.slice(0, pos).trim()
+        buffer = buffer.slice(pos + 1)
 
-      if (delta.content) {
-        fullContent += delta.content
-        mainWindow.webContents.send(CHAT_CHUNK, {
-          requestId,
-          sessionId: sessionId || null,
-          content: delta.content
-        })
-      }
+        if (!line || !line.startsWith('data: ')) continue
 
-      if (delta.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          const idx = tc.index != null ? tc.index : 0
-          if (!toolCallMap[idx]) {
-            toolCallMap[idx] = { id: '', function: { name: '', arguments: '' } }
+        const data = line.slice(6).trim()
+        if (data === '[DONE]') continue
+
+        let parsed = null
+        try {
+          parsed = JSON.parse(data)
+        } catch (_e) {
+          // 忽略 SSE 解析错误
+          continue
+        }
+
+        if (parsed.error) {
+          const errorMsg = parsed.error.message || 'Unknown API error'
+          mainWindow.webContents.send(CHAT_ERROR, {
+            requestId,
+            sessionId: sessionId || null,
+            error: errorMsg
+          })
+          throw AppError.llm(errorMsg)
+        }
+
+        const delta = parsed.choices?.[0]?.delta
+        if (!delta) continue
+
+        if (delta.reasoning_content) {
+          fullReasoning += delta.reasoning_content
+          mainWindow.webContents.send(CHAT_REASONING_CHUNK, {
+            requestId,
+            sessionId: sessionId || null,
+            content: delta.reasoning_content
+          })
+        }
+
+        if (delta.content) {
+          fullContent += delta.content
+          mainWindow.webContents.send(CHAT_CHUNK, {
+            requestId,
+            sessionId: sessionId || null,
+            content: delta.content
+          })
+        }
+
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index != null ? tc.index : 0
+            if (!toolCallMap[idx]) {
+              toolCallMap[idx] = { id: '', function: { name: '', arguments: '' } }
+            }
+            if (tc.id) toolCallMap[idx].id = tc.id
+            if (tc.function?.name) toolCallMap[idx].function.name += tc.function.name
+            if (tc.function?.arguments) toolCallMap[idx].function.arguments += tc.function.arguments
           }
-          if (tc.id) toolCallMap[idx].id = tc.id
-          if (tc.function?.name) toolCallMap[idx].function.name += tc.function.name
-          if (tc.function?.arguments) toolCallMap[idx].function.arguments += tc.function.arguments
         }
       }
+    }
+  } catch (e) {
+    // abort / 取消导致的读流中断：返回已收集的部分内容，不抛错、不发 CHAT_ERROR
+    if (cancelToken && cancelToken.cancelled) {
+      try { await reader.cancel() } catch (_e) { /* ignore */ }
+    } else {
+      throw e
     }
   }
 
@@ -813,11 +857,29 @@ export function streamNoteAI(mainWindow, action, noteContent, selectedText, mode
       })
 
       res.on('error', (err) => {
+        // cancel() 调用 req.destroy() 会触发此处：视为正常取消，返回部分内容
+        if (cancelToken && cancelToken.cancelled) {
+          resolve({ fullContent })
+          return
+        }
         reject(AppError.llm(`Stream error: ${err.message}`))
       })
     })
 
+    // 注册即时中止：cancel() 会立即调用 req.destroy()，中断 pending / 思考阶段 / chunk 间隙
+    if (cancelToken) {
+      cancelToken.abort = () => { try { req.destroy() } catch (_e) { /* ignore */ } }
+      if (cancelToken.cancelled) {
+        try { req.destroy() } catch (_e) { /* ignore */ }
+      }
+    }
+
     req.on('error', (err) => {
+      // cancel() 调用 req.destroy() 会触发此处：视为正常取消，返回部分内容
+      if (cancelToken && cancelToken.cancelled) {
+        resolve({ fullContent: '' })
+        return
+      }
       reject(AppError.llm(`Request error: ${err.message}`))
     })
 

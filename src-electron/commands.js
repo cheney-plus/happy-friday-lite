@@ -533,10 +533,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('stop_note_fim_completion', (_event, args) => {
-    const token = cancelTokens.get(args.requestId)
-    if (token && token._abortController) {
-      token._abortController.abort()
-    }
+    // cancel() 现在会自动调用 token.abort()（即 controller.abort()），无需手动查找 _abortController
     cancelTokens.cancel(args.requestId)
     return true
   })
