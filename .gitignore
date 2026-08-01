@@ -51,3 +51,4 @@ python/__pycache__/
 *.temp
 node_modules
 release/
+*.md

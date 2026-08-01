@@ -60,7 +60,8 @@ jobs:
       - name: Install Linux system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libarchive-tools
+          sudo apt-get install -y libarchive-tools ruby ruby-dev build-essential
+          sudo gem install fpm --no-document
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps
