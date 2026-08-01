@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "memory": "Memory",
+    "skills": "Skills",
+    "mcp": "MCP",
+    "usage": "Usage"
+  },
+  "skills": {
+    "title": "Skills Management",
+    "addSkill": "Add Skill",
+    "installed": "Installed Skills",
+    "builtin": "Built-in Skills",
+    "emptyInstalled": "No installed skills yet",
+    "disable": "Disable",
+    "enable": "Enable",
+    "uninstall": "Uninstall"
+  },
+  "comingSoon": "Coming soon"
+}

@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "memory": "记忆管理",
+    "skills": "Skills管理",
+    "mcp": "MCP连接",
+    "usage": "用量统计"
+  },
+  "skills": {
+    "title": "Skills管理",
+    "addSkill": "添加Skill",
+    "installed": "我安装的Skills",
+    "builtin": "官方内置Skills",
+    "emptyInstalled": "暂无安装的Skills",
+    "disable": "禁用",
+    "enable": "启用",
+    "uninstall": "卸载"
+  },
+  "comingSoon": "功能开发中，敬请期待"
+}
