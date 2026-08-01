@@ -195,6 +195,21 @@ export function registerAgentCommands(mainWindow) {
       log.info(`====== agent-invoke 完成: requestId=${requestId} ======`)
       return { sessionId: currentSessionId }
     } catch (e) {
+      // 取消导致的异常：发 CHAT_DONE（stopped=true）而非 CHAT_ERROR，避免前端卡在错误态
+      // 正常取消路径已在 streamAgentWithHITL 内部处理（返回部分内容，不抛出），此处为兜底
+      const token = cancelTokens.get(requestId)
+      if (token?.cancelled) {
+        log.info(`agent-invoke 因取消结束，发送 CHAT_DONE`)
+        mainWindow.webContents.send(CHAT_DONE, {
+          requestId,
+          sessionId: currentSessionId || null,
+          fullContent: '',
+          reasoningContent: '',
+          messageId: null,
+          userMessageId: userMessageId || null
+        })
+        return { sessionId: currentSessionId }
+      }
       log.error(`agent-invoke 失败: ${e.message}`)
       log.error(e.stack)
       mainWindow.webContents.send(CHAT_ERROR, {
@@ -328,13 +343,25 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
 
     // 流式执行，收集 tokens
     log.info(`调用 streamEvents, version=v2, thread_id=${config.configurable.thread_id}`)
+    // 用 AbortController 实现抢占式中止：cancel() 会立即 controller.abort()，
+    // 中断 streamEvents 迭代（pending 阶段 / chunk 间隙 / 审批等待均生效）
+    const abortController = new AbortController()
+    if (cancelToken) {
+      cancelToken.abort = () => abortController.abort()
+      if (cancelToken.cancelled) abortController.abort()
+    }
     let stream
     try {
       stream = await agent.streamEvents(currentInput, {
         version: 'v2',
+        signal: abortController.signal,
         ...config
       })
     } catch (e) {
+      if (cancelToken?.cancelled) {
+        log.info(`streamEvents 创建期间已取消，退出循环`)
+        break
+      }
       log.error(`streamEvents 创建失败: ${e.message}`)
       log.error(e.stack)
       throw e
@@ -463,9 +490,14 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
         }
       }
     } catch (e) {
-      log.error(`流迭代出错 (已收到 ${eventCount} 事件): ${e.message}`)
-      log.error(e.stack)
-      throw e
+      // abort / 取消导致的流迭代中断：不再抛出，落入下方 if (cancelToken?.cancelled) break 正常退出
+      if (cancelToken?.cancelled) {
+        log.info(`流迭代因取消中断 (已收到 ${eventCount} 事件)，正常退出`)
+      } else {
+        log.error(`流迭代出错 (已收到 ${eventCount} 事件): ${e.message}`)
+        log.error(e.stack)
+        throw e
+      }
     }
 
     log.info(`流迭代结束，共收到 ${eventCount} 个事件, contentLen=${fullContent.length}`)
@@ -542,7 +574,17 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
 
         // 等待用户审批决策
         log.info(`等待用户审批决策...`)
-        const decision = await waitForApproval(requestId)
+        let decision
+        try {
+          decision = await waitForApproval(requestId)
+        } catch (e) {
+          // agent-stop 调用 cancelApproval 会 reject 此 promise：取消时退出循环，返回部分内容
+          if (cancelToken?.cancelled) {
+            log.info(`审批等待期间被取消，退出循环`)
+            break
+          }
+          throw e
+        }
 
         // 更新审批 tool 段状态
         if (decision.type === 'approve') {
