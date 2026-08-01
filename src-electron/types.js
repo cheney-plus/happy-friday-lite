@@ -13,6 +13,12 @@ export function defaultConfig() {
       autoDir: null,
       maxKeep: 7
     },
+    // 对话历史自动清理：默认关闭，开启后按阈值清理超过指定时间未活动的会话
+    history: {
+      autoClean: false,
+      cleanBefore: '3months', // '1month' | '3months' | '6months' | '1year'
+      lastCleanAt: null
+    },
     rag: {},
     python: {
       path: null

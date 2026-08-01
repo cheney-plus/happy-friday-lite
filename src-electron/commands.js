@@ -17,6 +17,7 @@ import {
 } from './python-env.js'
 import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT, BACKUP_PROGRESS } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
+import { cleanHistoryNow } from './historyClean.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
@@ -1059,6 +1060,31 @@ export function registerCommands(mainWindow) {
       return { success: false, canceled: true }
     }
     return { success: true, dir: result.filePaths[0] }
+  })
+
+  // ========== 对话历史自动清理相关命令 ==========
+  // 获取对话历史清理配置
+  ipcMain.handle('history-get-config', async () => {
+    const config = loadConfig()
+    return config.history || null
+  })
+
+  // 设置对话历史清理配置
+  ipcMain.handle('history-set-config', async (_event, args) => {
+    const config = loadConfig()
+    config.history = { ...config.history, ...args }
+    saveConfig(config)
+    return { success: true, history: config.history }
+  })
+
+  // 立即执行一次对话历史清理（用户开启功能时触发，属用户主动操作）
+  ipcMain.handle('history-clean-now', async () => {
+    try {
+      const result = await cleanHistoryNow()
+      return { success: true, ...result }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
   })
 
   // ========== RAG 知识检索相关命令 ==========

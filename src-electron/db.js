@@ -498,6 +498,26 @@ export function rollbackSession(sessionId, messageId) {
   updateSessionTimestamp(sessionId)
 }
 
+/**
+ * 清理在 beforeISO 之前最后活动的会话及其消息（对话历史）。
+ * 以 sessions.updatedAt（最后活动时间）为判定依据：长期未活动的会话才会被清理。
+ * agent_threads 与对话历史相互独立，不在清理范围内。
+ * @param {string} beforeISO ISO 时间字符串，updatedAt 早于此值的会话将被删除
+ * @returns {{ count: number }} 被清理的会话数量
+ */
+export function cleanOldSessions(beforeISO) {
+  const rows = queryAll('SELECT id FROM sessions WHERE updatedAt < ?', [beforeISO])
+  if (rows.length === 0) return { count: 0 }
+
+  const ids = rows.map(r => r.id)
+  const placeholders = ids.map(() => '?').join(',')
+  // 先删消息（外键），再删会话本身
+  db.run(`DELETE FROM messages WHERE sessionId IN (${placeholders})`, ids)
+  db.run(`DELETE FROM sessions WHERE id IN (${placeholders})`, ids)
+  saveDb()
+  return { count: ids.length }
+}
+
 export function createNote(knowledgeBaseId, notebookId, title) {
   const now = nowISO()
   const id = generateId()

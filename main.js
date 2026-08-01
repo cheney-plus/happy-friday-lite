@@ -6,6 +6,7 @@ import { setDataDir as setConfigDataDir } from './src-electron/config.js'
 import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
 import { checkAutoBackup } from './src-electron/backup.js'
+import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
 import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 
@@ -145,6 +146,9 @@ app.whenReady().then(async () => {
 
   // 启动后检查自动备份（异步，不阻塞窗口）
   checkAutoBackup().catch(e => console.error('[Main] Auto backup check failed:', e))
+
+  // 启动后检查对话历史自动清理（异步，至多每天一次，不阻塞窗口）
+  checkAutoCleanHistory().catch(e => console.error('[Main] Auto history clean check failed:', e))
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {

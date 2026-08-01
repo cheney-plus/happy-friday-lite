@@ -226,6 +226,48 @@
         </div>
       </div>
 
+      <!-- 对话历史 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.history') }}</div>
+        <div class="group-content">
+          <div class="setting-item">
+            <div class="item-label-group">
+              <span class="item-label">{{ t('settings.autoCleanHistory') }}</span>
+              <span class="item-hint">{{ t('settings.autoCleanHistoryHint') }}</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="historyConfig.autoClean" @change="onAutoCleanToggle" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div v-if="historyConfig.autoClean" class="setting-item">
+            <span class="item-label">{{ t('settings.cleanBefore') }}</span>
+            <div class="font-size-options">
+              <div
+                :class="['font-size-option', { active: historyConfig.cleanBefore === '1month' }]"
+                @click="setCleanBefore('1month')"
+              >{{ t('settings.clean1month') }}</div>
+              <div
+                :class="['font-size-option', { active: historyConfig.cleanBefore === '3months' }]"
+                @click="setCleanBefore('3months')"
+              >{{ t('settings.clean3months') }}</div>
+              <div
+                :class="['font-size-option', { active: historyConfig.cleanBefore === '6months' }]"
+                @click="setCleanBefore('6months')"
+              >{{ t('settings.clean6months') }}</div>
+              <div
+                :class="['font-size-option', { active: historyConfig.cleanBefore === '1year' }]"
+                @click="setCleanBefore('1year')"
+              >{{ t('settings.clean1year') }}</div>
+            </div>
+          </div>
+          <div v-if="historyConfig.autoClean && historyConfig.lastCleanAt" class="setting-item">
+            <span class="item-label">{{ t('settings.lastCleanTime') }}</span>
+            <span class="item-link">{{ formatBackupTime(historyConfig.lastCleanAt) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 知识库检索 (RAG) -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.rag') }}</div>
@@ -630,6 +672,13 @@ const backupConfig = reactive({
   maxKeep: 7
 });
 
+// 对话历史自动清理配置（默认关闭，开启后按阈值清理长期未活动的会话）
+const historyConfig = reactive({
+  autoClean: false,
+  cleanBefore: '3months',
+  lastCleanAt: null
+});
+
 // 备份进度（由主进程 worker 推送的事件驱动）
 const backupProgress = reactive({
   active: false,
@@ -765,6 +814,54 @@ const formatBackupTime = (iso) => {
   const d = new Date(iso);
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+// ========== 对话历史自动清理 ==========
+const loadHistoryConfig = async () => {
+  try {
+    const cfg = await electronService.invoke('history-get-config');
+    if (cfg) {
+      historyConfig.autoClean = cfg.autoClean || false;
+      historyConfig.cleanBefore = cfg.cleanBefore || '3months';
+      historyConfig.lastCleanAt = cfg.lastCleanAt || null;
+    }
+  } catch (e) {
+    console.error('加载对话历史清理配置失败:', e);
+  }
+};
+
+const saveHistoryConfig = async () => {
+  try {
+    const result = await electronService.invoke('history-set-config', {
+      autoClean: historyConfig.autoClean,
+      cleanBefore: historyConfig.cleanBefore
+    });
+    // 同步主进程回写的配置（含 lastCleanAt）
+    if (result && result.history) {
+      historyConfig.lastCleanAt = result.history.lastCleanAt || null;
+    }
+  } catch (e) {
+    console.error('保存对话历史清理配置失败:', e);
+  }
+};
+
+// 开关切换：保存配置；开启时立即执行一次清理（用户主动操作，不属于频繁扫描）
+const onAutoCleanToggle = async () => {
+  await saveHistoryConfig();
+  if (!historyConfig.autoClean) return;
+  try {
+    const cleanResult = await electronService.invoke('history-clean-now');
+    if (cleanResult && cleanResult.success && cleanResult.lastCleanAt) {
+      historyConfig.lastCleanAt = cleanResult.lastCleanAt;
+    }
+  } catch (e) {
+    console.error('立即清理对话历史失败:', e);
+  }
+};
+
+const setCleanBefore = (val) => {
+  historyConfig.cleanBefore = val;
+  saveHistoryConfig();
 };
 
 // ========== Python 环境 ==========
@@ -1115,6 +1212,7 @@ onMounted(() => {
   settings.displayMode = currentMode.value;
   currentLanguage.value = appStore.language || 'zh-CN';
   loadBackupConfig();
+  loadHistoryConfig();
   loadRagStats();
   loadPythonStatus();
   // 订阅备份进度事件（主进程 worker 推送）
@@ -1267,6 +1365,20 @@ const openAuthorEmail = () => {
   font-size: 14px;
   color: var(--text-primary);
   font-weight: 500;
+}
+
+.item-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-right: 16px;
+}
+
+.item-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  line-height: 1.4;
 }
 
 .theme-select-wrapper {
