@@ -37,7 +37,7 @@
             </header>
 
             <!-- 消息区域 -->
-            <main class="dialog-messages" ref="messagesContainer">
+            <main class="dialog-messages" ref="messagesContainer" @scroll="checkScrollPosition">
               <div class="messages-inner">
                 <template v-for="(msg, index) in messages" :key="msg.id ?? index">
                   <UserMessage v-if="msg.role === 'user'" :content="msg.content" />
@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, nextTick, onUnmounted, watch } from 'vue';
 import { electronService } from '@/services/electron';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
@@ -162,6 +162,8 @@ const dialogStyle = ref({});
 let activeRequestId = '';
 let isDoneReceived = false;
 let currentSessionId = '';
+// 上一次的 scrollTop，用于判断滚动方向（区分用户主动上滑与程序置底）
+let lastScrollTop = 0;
 let unlistenChunk = null;
 let unlistenReasoning = null;
 let unlistenDone = null;
@@ -201,6 +203,7 @@ function resetState() {
   currentSessionId = '';
   isAtBottom.value = true;
   showScrollDownBtn.value = false;
+  lastScrollTop = 0;
 }
 
 function setupListeners() {
@@ -266,8 +269,8 @@ function setupListeners() {
 
     streamingContent.value = '';
     streamingReasoning.value = '';
-    showScrollDownBtn.value = false;
-    scrollToBottom(true);
+    // 流式结束时仅当用户停留在底部才跟随滚动，避免打断已上滑阅读的用户
+    scrollToBottom();
     nextTick(() => {
       textareaRef.value?.focus();
     });
@@ -474,21 +477,19 @@ function checkScrollPosition() {
   if (!el) return;
   const threshold = 80;
   const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-  isAtBottom.value = distanceFromBottom < threshold;
+  // 用户向上滚动时立即停止自动跟随，避免流式输出把滚动条拉回底部；
+  // 仅当重新滚动到接近底部时才恢复自动跟随
+  if (el.scrollTop < lastScrollTop - 2) {
+    isAtBottom.value = false;
+  } else if (distanceFromBottom < threshold) {
+    isAtBottom.value = true;
+  }
+  lastScrollTop = el.scrollTop;
   showScrollDownBtn.value = !isAtBottom.value && messages.value.length > 0;
 }
 
-onMounted(() => {
-  if (messagesContainer.value) {
-    messagesContainer.value.addEventListener('scroll', checkScrollPosition);
-  }
-});
-
 onUnmounted(() => {
   cleanupListeners();
-  if (messagesContainer.value) {
-    messagesContainer.value.removeEventListener('scroll', checkScrollPosition);
-  }
 });
 </script>
 
