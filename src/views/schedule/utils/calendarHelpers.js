@@ -25,11 +25,6 @@ export function isTodayStr(dateStr) {
   return dateStr === localStr;
 }
 
-export function timeToMin(time) {
-  const [h, m] = time.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
-
 export function isDateInRange(date, start, end) {
   if (!start || !end) return false;
   const s = start < end ? start : end;
@@ -59,16 +54,6 @@ export function useCalendarHelpers() {
   const { locale, t } = useI18n();
   const isZh = computed(() => locale.value === 'zh-CN');
 
-  function formatHour(h) {
-    if (isZh.value) {
-      return h === 0 ? '' : `${h}:00`;
-    }
-    if (h === 0) return '';
-    if (h < 12) return `${h} AM`;
-    if (h === 12) return '12 PM';
-    return `${h - 12} PM`;
-  }
-
   function getMonthDayLabel(dateStr) {
     const m = parseInt(dateStr.slice(5, 7));
     const d = parseInt(dateStr.slice(8, 10));
@@ -96,5 +81,5 @@ export function useCalendarHelpers() {
     t('schedule.october'), t('schedule.november'), t('schedule.december'),
   ]);
 
-  return { isZh, formatHour, getMonthDayLabel, weekDayLabels, weekDayMiniLabels, monthNames };
+  return { isZh, getMonthDayLabel, weekDayLabels, weekDayMiniLabels, monthNames };
 }

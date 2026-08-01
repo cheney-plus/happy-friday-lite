@@ -6,7 +6,8 @@ export const useAppStore = defineStore('app', {
     language: 'zh-CN',
     theme: 'light',
     loading: false,
-    noteFimCompletion: true
+    noteFimCompletion: true,
+    scheduleDefaultView: 'month'
   }),
   actions: {
     toggleSidebar() {
@@ -20,6 +21,9 @@ export const useAppStore = defineStore('app', {
     },
     setNoteFimCompletion(value) {
       this.noteFimCompletion = value
+    },
+    setScheduleDefaultView(value) {
+      this.scheduleDefaultView = value
     }
   }
 })

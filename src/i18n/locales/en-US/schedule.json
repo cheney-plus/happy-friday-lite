@@ -22,6 +22,7 @@
   "cancel": "Cancel",
   "delete": "Delete",
   "noEvents": "No events",
+  "noEventsWeek": "No events this week",
   "eventCount": "{{count}} events",
   "confirmDelete": "Are you sure you want to delete this event?",
   "dateRange": "Date",

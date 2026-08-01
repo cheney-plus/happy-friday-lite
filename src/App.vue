@@ -105,6 +105,9 @@ onMounted(async () => {
         if (config.noteFimCompletion !== undefined) {
           appStore.setNoteFimCompletion(config.noteFimCompletion);
         }
+        if (config.scheduleDefaultView) {
+          appStore.setScheduleDefaultView(config.scheduleDefaultView);
+        }
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -122,6 +125,9 @@ onMounted(async () => {
       }
       if (data.noteFimCompletion !== undefined) {
         appStore.setNoteFimCompletion(data.noteFimCompletion);
+      }
+      if (data.scheduleDefaultView) {
+        appStore.setScheduleDefaultView(data.scheduleDefaultView);
       }
     });
   } else {

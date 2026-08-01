@@ -116,7 +116,6 @@
       <!-- Week View -->
       <div v-else-if="currentView === 'week'" class="week-view">
         <div class="wk-header">
-          <div class="wk-gutter-head"></div>
           <div class="wk-header-days">
             <div
               v-for="day in weekDays"
@@ -128,69 +127,63 @@
             </div>
           </div>
         </div>
-        <div class="wk-allday">
-          <div class="wk-gutter-allday">{{ t('schedule.allDay') }}</div>
-          <div class="wk-allday-cols">
+        <div class="wk-scroll">
+          <!-- 周视图主体：跨日与单日日程统一在同一区域，跨日日程作为连续色条悬浮于列顶部 -->
+          <div class="wk-cols" @mouseup="onWeekGridMouseUp">
             <div
-              v-for="day in weekDays"
+              v-for="(day, dayIdx) in weekDays"
               :key="day.date"
-              :class="['wk-allday-col', { 'wk-today-col': day.isToday }]"
-              :style="allDayCellStyle(day.date)"
-              @click="onAllDayCellClick(day.date)"
+              :class="['wk-day-col', {
+                'wk-today-col': day.isToday,
+                'is-selected': isDateInRange(day.date, weekDayDrag.startDate, weekDayDrag.endDate),
+                'is-dragging': weekDayDrag.active
+              }]"
+              :style="{ paddingTop: weekBarOffsetByDate[dayIdx] + 'px' }"
+              @mousedown.prevent="onWeekDayMouseDown(day.date, $event)"
+              @mouseenter="onWeekDayMouseEnter(day.date)"
+              @mouseup="onWeekDayMouseUp(day.date)"
+              @click="onWeekDayClick(day.date)"
             >
-              <div
-                v-for="evt in getDayEventsForAllDayRow(day.date)"
-                :key="evt.id"
-                :class="['wk-allday-evt', evt.completed ? 'is-completed' : 'is-incomplete']"
-                :style="{ backgroundColor: getEventBgColor(evt), color: getEventDisplayColor(evt), borderLeftColor: getEventDisplayColor(evt) }"
-                @click.stop="onEventClick(evt)"
-                @contextmenu.prevent.stop="onEventRightClick($event, evt)"
-              >{{ evt.title }}</div>
-            </div>
-          </div>
-        </div>
-        <div class="wk-scroll" ref="weekScrollRef">
-          <div class="wk-body" :style="{ height: totalDayHeight + 'px' }">
-            <div class="wk-gutter-times">
-              <div v-for="h in 24" :key="h" class="wk-gutter-hour" :style="{ top: ((h - 1) * hourPx) + 'px' }">
-                {{ formatHour(h - 1) }}
-              </div>
-            </div>
-            <div class="wk-grid" @mouseup="onWeekCellMouseUp">
-              <div
-                v-for="day in weekDays"
-                :key="day.date"
-                :class="['wk-col', { 'wk-today-col': day.isToday }]"
-              >
+              <div class="wk-day-events">
                 <div
-                  v-for="h in 24"
-                  :key="h"
-                  :class="['wk-cell', { 'wk-cell-selected': weekTimeDrag.active && day.date === weekTimeDrag.startDate && h - 1 >= Math.min(weekTimeDrag.startHour, weekTimeDrag.endHour) && h - 1 <= Math.max(weekTimeDrag.startHour, weekTimeDrag.endHour) }]"
-                  :style="{ height: hourPx + 'px' }"
-                  @mousedown.prevent="onWeekCellMouseDown(day.date, h - 1, $event)"
-                  @mouseenter="onWeekCellMouseEnter(h - 1)"
-                  @click="onWeekCellClick(day.date, h - 1)"
+                  v-for="evt in getWeekSingleDayEvents(day.date)"
+                  :key="evt.id"
+                  :class="['wk-card', evt.completed ? 'is-completed' : 'is-incomplete']"
+                  :style="{ backgroundColor: getEventBgColor(evt) }"
+                  @click.stop="onEventClick(evt)"
+                  @contextmenu.prevent.stop="onEventRightClick($event, evt)"
                 >
-                  <div class="wk-cell-half"></div>
-                </div>
-                <div class="wk-evt-layer">
-                  <div
-                    v-for="evt in getTimedEventsForDate(day.date)"
-                    :key="evt.id"
-                    class="wk-evt"
-                    :style="timedEventStyle(evt)"
-                    @click.stop="onEventClick(evt)"
-                    @contextmenu.prevent.stop="onEventRightClick($event, evt)"
-                  >
-                    <div class="wk-evt-title">{{ evt.title }}</div>
-                    <div class="wk-evt-time">{{ evt.startTime }} - {{ evt.endTime }}</div>
+                  <div class="wk-card-head">
+                    <span class="wk-card-title">{{ evt.title }}</span>
+                    <span v-if="evt.reminder" class="wk-card-reminder" :title="t('schedule.reminder')">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    </span>
+                    <span class="wk-priority-tag" :class="priorityClass(evt.priority)">{{ priorityLabel(evt.priority) }}</span>
                   </div>
+                  <div class="wk-card-meta">
+                    <span v-if="evt.allDay" class="wk-card-allday">{{ t('schedule.allDay') }}</span>
+                    <span v-else class="wk-card-time">{{ evt.startTime }} - {{ evt.endTime }}</span>
+                  </div>
+                  <div v-if="evt.description" class="wk-card-desc">{{ evt.description }}</div>
                 </div>
               </div>
             </div>
-            <div v-if="isCurrentWeek" class="wk-now" :style="{ top: nowY + 'px' }">
-              <div class="wk-now-line"></div>
-              <div v-if="todayColIndex >= 0" class="wk-now-bold" :style="nowBoldStyle()"></div>
+            <!-- 跨日日程：连续横跨多列的色条，与单日卡片同处一个区域 -->
+            <div
+              v-for="bar in weekMultiDayBars"
+              :key="'wmd-' + bar.event.id"
+              :class="['wk-mday-bar', bar.event.completed ? 'is-completed' : 'is-incomplete']"
+              :style="weekBarStyle(bar)"
+              @click.stop="onEventClick(bar.event)"
+              @contextmenu.prevent.stop="onEventRightClick($event, bar.event)"
+            >
+              <span class="wk-mday-bar-title">{{ bar.event.title }}</span>
+              <span class="wk-mday-bar-date">{{ formatWeekBarDateRange(bar.event) }}</span>
+              <span class="wk-priority-tag" :class="priorityClass(bar.event.priority)">{{ priorityLabel(bar.event.priority) }}</span>
+            </div>
+            <!-- 本周无日程时的居中提示（不阻挡点击，仍可点空白创建） -->
+            <div v-if="!weekHasEvents" class="wk-empty">
+              {{ isCurrentWeek ? t('schedule.noEventsWeek') : t('schedule.noEvents') }}
             </div>
           </div>
         </div>
@@ -261,6 +254,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch, onDeactivated, 
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useScheduleStore, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
+import { useAppStore } from '@/store';
 import ScheduleTaskList from './ScheduleTaskList.vue';
 import EventFormModal from './components/EventFormModal.vue';
 import EventContextMenu from './components/EventContextMenu.vue';
@@ -274,7 +268,6 @@ import {
   formatDate,
   isTodayStr,
   isDateInRange,
-  timeToMin,
   getEventBgColor,
   getEventDisplayColor,
 } from './utils/calendarHelpers';
@@ -282,15 +275,18 @@ import {
 const { t } = useI18n();
 const router = useRouter();
 const scheduleStore = useScheduleStore();
+const appStore = useAppStore();
 
-const { isZh, formatHour, getMonthDayLabel, weekDayLabels, weekDayMiniLabels, monthNames } = useCalendarHelpers();
+const { isZh, getMonthDayLabel, weekDayLabels, weekDayMiniLabels, monthNames } = useCalendarHelpers();
 
 // ========== 视图状态 ==========
-const currentView = ref('month');
+// 初始视图取自设置：打开日程时默认显示用户配置的视图
+const currentView = ref(appStore.scheduleDefaultView === 'week' ? 'week' : 'month');
+// 记录上次已知的默认视图，用于在 keep-alive 重新激活时检测设置是否变更
+const lastDefaultView = ref(appStore.scheduleDefaultView);
 const viewYear = ref(new Date().getFullYear());
 const viewMonth = ref(new Date().getMonth());
 const weekOffset = ref(0);
-const weekScrollRef = ref(null);
 const showAssistant = ref(false);
 
 const views = computed(() => [
@@ -605,11 +601,6 @@ function shouldShowMore(date) {
 }
 
 // ========== 周视图 ==========
-const hourPx = 48;
-const totalDayHeight = 24 * hourPx;
-const nowY = ref(0);
-let nowTimer = null;
-
 const weekDays = computed(() => {
   const now = new Date();
   const currentDay = now.getDay();
@@ -636,64 +627,131 @@ const weekDays = computed(() => {
 
 const isCurrentWeek = computed(() => weekOffset.value === 0);
 
-// 今日在周视图中的列索引（0=周一 … 6=周日），用于定位蓝色时间线加粗段
-const todayColIndex = computed(() => weekDays.value.findIndex(d => d.isToday));
+/** 当前查看的周是否没有任何日程（含跨日与单日） */
+const weekHasEvents = computed(() => {
+  const days = weekDays.value;
+  if (days.length === 0) return true;
+  const weekStart = days[0].date;
+  const weekEnd = days[6].date;
+  return scheduleStore.events.some(e => e.end >= weekStart && e.start <= weekEnd);
+});
 
-/** 今日列的加粗蓝色线段位置 */
-function nowBoldStyle() {
-  const idx = todayColIndex.value;
-  if (idx < 0) return {};
+/**
+ * 周视图跨日日程条：每个跨日事件（start !== end）渲染为一条连续横跨多列的色条。
+ * 通过贪心算法分配垂直槽位以避免重叠，类似月视图的 multi-day-bar。
+ */
+const weekMultiDayBars = computed(() => {
+  const days = weekDays.value;
+  if (days.length === 0) return [];
+  const weekStart = days[0].date;
+  const weekEnd = days[6].date;
+  const dateIndex = new Map();
+  days.forEach((d, i) => dateIndex.set(d.date, i));
+
+  const seen = new Set();
+  const segs = [];
+  for (const evt of scheduleStore.events) {
+    if (evt.start === evt.end) continue; // 单日事件不在此处理
+    if (evt.end < weekStart || evt.start > weekEnd) continue;
+    if (seen.has(evt.id)) continue;
+    seen.add(evt.id);
+    const vs = evt.start < weekStart ? weekStart : evt.start;
+    const ve = evt.end > weekEnd ? weekEnd : evt.end;
+    const startCol = dateIndex.get(vs);
+    const endCol = dateIndex.get(ve);
+    if (startCol === undefined || endCol === undefined) continue;
+    segs.push({ event: evt, startCol, endCol });
+  }
+
+  // 按起始列排序后贪心分配槽位
+  segs.sort((a, b) => a.startCol - b.startCol || a.endCol - b.endCol);
+  const activeEndCols = [];
+  for (const seg of segs) {
+    let slot = -1;
+    for (let i = 0; i < activeEndCols.length; i++) {
+      if (activeEndCols[i] < seg.startCol) { slot = i; break; }
+    }
+    if (slot === -1) {
+      slot = activeEndCols.length;
+      activeEndCols.push(seg.endCol);
+    } else {
+      activeEndCols[slot] = seg.endCol;
+    }
+    seg.slot = slot;
+  }
+  return segs;
+});
+
+/**
+ * 单日日程（start === end）按日期分组，并按"未完成 → 优先级 → 全天 → 时间"排序，
+ * 使重要的未完成事项优先展示在卡片列顶部。
+ */
+const weekSingleDayEventsByDate = computed(() => {
+  const map = new Map();
+  const pr = { urgent: 0, important: 1, minor: 2 };
+  for (const day of weekDays.value) {
+    const evts = scheduleStore
+      .getEventsForDateRange(day.date, day.date)
+      .filter(e => e.start === e.end)
+      .sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        const pa = pr[a.priority || DEFAULT_EVENT_PRIORITY] ?? 1;
+        const pb = pr[b.priority || DEFAULT_EVENT_PRIORITY] ?? 1;
+        if (pa !== pb) return pa - pb;
+        if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+        return (a.startTime || '').localeCompare(b.startTime || '');
+      });
+    map.set(day.date, evts);
+  }
+  return map;
+});
+
+function getWeekSingleDayEvents(date) {
+  return weekSingleDayEventsByDate.value.get(date) || [];
+}
+
+/** 跨日色条的日期范围标签，如 "8月1日 - 8月3日" / "Aug 1 - Aug 3" */
+function formatWeekBarDateRange(evt) {
+  const s = getMonthDayLabel(evt.start);
+  const e = getMonthDayLabel(evt.end);
+  return s === e ? s : `${s} - ${e}`;
+}
+
+// 跨日色条尺寸常量（与 CSS 中 .wk-mday-bar 高度对应）
+const WK_BAR_H = 30;
+const WK_BAR_GAP = 4;
+const WK_BASE_PAD = 6;
+
+/**
+ * 各日期列顶部为跨日色条预留的偏移量（数组，按列索引 0..6）。
+ * 覆盖该列的色条按槽位占据顶部空间，单日卡片在偏移量之下排布，避免与色条重叠。
+ */
+const weekBarOffsetByDate = computed(() => {
+  const days = weekDays.value;
+  const bars = weekMultiDayBars.value;
+  const offsets = [];
+  for (let i = 0; i < days.length; i++) {
+    let maxSlot = -1;
+    for (const bar of bars) {
+      if (i >= bar.startCol && i <= bar.endCol && bar.slot > maxSlot) {
+        maxSlot = bar.slot;
+      }
+    }
+    offsets.push(WK_BASE_PAD + (maxSlot + 1) * (WK_BAR_H + WK_BAR_GAP));
+  }
+  return offsets;
+});
+
+/** 跨日色条定位样式：按起止列与槽位绝对定位，连续横跨多列 */
+function weekBarStyle(bar) {
+  const span = bar.endCol - bar.startCol + 1;
   return {
-    left: `calc(56px + ${idx} * (100% - 56px) / 7)`,
-    width: `calc((100% - 56px) / 7)`,
+    left: `calc(${bar.startCol * (100 / 7)}% + 4px)`,
+    width: `calc(${span * (100 / 7)}% - 8px)`,
+    top: `${WK_BASE_PAD + bar.slot * (WK_BAR_H + WK_BAR_GAP)}px`,
+    height: `${WK_BAR_H}px`,
+    backgroundColor: getEventBgColor(bar.event),
   };
-}
-
-// 全天行展示当日全部任务（含跨日 + 定时），作为当日任务清单
-const ALLDAY_ITEM_H = 20;   // 单个 item 占用高度（含 gap）
-const ALLDAY_BASE_MIN_H = 56; // 全天行最小高度（已调高）
-
-function getDayEventsForAllDayRow(date) {
-  return scheduleStore.getEventsForDateRange(date, date);
-}
-
-/** 全天行单元格高度：随 item 数量增长，并始终预留至少一个空位以便点击 */
-function allDayCellStyle(date) {
-  const count = getDayEventsForAllDayRow(date).length;
-  const minH = Math.max(ALLDAY_BASE_MIN_H, (count + 1) * ALLDAY_ITEM_H + 8);
-  return { minHeight: minH + 'px' };
-}
-
-function onAllDayCellClick(date) {
-  openCreateModal(date, date, undefined, undefined, true);
-}
-
-function timedEventStyle(evt) {
-  const s = timeToMin(evt.startTime || '00:00');
-  const e = timeToMin(evt.endTime || '23:59');
-  const top = (s / 60) * hourPx;
-  const height = Math.max(((e - s) / 60) * hourPx, 22);
-  const dc = getEventDisplayColor(evt);
-  return {
-    top: `${top}px`,
-    height: `${height}px`,
-    backgroundColor: dc + (evt.completed ? '18' : '40'),
-    borderLeftColor: dc,
-    color: dc,
-  };
-}
-
-function updateNowY() {
-  const now = new Date();
-  nowY.value = (now.getHours() * 60 + now.getMinutes()) / 60 * hourPx;
-}
-
-function scrollToNow() {
-  if (!weekScrollRef.value) return;
-  const now = new Date();
-  // 统一定位到当前时间点
-  const y = (now.getHours() - 1) * hourPx;
-  weekScrollRef.value.scrollTop = Math.max(0, y);
 }
 
 // ========== 年视图 ==========
@@ -766,10 +824,6 @@ function priorityLabel(p) {
   return t('schedule.priorityImportant');
 }
 
-function getTimedEventsForDate(date) {
-  return scheduleStore.getEventsForDateRange(date, date).filter(e => !e.allDay);
-}
-
 // ========== 导航 ==========
 function navigatePrev() {
   if (currentView.value === 'month') {
@@ -823,14 +877,19 @@ function switchView(view) {
     const currentDay = now.getDay();
     const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
     const thisMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
-    const targetMonday = new Date(viewYear.value, viewMonth.value, 1);
+    // 查看月份包含今日时锚定今日（切到本周），否则锚定该月 1 号
+    const isCurrentMonth = now.getFullYear() === viewYear.value && now.getMonth() === viewMonth.value;
+    const targetDate = isCurrentMonth
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      : new Date(viewYear.value, viewMonth.value, 1);
+    // 取目标日期所在周的周一，确保 diffDays 为 7 的倍数
+    const targetDay = targetDate.getDay();
+    const targetMondayOffset = targetDay === 0 ? -6 : 1 - targetDay;
+    const targetMonday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + targetMondayOffset);
     const diffDays = Math.round((targetMonday - thisMonday) / 86400000);
     weekOffset.value = Math.round(diffDays / 7);
   }
   currentView.value = view;
-  if (view === 'week') {
-    nextTick(scrollToNow);
-  }
 }
 
 function onYearMonthClick(monthIndex) {
@@ -888,46 +947,49 @@ function onGridMouseUp() {
   }
 }
 
-// ========== 周视图拖拽选择 ==========
-const weekTimeDrag = ref({
-  active: false,
-  startDate: '',
-  startHour: -1,
-  endHour: -1,
-});
+// ========== 周视图拖拽选择（按天，跨日创建全天日程） ==========
+const weekDayDrag = ref({ active: false, startDate: '', endDate: '', completed: false });
 
-function onWeekCellClick(date, hour) {
-  if (weekTimeDrag.value.active) return;
-  const startTime = `${String(hour).padStart(2, '0')}:00`;
-  const endHour = hour + 1;
-  const endTime = endHour >= 24 ? '23:59' : `${String(endHour).padStart(2, '0')}:00`;
-  openCreateModal(date, date, startTime, endTime, false);
-}
-
-function onWeekCellMouseDown(date, hour, event) {
+function onWeekDayMouseDown(date, event) {
   if (event && event.button !== 0) return; // 仅左键可拖拽
-  weekTimeDrag.value = {
-    active: true,
-    startDate: date,
-    startHour: hour,
-    endHour: hour,
-  };
+  weekDayDrag.value = { active: true, startDate: date, endDate: date, completed: false };
 }
 
-function onWeekCellMouseEnter(hour) {
-  if (!weekTimeDrag.value.active) return;
-  weekTimeDrag.value.endHour = hour;
+function onWeekDayMouseEnter(date) {
+  if (!weekDayDrag.value.active) return;
+  weekDayDrag.value.endDate = date;
 }
 
-function onWeekCellMouseUp() {
-  if (!weekTimeDrag.value.active) return;
-  const { startDate, startHour, endHour } = weekTimeDrag.value;
-  const minHour = Math.min(startHour, endHour);
-  const maxHour = Math.max(startHour, endHour);
-  const startTime = `${String(minHour).padStart(2, '0')}:00`;
-  const endTime = maxHour >= 23 ? '23:59' : `${String(maxHour + 1).padStart(2, '0')}:00`;
-  weekTimeDrag.value.active = false;
-  openCreateModal(startDate, startDate, startTime, endTime, false);
+function onWeekDayMouseUp(date) {
+  if (!weekDayDrag.value.active) return;
+  const start = weekDayDrag.value.startDate;
+  const end = date || weekDayDrag.value.endDate;
+  const s = start < end ? start : end;
+  const e = start < end ? end : start;
+  weekDayDrag.value.active = false;
+  weekDayDrag.value.startDate = '';
+  weekDayDrag.value.endDate = '';
+  if (s !== e) {
+    weekDayDrag.value.completed = true;
+    openCreateModal(s, e, undefined, undefined, true);
+  }
+}
+
+function onWeekGridMouseUp() {
+  if (weekDayDrag.value.active) {
+    weekDayDrag.value.active = false;
+    weekDayDrag.value.startDate = '';
+    weekDayDrag.value.endDate = '';
+  }
+}
+
+function onWeekDayClick(date) {
+  // 拖拽刚结束产生的 mouseup 会紧接着触发 click，这里跳过避免误创建
+  if (weekDayDrag.value.completed) {
+    weekDayDrag.value.completed = false;
+    return;
+  }
+  openCreateModal(date, date, undefined, undefined, true);
 }
 
 // ========== 事件交互 ==========
@@ -1020,9 +1082,7 @@ async function toggleEventComplete(evt) {
 
 // ========== 生命周期 ==========
 watch(currentView, (v) => {
-  if (v === 'week') {
-    nextTick(scrollToNow);
-  } else if (v === 'month') {
+  if (v === 'month') {
     nextTick(setupGridObserver);
   }
 });
@@ -1044,17 +1104,11 @@ function setupGridObserver() {
 
 onMounted(() => {
   scheduleStore.loadEvents();
-  updateNowY();
-  nowTimer = setInterval(updateNowY, 60000);
   nextTick(setupGridObserver);
   document.addEventListener('click', onViewDocClick);
 });
 
 onUnmounted(() => {
-  if (nowTimer) {
-    clearInterval(nowTimer);
-    nowTimer = null;
-  }
   gridResizeObserver?.disconnect();
   gridResizeObserver = null;
   document.removeEventListener('click', onViewDocClick);
@@ -1070,6 +1124,11 @@ onDeactivated(() => {
 // keep-alive 重新激活时刷新日程数据（onMounted 仅首次挂载时执行一次）
 onActivated(() => {
   scheduleStore.loadEvents();
+  // 若设置中的默认视图已变更（例如在设置页修改后返回），则同步切换到新默认视图
+  if (appStore.scheduleDefaultView !== lastDefaultView.value) {
+    lastDefaultView.value = appStore.scheduleDefaultView;
+    currentView.value = appStore.scheduleDefaultView === 'week' ? 'week' : 'month';
+  }
 });
 </script>
 
@@ -1562,14 +1621,8 @@ onActivated(() => {
 .wk-header {
   display: flex;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border-color);
   background: var(--bg-primary);
   z-index: 5;
-}
-
-.wk-gutter-head {
-  width: 56px;
-  flex-shrink: 0;
 }
 
 .wk-header-days {
@@ -1613,80 +1666,14 @@ onActivated(() => {
   justify-content: center;
 }
 
-.wk-allday {
-  display: flex;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-primary);
-}
-
-.wk-gutter-allday {
-  width: 56px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 10px;
-  font-size: 10px;
-  color: var(--text-tertiary);
-  font-weight: 500;
-}
-
-.wk-allday-cols {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  flex: 1;
-  padding-right: 8px;
-}
-
-.wk-allday-col {
-  border-left: 1px solid var(--border-color);
-  padding: 4px 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 56px;
-  min-width: 0;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.wk-allday-col:hover {
-  background: var(--bg-hover);
-}
-
-.wk-allday-evt {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border-left: 3px solid;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.wk-allday-evt:hover {
-  opacity: 0.85;
-}
-
-.wk-allday-evt.is-completed {
-  opacity: 0.6;
-  font-weight: 400;
-}
-
-.wk-allday-evt.is-incomplete {
-  opacity: 1;
-  font-weight: 600;
-}
-
 .wk-scroll {
   flex: 1;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
   position: relative;
+  /* 始终预留滚动条槽位，与表头 padding-right:8px 对齐，
+     避免无滚动条时正文列与表头列错位 */
+  scrollbar-gutter: stable;
 }
 
 .wk-scroll::-webkit-scrollbar {
@@ -1710,137 +1697,227 @@ onActivated(() => {
   background: transparent;
 }
 
-.wk-body {
-  display: flex;
-  position: relative;
-}
-
-.wk-gutter-times {
-  width: 56px;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.wk-gutter-hour {
+/* ---- 跨日日程条（悬浮于列顶部，连续横跨多列） ---- */
+.wk-mday-bar {
   position: absolute;
-  right: 10px;
-  transform: translateY(-7px);
-  font-size: 10px;
-  color: var(--text-tertiary);
-  font-weight: 500;
-  line-height: 1;
+  z-index: 2;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
-.wk-grid {
+.wk-mday-bar:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+}
+
+.wk-mday-bar.is-completed {
+  opacity: 0.6;
+}
+
+.wk-mday-bar.is-incomplete .wk-mday-bar-title {
+  font-weight: 700;
+}
+
+.wk-mday-bar.is-completed .wk-mday-bar-title {
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+.wk-mday-bar-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wk-mday-bar-date {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ---- 单日日程卡片列 ---- */
+.wk-cols {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  flex: 1;
+  grid-template-rows: 1fr;
+  min-height: 100%;
 }
 
-.wk-col {
-  border-left: 1px solid var(--border-color);
-  position: relative;
+.wk-day-col {
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.wk-day-col:hover:not(:has(.wk-card:hover)) {
+  background: var(--bg-hover);
 }
 
 .wk-today-col {
   background: color-mix(in srgb, var(--accent-color) 4%, transparent);
 }
 
-.wk-cell {
-  border-bottom: 1px solid var(--border-color);
+.wk-today-col:hover:not(:has(.wk-card:hover)) {
+  background: color-mix(in srgb, var(--accent-color) 7%, transparent);
+}
+
+.wk-day-col.is-selected,
+.wk-day-col.is-dragging.is-selected {
+  background: var(--accent-light);
+}
+
+.wk-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 0 12px;
+}
+
+/* ---- 富信息日程卡片 ---- */
+.wk-card {
+  border-radius: 8px;
+  padding: 8px 10px;
   cursor: pointer;
-  transition: background 0.1s;
-  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
-.wk-cell:hover {
-  background: var(--bg-hover);
+.wk-card:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
 }
 
-.wk-cell-selected {
-  background: var(--accent-light) !important;
+.wk-card.is-completed {
+  opacity: 0.6;
 }
 
-.wk-cell-half {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  border-bottom: 1px dashed color-mix(in srgb, var(--border-color) 60%, transparent);
+.wk-card.is-completed .wk-card-title {
+  text-decoration: line-through;
+  font-weight: 400;
 }
 
-.wk-evt-layer {
-  position: absolute;
-  top: 0;
-  left: 3px;
-  right: 3px;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.wk-evt {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border-radius: 5px;
-  border-left: 3px solid;
-  padding: 3px 8px;
-  overflow: hidden;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: opacity 0.15s, box-shadow 0.15s;
-}
-
-.wk-evt:hover {
-  opacity: 0.9;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.wk-evt-title {
-  font-size: 12px;
+.wk-card.is-incomplete .wk-card-title {
   font-weight: 600;
+}
+
+.wk-card-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.wk-card-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
   line-height: 1.3;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.wk-evt-time {
+.wk-card-reminder {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  display: inline-flex;
+}
+
+.wk-card-meta {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.wk-card-time {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wk-card-allday {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
   font-size: 10px;
-  opacity: 0.8;
-  margin-top: 1px;
+  font-weight: 600;
+  color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.wk-card-desc {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.wk-now {
+/* 优先级文字标签（卡片 + 跨日条共用） */
+.wk-priority-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.wk-priority-tag.priority-urgent {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.wk-priority-tag.priority-important {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.wk-priority-tag.priority-minor {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.14);
+}
+
+/* ---- 空状态提示 ---- */
+.wk-empty {
   position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 10;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
-}
-
-/* 非今日列的淡色时间线（横跨整周） */
-.wk-now-line {
-  position: absolute;
-  left: 56px;
-  right: 0;
-  top: -1px;
-  height: 3px;
-  background: var(--accent-color);
-  opacity: 0.35;
-}
-
-/* 今日列的加粗时间线段 */
-.wk-now-bold {
-  position: absolute;
-  top: -1px;
-  height: 3px;
-  background: var(--accent-color);
-  z-index: 1;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 /* ========== Year View ========== */

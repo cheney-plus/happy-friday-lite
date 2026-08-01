@@ -75,6 +75,19 @@
               <span class="toggle-slider"></span>
             </label>
           </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.scheduleDefaultView') }}</span>
+            <div class="font-size-options">
+              <div
+                :class="['font-size-option', { active: settings.scheduleDefaultView === 'week' }]"
+                @click="selectScheduleView('week')"
+              >{{ t('settings.viewWeek') }}</div>
+              <div
+                :class="['font-size-option', { active: settings.scheduleDefaultView === 'month' }]"
+                @click="selectScheduleView('month')"
+              >{{ t('settings.viewMonth') }}</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -541,7 +554,8 @@ const settings = reactive({
   displayMode: currentMode,
   fontSize: 16,
   messageNotify: false,
-  noteFimCompletion: appStore.noteFimCompletion
+  noteFimCompletion: appStore.noteFimCompletion,
+  scheduleDefaultView: appStore.scheduleDefaultView || 'month'
 });
 
 // ========== 通用提示弹窗（替代原生 alert/confirm） ==========
@@ -1055,6 +1069,19 @@ const saveNoteFimCompletion = async () => {
     const config = await electronService.invoke('get-config');
     if (config) {
       config.noteFimCompletion = settings.noteFimCompletion;
+      await electronService.invoke('save-config', config);
+    }
+  } catch (_e) {}
+};
+
+const selectScheduleView = async (value) => {
+  if (value !== 'week' && value !== 'month') return;
+  settings.scheduleDefaultView = value;
+  appStore.setScheduleDefaultView(value);
+  try {
+    const config = await electronService.invoke('get-config');
+    if (config) {
+      config.scheduleDefaultView = value;
       await electronService.invoke('save-config', config);
     }
   } catch (_e) {}
