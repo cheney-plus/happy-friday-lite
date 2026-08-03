@@ -9,11 +9,11 @@
     "title": "Skills Management",
     "addSkill": "Add Skill",
     "installed": "Installed Skills",
-    "builtin": "Built-in Skills",
     "emptyInstalled": "No installed skills yet",
-    "disable": "Disable",
-    "enable": "Enable",
-    "uninstall": "Uninstall"
+    "delete": "Delete",
+    "importFailed": "Import failed",
+    "deleteFailed": "Delete failed",
+    "duplicate": "A skill with the same name already exists"
   },
   "comingSoon": "Coming soon"
 }

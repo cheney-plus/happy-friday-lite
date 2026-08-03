@@ -4,7 +4,7 @@
     <div class="panel-header">
       <h2 class="section-title">{{ t('drawer.skills.title') }}</h2>
       <div class="header-actions">
-        <button class="add-skill-btn" @click="handleAddSkill">
+        <button class="add-skill-btn" :disabled="busy" @click="handleAddSkill">
           <Plus :size="14" :stroke-width="2" />
           {{ t('drawer.skills.addSkill') }}
         </button>
@@ -16,114 +16,153 @@
 
     <!-- Scrollable body -->
     <div class="panel-body">
-      <!-- Installed Skills -->
       <div class="skills-section">
         <h3 class="subsection-title">{{ t('drawer.skills.installed') }}</h3>
-        <div class="skills-list">
-          <div v-for="skill in installedSkills" :key="skill.id" class="skill-card installed">
-            <div class="skill-card-main">
-              <div class="skill-name">{{ skill.name }}</div>
-              <div class="skill-desc">{{ skill.description }}</div>
-            </div>
-            <button class="skill-menu-btn" @click.stop="toggleMenu(skill.id)">
-              <MoreHorizontal :size="16" />
+        <div class="skills-grid">
+          <div v-for="skill in skills" :key="skill.id" class="skill-card">
+            <div class="skill-name">{{ skill.name }}</div>
+            <div
+              class="skill-desc"
+              @mouseenter="showDescTooltip($event, skill.description)"
+              @mouseleave="hideDescTooltip"
+            >{{ skill.description }}</div>
+            <button
+              class="skill-delete-btn"
+              :title="t('drawer.skills.delete')"
+              @click.stop="handleDelete(skill)"
+            >
+              <Trash2 :size="12" :stroke-width="2" />
             </button>
-            <Transition name="menu-fade">
-              <div v-if="openMenuId === skill.id" class="skill-menu">
-                <button class="menu-option" @click.stop="handleSkillAction(skill, 'disable')">
-                  {{ skill.enabled ? t('drawer.skills.disable') : t('drawer.skills.enable') }}
-                </button>
-                <button class="menu-option danger" @click.stop="handleSkillAction(skill, 'uninstall')">
-                  {{ t('drawer.skills.uninstall') }}
-                </button>
-              </div>
-            </Transition>
           </div>
-          <div v-if="installedSkills.length === 0" class="empty-hint">
+          <div v-if="!loading && skills.length === 0" class="empty-hint">
             {{ t('drawer.skills.emptyInstalled') }}
           </div>
         </div>
       </div>
-
-      <!-- Built-in Skills -->
-      <div class="skills-section">
-        <h3 class="subsection-title">{{ t('drawer.skills.builtin') }}</h3>
-        <div class="skills-grid">
-          <div v-for="skill in builtinSkills" :key="skill.id" class="skill-card builtin">
-            <div class="skill-name">{{ skill.name }}</div>
-            <div class="skill-desc">{{ skill.description }}</div>
-          </div>
-        </div>
-      </div>
     </div>
+
+    <!-- Transient notice -->
+    <Transition name="menu-fade">
+      <div v-if="notice" class="notice" :class="notice.type">{{ notice.text }}</div>
+    </Transition>
+
+    <!-- Full-description hover tooltip (fixed → escapes scroll/overflow) -->
+    <div
+      v-if="tooltip.visible"
+      class="desc-tooltip"
+      :style="tooltip.style"
+    >{{ tooltip.text }}</div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Plus, MoreHorizontal, X } from 'lucide-vue-next';
+import { Plus, Trash2, X } from 'lucide-vue-next';
 
 const { t } = useI18n();
 
 const emit = defineEmits(['close']);
 
-const openMenuId = ref(null);
+const skills = ref([]);
+const loading = ref(false);
+const busy = ref(false);
+const notice = ref(null);
+let noticeTimer = null;
 
-const installedSkills = ref([
-  {
-    id: 'wechat-reading',
-    name: '微信读书 skill',
-    description: '微信读书助手 — 书籍搜索、管理书架、查看笔记划线、浏览书评、阅读统计、发现推荐好书',
-    enabled: true
+// 描述悬浮 tooltip：使用 fixed 定位以逃出滚动容器的 overflow 裁剪
+const tooltip = ref({ visible: false, text: '', style: {} });
+
+const showNotice = (text, type = 'info') => {
+  notice.value = { text, type };
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => {
+    notice.value = null;
+  }, 2800);
+};
+
+const showDescTooltip = (e, text) => {
+  if (!text) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const maxW = 320;
+  // 水平：尽量贴左，越界则右移
+  let x = rect.left;
+  if (x + maxW > window.innerWidth - 8) {
+    x = Math.max(8, window.innerWidth - 8 - maxW);
   }
-]);
-
-const builtinSkills = ref([
-  {
-    id: 'knowledge-base',
-    name: '知识库管理',
-    description: '知识库管理与元信息操作：内容导入/导出/移动/重命名、文件夹层级浏览与组织、按名称/标签/类型定位文件与文件夹、标签管理（给文件打/移除标签）...'
-  },
-  {
-    id: 'note-manage',
-    name: '笔记管理',
-    description: '管理用户的笔记和笔记本（新建、追加、编辑笔记内容、推送、重命名、移动笔记，按标题定位笔记，按笔记本浏览笔记列表，导出笔记到 works...'
-  },
-  {
-    id: 'create-skill',
-    name: '创建skill',
-    description: '创建新技能（skill）、修改并优化现有技能。当用户说"创建技能""新建 Skill""把这个流程变成技能""自动化我的 XX 流程"时触发。也适用于修...'
-  },
-  {
-    id: 'generate-ppt',
-    name: '生成ppt',
-    description: 'PPT演示文稿的创建与多轮编辑。支持创建PPT、对已有PPT进行修改（新增/编辑/删除/移动页面）、全局风格调整。当用户提到PPT、演示文...'
-  },
-  {
-    id: 'generate-report',
-    name: '生成报告',
-    description: '根据用户提供的数据或主题，自动生成结构化的分析报告，支持多种格式和模板选择。'
-  },
-  {
-    id: 'generate-podcast',
-    name: '生成播客',
-    description: '将文本内容转换为播客风格的音频脚本，支持多角色对话、语气调整等。'
+  // 垂直：选择上下空间较大的一侧展开（tooltip 不限高、无滚动条，
+  // 鼠标移入即消失，故不裁剪、不滚动，整段展示）
+  const spaceBelow = window.innerHeight - rect.bottom - 6;
+  const spaceAbove = rect.top - 6;
+  let style;
+  if (spaceBelow >= spaceAbove) {
+    style = { left: x + 'px', top: Math.max(8, rect.bottom + 6) + 'px' };
+  } else {
+    // 上方展开：用 bottom 锚定，向上生长
+    style = { left: x + 'px', bottom: Math.max(8, window.innerHeight - rect.top + 6) + 'px' };
   }
-]);
-
-const toggleMenu = (id) => {
-  openMenuId.value = openMenuId.value === id ? null : id;
+  tooltip.value = { visible: true, text, style };
 };
 
-const handleAddSkill = () => {
-  // TODO: implement add skill dialog
+const hideDescTooltip = () => {
+  tooltip.value = { ...tooltip.value, visible: false };
 };
 
-const handleSkillAction = (_skill, _action) => {
-  openMenuId.value = null;
-  // TODO: implement skill actions
+const loadSkills = async () => {
+  loading.value = true;
+  try {
+    const list = await window.electronAPI?.invoke('agent-list-skills');
+    skills.value = Array.isArray(list) ? list : [];
+  } catch (e) {
+    console.error('load skills failed', e);
+    skills.value = [];
+  } finally {
+    loading.value = false;
+  }
 };
+
+const handleAddSkill = async () => {
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    const res = await window.electronAPI?.invoke('agent-import-skill');
+    if (!res) return;
+    if (res.success) {
+      await loadSkills();
+    } else if (!res.canceled) {
+      const msg = res.duplicate
+        ? t('drawer.skills.duplicate')
+        : `${t('drawer.skills.importFailed')}: ${res.error || ''}`;
+      showNotice(msg, 'error');
+    }
+  } catch (e) {
+    showNotice(`${t('drawer.skills.importFailed')}: ${e?.message || e}`, 'error');
+  } finally {
+    busy.value = false;
+  }
+};
+
+const handleDelete = async (skill) => {
+  try {
+    const res = await window.electronAPI?.invoke('agent-delete-skill', { id: skill.id });
+    if (!res) return;
+    if (res.success) {
+      await loadSkills();
+    } else if (!res.canceled) {
+      showNotice(`${t('drawer.skills.deleteFailed')}: ${res.error || ''}`, 'error');
+    }
+  } catch (e) {
+    showNotice(`${t('drawer.skills.deleteFailed')}: ${e?.message || e}`, 'error');
+  }
+};
+
+onMounted(() => {
+  loadSkills();
+});
+
+onUnmounted(() => {
+  clearTimeout(noticeTimer);
+});
 </script>
 
 <style scoped>
@@ -132,6 +171,7 @@ const handleSkillAction = (_skill, _action) => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  position: relative;
 }
 
 /* Fixed header */
@@ -171,9 +211,14 @@ const handleSkillAction = (_skill, _action) => {
   transition: background-color 0.15s, border-color 0.15s;
 }
 
-.add-skill-btn:hover {
+.add-skill-btn:hover:not(:disabled) {
   background-color: var(--bg-hover);
   border-color: var(--text-tertiary);
+}
+
+.add-skill-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .close-btn {
@@ -239,31 +284,25 @@ const handleSkillAction = (_skill, _action) => {
   margin: 0;
 }
 
-/* Installed skills list */
-.skills-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Uniform 2-column grid */
+.skills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
 }
 
+/* Uniform card: fixed height so every card is the same size */
 .skill-card {
+  position: relative;
   background-color: var(--bg-secondary);
   border-radius: 8px;
   padding: 10px 12px;
-  transition: background-color 0.15s;
-}
-
-.skill-card.installed {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  position: relative;
-  gap: 8px;
-}
-
-.skill-card-main {
-  min-width: 0;
-  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  height: 96px;
+  box-sizing: border-box;
+  cursor: default;
 }
 
 .skill-name {
@@ -271,78 +310,52 @@ const handleSkillAction = (_skill, _action) => {
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.4;
+  /* 单行 + 省略号，保证高度一致 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* 给右上角删除按钮留出空间 */
+  padding-right: 20px;
 }
 
 .skill-desc {
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
-  margin-top: 2px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.skill-menu-btn {
-  width: 24px;
-  height: 24px;
+/* Small delete button, top-right */
+.skill-delete-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
-  border-radius: 5px;
+  border-radius: 4px;
   color: var(--text-tertiary);
   cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 0.15s, color 0.15s;
+  padding: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
 }
 
-.skill-menu-btn:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-primary);
+.skill-card:hover .skill-delete-btn {
+  opacity: 1;
 }
 
-.skill-menu {
-  position: absolute;
-  right: 12px;
-  top: 36px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  padding: 3px;
-  z-index: 10;
-  min-width: 112px;
-}
-
-.menu-option {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-family: inherit;
-  text-align: left;
-  transition: background-color 0.15s;
-}
-
-.menu-option:hover {
-  background-color: var(--bg-hover);
-}
-
-.menu-option.danger {
+.skill-delete-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
   color: #ef4444;
-}
-
-.menu-option.danger:hover {
-  background-color: rgba(239, 68, 68, 0.08);
 }
 
 .menu-fade-enter-active,
@@ -355,32 +368,56 @@ const handleSkillAction = (_skill, _action) => {
   opacity: 0;
 }
 
-/* Built-in skills grid */
-.skills-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-}
-
-.skill-card.builtin {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  cursor: default;
-}
-
-.skill-card.builtin .skill-desc {
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-}
-
 .empty-hint {
+  grid-column: 1 / -1;
   font-size: 12px;
   color: var(--text-tertiary);
   padding: 10px 0;
 }
 
-[data-theme='dark'] .skill-menu {
+/* Transient notice */
+.notice {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  color: var(--text-primary);
+  z-index: 20;
+}
+
+.notice.error {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+}
+
+/* Full-description hover tooltip */
+.desc-tooltip {
+  position: fixed;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: normal;
+  word-break: break-word;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+[data-theme='dark'] .notice,
+[data-theme='dark'] .desc-tooltip {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 </style>

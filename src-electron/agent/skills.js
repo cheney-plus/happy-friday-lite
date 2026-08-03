@@ -259,6 +259,7 @@ export function listSkills() {
         const content = fs.readFileSync(filePath, 'utf-8')
         const meta = parseSkillMetadata(content, entry.name)
         skills.push({
+          id: entry.name,
           name: meta.name,
           description: meta.description,
           path: `/SKILL/${entry.name}`,
@@ -275,6 +276,7 @@ export function listSkills() {
           const content = fs.readFileSync(skillMdPath, 'utf-8')
           const meta = parseSkillMetadata(content, `SKILL.md`)
           skills.push({
+            id: entry.name,
             name: meta.name || entry.name,
             description: meta.description,
             path: `/SKILL/${entry.name}/SKILL.md`,
@@ -307,6 +309,109 @@ export function generateSkillIndex() {
   }
 
   return skills
+}
+
+/**
+ * 删除指定 Skill
+ *
+ * @param {string} id SKILL 目录下的子目录名（目录型技能）或 .md 文件名（顶层文件型技能）
+ * @returns {{ success: boolean, error?: string }}
+ */
+export function deleteSkill(id) {
+  // 安全校验：id 必须是单一路径分量，禁止任何目录穿越
+  if (!id || id !== path.basename(id) || id === '.' || id === '..') {
+    return { success: false, error: '非法的 Skill 标识' }
+  }
+  const skillDir = getSkillDir()
+  const target = path.join(skillDir, id)
+  // 双重校验：解析后目标必须仍在 SKILL 目录内
+  const resolved = path.resolve(target)
+  if (resolved !== path.join(skillDir, id)) {
+    return { success: false, error: '目标路径越界' }
+  }
+  try {
+    if (!fs.existsSync(target)) {
+      return { success: false, error: 'Skill 不存在' }
+    }
+    fs.rmSync(target, { recursive: true, force: true })
+    log.info(`已删除 Skill: ${id}`)
+    // 重建索引，保持 _index.json 与磁盘一致
+    generateSkillIndex()
+    return { success: true }
+  } catch (e) {
+    log.warn(`删除 Skill 失败: ${id}`, e.message)
+    return { success: false, error: e.message }
+  }
+}
+
+/**
+ * 导入 Skill：将源技能文件夹复制到 SKILL 目录，并解析其 SKILL.md
+ *
+ * 源文件夹必须包含 SKILL.md；同名冲突时自动追加序号（name-2、name-3 …）。
+ * 复用 copyDirRecursive 完成递归复制。
+ *
+ * @param {string} srcDir 源技能文件夹路径（须含 SKILL.md）
+ * @returns {{ success: boolean, skill?: object, error?: string }}
+ */
+export function importSkill(srcDir) {
+  if (!srcDir || !fs.existsSync(srcDir)) {
+    return { success: false, error: '源路径不存在' }
+  }
+  const stat = fs.statSync(srcDir)
+  if (!stat.isDirectory()) {
+    return { success: false, error: '请选择一个文件夹' }
+  }
+  const skillMdPath = path.join(srcDir, 'SKILL.md')
+  if (!fs.existsSync(skillMdPath)) {
+    return { success: false, error: '所选文件夹缺少 SKILL.md' }
+  }
+
+  // 先解析源 SKILL.md 元数据，用于重复校验与最终登记
+  let srcContent
+  try {
+    srcContent = fs.readFileSync(skillMdPath, 'utf-8')
+  } catch (e) {
+    return { success: false, error: '读取 SKILL.md 失败' }
+  }
+  const srcMeta = parseSkillMetadata(srcContent, 'SKILL.md')
+  const srcName = (srcMeta.name || '').trim()
+  const baseName = path.basename(srcDir)
+
+  ensureSkillDir()
+  const skillDir = getSkillDir()
+
+  // 重复校验 1：文件夹名与已安装 skill 目录重复 → 不导入
+  if (fs.existsSync(path.join(skillDir, baseName))) {
+    log.warn(`导入 Skill 失败：目录名重复 ${baseName}`)
+    return { success: false, duplicate: true, error: `已存在同名目录：${baseName}` }
+  }
+
+  // 重复校验 2：SKILL.md 的 name 与已安装 skill 名称重复 → 不导入
+  if (srcName) {
+    const existing = listSkills()
+    if (existing.some(s => (s.name || '').trim() === srcName)) {
+      log.warn(`导入 Skill 失败：名称重复 ${srcName}`)
+      return { success: false, duplicate: true, error: `已存在同名 Skill：${srcName}` }
+    }
+  }
+
+  const destDir = path.join(skillDir, baseName)
+  try {
+    copyDirRecursive(srcDir, destDir)
+    const skill = {
+      id: baseName,
+      name: srcMeta.name || baseName,
+      description: srcMeta.description,
+      path: `/SKILL/${baseName}/SKILL.md`,
+      fileName: `${baseName}/SKILL.md`
+    }
+    log.info(`已导入 Skill: ${baseName}`)
+    generateSkillIndex()
+    return { success: true, skill }
+  } catch (e) {
+    log.warn(`导入 Skill 失败: ${e.message}`)
+    return { success: false, error: e.message }
+  }
 }
 
 /**

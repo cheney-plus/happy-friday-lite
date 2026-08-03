@@ -20,7 +20,7 @@
  * 按 on_chat_model_stream / on_tool_start / on_tool_end / on_interrupt 分发到上述通道。
  */
 
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import { Command } from '@langchain/langgraph'
 import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_DONE, CHAT_ERROR } from '../events.js'
 import { CancellationTokens } from '../cancellation.js'
@@ -29,7 +29,7 @@ import * as db from '../db.js'
 import { buildLlmMessage } from '../attachmentContext.js'
 import { createAgentWithContext } from './index.js'
 import { createLogger } from './logger.js'
-import { listSkills, generateSkillIndex } from './skills.js'
+import { listSkills, generateSkillIndex, deleteSkill, importSkill } from './skills.js'
 import { listRegisteredTools, listToolNames } from './tools/registry.js'
 import {
   waitForApproval,
@@ -261,6 +261,40 @@ export function registerAgentCommands(mainWindow) {
   ipcMain.handle('agent-list-skills', async () => {
     generateSkillIndex()
     return listSkills()
+  })
+
+  // ========== agent-delete-skill: 删除指定技能 ==========
+  // 删除是不可逆操作，先弹出原生确认框；用户取消时返回 canceled: true
+  ipcMain.handle('agent-delete-skill', async (_event, args) => {
+    const id = args?.id
+    if (!id) return { success: false, error: '缺少 skill id' }
+
+    const confirm = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      buttons: ['取消', '删除'],
+      defaultId: 0,
+      cancelId: 0,
+      title: '删除 Skill',
+      message: '确定要删除该 Skill 吗？',
+      detail: '删除后无法恢复，该 Skill 目录下的所有文件将被一并移除。'
+    })
+    if (confirm.response !== 1) {
+      return { success: false, canceled: true }
+    }
+    return deleteSkill(id)
+  })
+
+  // ========== agent-import-skill: 通过文件夹选择器导入技能 ==========
+  // 弹出原生目录选择框，将选中文件夹复制进 SKILL 目录并解析 SKILL.md
+  ipcMain.handle('agent-import-skill', async () => {
+    const dlg = await dialog.showOpenDialog(mainWindow, {
+      title: '选择 Skill 文件夹',
+      properties: ['openDirectory']
+    })
+    if (dlg.canceled || !dlg.filePaths.length) {
+      return { success: false, canceled: true }
+    }
+    return importSkill(dlg.filePaths[0])
   })
 
   log.info('====== Agent IPC 通道注册完成 ======')

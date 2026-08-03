@@ -8,12 +8,12 @@
   "skills": {
     "title": "Skills管理",
     "addSkill": "添加Skill",
-    "installed": "我安装的Skills",
-    "builtin": "官方内置Skills",
-    "emptyInstalled": "暂无安装的Skills",
-    "disable": "禁用",
-    "enable": "启用",
-    "uninstall": "卸载"
+    "installed": "已安装的Skills",
+    "emptyInstalled": "暂无已安装的Skills",
+    "delete": "删除",
+    "importFailed": "导入失败",
+    "deleteFailed": "删除失败",
+    "duplicate": "已存在同名 Skill，重复导入"
   },
   "comingSoon": "功能开发中，敬请期待"
 }
