@@ -116,5 +116,8 @@
   "dialogSuccessTitle": "操作成功",
   "dialogErrorTitle": "发生错误",
   "dialogWarningTitle": "提示",
-  "dialogConfirmTitle": "请确认"
+  "dialogConfirmTitle": "请确认",
+  "runtimeLogs": "运行日志",
+  "openLogDir": "打开日志目录",
+  "openLogDirFailed": "打开日志目录失败"
 }

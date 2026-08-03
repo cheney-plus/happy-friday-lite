@@ -9,6 +9,7 @@ import { checkAutoBackup } from './src-electron/backup.js'
 import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
 import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
+import { initLogger } from './src-electron/logger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -31,6 +32,13 @@ if (isDev) {
   app.commandLine.appendSwitch('disable-setuid-sandbox')
   app.setPath('userData', path.join(__dirname, 'app-data', 'electron-user-data'))
 }
+
+// 尽早初始化文件日志器，接管 console.* 与未捕获异常，
+// 将运行日志落盘到数据目录，便于安装后排查异常。
+// 必须在 app.whenReady 之前同步执行，以捕获后续所有模块的输出。
+initLogger(
+  isDev ? path.join(__dirname, 'app-data') : app.getPath('userData')
+)
 
 let mainWindow = null
 let kbWatcherHandle = null

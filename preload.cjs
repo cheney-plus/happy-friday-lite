@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-read-file-buffer',
       'kb-open-file-external',
       'kb-watch-current-dir',
+      'logs-open-dir',
       'backup-create',
       'backup-restore',
       'backup-get-config',

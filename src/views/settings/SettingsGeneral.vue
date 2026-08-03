@@ -326,6 +326,12 @@
             <span class="item-label">{{ t('settings.versionLabel') }}&nbsp;{{ appVersion }}</span>
             <button class="text-btn" @click="checkForUpdate">{{ t('settings.checkUpdate') }}</button>
           </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.runtimeLogs') }}</span>
+            <div class="logs-actions">
+              <button class="text-btn" @click="openLogDir">{{ t('settings.openLogDir') }}</button>
+            </div>
+          </div>
           <div class="setting-item clickable" @click="showFeaturesModal = true">
             <span class="item-label">{{ t('settings.features') }}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -1288,6 +1294,14 @@ const openHelpUrl = () => {
   electronService.invoke('open-external', HELP_URL);
 };
 
+// 打开运行日志所在目录（系统文件管理器）
+const openLogDir = async () => {
+  const res = await electronService.invoke('logs-open-dir');
+  if (!res || res.success === false) {
+    notifyError(res?.error || t('settings.openLogDirFailed'));
+  }
+};
+
 const checkForUpdate = () => {
   electronService.invoke('open-external', `${HELP_URL}/releases`);
 };
@@ -2154,6 +2168,13 @@ const openAuthorEmail = () => {
   font-size: 13px;
   color: var(--text-tertiary);
   line-height: 1.5;
+}
+
+/* 运行日志 */
+.logs-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 [data-theme='dark'] .theme-dropdown-menu {

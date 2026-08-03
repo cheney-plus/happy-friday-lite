@@ -116,5 +116,8 @@
   "dialogSuccessTitle": "Success",
   "dialogErrorTitle": "Error",
   "dialogWarningTitle": "Notice",
-  "dialogConfirmTitle": "Confirm"
+  "dialogConfirmTitle": "Confirm",
+  "runtimeLogs": "Runtime Logs",
+  "openLogDir": "Open Log Folder",
+  "openLogDirFailed": "Failed to open log folder"
 }

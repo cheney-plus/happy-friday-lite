@@ -21,6 +21,7 @@ import { cleanHistoryNow } from './historyClean.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
+import { getLogDir } from './logger.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -870,6 +871,21 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('kb-open-in-explorer', async (_event, args) => {
     if (args.path) {
       await shell.openPath(args.path)
+    }
+  })
+
+  // 打开日志目录（系统文件管理器），供安装后用户查看运行日志
+  ipcMain.handle('logs-open-dir', async () => {
+    const dir = getLogDir()
+    if (!dir) return { success: false, error: 'Logger not initialized' }
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+      await shell.openPath(dir)
+      return { success: true, logDir: dir }
+    } catch (e) {
+      return { success: false, error: e.message, logDir: dir }
     }
   })
 
