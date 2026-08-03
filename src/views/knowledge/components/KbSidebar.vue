@@ -41,7 +41,7 @@
               >
                 <FolderOpenIcon :size="14" />
               </button>
-              <button v-if="!searchQuery" class="add-btn" @click.stop="$emit('add-kb', category.id)" title="添加知识库">
+              <button v-if="!searchQuery && category.id !== 'agent'" class="add-btn" @click.stop="$emit('add-kb', category.id)" title="添加知识库">
                 <PlusIcon :size="14" />
               </button>
             </div>
