@@ -28,10 +28,12 @@
     "adm-zip": "^0.5.17",
     "cheerio": "^1.2.0",
     "deepagents": "^1.10.5",
+    "epub2": "^3.0.2",
     "html-to-text": "^9.0.5",
     "mammoth": "^1.12.0",
     "marked": "^18.0.3",
     "officeparser": "^6.1.1",
+    "pdf-parse": "^1.1.1",
     "pptxgenjs": "^4.0.1",
     "sql.js": "^1.14.1",
     "turndown": "^7.2.4",
@@ -104,7 +106,8 @@
     "asarUnpack": [
       "node_modules/sql.js/dist/sql-wasm.wasm",
       "node_modules/@zvec/**/*.node",
-      "node_modules/@zvec/**/*.so"
+      "node_modules/@zvec/**/*.so",
+      "public/skills/**/*"
     ],
     "files": [
       "dist/**/*",
@@ -116,6 +119,7 @@
       "node_modules/sql.js/dist/sql-wasm.js",
       "node_modules/sql.js/dist/sql-wasm.wasm",
       "node_modules/sql.js/package.json",
+      "!dist/skills/**/*",
       "!node_modules/react-icons/**/*",
       "!node_modules/react/**/*",
       "!node_modules/react-dom/**/*",

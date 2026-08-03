@@ -31,23 +31,33 @@ async function loadTextFile(filePath) {
 }
 
 // 加载 PDF 文件
+// 依赖 pdf-parse（@langchain/community 的可选 peer 依赖）。
+// 同 EPUB：pdf-parse 必须显式声明在 dependencies 中，否则打包时被裁剪，
+// 运行时 import("pdf-parse") 抛错，PDF 索引构建失败。
 async function loadPdfFile(filePath) {
-  const { PDFLoader } = await import('@langchain/community/document_loaders/fs/pdf')
-  const loader = new PDFLoader(filePath)
-  const docs = await loader.load()
-  const stat = fs.statSync(filePath)
-  // 补充元数据
-  return docs.map(doc => ({
-    ...doc,
-    metadata: {
-      ...doc.metadata,
-      source: filePath,
-      fileType: 'pdf',
-      fileSize: stat.size,
-      fileCreatedAt: stat.birthtime.toISOString(),
-      fileModifiedAt: stat.mtime.toISOString()
+  try {
+    const { PDFLoader } = await import('@langchain/community/document_loaders/fs/pdf')
+    const loader = new PDFLoader(filePath)
+    const docs = await loader.load()
+    const stat = fs.statSync(filePath)
+    // 补充元数据
+    return docs.map(doc => ({
+      ...doc,
+      metadata: {
+        ...doc.metadata,
+        source: filePath,
+        fileType: 'pdf',
+        fileSize: stat.size,
+        fileCreatedAt: stat.birthtime.toISOString(),
+        fileModifiedAt: stat.mtime.toISOString()
+      }
+    }))
+  } catch (e) {
+    if (/pdf-parse/i.test(e.message)) {
+      throw new Error(`PDF 解析依赖 pdf-parse 缺失（打包未包含）：${e.message}。请确认 pdf-parse 已在 dependencies 中声明并重新构建。`)
     }
-  }))
+    throw e
+  }
 }
 
 // 加载 HTML 文件（本地文件直接用 cheerio 解析，不使用 CheerioWebBaseLoader）
@@ -88,22 +98,33 @@ async function loadJsonFile(filePath) {
 }
 
 // 加载 EPUB 文件
+// 依赖 epub2（@langchain/community 的可选 peer 依赖）。
+// 注意：epub2 必须在 package.json 的 dependencies 中显式声明，否则
+// electron-builder 打包时会将其作为 peer 依赖裁剪掉，导致打包后运行时
+// import("epub2") 抛出 "Failed to load epub2"，EPUB 索引构建失败。
 async function loadEpubFile(filePath) {
-  const { EPubLoader } = await import('@langchain/community/document_loaders/fs/epub')
-  const loader = new EPubLoader(filePath)
-  const docs = await loader.load()
-  const stat = fs.statSync(filePath)
-  return docs.map(doc => ({
-    ...doc,
-    metadata: {
-      ...doc.metadata,
-      source: filePath,
-      fileType: 'epub',
-      fileSize: stat.size,
-      fileCreatedAt: stat.birthtime.toISOString(),
-      fileModifiedAt: stat.mtime.toISOString()
+  try {
+    const { EPubLoader } = await import('@langchain/community/document_loaders/fs/epub')
+    const loader = new EPubLoader(filePath)
+    const docs = await loader.load()
+    const stat = fs.statSync(filePath)
+    return docs.map(doc => ({
+      ...doc,
+      metadata: {
+        ...doc.metadata,
+        source: filePath,
+        fileType: 'epub',
+        fileSize: stat.size,
+        fileCreatedAt: stat.birthtime.toISOString(),
+        fileModifiedAt: stat.mtime.toISOString()
+      }
+    }))
+  } catch (e) {
+    if (/epub2/i.test(e.message)) {
+      throw new Error(`EPUB 解析依赖 epub2 缺失（打包未包含）：${e.message}。请确认 epub2 已在 dependencies 中声明并重新构建。`)
     }
-  }))
+    throw e
+  }
 }
 
 // 加载 DOCX 文件（使用 mammoth 提取纯文本）

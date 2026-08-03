@@ -40,7 +40,8 @@ const __dirname = path.dirname(__filename)
 
 // 内置技能源目录：项目根目录下的 public/skills/
 // 开发环境：{项目根}/public/skills/
-// 打包环境：{app根}/public/skills/（需在 electron-builder files 中包含）
+// 打包环境：{app根}/public/skills/（须在 electron-builder 的 files 中包含，
+//           并通过 asarUnpack 解包到 app.asar.unpacked，确保可被读取/复制）
 // skills.js 位于 {项目根}/src-electron/agent/，故需上溯 2 级到达项目根
 const BUILTIN_SKILLS_SRC_DIR = path.resolve(__dirname, '..', '..', 'public', 'skills')
 
@@ -67,6 +68,14 @@ export function ensureSkillDir() {
 
 /**
  * 递归复制目录
+ *
+ * 注意：源目录在打包后可能位于 asar 归档内（public/skills 已通过
+ * electron-builder 的 asarUnpack 解包到 app.asar.unpacked，但仍以
+ * app.asar 路径访问）。这里使用 readFileSync/writeFileSync 而非
+ * copyFileSync，因为前者对 asar 源路径的兼容性最稳定（readFileSync
+ * 是 asar 最早支持、最可靠的核心操作），避免某些 Electron 版本下
+ * copyFileSync 从 asar 源复制时的边界问题。
+ *
  * @param {string} src 源目录
  * @param {string} dest 目标目录
  */
@@ -81,7 +90,9 @@ function copyDirRecursive(src, dest) {
     if (entry.isDirectory()) {
       copyDirRecursive(srcPath, destPath)
     } else if (entry.isFile()) {
-      fs.copyFileSync(srcPath, destPath)
+      // readFileSync 对 asar 源路径稳定可靠；写入目标是用户磁盘
+      const buf = fs.readFileSync(srcPath)
+      fs.writeFileSync(destPath, buf)
     }
   }
 }
