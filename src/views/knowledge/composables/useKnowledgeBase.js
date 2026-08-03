@@ -1,8 +1,8 @@
 import { ref, reactive, computed, nextTick } from 'vue';
 import { coverOptions, DEFAULT_CATEGORIES } from '../constants';
 
-// Agent 智能体目录下需要隐藏的系统目录（仅显示 SKILL、SANDBOX 及用户创建的目录）
-const AGENT_HIDDEN_DIRS = ['memories', 'large_tool_results'];
+// Agent 智能体目录下需要隐藏的系统目录（SKILL 由后端维护不在侧边栏展示，仅显示 SANDBOX 及用户创建的目录）
+const AGENT_HIDDEN_DIRS = ['memories', 'large_tool_results', 'SKILL'];
 
 export function useKnowledgeBase(fileSystem, sidebar) {
   const api = window.electronAPI;
@@ -41,7 +41,7 @@ export function useKnowledgeBase(fileSystem, sidebar) {
         // 只添加磁盘上存在但列表中没有的文件夹
         for (const entry of entries) {
           if (entry.isDirectory && !category.items.some(i => i.name === entry.name)) {
-            // Agent 智能体目录下隐藏系统目录（如 memories），仅显示 SKILL、SANDBOX 及用户创建的目录
+            // Agent 智能体目录下隐藏系统目录（如 memories、SKILL），仅显示 SANDBOX 及用户创建的目录
             if (category.id === 'agent' && AGENT_HIDDEN_DIRS.includes(entry.name)) {
               continue;
             }
@@ -203,7 +203,7 @@ export function useKnowledgeBase(fileSystem, sidebar) {
 
   async function deleteKnowledgeBase(contextMenu) {
     if (!contextMenu.item) return;
-    // 受保护的默认知识库（如 SKILL、沙盒区）不可删除
+    // 受保护的默认知识库（如沙盒区）不可删除
     if (contextMenu.item.protected) return;
     const categoryId = contextMenu.categoryId;
     const itemId = contextMenu.item.id;

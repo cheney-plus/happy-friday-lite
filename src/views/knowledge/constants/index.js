@@ -89,7 +89,6 @@ export const DEFAULT_CATEGORIES = [
     name: 'Agent智能体',
     expanded: true,
     items: [
-      { id: 'rag-thinking', name: 'SKILL', protected: true },
       { id: 'rag-sandbox', name: 'SANDBOX', protected: true }
     ]
   }
