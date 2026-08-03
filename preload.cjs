@@ -100,7 +100,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-list-tools',
       'agent-list-skills',
       'agent-delete-skill',
-      'agent-import-skill'
+      'agent-import-skill',
+      'mcp-list-servers',
+      'mcp-add-servers',
+      'mcp-delete-server',
+      'mcp-refresh-server',
+      'mcp-get-local-config',
+      'mcp-local-toggle'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

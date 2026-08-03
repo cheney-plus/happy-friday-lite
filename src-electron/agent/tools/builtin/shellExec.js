@@ -92,7 +92,9 @@ async function handler(args, ctx) {
 
   // 非白名单命令（如 rm/mv/cp/重定向等）：在 handler 内部触发审批流程
   // 复用 HITL 的 waitForApproval 机制，推送 agent-tool-approval 事件到前端
-  if (analysis.needApproval) {
+  // MCP 模式（ctx.autoApprove=true）下无前端审批通道，跳过审批直接执行，
+  // 与本地 MCP server（如 Claude Desktop）执行 shell 的惯例一致。
+  if (analysis.needApproval && !ctx.autoApprove) {
     ctx.logger.info(`[execute_command] 非白名单命令，请求用户审批: ${command}`)
     const approvalToolCallId = `execute_command_approval_${Date.now()}`
     ctx.emit('agent-tool-approval', {

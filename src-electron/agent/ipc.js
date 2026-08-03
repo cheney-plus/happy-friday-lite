@@ -32,6 +32,16 @@ import { createLogger } from './logger.js'
 import { listSkills, generateSkillIndex, deleteSkill, importSkill } from './skills.js'
 import { listRegisteredTools, listToolNames } from './tools/registry.js'
 import {
+  listMcpServers,
+  addMcpServers,
+  deleteMcpServer,
+  refreshMcpServer,
+  getLocalMcpConfig,
+  getLocalMcpStatus,
+  startLocalMcpServer,
+  stopLocalMcpServer
+} from './mcp.js'
+import {
   waitForApproval,
   resolveApprove,
   resolveReject,
@@ -295,6 +305,59 @@ export function registerAgentCommands(mainWindow) {
       return { success: false, canceled: true }
     }
     return importSkill(dlg.filePaths[0])
+  })
+
+  // ========== MCP 连接管理 ==========
+  // 设计参考：src-electron/agent/mcp.js
+  // 通道：
+  //   - mcp-list-servers: 查询已添加的 MCP 服务器列表
+  //   - mcp-add-servers:  粘贴 JSON 添加（remote streamable_http/sse、stdio）
+  //   - mcp-delete-server: 删除指定服务器
+  //   - mcp-refresh-server: 重新连接并刷新工具列表
+  //   - mcp-get-local-config: 获取本机 MCP 服务的可复制 JSON
+  //   - mcp-local-toggle: 启停本机 MCP 服务（args: { enabled }）
+
+  ipcMain.handle('mcp-list-servers', async () => {
+    return listMcpServers()
+  })
+
+  ipcMain.handle('mcp-add-servers', async (_event, args) => {
+    const json = args?.json
+    if (!json || typeof json !== 'string') {
+      return { success: false, error: 'invalidJson' }
+    }
+    return addMcpServers(json)
+  })
+
+  ipcMain.handle('mcp-delete-server', async (_event, args) => {
+    const name = args?.name
+    if (!name) return { success: false, error: '缺少 name' }
+    return deleteMcpServer(name)
+  })
+
+  ipcMain.handle('mcp-refresh-server', async (_event, args) => {
+    const name = args?.name
+    if (!name) return { success: false, error: '缺少 name' }
+    return refreshMcpServer(name)
+  })
+
+  ipcMain.handle('mcp-get-local-config', async () => {
+    return getLocalMcpConfig()
+  })
+
+  ipcMain.handle('mcp-local-toggle', async (_event, args) => {
+    const enabled = !!args?.enabled
+    try {
+      if (enabled) {
+        await startLocalMcpServer()
+      } else {
+        await stopLocalMcpServer()
+      }
+      return { success: true, ...getLocalMcpStatus() }
+    } catch (e) {
+      log.error(`mcp-local-toggle 失败: ${e.message}`)
+      return { success: false, error: e.message, ...getLocalMcpStatus() }
+    }
   })
 
   log.info('====== Agent IPC 通道注册完成 ======')

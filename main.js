@@ -158,6 +158,12 @@ app.whenReady().then(async () => {
   // 启动后检查对话历史自动清理（异步，至多每天一次，不阻塞窗口）
   checkAutoCleanHistory().catch(e => console.error('[Main] Auto history clean check failed:', e))
 
+  // 若用户曾开启本机 MCP 服务，则自动拉起（异步，不阻塞窗口）
+  import('./src-electron/agent/mcp.js')
+    .then(({ autoStartLocalIfEnabled }) => autoStartLocalIfEnabled())
+    .then(() => console.log('[Main] ✅ MCP module initialized'))
+    .catch(error => console.error('[Main] ❌ Failed to initialize MCP:', error))
+
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
