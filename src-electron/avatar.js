@@ -72,10 +72,35 @@ export function pickRandom(arr) {
 }
 
 /**
+ * 将一个已获得的头像记录到 config.avatarHistory（按 name 去重）。
+ * 反作弊：仅记录"当前选中"的那一张头像的 dataUrl，不导出整库。
+ *
+ * @param {Object} config 配置对象（会被原地修改，但本函数不负责 saveConfig）
+ * @param {{ name: string, dataUrl: string, rarity?: string, updatedAt?: string }} entry 头像条目
+ */
+export function recordAvatarToHistory(config, entry) {
+  if (!entry || !entry.name || !entry.dataUrl) return
+  if (!Array.isArray(config.avatarHistory)) {
+    config.avatarHistory = []
+  }
+  // 按 name 去重：已记录过则不重复追加（保留首次获得时间）
+  if (config.avatarHistory.some(a => a.name === entry.name)) {
+    return
+  }
+  config.avatarHistory.push({
+    name: entry.name,
+    dataUrl: entry.dataUrl,
+    rarity: entry.rarity || 'common',
+    obtainedAt: entry.updatedAt || new Date().toISOString()
+  })
+}
+
+/**
  * 首次启动时为未设置头像的用户随机分配一个普通头像。
  * - 已设置过头像（config.avatar 含 dataUrl）则跳过，保留用户既有选择。
  * - 仅从普通池选取，稀有头像不参与默认分配，以保持其稀缺性。
  * - 头像库不可用时静默跳过（前端将回退到默认头像资源）。
+ * - 分配的同时记录到 avatarHistory，作为"已获得"头像。
  *
  * 需在 config 数据目录已初始化（setDataDir）后调用。
  * @returns {boolean} 是否本次分配了新头像
@@ -84,6 +109,11 @@ export function ensureDefaultAvatar() {
   try {
     const config = loadConfig()
     if (config.avatar && config.avatar.dataUrl) {
+      // 兜底：旧版本未记录 history 时，把当前头像补录进去
+      if (!Array.isArray(config.avatarHistory) || config.avatarHistory.length === 0) {
+        recordAvatarToHistory(config, config.avatar)
+        saveConfig(config)
+      }
       return false
     }
     const { common } = listAvatars()
@@ -98,6 +128,8 @@ export function ensureDefaultAvatar() {
       rarity: 'common',
       updatedAt: new Date().toISOString()
     }
+    // 同步记录到历史，作为首个已获得头像
+    recordAvatarToHistory(config, config.avatar)
     saveConfig(config)
     console.log(`[avatar] 已分配默认头像: ${chosen}`)
     return true
@@ -105,4 +137,49 @@ export function ensureDefaultAvatar() {
     console.warn(`[avatar] ensureDefaultAvatar 失败: ${e?.message || e}`)
     return false
   }
+}
+
+/**
+ * 获取当前头像 + 历史已获得头像列表（供记忆管理界面展示与切换）。
+ * @returns {{ current: Object|null, history: Array }}
+ */
+export function getAvatarHistory() {
+  const config = loadConfig()
+  // 兜底：若 history 为空但 current 存在，补录 current
+  const history = Array.isArray(config.avatarHistory) ? [...config.avatarHistory] : []
+  if (history.length === 0 && config.avatar?.name) {
+    history.push({
+      name: config.avatar.name,
+      dataUrl: config.avatar.dataUrl,
+      rarity: config.avatar.rarity || 'common',
+      obtainedAt: config.avatar.updatedAt || new Date().toISOString()
+    })
+  }
+  return { current: config.avatar || null, history }
+}
+
+/**
+ * 从历史已获得头像中切换到指定头像（按 name 匹配）。
+ * 反作弊：仅能在已获得的头像间切换，不能凭空获得未解锁的头像。
+ *
+ * @param {string} name 头像名（不含扩展名）
+ * @returns {{ success: boolean, avatar?: Object, error?: string }}
+ */
+export function setAvatarFromHistory(name) {
+  if (!name) return { success: false, error: '缺少头像名' }
+  const config = loadConfig()
+  const history = Array.isArray(config.avatarHistory) ? config.avatarHistory : []
+  const found = history.find(a => a.name === name)
+  if (!found) {
+    return { success: false, error: '该头像尚未获得' }
+  }
+  config.avatar = {
+    dataUrl: found.dataUrl,
+    name: found.name,
+    rarity: found.rarity || 'common',
+    updatedAt: new Date().toISOString()
+  }
+  saveConfig(config)
+  console.log(`[avatar] 从历史切换头像: ${found.name}`)
+  return { success: true, avatar: config.avatar }
 }

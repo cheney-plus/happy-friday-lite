@@ -7,7 +7,8 @@
  *
  * 关键装配点：
  *   - model: 通过 modelAdapter.js 把项目模型配置适配为 LangChain ChatOpenAI
- *   - backend: 通过 backend.js 装配 CompositeBackend（FilesystemBackend + StoreBackend）
+ *   - backend: 通过 backend.js 装配 CompositeBackend（FilesystemBackend，/memories/ 亦落盘）
+ *   - memory: 通过 memoryFiles.js 确保 SOUL/USER/MEMORY/Agent.md 存在，并传 memory: 参数加载进系统提示词
  *   - permissions: 通过 permissions.js 配置文件系统权限规则
  *   - tools: 通过 tools/registry.js 构建已注册的 LangChain 工具集
  *   - interruptOn: 通过 tools/registry.js 自动收集 requireApproval=true 的工具
@@ -28,6 +29,7 @@ import { ensureSkillDir, listSkills } from './skills.js'
 import { buildSubagents } from './subagents.js'
 import { buildLangChainTools, buildInterruptConfig } from './tools/registry.js'
 import { loadAgentMcpTools } from './mcp.js'
+import { ensureMemoryFiles, getMemoryPaths } from './memoryFiles.js'
 // 触发 builtin 工具注册
 import './tools/index.js'
 
@@ -65,6 +67,8 @@ export async function createAgent(modelConfig, options = {}) {
 
   // 1. 确保 SKILL 目录和沙箱目录存在
   ensureSkillDir()
+  // 确保四份记忆文件存在（SOUL.md / USER.md / MEMORY.md / Agent.md），供 memory: 参数加载
+  ensureMemoryFiles()
 
   // 2. 创建模型
   const model = createLangChainModel(modelConfig)
@@ -112,6 +116,12 @@ export async function createAgent(modelConfig, options = {}) {
   const subagents = buildSubagents()
 
   // 9. 创建 DeepAgent
+  // memory: 四份记忆文件在启动时加载进系统提示词（filesystem-backed memory），
+  //         Agent 亦可通过 edit_file 自主更新（permissions 已放行 /memories/**）。
+  //         - SOUL.md   定义 Friday 的人格与说话做事风格
+  //         - USER.md   记录用户的习惯与爱好
+  //         - MEMORY.md 跨会话长期记忆
+  //         - Agent.md  经验与技巧
   const agent = await createDeepAgent({
     model,
     tools,
@@ -121,6 +131,7 @@ export async function createAgent(modelConfig, options = {}) {
     subagents,
     checkpointer: getCheckpointer(),
     store: getSharedStore(),
+    memory: getMemoryPaths(),
     skills: ['/SKILL/'],
     systemPrompt:
       '你是 Friday Agent，一个集成在 Happy Friday Lite 知识库应用中的智能助手。\n\n' +
@@ -165,7 +176,15 @@ export async function createAgent(modelConfig, options = {}) {
       '2. 写操作（创建笔记/日程/文件、执行 Python 代码、POST/PUT/PATCH/DELETE 请求）需用户审批后执行\n' +
       '3. 涉及用户隐私的信息不得外泄\n' +
       '4. 用中文回答用户问题\n' +
-      '5. 所有文件操作路径必须位于 `/SANDBOX/` 下（/SKILL/、/memories/ 除外）\n'
+      '5. 所有文件操作路径必须位于 `/SANDBOX/` 下（/SKILL/、/memories/ 除外）\n\n' +
+      '## 记忆系统\n' +
+      '启动时已加载 `/memories/` 下的四份记忆文件到你的上下文：\n' +
+      '- `/memories/SOUL.md`：你的灵魂设定与说话做事风格（人格）\n' +
+      '- `/memories/USER.md`：用户的习惯与爱好\n' +
+      '- `/memories/MEMORY.md`：跨会话长期记忆（重要事实与事件）\n' +
+      '- `/memories/Agent.md`：你积累的经验与技巧\n' +
+      '当你在对话中学到新的用户偏好、重要事实或经验时，可用 `edit_file` 主动更新对应记忆文件，' +
+      '更新会持久化并在下次对话生效。更新应精炼、去重，避免冗长。\n'
   })
 
   log.info('====== DeepAgent 创建完成 ======')

@@ -106,7 +106,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'mcp-delete-server',
       'mcp-refresh-server',
       'mcp-get-local-config',
-      'mcp-local-toggle'
+      'mcp-local-toggle',
+      'agent-list-memories',
+      'agent-read-memory',
+      'agent-write-memory',
+      'agent-get-avatar-history',
+      'agent-set-avatar'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

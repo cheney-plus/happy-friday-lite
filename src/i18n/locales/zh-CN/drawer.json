@@ -55,5 +55,43 @@
     "deleteConfirmTitle": "删除 MCP 服务器",
     "deleteConfirm": "确定要删除该 MCP 服务器吗？"
   },
+  "memory": {
+    "title": "记忆管理",
+    "fridayCard": "Friday 助手",
+    "fridayName": "Friday",
+    "name": "姓名",
+    "birthDate": "出生日期",
+    "fridayBirthDate": "2026.2.7",
+    "currentAvatar": "当前头像",
+    "avatarHistory": "已获头像",
+    "avatarHistoryHint": "点击已获得的头像即可切换",
+    "noAvatarHistory": "暂无历史头像，让 Friday 帮你换个头像吧",
+    "switchAvatarFailed": "切换头像失败",
+    "rare": "稀有",
+    "common": "普通",
+    "memoryFiles": "记忆文件",
+    "memoryFilesHint": "Friday 会在对话中读取并更新这些记忆文件",
+    "edit": "编辑",
+    "editTitle": "编辑记忆文件",
+    "editMode": "编辑",
+    "previewMode": "预览",
+    "save": "保存",
+    "cancel": "取消",
+    "saved": "已保存",
+    "saveFailed": "保存失败",
+    "loading": "加载中...",
+    "words": "字",
+    "updated": "更新于",
+    "files": {
+      "SOUL": "灵魂设定",
+      "SOUL_desc": "设定 Friday 说话做事的风格",
+      "USER": "用户档案",
+      "USER_desc": "记录用户的习惯与爱好",
+      "MEMORY": "长期记忆",
+      "MEMORY_desc": "跨会话的重要事实与事件",
+      "Agent": "经验技巧",
+      "Agent_desc": "Friday 积累的经验与技巧"
+    }
+  },
   "comingSoon": "功能开发中，敬请期待"
 }

@@ -22,7 +22,7 @@ import { z } from 'zod'
 import { registerTool } from '../registry.js'
 import { loadConfig, saveConfig } from '../../../config.js'
 import { CONFIG_CHANGED } from '../../../events.js'
-import { resolveAvatarDir, listAvatars, readAsDataUrl, pickRandom } from '../../../avatar.js'
+import { resolveAvatarDir, listAvatars, readAsDataUrl, pickRandom, recordAvatarToHistory } from '../../../avatar.js'
 
 // 解锁稀有头像的口令（仅存在于 handler 内，不对外暴露）。
 // 以 base64 形式存储，运行时解码后比较，避免在打包源码（app.asar）中被直接 grep 出明文。
@@ -76,6 +76,8 @@ async function handler(args, ctx) {
     rarity: isRare ? 'rare' : 'common',
     updatedAt: new Date().toISOString()
   }
+  // 记录到历史已获得头像（按 name 去重），供记忆管理界面切换
+  recordAvatarToHistory(config, config.avatar)
   saveConfig(config)
   ctx.logger.info(`[set_avatar] 已更新头像: ${chosen} (${config.avatar.rarity})`)
 

@@ -1,27 +1,34 @@
 /**
  * 后端装配
  * ==========
- * 设计参考：Agent智能体设计.md 2.2
+ * 设计参考：Agent智能体设计.md 2.2 / LangChain Deep Agents memory
  *
- * 采用 CompositeBackend 路由，分离「项目文件」「跨会话记忆」：
- *   /memories/  → StoreBackend   跨会话记忆（InMemoryStore + SQLite 双向同步）
- *   其他        → FilesystemBackend Agent 工作文件、SKILL、沙盒区（本地磁盘）
+ * 采用 FilesystemBackend 统一承载 Agent 沙箱内的所有文件：
+ *   /SKILL/     Skill 文件（前端管理，Agent 可读写）
+ *   /memories/  跨会话记忆（SOUL.md / USER.md / MEMORY.md / Agent.md，磁盘文件）
+ *   /SANDBOX/   Agent 工作区（所有 LLM 生成的文件均存放于此）
  *
- * 决策：FilesystemBackend.virtualMode = true，路径被沙箱化为虚拟绝对路径，
- *      rootDir 锁定 {userData}/knowledge/agent/ 作为边界。
- *      这样 SkillsMiddleware 调用 backend.ls('/SKILL/') 才能正确解析为 {rootDir}/SKILL/。
+ * 决策：记忆文件采用「filesystem-backed memory」（Deep Agents 官方推荐模式），
+ *      真实落盘于 {rootDir}/memories/ 下，由 createDeepAgent 的 memory: 参数在
+ *      启动时加载进系统提示词，Agent 亦可通过 edit_file 自主更新。
+ *      相比早期 InMemoryStore + SQLite 双向同步方案，磁盘文件对本单用户本地应用
+ *      更直观、可调试、可在记忆管理界面直接编辑，且无易失性 / 时序问题。
+ *
+ * FilesystemBackend.virtualMode = true，路径被沙箱化为虚拟绝对路径，
+ * rootDir 锁定 {userData}/knowledge/agent/ 作为边界。
+ * 这样 SkillsMiddleware 调用 backend.ls('/SKILL/') 才能正确解析为 {rootDir}/SKILL/。
  */
 
 import fs from 'fs'
 import path from 'path'
-import { FilesystemBackend, StoreBackend, CompositeBackend } from 'deepagents'
+import { FilesystemBackend, CompositeBackend } from 'deepagents'
 import { InMemoryStore } from '@langchain/langgraph'
 import { getDataDir } from '../config.js'
 import { createLogger } from './logger.js'
 
 const log = createLogger('Backend')
 
-// 单例 InMemoryStore：供 StoreBackend 使用，并在 memory.js 中与 SQLite 双向同步
+// 单例 InMemoryStore：作为 LangGraph BaseStore 供 createDeepAgent 使用（checkpointer 等）
 let sharedStore = null
 // 单例后端实例：避免每次创建 Agent 都重新装配
 let sharedBackend = null
@@ -37,7 +44,7 @@ export function getAgentRootDir() {
 
 /**
  * 获取共享 InMemoryStore 实例
- * 用于 StoreBackend 与 memory.js 双向同步
+ * 作为 LangGraph BaseStore 供 createDeepAgent 使用
  * @returns {InMemoryStore}
  */
 export function getSharedStore() {
@@ -49,16 +56,14 @@ export function getSharedStore() {
 }
 
 /**
- * 装配 CompositeBackend
- * - 默认后端：FilesystemBackend（rootDir = {userData}/knowledge/agent/，virtualMode=true）
- * - /memories/ 路由：StoreBackend（namespace='memories'）
+ * 装配后端（FilesystemBackend，virtualMode=true）
  *
  * 目录结构（rootDir 下）：
- *   /SKILL/       Skill 文件（前端管理，Agent 只读）
- *   /memories/    跨会话记忆（StoreBackend，Agent 读写）
+ *   /SKILL/       Skill 文件（前端管理，Agent 可读写）
+ *   /memories/    跨会话记忆（磁盘文件，Agent 读写，由 memory: 参数加载进系统提示词）
  *   /SANDBOX/     Agent 工作区（所有 LLM 生成的文件均存放于此，permissions 强制约束）
  *
- * @returns {CompositeBackend}
+ * @returns {FilesystemBackend|CompositeBackend}
  */
 export function buildBackend() {
   if (sharedBackend) return sharedBackend
@@ -84,17 +89,12 @@ export function buildBackend() {
     virtualMode: true
   })
 
-  // /memories/ 路由：跨会话记忆存储
-  const storeBackend = new StoreBackend({
-    store: getSharedStore(),
-    namespace: 'memories'
-  })
+  // 当前所有路径统一走 FilesystemBackend。
+  // 保留 CompositeBackend 形态以便未来按路径前缀挂载其他后端（如 StoreBackend）。
+  // 注意：CompositeBackend 构造器对 routes 执行 Object.entries，必须传入空对象而非 undefined。
+  sharedBackend = new CompositeBackend(fsBackend, {})
 
-  // 组合后端：路径前缀 /memories/ 走 StoreBackend，其他走 FilesystemBackend
-  sharedBackend = new CompositeBackend(fsBackend, {
-    '/memories/': storeBackend
-  })
-
-  log.info(`后端装配完成: rootDir=${rootDir}, routes=[/memories/→StoreBackend]`)
+  log.info(`后端装配完成: rootDir=${rootDir}, routes=[]（全部走 FilesystemBackend）`)
   return sharedBackend
 }
+

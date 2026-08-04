@@ -22,9 +22,9 @@
 
 import { ipcMain, dialog } from 'electron'
 import { Command } from '@langchain/langgraph'
-import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_DONE, CHAT_ERROR } from '../events.js'
+import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_DONE, CHAT_ERROR, CONFIG_CHANGED } from '../events.js'
 import { CancellationTokens } from '../cancellation.js'
-import { getDataDir } from '../config.js'
+import { getDataDir, loadConfig } from '../config.js'
 import * as db from '../db.js'
 import { buildLlmMessage } from '../attachmentContext.js'
 import { createAgentWithContext } from './index.js'
@@ -49,7 +49,9 @@ import {
   buildResumeCommand,
   emitApprovalRequest
 } from './humanInTheLoop.js'
-import { createThread, touchThread, loadMemoriesToStore, syncStoreToSQLite } from './memory.js'
+import { createThread, touchThread } from './memory.js'
+import { listMemoryFiles, readMemoryFile, writeMemoryFile } from './memoryFiles.js'
+import { getAvatarHistory, setAvatarFromHistory } from '../avatar.js'
 
 const log = createLogger('IPC')
 
@@ -140,8 +142,8 @@ export function registerAgentCommands(mainWindow) {
       const { agent, rootDir } = await createAgentWithContext(modelConfig, runtimeCtx)
       log.info(`Agent 创建完成, rootDir=${rootDir}`)
 
-      // 5. 加载历史记忆到 InMemoryStore
-      await loadMemoriesToStore(currentSessionId)
+      // 5. 记忆文件已切换为 filesystem-backed memory（/memories/*.md），
+      //    由 createDeepAgent 的 memory: 参数在创建时加载进系统提示词，无需再向 InMemoryStore 同步。
 
       // 6. 配置 checkpointer thread_id
       const config = { configurable: { thread_id: currentSessionId } }
@@ -184,8 +186,7 @@ export function registerAgentCommands(mainWindow) {
         throw e
       }
 
-      // 10. 同步记忆到 SQLite
-      await syncStoreToSQLite(currentSessionId)
+      // 10. 记忆文件为磁盘文件，Agent 通过 edit_file 写入即持久化，无需额外同步。
 
       // 11. 保存助手消息（含工具调用时间线段 metadata）
       const metadata = toolSegments.length > 0 ? { segments: toolSegments } : null
@@ -358,6 +359,63 @@ export function registerAgentCommands(mainWindow) {
       log.error(`mcp-local-toggle 失败: ${e.message}`)
       return { success: false, error: e.message, ...getLocalMcpStatus() }
     }
+  })
+
+  // ========== 记忆文件管理 ==========
+  // 设计参考：LangChain Deep Agents「filesystem-backed memory」
+  // 通道：
+  //   - agent-list-memories:  列出四份记忆文件（含内容、大小、更新时间）
+  //   - agent-read-memory:    读取单份记忆文件
+  //   - agent-write-memory:   写入（编辑）单份记忆文件
+  // 文件：SOUL.md / USER.md / MEMORY.md / Agent.md，存放于 Agent 沙箱 /memories/ 下。
+
+  ipcMain.handle('agent-list-memories', async () => {
+    return listMemoryFiles()
+  })
+
+  ipcMain.handle('agent-read-memory', async (_event, args) => {
+    const fileName = args?.fileName
+    if (!fileName) return { success: false, error: '缺少 fileName' }
+    return readMemoryFile(fileName)
+  })
+
+  ipcMain.handle('agent-write-memory', async (_event, args) => {
+    const { fileName, content } = args || {}
+    if (!fileName) return { success: false, error: '缺少 fileName' }
+    if (typeof content !== 'string') return { success: false, error: '缺少 content' }
+    const res = writeMemoryFile(fileName, content)
+    if (res.success) {
+      // 广播 config-changed 并无必要（记忆文件不在 config 中），
+      // 但 Agent 下次 invoke 会自动读取最新记忆文件，无需额外通知。
+      log.info(`记忆文件已更新: ${fileName}`)
+    }
+    return res
+  })
+
+  // ========== 头像历史管理 ==========
+  // 通道：
+  //   - agent-get-avatar-history: 获取当前头像 + 历史已获得头像列表
+  //   - agent-set-avatar:         从历史已获得头像中切换（按 name 匹配）
+  // 反作弊：仅能在已获得的头像间切换，切换后广播 config-changed 实时刷新前端。
+
+  ipcMain.handle('agent-get-avatar-history', async () => {
+    return getAvatarHistory()
+  })
+
+  ipcMain.handle('agent-set-avatar', async (_event, args) => {
+    const name = args?.name
+    if (!name) return { success: false, error: '缺少 name' }
+    const res = setAvatarFromHistory(name)
+    if (res.success) {
+      // 广播 config-changed，前端（侧边栏等）实时刷新头像
+      try {
+        const config = loadConfig()
+        mainWindow.webContents.send(CONFIG_CHANGED, config)
+      } catch (e) {
+        log.warn(`广播 config-changed 失败: ${e.message}`)
+      }
+    }
+    return res
   })
 
   log.info('====== Agent IPC 通道注册完成 ======')
