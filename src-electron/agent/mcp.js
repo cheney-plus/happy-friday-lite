@@ -41,6 +41,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { tool } from '@langchain/core/tools'
 import { convertToOpenAIFunction } from '@langchain/core/utils/function_calling'
+import { MultiServerMCPClient } from '@langchain/mcp-adapters'
 
 const log = createLogger('MCP')
 
@@ -215,6 +216,8 @@ export async function addMcpServers(jsonString) {
   }
 
   writeStore(store)
+  // 服务器列表变更，重置 Agent MCP 客户端缓存
+  invalidateAgentMcpClient()
   return { success: added.length > 0, added, errors }
 }
 
@@ -230,6 +233,7 @@ export function deleteMcpServer(name) {
     return { success: false, error: 'notFound' }
   }
   writeStore(store)
+  invalidateAgentMcpClient()
   return { success: true }
 }
 
@@ -254,7 +258,112 @@ export async function refreshMcpServer(name) {
     log.warn(`刷新 MCP 服务器 ${name} 失败: ${e.message}`)
   }
   writeStore(store)
+  invalidateAgentMcpClient()
   return { success: entry.status === 'connected', server: entry }
+}
+
+// ============================================================
+// Agent MCP 工具加载：把外部 MCP 服务器的工具转为 LangChain 工具
+// ============================================================
+//
+// 设计要点：
+//   - 使用 @langchain/mcp-adapters 的 MultiServerMCPClient 管理多服务器连接，
+//     它负责 JSON schema → Zod schema 转换、连接生命周期、工具调用转发。
+//   - 客户端缓存：跨 invoke 复用，避免每条消息都重连 / 重新 spawn stdio 进程。
+//   - 服务器变更（add/delete/refresh）时调用 invalidateAgentMcpClient() 重置缓存，
+//     下次 loadAgentMcpTools() 会用最新配置重建客户端。
+//   - onConnectionError: 'ignore' + throwOnLoadError: false：
+//     单个服务器故障不影响 Agent 使用其余工具。
+
+let agentMcpClient = null
+
+/**
+ * 把存储的 MCP 服务器条目转为 MultiServerMCPClient 配置
+ * 存储的 type 'streamable_http' 映射为 transport 'http'
+ */
+function buildAgentMcpConfig() {
+  const mcpServers = {}
+  for (const s of listMcpServers()) {
+    if (s.type === 'stdio') {
+      mcpServers[s.name] = {
+        transport: 'stdio',
+        command: s.config.command,
+        args: s.config.args || [],
+        ...(s.config.env ? { env: s.config.env } : {})
+      }
+    } else if (s.type === 'sse') {
+      mcpServers[s.name] = {
+        transport: 'sse',
+        url: s.config.url,
+        ...(s.config.headers ? { headers: s.config.headers } : {})
+      }
+    } else {
+      // streamable_http → http
+      mcpServers[s.name] = {
+        transport: 'http',
+        url: s.config.url,
+        ...(s.config.headers ? { headers: s.config.headers } : {})
+      }
+    }
+  }
+  return {
+    mcpServers,
+    // 单个服务器连接失败时跳过而非整体抛错，保证 Agent 仍可用
+    throwOnLoadError: false,
+    onConnectionError: 'ignore',
+    // 工具名加前缀避免与内置工具冲突：mcp__服务器名__工具名
+    prefixToolNameWithServerName: true,
+    additionalToolNamePrefix: 'mcp'
+  }
+}
+
+/**
+ * 加载所有已添加 MCP 服务器的工具，返回 LangChain DynamicStructuredTool[]
+ * 供 createAgent 合并进 Agent 工具集。客户端缓存复用，跨 invoke 不重连。
+ *
+ * @returns {Promise<Array>} LangChain 工具数组（无服务器时返回空数组）
+ */
+export async function loadAgentMcpTools() {
+  if (!listMcpServers().length) {
+    return []
+  }
+  if (!agentMcpClient) {
+    agentMcpClient = new MultiServerMCPClient(buildAgentMcpConfig())
+  }
+  try {
+    const tools = await agentMcpClient.getTools()
+    log.info(`Agent 加载 ${tools.length} 个 MCP 工具`)
+    return tools
+  } catch (e) {
+    log.warn(`加载 MCP 工具失败: ${e.message}`)
+    return []
+  }
+}
+
+/**
+ * 重置 Agent MCP 客户端缓存（关闭连接、置空）
+ * 在 addMcpServers / deleteMcpServer / refreshMcpServer 后调用，
+ * 使下次 loadAgentMcpTools() 用最新配置重建客户端。
+ */
+export function invalidateAgentMcpClient() {
+  if (agentMcpClient) {
+    agentMcpClient.close().catch(() => {})
+    agentMcpClient = null
+  }
+}
+
+/**
+ * 关闭所有 Agent MCP 连接（应用退出时调用）
+ */
+export async function closeAgentMcpConnections() {
+  if (agentMcpClient) {
+    try {
+      await agentMcpClient.close()
+    } catch (_e) {
+      /* ignore */
+    }
+    agentMcpClient = null
+  }
 }
 
 // ============================================================

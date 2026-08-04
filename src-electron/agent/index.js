@@ -27,6 +27,7 @@ import { buildPermissions } from './permissions.js'
 import { ensureSkillDir, listSkills } from './skills.js'
 import { buildSubagents } from './subagents.js'
 import { buildLangChainTools, buildInterruptConfig } from './tools/registry.js'
+import { loadAgentMcpTools } from './mcp.js'
 // 触发 builtin 工具注册
 import './tools/index.js'
 
@@ -91,8 +92,11 @@ export async function createAgent(modelConfig, options = {}) {
     logger: createLogger('Tool'),
     emit: () => {} // 占位，运行时覆盖
   }
-  const tools = buildLangChainTools(toolCtx)
-  log.info(`工具集构建完成: ${tools.length} 个工具`)
+  const builtinTools = buildLangChainTools(toolCtx)
+  // 加载已添加的 MCP 服务器工具（外部工具，跨 invoke 复用连接）
+  const mcpTools = await loadAgentMcpTools()
+  const tools = [...builtinTools, ...mcpTools]
+  log.info(`工具集构建完成: ${builtinTools.length} 内置 + ${mcpTools.length} MCP = ${tools.length} 个工具`)
 
   // 6. 构建 interruptOn 配置（需审批的工具）
   const interruptOn = buildInterruptConfig()
@@ -132,6 +136,9 @@ export async function createAgent(modelConfig, options = {}) {
       '- 调用 REST API（requests_get / requests_post / requests_put / requests_patch / requests_delete）\n' +
       '- 处理 JSON 数据（json_parse / json_extract / json_format）\n' +
       '- 抓取网页正文（fetch_webpage_text，自动去除导航/广告等非正文内容）\n\n' +
+      (mcpTools.length > 0
+        ? `## 外部 MCP 工具\n用户已连接 ${mcpTools.length} 个外部 MCP 工具（工具名以 \`mcp__\` 开头，格式为 \`mcp__服务器名__工具名\`）。这些工具来自用户添加的 MCP 服务器，可直接调用。调用前请阅读工具描述确认参数与用途。\n\n`
+        : '') +
       '## 文件存放约束（强制）\n' +
       `Agent 工作区根目录绝对路径：${rootDir}\n` +
       `SANDBOX 绝对路径：${path.join(rootDir, 'SANDBOX')}（python_repl 脚本目录与输出目录均在此之下）\n\n` +

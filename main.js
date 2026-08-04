@@ -186,6 +186,13 @@ app.on('window-all-closed', function () {
   }
 })
 
+// 应用退出前关闭 Agent MCP 连接（stdio 子进程等），避免残留进程
+app.on('before-quit', () => {
+  import('./src-electron/agent/mcp.js')
+    .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections())
+    .catch(() => {})
+})
+
 ipcMain.on('window-minimize', () => {
   if (mainWindow) mainWindow.minimize()
 })
