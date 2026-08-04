@@ -265,31 +265,36 @@ let toolSpecsCache = null
 
 /**
  * 把注册表中的工具定义转为 MCP 工具规格（含 JSON schema）
+ * 仅暴露标记了 meta.exposedViaMcp=true 的应用功能工具（笔记 / 日程 / 知识库），
+ * 系统级工具（shell / python / pip / markitdown / get_current_time 等）不对外暴露。
  * 缓存：内置工具集在运行期不变
  */
 function getToolSpecs() {
   if (toolSpecsCache) return toolSpecsCache
-  toolSpecsCache = listRegisteredTools().map(def => {
-    let inputSchema = { type: 'object', properties: {} }
-    try {
-      // 用 @langchain/core 把 Zod schema 转为 JSON schema（兼容 zod / zod/v3）
-      const lcTool = tool(async () => '', {
-        name: def.name,
-        description: def.description,
-        schema: def.schema
-      })
-      const fn = convertToOpenAIFunction(lcTool)
-      // 去掉 $schema（MCP inputSchema 不需要），保留其余字段
-      if (fn?.parameters) {
-        const { $schema, ...rest } = fn.parameters
-        inputSchema = rest
+  toolSpecsCache = listRegisteredTools()
+    .filter((def) => def.meta?.exposedViaMcp === true)
+    .map((def) => {
+      let inputSchema = { type: 'object', properties: {} }
+      try {
+        // 用 @langchain/core 把 Zod schema 转为 JSON schema（兼容 zod / zod/v3）
+        const lcTool = tool(async () => '', {
+          name: def.name,
+          description: def.description,
+          schema: def.schema
+        })
+        const fn = convertToOpenAIFunction(lcTool)
+        // 去掉 $schema（MCP inputSchema 不需要），保留其余字段
+        if (fn?.parameters) {
+          const { $schema, ...rest } = fn.parameters
+          inputSchema = rest
+        }
+      } catch (e) {
+        log.warn(`工具 ${def.name} schema 转换失败: ${e.message}`)
       }
-    } catch (e) {
-      log.warn(`工具 ${def.name} schema 转换失败: ${e.message}`)
-    }
-    return { name: def.name, description: def.description, inputSchema, def }
-  })
-  log.info(`本机 MCP 服务暴露 ${toolSpecsCache.length} 个内置工具`)
+      return { name: def.name, description: def.description, inputSchema, def }
+    })
+  const total = listRegisteredTools().length
+  log.info(`本机 MCP 服务暴露 ${toolSpecsCache.length}/${total} 个应用功能工具（已过滤系统工具）`)
   return toolSpecsCache
 }
 

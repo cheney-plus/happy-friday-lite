@@ -70,7 +70,7 @@ registerTool({
   description: '查询用户的日程事件。可按日期范围筛选，不传则返回全部日程。',
   schema: listEventsSchema,
   handler: listEventsHandler,
-  meta: { requireApproval: false }
+  meta: { requireApproval: false, exposedViaMcp: true }
 })
 
 // ========== create_event ==========
@@ -124,7 +124,7 @@ registerTool({
   description: '创建一条新的日程事件。',
   schema: createEventSchema,
   handler: createEventHandler,
-  meta: { requireApproval: true } // 写操作需审批
+  meta: { requireApproval: true, exposedViaMcp: true } // 写操作需审批
 })
 
 // ========== update_event ==========
@@ -176,7 +176,7 @@ registerTool({
   description: '更新已有日程事件的属性。只需传需要修改的字段。',
   schema: updateEventSchema,
   handler: updateEventHandler,
-  meta: { requireApproval: true } // 写操作需审批
+  meta: { requireApproval: true, exposedViaMcp: true } // 写操作需审批
 })
 
 // ========== delete_event ==========
@@ -205,5 +205,5 @@ registerTool({
   description: '删除指定的日程事件。需用户审批后执行。',
   schema: deleteEventSchema,
   handler: deleteEventHandler,
-  meta: { requireApproval: true } // 删除操作需审批
+  meta: { requireApproval: true, exposedViaMcp: true } // 删除操作需审批
 })

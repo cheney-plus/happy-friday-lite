@@ -92,7 +92,7 @@ registerTool({
   description: '搜索用户的笔记。根据关键词在笔记标题和正文中查找匹配项。仅搜索未删除的笔记。',
   schema: searchNotesSchema,
   handler: searchNotesHandler,
-  meta: { requireApproval: false }
+  meta: { requireApproval: false, exposedViaMcp: true }
 })
 
 // ========== get_note ==========
@@ -122,7 +122,7 @@ registerTool({
   description: '根据笔记 ID 获取笔记完整内容。',
   schema: getNoteSchema,
   handler: getNoteHandler,
-  meta: { requireApproval: false }
+  meta: { requireApproval: false, exposedViaMcp: true }
 })
 
 // ========== create_note ==========
@@ -160,7 +160,7 @@ registerTool({
   description: '创建一条新笔记。支持 Markdown 格式内容。',
   schema: createNoteSchema,
   handler: createNoteHandler,
-  meta: { requireApproval: true } // 写操作需审批
+  meta: { requireApproval: true, exposedViaMcp: true } // 写操作需审批
 })
 
 // ========== update_note ==========
@@ -201,5 +201,5 @@ registerTool({
   description: '更新已有笔记的标题或内容。只需传需要修改的字段。',
   schema: updateNoteSchema,
   handler: updateNoteHandler,
-  meta: { requireApproval: true } // 写操作需审批
+  meta: { requireApproval: true, exposedViaMcp: true } // 写操作需审批
 })

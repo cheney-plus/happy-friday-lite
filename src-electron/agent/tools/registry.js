@@ -54,6 +54,7 @@ const registry = new Map()
  * @param {(args: Object, ctx: ToolContext) => Promise<string>} def.handler 执行逻辑
  * @param {Object} [def.meta] 元信息
  * @param {boolean} [def.meta.requireApproval=false] 是否需要人机审批
+ * @param {boolean} [def.meta.exposedViaMcp=false] 是否通过本机 MCP 服务对外暴露（仅应用功能工具应设为 true）
  */
 export function registerTool({ name, description, schema, handler, meta = {} }) {
   if (registry.has(name)) {

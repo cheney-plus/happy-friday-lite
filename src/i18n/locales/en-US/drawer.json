@@ -49,7 +49,7 @@
     "stop": "Stop",
     "starting": "Starting...",
     "copyHint": "Use this config in other MCP clients (e.g. Claude Desktop)",
-    "securityHint": "Binds to 127.0.0.1 only. Exposes all built-in tools (incl. shell / file ops) to local apps.",
+    "securityHint": "Binds to 127.0.0.1 only. Exposes application tools (notes / schedule / knowledge base) only, not shell / python system tools.",
     "statusOff": "Stopped",
     "statusOn": "Running",
     "deleteConfirmTitle": "Delete MCP Server",

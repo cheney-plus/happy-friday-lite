@@ -77,6 +77,7 @@ registerTool({
   schema,
   handler,
   meta: {
-    requireApproval: false // 检索是只读操作，无需审批
+    requireApproval: false, // 检索是只读操作，无需审批
+    exposedViaMcp: true
   }
 })

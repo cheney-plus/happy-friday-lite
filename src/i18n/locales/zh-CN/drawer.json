@@ -49,7 +49,7 @@
     "stop": "停止",
     "starting": "启动中...",
     "copyHint": "将此配置粘贴到其他 MCP 客户端（如 Claude Desktop）即可使用",
-    "securityHint": "仅绑定 127.0.0.1。会向本地应用暴露所有内置工具（含 shell / 文件操作）。",
+    "securityHint": "仅绑定 127.0.0.1。仅暴露应用功能工具（笔记 / 日程 / 知识库），不暴露 shell / python 等系统工具。",
     "statusOff": "已停止",
     "statusOn": "运行中",
     "deleteConfirmTitle": "删除 MCP 服务器",
