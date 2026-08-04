@@ -7,7 +7,9 @@ export const useAppStore = defineStore('app', {
     theme: 'light',
     loading: false,
     noteFimCompletion: true,
-    scheduleDefaultView: 'month'
+    scheduleDefaultView: 'month',
+    // 用户头像：{ dataUrl, name, rarity, updatedAt } 或 null（回退到默认头像）
+    avatar: null
   }),
   actions: {
     toggleSidebar() {
@@ -24,6 +26,9 @@ export const useAppStore = defineStore('app', {
     },
     setScheduleDefaultView(value) {
       this.scheduleDefaultView = value
+    },
+    setAvatar(avatar) {
+      this.avatar = avatar || null
     }
   }
 })

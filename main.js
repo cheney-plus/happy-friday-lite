@@ -5,6 +5,7 @@ import fs from 'fs'
 import { setDataDir as setConfigDataDir } from './src-electron/config.js'
 import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
+import { ensureDefaultAvatar } from './src-electron/avatar.js'
 import { checkAutoBackup } from './src-electron/backup.js'
 import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
@@ -110,6 +111,10 @@ app.whenReady().then(async () => {
   // 2. 初始化数据目录与数据库（sql.js WASM 加载），期间 splash 持续显示
   //    渲染进程加载 JS bundle + Vue mount 通常比此处更慢，IPC 注册会先于首次 invoke 完成
   const dataDir = await ensureDataDir()
+
+  // 首次启动时为未设置头像的用户随机分配一个普通头像（稀有头像不参与默认分配）
+  // 需在数据目录初始化后、IPC 注册前完成，确保前端首次 get-config 即可拿到头像
+  ensureDefaultAvatar()
 
   console.log('[Main] Registering IPC commands...')
   try {

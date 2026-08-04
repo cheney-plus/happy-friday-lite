@@ -6,6 +6,9 @@ export function defaultConfig() {
     theme: 'light',
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     noteFimCompletion: true,
+    // 用户头像：由 set_avatar 工具写入，结构为 { dataUrl, name, rarity, updatedAt }
+    // 为 null 时前端回退到默认头像 src/assets/images/user.png
+    avatar: null,
     backup: {
       enabled: false,
       interval: 'daily',

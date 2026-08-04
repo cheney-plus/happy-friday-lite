@@ -108,6 +108,9 @@ onMounted(async () => {
         if (config.scheduleDefaultView) {
           appStore.setScheduleDefaultView(config.scheduleDefaultView);
         }
+        if (config.avatar !== undefined) {
+          appStore.setAvatar(config.avatar);
+        }
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -128,6 +131,9 @@ onMounted(async () => {
       }
       if (data.scheduleDefaultView) {
         appStore.setScheduleDefaultView(data.scheduleDefaultView);
+      }
+      if (data.avatar !== undefined) {
+        appStore.setAvatar(data.avatar);
       }
     });
   } else {

@@ -10,7 +10,7 @@
         @mouseleave="hideTooltip"
       >
         <span class="avatar-ring"></span>
-        <img src="@/assets/images/user.png" alt="avatar" class="avatar-img" />
+        <img :src="avatarSrc" alt="avatar" class="avatar-img" />
         <span class="status-dot" :title="t('common.user.online')"></span>
       </button>
 
@@ -54,16 +54,20 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
+import { reactive, ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '@/store';
 import { useI18n } from 'vue-i18n';
 import { sidebarMenuConfig, sidebarBottomMenuConfig } from '@/config/menu';
 import AvatarDrawer from './AvatarDrawer.vue';
+import defaultAvatar from '@/assets/images/user.png';
 
 const appStore = useAppStore();
 const router = useRouter();
 const { t } = useI18n();
+
+// 用户头像：优先使用 set_avatar 工具写入的头像，否则回退到默认头像
+const avatarSrc = computed(() => appStore.avatar?.dataUrl || defaultAvatar);
 
 const tooltip = reactive({
   visible: false,

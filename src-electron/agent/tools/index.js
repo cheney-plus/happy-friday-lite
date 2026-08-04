@@ -49,5 +49,8 @@ import './builtin/webpageScraper.js'
 // 文件转 Markdown 工具（PDF/Word/PPT/Excel/HTML/CSV/JSON/XML/EPub → Markdown，支持 PDF OCR）
 import './builtin/markitdown.js'
 
+// 用户头像替换工具（从内置头像库随机选取；口令可解锁稀有头像）
+import './builtin/avatarOps.js'
+
 // 用户可在下方追加自定义工具导入：
 // import './builtin/myCustomTool.js'
