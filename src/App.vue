@@ -31,7 +31,7 @@ const appStore = useAppStore();
 const tabStore = useTabStore();
 const route = useRoute();
 const router = useRouter();
-const { initTheme, setTheme: applyThemeFromConfig } = useTheme();
+const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
 
 let unlistenConfig = null;
 
@@ -99,9 +99,17 @@ onMounted(async () => {
           appStore.setLanguage(config.language);
           setI18nLanguage(config.language);
         }
-        if (config.theme) {
-          appStore.setTheme(config.theme);
+        // 主题以本地 localStorage（useTheme）为权威源。
+        // 旧版本未将 theme 持久化到 config，config.theme 可能停留在默认 'light'；
+        // 若直接采用，后续 config-changed 广播（如切换头像）会用过期值覆盖当前主题。
+        // 因此以本地主题为准同步 appStore，并在 config 不同步时回写纠正。
+        if (config.theme !== currentMode.value) {
+          config.theme = currentMode.value;
+          try {
+            await electronService.invoke('save-config', config);
+          } catch (_e) {}
         }
+        appStore.setTheme(currentMode.value);
         if (config.noteFimCompletion !== undefined) {
           appStore.setNoteFimCompletion(config.noteFimCompletion);
         }

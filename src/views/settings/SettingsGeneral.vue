@@ -1141,11 +1141,21 @@ const toggleThemeDropdown = () => {
   showThemeDropdown.value = !showThemeDropdown.value;
 };
 
-const selectTheme = (value) => {
+const selectTheme = async (value) => {
   settings.displayMode = value;
   applyTheme(value);
   appStore.setTheme(value);
   showThemeDropdown.value = false;
+  // 持久化到 config.json，与 language 等设置保持一致。
+  // 否则 config.theme 会一直停留在默认 'light'，切换头像等广播 config-changed 时
+  // 会用过期的 theme 覆盖用户当前主题（深色被强制切回浅色）。
+  try {
+    const config = await electronService.invoke('get-config');
+    if (config) {
+      config.theme = value;
+      await electronService.invoke('save-config', config);
+    }
+  } catch (_e) {}
 };
 
 const toggleLangDropdown = () => {
