@@ -29,7 +29,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Brain, Sparkles, Plug, BarChart3 } from 'lucide-vue-next';
 import SkillsManagement from './drawer/SkillsManagement.vue';
@@ -53,7 +53,12 @@ const visible = computed({
   set: (val) => emit('update:modelValue', val)
 });
 
-const activeSection = ref('skills');
+const activeSection = ref('memory');
+
+// 每次打开抽屉时默认回到「记忆管理」tab
+watch(visible, (val) => {
+  if (val) activeSection.value = 'memory';
+});
 
 const navItems = computed(() => [
   { key: 'memory', label: t('drawer.nav.memory'), icon: Brain },
