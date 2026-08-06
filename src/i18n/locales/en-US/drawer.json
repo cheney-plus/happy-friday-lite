@@ -69,6 +69,7 @@
     "switchAvatarFailed": "Failed to switch avatar",
     "rare": "Rare",
     "common": "Common",
+    "obtainedCount": "Obtained",
     "memoryFiles": "Memory Files",
     "memoryFilesHint": "Friday reads and updates these memory files during conversations",
     "edit": "Edit",

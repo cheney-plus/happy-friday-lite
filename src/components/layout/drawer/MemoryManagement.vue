@@ -10,11 +10,15 @@
 
     <!-- Scrollable body -->
     <div class="panel-body">
-      <!-- ============ Friday 拟人 ID 卡片 ============ -->
+      <!-- ============ Friday 助手卡片 ============ -->
       <div class="memory-section">
         <h3 class="subsection-title">{{ t('drawer.memory.fridayCard') }}</h3>
         <div class="friday-card">
-          <div class="friday-avatar-wrap">
+          <div
+            class="friday-avatar-wrap"
+            :title="t('drawer.memory.avatarHistory')"
+            @click="avatarPanelVisible = true"
+          >
             <img
               v-if="currentAvatar?.dataUrl"
               :src="currentAvatar.dataUrl"
@@ -22,7 +26,7 @@
               :alt="t('drawer.memory.fridayName')"
             />
             <div v-else class="friday-avatar fallback">
-              <Brain :size="36" :stroke-width="1.4" />
+              <Brain :size="32" :stroke-width="1.4" />
             </div>
             <span
               v-if="currentAvatar?.rarity === 'rare'"
@@ -42,17 +46,6 @@
               <span class="info-value">{{ t('drawer.memory.fridayBirthDate') }}</span>
             </div>
           </div>
-          <!-- 已获头像入口：点击打开面板展示所有已获得的头像 -->
-          <button
-            class="obtained-btn"
-            :disabled="avatarLoading"
-            @click="avatarPanelVisible = true"
-          >
-            <Images :size="14" :stroke-width="1.8" />
-            <span class="obtained-label">{{ t('drawer.memory.avatarHistory') }}</span>
-            <span class="obtained-count">{{ avatarHistory.length }}</span>
-            <ChevronRight :size="14" :stroke-width="2" class="obtained-arrow" />
-          </button>
         </div>
       </div>
 
@@ -192,6 +185,24 @@
             </div>
 
             <div class="modal-body avatar-panel-body">
+              <!-- 当前选中头像大图展示 -->
+              <div v-if="currentAvatar" class="current-avatar-showcase">
+                <div class="showcase-avatar-wrap">
+                  <img
+                    :src="currentAvatar.dataUrl"
+                    :alt="currentAvatar.name"
+                    class="showcase-avatar"
+                  />
+                  <span
+                    v-if="currentAvatar.rarity === 'rare'"
+                    class="showcase-rare-badge"
+                    :title="t('drawer.memory.rare')"
+                  >
+                    <Crown :size="13" :stroke-width="2.2" />
+                  </span>
+                </div>
+              </div>
+
               <div class="section-hint">{{ t('drawer.memory.avatarHistoryHint') }}</div>
 
               <div v-if="avatarLoading" class="empty-hint">{{ t('drawer.memory.loading') }}</div>
@@ -224,6 +235,7 @@
         </div>
       </Transition>
     </Teleport>
+
   </div>
 </template>
 
@@ -233,7 +245,7 @@ import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import {
   Brain, X, Pencil, Eye, Crown, Sparkles, User, BookOpen, Wrench,
-  Images, ChevronRight
+  Images
 } from 'lucide-vue-next';
 
 const { t } = useI18n();
@@ -509,17 +521,26 @@ onUnmounted(() => {
 
 /* ============ Friday 卡片 ============ */
 .friday-card {
+  position: relative;
   background-color: var(--bg-secondary);
   border-radius: 8px;
+  border: 1px solid var(--border-color);
   padding: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
+  transition: border-color 0.18s;
+}
+
+.friday-card:hover {
+  border-color: var(--text-tertiary);
 }
 
 .friday-avatar-wrap {
   position: relative;
   flex-shrink: 0;
+  cursor: pointer;
+  border-radius: 14px;
 }
 
 .friday-avatar {
@@ -536,6 +557,29 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   color: var(--text-tertiary);
+}
+
+.avatar-id-hint {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-color, #6366f1);
+  color: #fff;
+  border: 2px solid var(--bg-secondary);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.18s, transform 0.18s;
+}
+
+.friday-avatar-wrap:hover .avatar-id-hint {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .rarity-badge {
@@ -579,63 +623,12 @@ onUnmounted(() => {
 
 .info-value {
   color: var(--text-primary);
+  min-width: 0;
 }
 
 .info-value.name {
   font-size: 14px;
   font-weight: 600;
-}
-
-/* ============ 已获头像入口按钮（ID 卡片右侧） ============ */
-.obtained-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 9px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-primary);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  flex-shrink: 0;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.obtained-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: var(--text-tertiary);
-  color: var(--text-primary);
-}
-
-.obtained-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.obtained-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.obtained-arrow {
-  opacity: 0.55;
-  transition: opacity 0.15s, transform 0.15s;
-}
-
-.obtained-btn:hover:not(:disabled) .obtained-arrow {
-  opacity: 1;
-  transform: translateX(1px);
 }
 
 /* ============ 头像历史网格 ============ */
@@ -712,6 +705,40 @@ onUnmounted(() => {
   color: var(--accent-color, #3b82f6);
   line-height: 1;
   margin-top: 1px;
+}
+
+/* ============ 已获头像面板：当前头像大图展示 ============ */
+.current-avatar-showcase {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px 4px;
+}
+
+.showcase-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.showcase-avatar {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+}
+
+.showcase-rare-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  border: 2px solid var(--bg-primary);
 }
 
 /* ============ 记忆文件网格 ============ */

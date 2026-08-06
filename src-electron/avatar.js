@@ -5,7 +5,7 @@
  *   - 内置头像库目录解析（dev: public/images，prod: dist/images，asar 内可透明读取）
  *   - 稀有 / 普通头像分组
  *   - 图片读取为 data URL
- *   - ensureDefaultAvatar：首次启动时为未设置头像的用户随机分配一个普通头像
+ *   - ensureDefaultAvatar：首次启动时为未设置头像的用户随机分配 5 个普通头像
  *
  * 稀有头像（白鹿 / 彩虹鹦鹉 / 发光水母 / 星空鲸）仅能通过 set_avatar 工具的口令解锁，
  * 默认头像只从普通池中选取，以保持稀有头像的稀缺性。
@@ -72,6 +72,22 @@ export function pickRandom(arr) {
 }
 
 /**
+ * 从数组中随机取 N 个不重复元素（Fisher-Yates 洗牌算法取前 N 个）
+ * @template T
+ * @param {T[]} arr
+ * @param {number} n 要取的元素数量
+ * @returns {T[]}
+ */
+export function pickRandomN(arr, n) {
+  const copy = [...arr]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy.slice(0, Math.min(n, copy.length))
+}
+
+/**
  * 将一个已获得的头像记录到 config.avatarHistory（按 name 去重）。
  * 反作弊：仅记录"当前选中"的那一张头像的 dataUrl，不导出整库。
  *
@@ -96,11 +112,13 @@ export function recordAvatarToHistory(config, entry) {
 }
 
 /**
- * 首次启动时为未设置头像的用户随机分配一个普通头像。
+ * 首次启动时为未设置头像的用户随机分配 5 个普通头像。
  * - 已设置过头像（config.avatar 含 dataUrl）则跳过，保留用户既有选择。
  * - 仅从普通池选取，稀有头像不参与默认分配，以保持其稀缺性。
  * - 头像库不可用时静默跳过（前端将回退到默认头像资源）。
- * - 分配的同时记录到 avatarHistory，作为"已获得"头像。
+ * - 随机选取 5 个普通头像：第一个设为当前头像，其余 4 个连同第一个一并记录到 avatarHistory，
+ *   作为"已获得"头像供用户随时切换。
+ * - 若普通池不足 5 个，则按实际数量分配。
  *
  * 需在 config 数据目录已初始化（setDataDir）后调用。
  * @returns {boolean} 是否本次分配了新头像
@@ -120,18 +138,33 @@ export function ensureDefaultAvatar() {
     if (common.length === 0) {
       return false
     }
-    const chosen = pickRandom(common)
-    const dataUrl = readAsDataUrl(path.join(resolveAvatarDir(), chosen))
+    const chosenList = pickRandomN(common, 5)
+    const now = new Date().toISOString()
+
+    // 第一个设为当前头像
+    const first = chosenList[0]
+    const firstDataUrl = readAsDataUrl(path.join(resolveAvatarDir(), first))
     config.avatar = {
-      dataUrl,
-      name: path.basename(chosen, '.png'),
+      dataUrl: firstDataUrl,
+      name: path.basename(first, '.png'),
       rarity: 'common',
-      updatedAt: new Date().toISOString()
+      updatedAt: now
     }
-    // 同步记录到历史，作为首个已获得头像
+
+    // 所有 5 个头像一并记录到历史，作为已获得头像
     recordAvatarToHistory(config, config.avatar)
+    for (let i = 1; i < chosenList.length; i++) {
+      const file = chosenList[i]
+      const dataUrl = readAsDataUrl(path.join(resolveAvatarDir(), file))
+      recordAvatarToHistory(config, {
+        name: path.basename(file, '.png'),
+        dataUrl,
+        rarity: 'common',
+        updatedAt: now
+      })
+    }
     saveConfig(config)
-    console.log(`[avatar] 已分配默认头像: ${chosen}`)
+    console.log(`[avatar] 已分配 ${chosenList.length} 个默认头像: ${chosenList.join(', ')}`)
     return true
   } catch (e) {
     console.warn(`[avatar] ensureDefaultAvatar 失败: ${e?.message || e}`)

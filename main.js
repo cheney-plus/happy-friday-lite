@@ -112,7 +112,7 @@ app.whenReady().then(async () => {
   //    渲染进程加载 JS bundle + Vue mount 通常比此处更慢，IPC 注册会先于首次 invoke 完成
   const dataDir = await ensureDataDir()
 
-  // 首次启动时为未设置头像的用户随机分配一个普通头像（稀有头像不参与默认分配）
+  // 首次启动时为未设置头像的用户随机分配 5 个普通头像（稀有头像不参与默认分配）
   // 需在数据目录初始化后、IPC 注册前完成，确保前端首次 get-config 即可拿到头像
   ensureDefaultAvatar()
 

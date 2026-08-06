@@ -69,6 +69,7 @@
     "switchAvatarFailed": "切换头像失败",
     "rare": "稀有",
     "common": "普通",
+    "obtainedCount": "已获",
     "memoryFiles": "记忆文件",
     "memoryFilesHint": "Friday 会在对话中读取并更新这些记忆文件",
     "edit": "编辑",
