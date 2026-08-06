@@ -142,8 +142,9 @@ export function registerAgentCommands(mainWindow) {
       const { agent, rootDir } = await createAgentWithContext(modelConfig, runtimeCtx)
       log.info(`Agent 创建完成, rootDir=${rootDir}`)
 
-      // 5. 记忆文件已切换为 filesystem-backed memory（/memories/*.md），
-      //    由 createDeepAgent 的 memory: 参数在创建时加载进系统提示词，无需再向 InMemoryStore 同步。
+      // 5. 记忆文件为 filesystem-backed memory（/memories/*.md 落盘）。
+      //    createAgent 每次 invoke 都从磁盘实时读取并注入系统提示词（不使用 SDK memory:
+      //    参数，避免 checkpointer 缓存导致内容过期），Agent 通过 edit_file 写入即持久化。
 
       // 6. 配置 checkpointer thread_id
       const config = { configurable: { thread_id: currentSessionId } }

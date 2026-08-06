@@ -8,7 +8,9 @@
  * 关键装配点：
  *   - model: 通过 modelAdapter.js 把项目模型配置适配为 LangChain ChatOpenAI
  *   - backend: 通过 backend.js 装配 CompositeBackend（FilesystemBackend，/memories/ 亦落盘）
- *   - memory: 通过 memoryFiles.js 确保 SOUL/USER/MEMORY/Agent.md 存在，并传 memory: 参数加载进系统提示词
+ *   - memory: 通过 memoryFiles.js 确保 SOUL/USER/MEMORY/Agent.md 存在，并在每次 invoke 时
+ *            从磁盘实时读取注入系统提示词（不使用 SDK memory: 参数，避免 checkpointer
+ *            缓存 memoryContents 导致同一会话内 Agent 看到过期内容、edit_file 失败）
  *   - permissions: 通过 permissions.js 配置文件系统权限规则
  *   - tools: 通过 tools/registry.js 构建已注册的 LangChain 工具集
  *   - interruptOn: 通过 tools/registry.js 自动收集 requireApproval=true 的工具
@@ -29,7 +31,7 @@ import { ensureSkillDir, listSkills } from './skills.js'
 import { buildSubagents } from './subagents.js'
 import { buildLangChainTools, buildInterruptConfig } from './tools/registry.js'
 import { loadAgentMcpTools } from './mcp.js'
-import { ensureMemoryFiles, getMemoryPaths } from './memoryFiles.js'
+import { ensureMemoryFiles, listMemoryFiles } from './memoryFiles.js'
 // 触发 builtin 工具注册
 import './tools/index.js'
 
@@ -115,13 +117,23 @@ export async function createAgent(modelConfig, options = {}) {
   // 8. 装配子 Agent
   const subagents = buildSubagents()
 
-  // 9. 创建 DeepAgent
-  // memory: 四份记忆文件在启动时加载进系统提示词（filesystem-backed memory），
-  //         Agent 亦可通过 edit_file 自主更新（permissions 已放行 /memories/**）。
-  //         - SOUL.md   定义 Friday 的人格与说话做事风格
-  //         - USER.md   记录用户的习惯与爱好
-  //         - MEMORY.md 跨会话长期记忆
-  //         - Agent.md  经验与技巧
+  // 9. 实时加载记忆文件内容（filesystem-backed memory）
+  //    不使用 createDeepAgent 的 memory: 参数：该参数背后的 createMemoryMiddleware 会把
+  //    四份文件内容缓存进 checkpointer state（state.memoryContents），同一会话内仅首次
+  //    invoke 从磁盘读取，之后一直复用缓存。后果是 Agent 用 edit_file 更新记忆文件后，
+  //    系统提示词仍展示旧内容——后续 edit_file 的 old_string 与磁盘实际内容不符而失败，
+  //    磁盘未被写入，重启后看似"丢失"。改为每次创建 Agent（即每次 invoke）时从磁盘实时
+  //    读取注入系统提示词，确保 Agent 始终看到最新内容，edit_file 也能正确匹配。
+  //    - SOUL.md   定义 Friday 的人格与说话做事风格
+  //    - USER.md   记录用户的习惯与爱好
+  //    - MEMORY.md 跨会话长期记忆
+  //    - Agent.md  经验与技巧
+  const memoryFilesList = listMemoryFiles()
+  const memoryContentsBlock = memoryFilesList
+    .map((f) => `### /memories/${f.fileName}\n${f.content || '(空)'}`)
+    .join('\n\n')
+
+  // 10. 创建 DeepAgent
   const agent = await createDeepAgent({
     model,
     tools,
@@ -131,7 +143,6 @@ export async function createAgent(modelConfig, options = {}) {
     subagents,
     checkpointer: getCheckpointer(),
     store: getSharedStore(),
-    memory: getMemoryPaths(),
     skills: ['/SKILL/'],
     systemPrompt:
       '你是 Friday Agent，一个集成在 Happy Friday Lite 知识库应用中的智能助手。\n\n' +
@@ -178,13 +189,12 @@ export async function createAgent(modelConfig, options = {}) {
       '4. 用中文回答用户问题\n' +
       '5. 所有文件操作路径必须位于 `/SANDBOX/` 下（/SKILL/、/memories/ 除外）\n\n' +
       '## 记忆系统\n' +
-      '启动时已加载 `/memories/` 下的四份记忆文件到你的上下文：\n' +
-      '- `/memories/SOUL.md`：你的灵魂设定与说话做事风格（人格）\n' +
-      '- `/memories/USER.md`：用户的习惯与爱好\n' +
-      '- `/memories/MEMORY.md`：跨会话长期记忆（重要事实与事件）\n' +
-      '- `/memories/Agent.md`：你积累的经验与技巧\n' +
-      '当你在对话中学到新的用户偏好、重要事实或经验时，可用 `edit_file` 主动更新对应记忆文件，' +
-      '更新会持久化并在下次对话生效。更新应精炼、去重，避免冗长。\n'
+      '以下四份记忆文件已从磁盘实时加载（每次对话前刷新，反映最新内容）：\n\n' +
+      memoryContentsBlock + '\n\n' +
+      '**更新规则**：当你在对话中学到新的用户偏好、重要事实或经验时，应立即用 `edit_file` 更新对应记忆文件' +
+      '（以当前内容片段作为 `old_string`，新内容作为 `new_string`）。更新会立即落盘并在下次对话生效。' +
+      '更新应精炼、去重，避免冗长。\n' +
+      '注意：`write_file` 无法覆盖已存在的文件，修改记忆文件请务必使用 `edit_file`。\n'
   })
 
   log.info('====== DeepAgent 创建完成 ======')
