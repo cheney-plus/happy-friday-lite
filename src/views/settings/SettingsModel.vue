@@ -139,7 +139,7 @@
       <div v-if="showAddModal" class="modal-overlay" @click.self="closeModal">
         <div class="modal-container">
           <div class="modal-header">
-            <h3 class="modal-title">添加模型</h3>
+            <h3 class="modal-title">{{ modalTitle }}</h3>
             <button class="close-btn" @click="closeModal">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -301,6 +301,12 @@
               <svg v-if="selectedModel === model.id" class="check-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
+              <button class="edit-btn" @click.stop="editModel(model)" title="编辑模型">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
               <button class="delete-btn" @click.stop="confirmDeleteModel(model)" title="删除模型">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -345,6 +351,7 @@ const goBack = () => {
 const selectedModel = ref('');
 
 const showAddModal = ref(false);
+const editingModelId = ref(null);
 const showApiKey = ref(false);
 const showEmbeddingApiKey = ref(false);
 const showDeleteConfirm = ref(false);
@@ -420,6 +427,24 @@ const selectModel = (model) => {
 };
 
 const deleteTarget = ref(null);
+
+const modalTitle = computed(() => editingModelId.value ? '编辑模型' : '添加模型');
+
+const editModel = (model) => {
+  editingModelId.value = model.id;
+  formData.value = {
+    provider: model.provider,
+    apiKey: model.apiKey,
+    modelName: model.modelName,
+    embeddingModelName: model.embeddingModelName || '',
+    modelUrl: model.provider === 'other' ? (model.baseUrl || '') : '',
+    useSeparateEmbeddingConfig: model.useSeparateEmbeddingConfig || false,
+    embeddingApiKey: model.embeddingApiKey || '',
+    embeddingUrl: model.embeddingBaseUrl || ''
+  };
+  showModelDropdown.value = false;
+  showAddModal.value = true;
+};
 
 const confirmDeleteModel = (model) => {
   deleteTarget.value = model;
@@ -589,37 +614,63 @@ const resetForm = () => {
   };
   showApiKey.value = false;
   showEmbeddingApiKey.value = false;
+  editingModelId.value = null;
 };
 
 const handleSave = () => {
   if (isFormValid.value) {
     const provider = providerList.find(p => p.value === formData.value.provider);
     const isOther = formData.value.provider === 'other';
-    const newModel = {
-      id: `model_${Date.now()}`,
+    const modelData = {
       provider: formData.value.provider,
       providerLabel: provider?.label || '未知',
       apiKey: formData.value.apiKey,
       modelName: formData.value.modelName,
       embeddingModelName: formData.value.embeddingModelName || '',
-      baseUrl: isOther ? formData.value.modelUrl : (provider?.baseUrl || ''),
-      createdAt: Date.now()
+      baseUrl: isOther ? formData.value.modelUrl : (provider?.baseUrl || '')
     };
 
     if (isOther) {
-      newModel.useSeparateEmbeddingConfig = !!formData.value.useSeparateEmbeddingConfig;
+      modelData.useSeparateEmbeddingConfig = !!formData.value.useSeparateEmbeddingConfig;
       if (formData.value.useSeparateEmbeddingConfig) {
-        newModel.embeddingApiKey = formData.value.embeddingApiKey;
-        newModel.embeddingBaseUrl = formData.value.embeddingUrl;
+        modelData.embeddingApiKey = formData.value.embeddingApiKey;
+        modelData.embeddingBaseUrl = formData.value.embeddingUrl;
       }
     }
 
-    customModels.value.push(newModel);
-    saveCustomModels();
-    // 新增模型后自动选为首选模型
-    selectedModel.value = newModel.id;
-    localStorage.setItem('happy-friday-selected-model', newModel.id);
-    syncModelsToConfig();
+    if (editingModelId.value) {
+      // 编辑已有模型：保留 id 与 createdAt
+      const existing = customModels.value.find(m => m.id === editingModelId.value);
+      const updatedModel = {
+        ...modelData,
+        id: editingModelId.value,
+        createdAt: existing?.createdAt || Date.now()
+      };
+      const idx = customModels.value.findIndex(m => m.id === editingModelId.value);
+      if (idx !== -1) {
+        customModels.value[idx] = updatedModel;
+      }
+      saveCustomModels();
+      syncModelsToConfig();
+      // 编辑后清除该模型的余额缓存，避免展示过期数据
+      if (balanceStates.value[editingModelId.value]) {
+        const { [editingModelId.value]: _, ...rest } = balanceStates.value;
+        balanceStates.value = rest;
+      }
+    } else {
+      // 新增模型
+      const newModel = {
+        ...modelData,
+        id: `model_${Date.now()}`,
+        createdAt: Date.now()
+      };
+      customModels.value.push(newModel);
+      saveCustomModels();
+      // 新增模型后自动选为首选模型
+      selectedModel.value = newModel.id;
+      localStorage.setItem('happy-friday-selected-model', newModel.id);
+      syncModelsToConfig();
+    }
     closeModal();
   }
 };
@@ -636,7 +687,10 @@ async function queryBalanceFor(model) {
     [model.id]: { loading: true, data: null, error: null, updatedAt: null }
   };
   try {
-    const res = await electronService.invoke('model-query-balance', { model });
+    // Vue 3 响应式对象（Proxy）无法被 structuredClone 克隆，Electron IPC 会静默失败，
+    // 必须先展开为普通对象再传递
+    const plainModel = { ...model };
+    const res = await electronService.invoke('model-query-balance', { model: plainModel });
     if (res && res.success !== false) {
       balanceStates.value = {
         ...balanceStates.value,
@@ -995,13 +1049,33 @@ function formatTime(ts) {
   transition: all 0.15s;
 }
 
-.model-dropdown-item:hover .delete-btn {
+.model-dropdown-item:hover .delete-btn,
+.model-dropdown-item:hover .edit-btn {
   opacity: 1;
 }
 
 .delete-btn:hover {
   color: #ef4444;
   background-color: rgba(239, 68, 68, 0.1);
+}
+
+.edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.edit-btn:hover {
+  color: var(--accent-color, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
 .custom-models-container {
