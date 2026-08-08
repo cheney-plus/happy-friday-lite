@@ -22,6 +22,7 @@ import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
 import { getLogDir } from './logger.js'
+import { getShareUrl } from './shareServer.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -169,6 +170,15 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('get_session_messages', (_event, args) => {
     return db.getMessages(args.sessionId)
+  })
+
+  // 生成内网分享链接：返回只读对话查看页面的 URL
+  ipcMain.handle('get-share-link', (_event, args) => {
+    const url = getShareUrl(args.sessionId)
+    if (!url) {
+      return { success: false, error: '分享服务未启动' }
+    }
+    return { success: true, url }
   })
 
   ipcMain.handle('save_message', (_event, args) => {

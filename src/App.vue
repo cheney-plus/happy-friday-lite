@@ -1,8 +1,8 @@
 <template>
-  <div class="app-container">
-    <TabBar />
+  <div class="app-container" :class="{ 'is-share-view': isShareView }">
+    <TabBar v-if="!isShareView" />
     <div class="main-body">
-      <Sidebar />
+      <Sidebar v-if="!isShareView" />
       <main class="main-content">
         <div class="content-wrapper">
           <router-view v-slot="{ Component }">
@@ -19,7 +19,7 @@
 <script setup>
 import Sidebar from '@/components/layout/Sidebar.vue';
 import TabBar from '@/components/layout/TabBar.vue';
-import { onMounted, onUnmounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useAppStore, useTabStore } from '@/store';
 import { electronService } from '@/services/electron';
 import { setI18nLanguage } from '@/i18n';
@@ -32,6 +32,9 @@ const tabStore = useTabStore();
 const route = useRoute();
 const router = useRouter();
 const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
+
+// 分享视图：隐藏侧边栏/标签栏，全屏展示对话界面
+const isShareView = computed(() => route.meta?.share === true || !isElectronEnvironment());
 
 let unlistenConfig = null;
 
@@ -188,5 +191,14 @@ onUnmounted(() => {
   background-color: var(--bg-primary);
   border-radius: var(--content-radius);
   margin: 0;
+}
+
+/* 分享视图：全屏展示，去除内边距与圆角 */
+.app-container.is-share-view .main-body {
+  padding: 0;
+}
+
+.app-container.is-share-view .content-wrapper {
+  border-radius: 0;
 }
 </style>

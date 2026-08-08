@@ -66,6 +66,13 @@ export const routes = [
     component: () => import('@/views/friday/FridayConversation.vue')
   },
   {
+    // 内网分享：复用对话界面，通过 meta.share 标记为分享模式（隐藏输入框）
+    path: '/share/:sessionId',
+    name: 'share',
+    component: () => import('@/views/friday/FridayConversation.vue'),
+    meta: { share: true }
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/knowledge'
   }

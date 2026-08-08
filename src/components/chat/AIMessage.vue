@@ -37,7 +37,7 @@
         <span v-if="isStreaming" class="streaming-cursor"></span>
       </div>
 
-      <div v-if="!isStreaming" class="ai-footer">
+      <div v-if="showActions && !isStreaming" class="ai-footer">
         <div class="footer-left">
           <button class="action-icon-btn" @click="$emit('action', 'add')">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -95,6 +95,7 @@ const props = defineProps({
   displayName: { type: String, default: '周五' },
   showDivider: { type: Boolean, default: true },
   isStreaming: { type: Boolean, default: false },
+  showActions: { type: Boolean, default: true },
   showRollback: { type: Boolean, default: true },
   reasoning: { type: String, default: '' },
   reasoningStreamingContent: { type: String, default: '' }

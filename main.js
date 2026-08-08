@@ -11,6 +11,7 @@ import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
 import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 import { initLogger } from './src-electron/logger.js'
+import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -163,6 +164,9 @@ app.whenReady().then(async () => {
   // 启动后检查对话历史自动清理（异步，至多每天一次，不阻塞窗口）
   checkAutoCleanHistory().catch(e => console.error('[Main] Auto history clean check failed:', e))
 
+  // 启动内网分享服务（只读 HTTP，供局域网浏览器查看对话）
+  startShareServer().catch(e => console.error('[Main] Share server failed to start:', e))
+
   // 若用户曾开启本机 MCP 服务，则自动拉起（异步，不阻塞窗口）
   import('./src-electron/agent/mcp.js')
     .then(({ autoStartLocalIfEnabled }) => autoStartLocalIfEnabled())
@@ -185,6 +189,7 @@ app.on('window-all-closed', function () {
     powerSaveBlocker.stop(powerBlockerId)
     powerBlockerId = null
   }
+  stopShareServer()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()

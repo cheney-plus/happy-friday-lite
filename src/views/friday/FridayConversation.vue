@@ -1,7 +1,7 @@
 <template>
   <div class="conversation-container">
     <header class="conversation-header">
-      <button v-if="showBackBtn" class="header-btn back-btn" @click="goBack">
+      <button v-if="!isShareMode && showBackBtn" class="header-btn back-btn" @click="goBack">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 12H5"></path>
           <polyline points="12 19 5 12 12 5"></polyline>
@@ -13,7 +13,7 @@
         <span class="header-time">{{ chatTime }}</span>
       </div>
 
-      <button class="header-btn knowledge-btn" @click="handleAddToKnowledge">
+      <button v-if="!isShareMode" class="header-btn knowledge-btn" @click="handleAddToKnowledge">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
@@ -49,7 +49,7 @@
                 />
               </template>
             </div>
-            <div class="agent-footer">
+            <div v-if="!isShareMode" class="agent-footer">
               <div class="footer-left">
                 <button class="action-icon-btn" @click="handleAction('add', index)">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,6 +85,7 @@
             :content="msg.content"
             :reasoning="msg.reasoning"
             :show-divider="true"
+            :show-actions="!isShareMode"
             :show-rollback="currentMode === 'chat'"
             @action="(type) => handleAction(type, index)"
           />
@@ -136,6 +137,7 @@
     </main>
 
     <ChatInputBox
+      v-if="!isShareMode"
       v-model="inputText"
       placeholder="输入消息..."
       :is-streaming="isStreaming"
@@ -271,6 +273,10 @@ function renderMarkdown(content) {
 }
 
 const showBackBtn = computed(() => route.query.hideBack !== 'true');
+
+// 分享模式：通过分享链接在浏览器中打开（复用对话界面，隐藏输入框与操作按钮）
+// 触发条件：路由 meta.share 标记 或 运行在非 Electron 环境（浏览器）
+const isShareMode = computed(() => route.meta?.share === true || !electronService.isElectron);
 
 // Agent 模式"思考中"指示器：流式执行中且未在输出文本时显示
 // 触发场景：1) 尚未收到任何段；2) 上一段是工具调用（工具结束后等待 LLM 下一轮思考）
@@ -796,6 +802,27 @@ async function loadSessionHistory(sessionId) {
   }
 }
 
+// 分享模式：通过 HTTP 接口加载会话与消息（浏览器环境下无 IPC，走 fetch）
+async function loadShareData(sessionId) {
+  try {
+    const res = await fetch(`/api/share/${encodeURIComponent(sessionId)}`);
+    const data = await res.json();
+    if (data && data.success && data.session) {
+      chatTitle.value = data.session.title || '与 Friday 的对话';
+      currentMode.value = data.session.mode || 'chat';
+      messages.value = (data.messages || []).map(m => {
+        const msg = { role: m.role, content: m.content, id: m.id };
+        if (m.metadata && m.metadata.segments && Array.isArray(m.metadata.segments)) {
+          msg.segments = m.metadata.segments;
+        }
+        return msg;
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load share data:', err);
+  }
+}
+
 async function triggerAiResponse() {
   if (isStreaming.value || isRollingBack.value) return;
 
@@ -859,6 +886,15 @@ async function initConversation() {
   currentSessionId.value = route.params.sessionId || '';
   if (currentSessionId.value.startsWith('new-')) {
     currentSessionId.value = '';
+  }
+
+  // 分享模式：仅加载并展示对话内容，不触发 AI 响应、不走 IPC
+  if (isShareMode.value) {
+    if (currentSessionId.value) {
+      await loadShareData(currentSessionId.value);
+    }
+    nextTick(() => scrollToBottom(true));
+    return;
   }
 
   if (currentSessionId.value) {
