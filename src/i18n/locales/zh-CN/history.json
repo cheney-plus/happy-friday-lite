@@ -52,5 +52,10 @@
   "selectedCount": "已选择 {count} 项",
   "batchDelete": "批量删除",
   "items": "项",
-  "multiSelect": "多选"
+  "multiSelect": "多选",
+  "noModelConfig": "未配置大模型",
+  "noSessionContent": "暂无对话内容",
+  "summaryEmpty": "总结内容为空，请重试",
+  "summaryFailed": "总结失败，请重试",
+  "loadSessionFailed": "加载对话失败"
 }

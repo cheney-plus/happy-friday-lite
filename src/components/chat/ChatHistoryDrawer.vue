@@ -4,7 +4,7 @@
       class="drawer-toggle-btn"
       :class="{ active: isOpen, hidden: isOpen }"
       @click="toggleDrawer"
-      title="历史对话"
+      :title="t('history.title')"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
@@ -15,7 +15,7 @@
     <Transition name="drawer">
       <div v-if="isOpen" class="history-drawer">
         <div class="drawer-header">
-          <span class="drawer-title">历史对话</span>
+          <span class="drawer-title">{{ t('history.title') }}</span>
           <button class="drawer-close-btn" @click="isOpen = false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -26,14 +26,14 @@
 
         <div class="drawer-body">
           <div v-if="loading" class="drawer-empty">
-            <span>加载中...</span>
+            <span>{{ t('history.loading') }}</span>
           </div>
 
           <div v-else-if="sessions.length === 0" class="drawer-empty">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
-            <span>暂无历史对话</span>
+            <span>{{ t('history.empty') }}</span>
           </div>
 
           <div v-else class="session-list">
@@ -59,7 +59,7 @@
         </div>
 
         <div v-if="sessions.length > 0" class="drawer-footer" @click="goToHistoryPage">
-          <span>查看全部历史</span>
+          <span>{{ t('history.viewAll') }}</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
@@ -78,14 +78,14 @@
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-                <span>删除对话</span>
+                <span>{{ t('history.delete') }}</span>
               </button>
               <button class="menu-item" @click="handleRename">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                 </svg>
-                <span>重命名对话</span>
+                <span>{{ t('history.rename') }}</span>
               </button>
               <button class="menu-item" @click="handleSaveAsNote">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -94,7 +94,7 @@
                   <line x1="12" y1="6" x2="12" y2="13"></line>
                   <line x1="9" y1="10" x2="15" y2="10"></line>
                 </svg>
-                <span>保存为笔记</span>
+                <span>{{ t('history.saveAsNote') }}</span>
               </button>
               <button class="menu-item" @click="handleShare">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -104,7 +104,7 @@
                   <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                   <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                 </svg>
-                <span>分享</span>
+                <span>{{ t('history.share') }}</span>
               </button>
             </div>
           </div>
@@ -116,17 +116,17 @@
     <Teleport to="body">
       <div v-if="showRenameModal" class="rename-modal-overlay" @click.self="showRenameModal = false">
         <div class="rename-modal">
-          <div class="rename-modal-title">重命名对话</div>
+          <div class="rename-modal-title">{{ t('history.renameTitle') }}</div>
           <input
             v-model="renameValue"
             class="rename-input"
-            placeholder="输入新名称"
+            :placeholder="t('history.renamePlaceholder')"
             @keydown.enter="confirmRename"
             ref="renameInputRef"
           />
           <div class="rename-modal-actions">
-            <button class="rename-cancel-btn" @click="showRenameModal = false">取消</button>
-            <button class="rename-confirm-btn" @click="confirmRename">确认</button>
+            <button class="rename-cancel-btn" @click="showRenameModal = false">{{ t('history.cancel') }}</button>
+            <button class="rename-confirm-btn" @click="confirmRename">{{ t('history.confirm') }}</button>
           </div>
         </div>
       </div>
@@ -135,26 +135,26 @@
     <Teleport to="body">
       <div v-if="shareModal.visible" class="rename-modal-overlay" @click.self="closeShareModal">
         <div class="rename-modal share-modal">
-          <div class="rename-modal-title">分享对话</div>
-          <div class="share-desc">生成「{{ shareModal.sessionTitle }}」的分享链接，对方可在浏览器中查看。</div>
+          <div class="rename-modal-title">{{ t('history.shareTitle') }}</div>
+          <div class="share-desc">{{ t('history.shareDesc', { title: shareModal.sessionTitle }) }}</div>
           <div v-if="shareModal.loading" class="share-loading">
             <span class="share-spinner"></span>
-            <span>正在生成分享链接...</span>
+            <span>{{ t('history.shareLoading') }}</span>
           </div>
           <template v-else-if="shareModal.url">
             <div class="share-link-box">
               <input class="share-link-input" :value="shareModal.url" readonly ref="shareLinkInputRef" @click="selectShareLink" />
               <button class="share-copy-btn" :class="{ copied: shareModal.copied }" @click="copyShareLink">
-                <span v-if="shareModal.copied">已复制</span>
-                <span v-else>复制</span>
+                <span v-if="shareModal.copied">{{ t('history.shareCopied') }}</span>
+                <span v-else>{{ t('history.shareCopy') }}</span>
               </button>
             </div>
-            <div class="share-tip">该链接仅限同一内网访问。</div>
+            <div class="share-tip">{{ t('history.shareTip') }}</div>
           </template>
-          <div v-else class="share-error">{{ shareModal.error || '生成分享链接失败' }}</div>
+          <div v-else class="share-error">{{ shareModal.error || t('history.shareError') }}</div>
           <div class="rename-modal-actions">
-            <button v-if="shareModal.url" class="rename-confirm-btn" @click="openShareLink">在浏览器打开</button>
-            <button class="rename-cancel-btn" @click="closeShareModal">关闭</button>
+            <button v-if="shareModal.url" class="rename-confirm-btn" @click="openShareLink">{{ t('history.shareOpen') }}</button>
+            <button class="rename-cancel-btn" @click="closeShareModal">{{ t('history.close') }}</button>
           </div>
         </div>
       </div>
@@ -171,6 +171,7 @@
 <script setup>
 import { ref, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
 import { marked } from 'marked';
@@ -178,6 +179,7 @@ import { marked } from 'marked';
 const emit = defineEmits(['open-session']);
 
 const router = useRouter();
+const { t } = useI18n();
 const noteStore = useNoteStore();
 const isOpen = ref(false);
 const loading = ref(false);
@@ -380,16 +382,16 @@ const handleSaveAsNote = async () => {
 
   const model = loadModelConfig();
   if (!model) {
-    showSaveToast('未配置大模型');
+    showSaveToast(t('history.noModelConfig'));
     return;
   }
 
-  showSaveToast('正在整理笔记，请稍后在笔记中查看');
+  showSaveToast(t('history.saveAsNoteToast'));
 
   try {
     const messages = await electronService.invoke('get_session_messages', { sessionId });
     if (!messages || messages.length === 0) {
-      showSaveToast('暂无对话内容');
+      showSaveToast(t('history.noSessionContent'));
       return;
     }
 
@@ -451,7 +453,7 @@ ${transcript}
       const finalContent = summaryContent || data.fullContent || '';
 
       if (!finalContent.trim()) {
-        showSaveToast('总结内容为空，请重试');
+        showSaveToast(t('history.summaryEmpty'));
         return;
       }
 
@@ -479,13 +481,13 @@ ${transcript}
         const plainText = stripMarkdown(finalContent);
         const note = await noteStore.importNote(null, null, title, htmlContent, plainText);
         if (note) {
-          showSaveToast('已保存为笔记');
+          showSaveToast(t('history.saveAsNoteSuccess'));
         } else {
-          showSaveToast('保存失败');
+          showSaveToast(t('history.saveAsNoteFailed'));
         }
       } catch (err) {
         console.error('Failed to save summary note:', err);
-        showSaveToast('保存失败');
+        showSaveToast(t('history.saveAsNoteFailed'));
       }
     });
 
@@ -500,7 +502,7 @@ ${transcript}
       if (unlistenError) unlistenError();
 
       console.error('Summary error:', data.error);
-      showSaveToast('总结失败，请重试');
+      showSaveToast(t('history.summaryFailed'));
     });
 
     electronService
@@ -512,14 +514,14 @@ ${transcript}
       })
       .catch((err) => {
         console.error('Summary invoke error:', err);
-        showSaveToast('总结失败，请重试');
+        showSaveToast(t('history.summaryFailed'));
         unlistenChunk();
         unlistenDone();
         if (unlistenError) unlistenError();
       });
   } catch (err) {
     console.error('Failed to load session messages:', err);
-    showSaveToast('加载对话失败');
+    showSaveToast(t('history.loadSessionFailed'));
   }
 };
 

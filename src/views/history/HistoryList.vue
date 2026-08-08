@@ -135,6 +135,13 @@
                     <span>{{ t('history.multiSelect') }}</span>
                   </button>
                   <div class="menu-divider-sm"></div>
+                  <button class="dropdown-item dropdown-delete" @click.stop="handleRowMenuDelete(session)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    <span>{{ t('history.delete') }}</span>
+                  </button>
                   <button class="dropdown-item" @click.stop="handleRowMenuRename(session)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -160,13 +167,6 @@
                       <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                     </svg>
                     <span>{{ t('history.share') }}</span>
-                  </button>
-                  <button class="dropdown-item dropdown-delete" @click.stop="handleRowMenuDelete(session)">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                    <span>{{ t('history.delete') }}</span>
                   </button>
                 </div>
               </button>
@@ -204,12 +204,12 @@
           :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
           @click.stop
         >
-          <button class="menu-item" @click="handleOpenNewTab">
+          <button class="menu-item delete-item" @click="handleDelete">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14"></path>
-              <polyline points="12 5 19 12 12 19"></polyline>
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
-            <span>{{ t('history.openInNewTab') }}</span>
+            <span>{{ t('history.delete') }}</span>
           </button>
           <button class="menu-item" @click="handleRename">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -217,6 +217,15 @@
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
             <span>{{ t('history.rename') }}</span>
+          </button>
+          <button class="menu-item" @click="handleContextMenuSaveAsNote">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              <line x1="12" y1="6" x2="12" y2="13"></line>
+              <line x1="9" y1="10" x2="15" y2="10"></line>
+            </svg>
+            <span>{{ t('history.saveAsNote') }}</span>
           </button>
           <button class="menu-item" @click="handleShare">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -229,12 +238,12 @@
             <span>{{ t('history.share') }}</span>
           </button>
           <div class="menu-divider"></div>
-          <button class="menu-item delete-item" @click="handleDelete">
+          <button class="menu-item" @click="handleOpenNewTab">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <path d="M5 12h14"></path>
+              <polyline points="12 5 19 12 12 19"></polyline>
             </svg>
-            <span>{{ t('history.delete') }}</span>
+            <span>{{ t('history.openInNewTab') }}</span>
           </button>
         </div>
       </div>
@@ -851,6 +860,14 @@ const handleOpenNewTab = () => {
   const session = contextMenu.value.session;
   if (session) openSession(session);
   closeContextMenu();
+};
+
+// 右键菜单-保存为笔记
+const handleContextMenuSaveAsNote = () => {
+  const session = contextMenu.value.session;
+  if (!session) return;
+  closeContextMenu();
+  handleRowMenuSaveAsNote(session);
 };
 
 // 重命名

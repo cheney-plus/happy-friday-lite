@@ -52,5 +52,10 @@
   "selectedCount": "{count} selected",
   "batchDelete": "Batch Delete",
   "items": "items",
-  "multiSelect": "Multi-select"
+  "multiSelect": "Multi-select",
+  "noModelConfig": "No model configured",
+  "noSessionContent": "No conversation content",
+  "summaryEmpty": "Summary is empty, please retry",
+  "summaryFailed": "Summary failed, please retry",
+  "loadSessionFailed": "Failed to load conversation"
 }
