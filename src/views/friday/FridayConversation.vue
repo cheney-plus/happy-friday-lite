@@ -20,6 +20,7 @@
           <line x1="12" y1="6" x2="12" y2="13"></line>
           <line x1="9" y1="10" x2="15" y2="10"></line>
         </svg>
+        <span class="btn-tooltip hover-tooltip">保存为笔记</span>
       </button>
     </header>
 
@@ -47,6 +48,44 @@
                   :default-collapsed="seg.status === 'success' && !seg.requireApproval"
                 />
               </template>
+            </div>
+            <div class="agent-footer">
+              <div class="footer-left">
+                <button class="action-icon-btn" @click="handleAction('share', index)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                  </svg>
+                  <span class="tooltip">分享</span>
+                </button>
+                <button class="action-icon-btn" @click="handleAction('add', index)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                  </svg>
+                  <span class="tooltip">保存</span>
+                </button>
+                <button class="action-icon-btn" @click="handleAction('copy', index)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span class="tooltip">复制</span>
+                </button>
+              </div>
+              <div class="footer-right">
+                <button class="action-icon-btn" @click="handleAction('rollback', index)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 14 4 9 9 4"></polyline>
+                    <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                  </svg>
+                  <span class="tooltip">回退</span>
+                </button>
+              </div>
             </div>
             <div class="message-divider"></div>
           </div>
@@ -205,6 +244,11 @@ const pendingApproval = ref(null);
 // "全部批准"模式：本次 AI 执行内后续所有工具调用自动批准，新对话仍需审批
 const autoApproveAll = ref(false);
 
+// 总结功能临时事件监听器（用于 onUnmounted 清理）
+let unlistenSummaryChunk = null;
+let unlistenSummaryDone = null;
+let unlistenSummaryError = null;
+
 // 流式结束时重置"全部批准"标记（下一次对话仍需审批）
 watch(isStreaming, (streaming) => {
   if (!streaming) autoApproveAll.value = false;
@@ -221,8 +265,17 @@ function formatTime(date) {
   return `${h}:${m}`;
 }
 
-// Agent 模式文本段 Markdown 渲染
-marked.setOptions({ breaks: true, gfm: true });
+// Agent 模式文本段 Markdown 渲染（含代码块语言标签 + 复制按钮）
+const agentMarkedRenderer = new marked.Renderer();
+agentMarkedRenderer.code = function ({ text, lang }) {
+  const language = lang || '';
+  const escapedText = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-block-lang">${language}</span><button class="code-copy-btn" data-code="${encodeURIComponent(text)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div><pre><code class="language-${language}">${escapedText}</code></pre></div>`;
+};
+marked.setOptions({ breaks: true, gfm: true, renderer: agentMarkedRenderer });
 function renderMarkdown(content) {
   return marked.parse(content);
 }
@@ -247,16 +300,259 @@ function goBack() {
 }
 
 function handleAddToKnowledge() {
-  // TODO: 待实现
+  if (isStreaming.value) return;
+  if (!messages.value.length) {
+    showSaveToast('暂无对话内容');
+    return;
+  }
+
+  const model = loadModelConfig();
+  if (!model) {
+    showSaveToast('未配置大模型');
+    return;
+  }
+
+  // 立即反馈：先显示提示，再异步处理
+  showSaveToast('正在整理笔记，请稍后在笔记中查看');
+
+  // 异步执行总结，不阻塞 UI
+  setTimeout(() => {
+    doSummarize(model);
+  }, 50);
+}
+
+async function doSummarize(model) {
+  const summaryRequestId = `summary_${Date.now()}`;
+  let summaryContent = '';
+  let summaryDone = false;
+
+  // Build conversation transcript
+  const transcript = messages.value
+    .map(msg => {
+      if (msg.role === 'user') {
+        return `【用户】${msg.content}`;
+      } else if (msg.role === 'assistant') {
+        if (msg.content) {
+          return `【周五】${msg.content}`;
+        }
+        if (msg.segments && msg.segments.length) {
+          const textParts = msg.segments
+            .filter(s => s.type === 'text' && s.content)
+            .map(s => s.content);
+          return textParts.length ? `【周五】${textParts.join('\n')}` : '';
+        }
+        return '';
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n\n');
+
+  const prompt = `请将以下对话内容总结为一份结构化笔记，要求：
+1. 第一行使用 # 标题格式，为这份笔记取一个简洁且有意义的标题，标签最后不要带笔记二字（不超过20字）
+2. 主题概述（一句话概括）
+3. 关键要点（3-5个要点）
+4. 详细内容（按主题分类整理）
+5. 结论与建议
+
+对话内容：
+
+${transcript}
+
+请使用 Markdown 格式输出。`;
+
+  unlistenSummaryChunk = electronService.listen('chat-chunk', (event) => {
+    const data = event.payload;
+    if (data.requestId !== summaryRequestId) return;
+    summaryContent += data.content;
+  });
+
+  unlistenSummaryDone = electronService.listen('chat-done', async (event) => {
+    const data = event.payload;
+    if (data.requestId !== summaryRequestId) return;
+    if (summaryDone) return;
+    summaryDone = true;
+
+    if (unlistenSummaryChunk) { unlistenSummaryChunk(); unlistenSummaryChunk = null; }
+    if (unlistenSummaryDone) { unlistenSummaryDone(); unlistenSummaryDone = null; }
+    if (unlistenSummaryError) { unlistenSummaryError(); unlistenSummaryError = null; }
+
+    const finalContent = summaryContent || data.fullContent || '';
+
+    if (!finalContent.trim()) {
+      showSaveToast('总结内容为空，请重试');
+      return;
+    }
+
+    try {
+      // 从 LLM 响应中提取标题（第一行 H1）
+      const lines = finalContent.split('\n');
+      let title = '对话总结';
+      for (const line of lines) {
+        const match = line.match(/^#\s+(.+)/);
+        if (match) {
+          title = match[1].trim();
+          break;
+        }
+      }
+      // 如果没有 H1，取第一行非空内容作为标题
+      if (title === '对话总结') {
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#')) {
+            title = trimmed.slice(0, 30);
+            break;
+          }
+        }
+      }
+
+      const htmlContent = marked.parse(finalContent);
+      const plainText = stripMarkdown(finalContent);
+      const note = await noteStore.importNote(null, null, title, htmlContent, plainText);
+      if (note) {
+        showSaveToast('已保存为笔记');
+      } else {
+        showSaveToast('保存失败');
+      }
+    } catch (err) {
+      console.error('Failed to save summary note:', err);
+      showSaveToast('保存失败');
+    }
+  });
+
+  unlistenSummaryError = electronService.listen('chat-error', (event) => {
+    const data = event.payload;
+    if (data.requestId !== summaryRequestId) return;
+    if (summaryDone) return;
+    summaryDone = true;
+
+    if (unlistenSummaryChunk) { unlistenSummaryChunk(); unlistenSummaryChunk = null; }
+    if (unlistenSummaryDone) { unlistenSummaryDone(); unlistenSummaryDone = null; }
+    if (unlistenSummaryError) { unlistenSummaryError(); unlistenSummaryError = null; }
+
+    console.error('Summary error:', data.error);
+    showSaveToast('总结失败，请重试');
+  });
+
+  electronService
+    .invoke('chat_without_memory', {
+      requestId: summaryRequestId,
+      model: model,
+      message: prompt,
+      enableThinking: false
+    })
+    .catch((err) => {
+      console.error('Summary invoke error:', err);
+      showSaveToast('总结失败，请重试');
+      if (unlistenSummaryChunk) { unlistenSummaryChunk(); unlistenSummaryChunk = null; }
+      if (unlistenSummaryDone) { unlistenSummaryDone(); unlistenSummaryDone = null; }
+      if (unlistenSummaryError) { unlistenSummaryError(); unlistenSummaryError = null; }
+    });
 }
 
 function handleAction(action, index) {
   if (action === 'rollback') {
     handleRollback(index);
   } else if (action === 'share') {
-    // TODO: 待实现
+    handleShare(index);
   } else if (action === 'add') {
     saveMessageToNote(index);
+  } else if (action === 'copy') {
+    handleCopyMessage(index);
+  }
+}
+
+async function handleCodeBlockCopy(event) {
+  const btn = event.target.closest('.code-copy-btn');
+  if (!btn) return;
+
+  const code = decodeURIComponent(btn.dataset.code);
+  try {
+    await navigator.clipboard.writeText(code);
+    btn.classList.add('copied');
+    const originalSvg = btn.innerHTML;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = originalSvg;
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy code:', err);
+  }
+}
+
+function stripMarkdown(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, (match) => match.replace(/```.*\n?/g, ''))
+    .replace(/`[^`]+`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+async function handleCopyMessage(index) {
+  const msg = messages.value[index];
+  if (!msg || msg.role !== 'assistant') return;
+
+  const content = msg.content || '';
+  if (!content.trim()) return;
+
+  try {
+    const htmlContent = renderMarkdown(content);
+    const textContent = stripMarkdown(content);
+
+    const clipboardItem = new ClipboardItem({
+      'text/html': new Blob([htmlContent], { type: 'text/html' }),
+      'text/plain': new Blob([textContent], { type: 'text/plain' })
+    });
+
+    await navigator.clipboard.write([clipboardItem]);
+    showSaveToast('已复制到剪贴板');
+  } catch (err) {
+    console.error('Failed to copy message:', err);
+    showSaveToast('复制失败');
+  }
+}
+
+async function handleShare(index) {
+  const msg = messages.value[index];
+  if (!msg || msg.role !== 'assistant') return;
+
+  const content = msg.content || '';
+  if (!content.trim()) {
+    showSaveToast('消息内容为空');
+    return;
+  }
+
+  const textContent = stripMarkdown(content);
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: chatTitle.value,
+        text: textContent
+      });
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Share failed:', err);
+      }
+    }
+  } else {
+    try {
+      await navigator.clipboard.writeText(textContent);
+      showSaveToast('已复制到剪贴板');
+    } catch (err) {
+      console.error('Share fallback failed:', err);
+      showSaveToast('分享失败');
+    }
   }
 }
 
@@ -644,6 +940,8 @@ async function initConversation() {
 }
 
 onMounted(async () => {
+  document.addEventListener('click', handleCodeBlockCopy);
+
   unlistenChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
@@ -869,6 +1167,13 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener('click', handleCodeBlockCopy);
+
+  // 清理总结功能临时事件监听器
+  if (unlistenSummaryChunk) { unlistenSummaryChunk(); unlistenSummaryChunk = null; }
+  if (unlistenSummaryDone) { unlistenSummaryDone(); unlistenSummaryDone = null; }
+  if (unlistenSummaryError) { unlistenSummaryError(); unlistenSummaryError = null; }
+
   if (unlistenChunk) unlistenChunk();
   if (unlistenReasoning) unlistenReasoning();
   if (unlistenDone) unlistenDone();
@@ -958,6 +1263,7 @@ async function handleRejectTool(decision) {
   justify-content: space-between;
   padding: 12px 16px;
   flex-shrink: 0;
+  overflow: visible;
   -webkit-app-region: drag;
   app-region: drag;
 }
@@ -976,11 +1282,48 @@ async function handleRejectTool(decision) {
   transition: all 0.15s ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
+  position: relative;
 }
 
 .header-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.header-btn .hover-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  font-size: 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.header-btn .btn-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: rgba(0, 0, 0, 0.8);
+}
+
+.header-btn .hover-tooltip {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.header-btn:hover .hover-tooltip {
+  opacity: 1;
+  visibility: visible;
 }
 
 .header-center {
@@ -1329,5 +1672,182 @@ async function handleRejectTool(decision) {
 @keyframes thinking-dot {
   0%, 60%, 100% { opacity: 0; }
   30% { opacity: 1; }
+}
+
+/* ========== Agent 模式：操作按钮 ========== */
+.agent-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding-left: 44px; /* 与时间线内容对齐 */
+}
+
+.agent-footer .footer-left,
+.agent-footer .footer-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.agent-footer .action-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.agent-footer .action-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.agent-footer .action-icon-btn.copied {
+  color: #10b981;
+}
+
+.agent-footer .action-icon-btn.copied:hover {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.agent-footer .tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  font-size: 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.agent-footer .tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.8);
+}
+
+.agent-footer .action-icon-btn:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ========== Agent 模式：代码块样式 ========== */
+.agent-text-body .markdown-body :deep(.code-block-wrapper) {
+  margin: 10px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='dark'] .agent-text-body .markdown-body :deep(.code-block-wrapper) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agent-text-body .markdown-body :deep(.code-block-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+}
+
+.agent-text-body .markdown-body :deep(.code-block-lang) {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  text-transform: lowercase;
+}
+
+.agent-text-body .markdown-body :deep(.code-copy-btn) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.agent-text-body .markdown-body :deep(.code-copy-btn:hover) {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .agent-text-body .markdown-body :deep(.code-copy-btn:hover) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.agent-text-body .markdown-body :deep(.code-copy-btn.copied) {
+  color: #10b981;
+}
+
+.agent-text-body .markdown-body :deep(.code-block-wrapper pre) {
+  margin: 0;
+  padding: 14px;
+  background: transparent;
+  border-radius: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+[data-theme='dark'] .agent-text-body .markdown-body :deep(.code-block-wrapper pre) {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.agent-text-body .markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar) {
+  height: 4px;
+}
+
+.agent-text-body .markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+.agent-text-body .markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb) {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+[data-theme='dark'] .agent-text-body .markdown-body :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.agent-text-body .markdown-body :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 12px 0;
+}
+
+.agent-text-body .markdown-body :deep(a) {
+  color: #10b981;
+  text-decoration: none;
+}
+
+.agent-text-body .markdown-body :deep(a:hover) {
+  text-decoration: underline;
 }
 </style>
