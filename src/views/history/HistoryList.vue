@@ -142,6 +142,15 @@
                     </svg>
                     <span>{{ t('history.rename') }}</span>
                   </button>
+                  <button class="dropdown-item" @click.stop="handleRowMenuSaveAsNote(session)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                      <line x1="12" y1="6" x2="12" y2="13"></line>
+                      <line x1="9" y1="10" x2="15" y2="10"></line>
+                    </svg>
+                    <span>{{ t('history.saveAsNote') }}</span>
+                  </button>
                   <button class="dropdown-item" @click.stop="handleRowMenuShare(session)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <circle cx="18" cy="5" r="3"></circle>
@@ -300,6 +309,12 @@
         </div>
       </div>
     </Teleport>
+
+    <Transition name="toast-fade">
+      <div v-if="saveToastVisible" class="save-toast">
+        {{ saveToastMessage }}
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -308,9 +323,12 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
+import { useNoteStore } from '@/store/modules/note';
+import { marked } from 'marked';
 
 const router = useRouter();
 const { t } = useI18n();
+const noteStore = useNoteStore();
 
 const loading = ref(false);
 const loadingMore = ref(false);
@@ -363,6 +381,9 @@ const shareModal = ref({
 
 const renameInputRef = ref(null);
 const shareLinkInputRef = ref(null);
+
+const saveToastVisible = ref(false);
+const saveToastMessage = ref('');
 
 // 加载最近 3 个月的会话（含统计信息）
 const loadSessions = async () => {
@@ -517,6 +538,167 @@ const handleRowMenuRename = (session) => {
       renameInputRef.value.select();
     }
   });
+};
+
+const showSaveToast = (message) => {
+  saveToastMessage.value = message;
+  saveToastVisible.value = true;
+  setTimeout(() => {
+    saveToastVisible.value = false;
+  }, 2500);
+};
+
+const loadModelConfig = () => {
+  try {
+    const stored = localStorage.getItem('happy-friday-custom-models');
+    if (!stored) return null;
+    const models = JSON.parse(stored);
+    const findById = (id) => id ? models.find(m => m.id === id) : null;
+    return findById(localStorage.getItem('happy-friday-selected-model')) || models[0] || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const stripMarkdown = (text) => {
+  return text
+    .replace(/```[\s\S]*?```/g, (match) => match.replace(/```.*\n?/g, ''))
+    .replace(/`[^`]+`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const handleRowMenuSaveAsNote = async (session) => {
+  closeRowMenu();
+  const model = loadModelConfig();
+  if (!model) {
+    showSaveToast('未配置大模型');
+    return;
+  }
+  showSaveToast(t('history.saveAsNoteToast'));
+
+  try {
+    const messages = await electronService.invoke('get_session_messages', { sessionId: session.id });
+    if (!messages || messages.length === 0) {
+      showSaveToast('暂无对话内容');
+      return;
+    }
+
+    const transcript = messages
+      .map(msg => {
+        if (msg.role === 'user') return `【用户】${msg.content}`;
+        if (msg.role === 'assistant') {
+          if (msg.content) return `【周五】${msg.content}`;
+          if (msg.metadata?.segments) {
+            const textParts = msg.metadata.segments.filter(s => s.type === 'text' && s.content).map(s => s.content);
+            return textParts.length ? `【周五】${textParts.join('\n')}` : '';
+          }
+          return '';
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n\n');
+
+    const prompt = `请将以下对话内容总结为一份结构化笔记，要求：
+1. 第一行使用 # 标题格式，为这份笔记取一个简洁且有意义的标题，标签最后不要带笔记二字（不超过20字）
+2. 主题概述（一句话概括）
+3. 关键要点（3-5个要点）
+4. 详细内容（按主题分类整理）
+5. 结论与建议
+
+对话内容：
+
+${transcript}
+
+请使用 Markdown 格式输出。`;
+
+    const summaryRequestId = `summary_${Date.now()}`;
+    let summaryContent = '';
+    let summaryDone = false;
+    let unlistenError = null;
+
+    const unlistenChunk = electronService.listen('chat-chunk', (event) => {
+      const data = event.payload;
+      if (data.requestId !== summaryRequestId) return;
+      summaryContent += data.content;
+    });
+
+    const cleanup = () => {
+      unlistenChunk();
+      unlistenDone();
+      if (unlistenError) unlistenError();
+    };
+
+    const unlistenDone = electronService.listen('chat-done', async (event) => {
+      const data = event.payload;
+      if (data.requestId !== summaryRequestId || summaryDone) return;
+      summaryDone = true;
+      cleanup();
+
+      const finalContent = summaryContent || data.fullContent || '';
+      if (!finalContent.trim()) {
+        showSaveToast(t('history.saveAsNoteFailed'));
+        return;
+      }
+
+      try {
+        const lines = finalContent.split('\n');
+        let title = '对话总结';
+        for (const line of lines) {
+          const match = line.match(/^#\s+(.+)/);
+          if (match) { title = match[1].trim(); break; }
+        }
+        if (title === '对话总结') {
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#')) { title = trimmed.slice(0, 30); break; }
+          }
+        }
+
+        const htmlContent = marked.parse(finalContent);
+        const plainText = stripMarkdown(finalContent);
+        const note = await noteStore.importNote(null, null, title, htmlContent, plainText);
+        showSaveToast(note ? t('history.saveAsNoteSuccess') : t('history.saveAsNoteFailed'));
+      } catch (err) {
+        console.error('Failed to save note:', err);
+        showSaveToast(t('history.saveAsNoteFailed'));
+      }
+    });
+
+    unlistenError = electronService.listen('chat-error', (event) => {
+      const data = event.payload;
+      if (data.requestId !== summaryRequestId || summaryDone) return;
+      summaryDone = true;
+      cleanup();
+      showSaveToast(t('history.saveAsNoteFailed'));
+    });
+
+    electronService.invoke('chat_without_memory', {
+      requestId: summaryRequestId,
+      model,
+      message: prompt,
+      enableThinking: false
+    }).catch(() => {
+      if (!summaryDone) {
+        summaryDone = true;
+        cleanup();
+        showSaveToast(t('history.saveAsNoteFailed'));
+      }
+    });
+  } catch (err) {
+    console.error('Failed to load session messages:', err);
+    showSaveToast('加载对话失败');
+  }
 };
 
 const handleRowMenuDelete = (session) => {
@@ -1522,5 +1704,39 @@ onUnmounted(() => {
   background: rgba(220, 38, 38, 0.08);
   color: #dc2626;
   font-size: 13px;
+}
+
+.save-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast-fade-enter-active {
+  transition: all 0.25s ease-out;
+}
+
+.toast-fade-leave-active {
+  transition: all 0.2s ease-in;
+}
+
+.toast-fade-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}
+
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-4px);
 }
 </style>
