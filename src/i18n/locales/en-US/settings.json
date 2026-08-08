@@ -119,5 +119,26 @@
   "dialogConfirmTitle": "Confirm",
   "runtimeLogs": "Runtime Logs",
   "openLogDir": "Open Log Folder",
-  "openLogDirFailed": "Failed to open log folder"
+  "openLogDirFailed": "Failed to open log folder",
+  "balance": {
+    "query": "Query balance",
+    "querying": "Querying...",
+    "refresh": "Refresh",
+    "refreshAll": "Refresh all",
+    "available": "Available",
+    "totalBalance": "Total balance",
+    "granted": "Granted balance",
+    "toppedUp": "Topped-up balance",
+    "cashBalance": "Cash balance",
+    "currency": "Currency",
+    "notSupported": "This provider does not support balance query",
+    "queryFailed": "Query failed",
+    "noBalance": "No balance info",
+    "account": "Account balance",
+    "accountAvailable": "Account available",
+    "accountUnavailable": "Account unavailable",
+    "lastUpdate": "Updated at",
+    "supportedProvider": "Supported",
+    "retry": "Retry"
+  }
 }

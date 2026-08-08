@@ -44,6 +44,95 @@
           <span>添加模型</span>
         </div>
       </div>
+
+      <div class="group-title balance-group-title">
+        <span>{{ t('settings.balance.account') }}</span>
+        <button
+          v-if="customModels.length"
+          class="balance-refresh-all-btn"
+          :disabled="balanceRefreshingAll"
+          @click="queryAllBalances"
+        >
+          <svg v-if="balanceRefreshingAll" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+          </svg>
+          <span v-else>{{ t('settings.balance.refreshAll') }}</span>
+        </button>
+      </div>
+      <div class="balance-container">
+        <div v-if="!customModels.length" class="balance-empty">
+          {{ t('settings.balance.noBalance') }}
+        </div>
+        <div
+          v-for="model in customModels"
+          :key="'bal-' + model.id"
+          class="balance-card"
+        >
+          <div class="balance-card-head">
+            <img :src="getModelProviderIcon(model.provider)" :alt="model.providerLabel" class="balance-provider-icon" />
+            <div class="balance-card-info">
+              <div class="balance-card-name">{{ model.providerLabel }} {{ model.modelName }}</div>
+              <div class="balance-card-provider">{{ model.providerLabel }}</div>
+            </div>
+            <button
+              class="balance-query-btn"
+              :disabled="balanceStates[model.id]?.loading"
+              @click="queryBalanceFor(model)"
+            >
+              <svg v-if="balanceStates[model.id]?.loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+              </svg>
+              <span v-else>{{ t('settings.balance.query') }}</span>
+            </button>
+          </div>
+
+          <div v-if="balanceStates[model.id]" class="balance-card-body">
+            <!-- loading -->
+            <div v-if="balanceStates[model.id].loading" class="balance-status loading">
+              {{ t('settings.balance.querying') }}
+            </div>
+            <!-- not supported -->
+            <div v-else-if="balanceStates[model.id].data && balanceStates[model.id].data.supported === false" class="balance-status unsupported">
+              {{ t('settings.balance.notSupported') }}
+            </div>
+            <!-- error -->
+            <div v-else-if="balanceStates[model.id].error" class="balance-status error">
+              <span>{{ t('settings.balance.queryFailed') }}：{{ balanceStates[model.id].error }}</span>
+              <button class="balance-retry-btn" @click="queryBalanceFor(model)">{{ t('settings.balance.retry') }}</button>
+            </div>
+            <!-- success -->
+            <template v-else-if="balanceStates[model.id].data">
+              <div
+                class="balance-available-tag"
+                :class="balanceStates[model.id].data.available === false ? 'unavailable' : 'available'"
+              >
+                {{ balanceStates[model.id].data.available === false ? t('settings.balance.accountUnavailable') : t('settings.balance.accountAvailable') }}
+              </div>
+              <div class="balance-amounts">
+                <div class="balance-amount-item primary">
+                  <span class="balance-amount-label">{{ t('settings.balance.totalBalance') }}</span>
+                  <span class="balance-amount-value">{{ formatBalance(balanceStates[model.id].data.totalBalance, balanceStates[model.id].data.currency) }}</span>
+                </div>
+                <div v-if="balanceStates[model.id].data.grantedBalance > 0" class="balance-amount-item">
+                  <span class="balance-amount-label">{{ t('settings.balance.granted') }}</span>
+                  <span class="balance-amount-value">{{ formatBalance(balanceStates[model.id].data.grantedBalance, balanceStates[model.id].data.currency) }}</span>
+                </div>
+                <div v-if="balanceStates[model.id].data.toppedUpBalance > 0" class="balance-amount-item">
+                  <span class="balance-amount-label">{{ t('settings.balance.toppedUp') }}</span>
+                  <span class="balance-amount-value">{{ formatBalance(balanceStates[model.id].data.toppedUpBalance, balanceStates[model.id].data.currency) }}</span>
+                </div>
+                <div v-if="balanceStates[model.id].data.cashBalance > 0 && balanceStates[model.id].data.cashBalance !== balanceStates[model.id].data.toppedUpBalance" class="balance-amount-item">
+                  <span class="balance-amount-label">{{ t('settings.balance.cashBalance') }}</span>
+                  <span class="balance-amount-value">{{ formatBalance(balanceStates[model.id].data.cashBalance, balanceStates[model.id].data.currency) }}</span>
+                </div>
+              </div>
+              <div v-if="balanceStates[model.id].updatedAt" class="balance-updated">
+                {{ t('settings.balance.lastUpdate') }}: {{ formatTime(balanceStates[model.id].updatedAt) }}
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
     </div>
 
     <Teleport to="body">
@@ -243,9 +332,11 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
 
 const router = useRouter();
+const { t, locale } = useI18n();
 
 const goBack = () => {
   router.push('/settings');
@@ -532,6 +623,87 @@ const handleSave = () => {
     closeModal();
   }
 };
+
+// ========== 账户余额查询 ==========
+// 每个模型的余额查询状态：{ loading, data, error, updatedAt }
+const balanceStates = ref({});
+const balanceRefreshingAll = ref(false);
+
+async function queryBalanceFor(model) {
+  if (!model) return;
+  balanceStates.value = {
+    ...balanceStates.value,
+    [model.id]: { loading: true, data: null, error: null, updatedAt: null }
+  };
+  try {
+    const res = await electronService.invoke('model-query-balance', { model });
+    if (res && res.success !== false) {
+      balanceStates.value = {
+        ...balanceStates.value,
+        [model.id]: {
+          loading: false,
+          data: res.data,
+          error: res.data?.error || null,
+          updatedAt: Date.now()
+        }
+      };
+    } else {
+      balanceStates.value = {
+        ...balanceStates.value,
+        [model.id]: {
+          loading: false,
+          data: null,
+          error: (res && res.error) || t('settings.balance.queryFailed'),
+          updatedAt: Date.now()
+        }
+      };
+    }
+  } catch (e) {
+    balanceStates.value = {
+      ...balanceStates.value,
+      [model.id]: {
+        loading: false,
+        data: null,
+        error: e?.message || t('settings.balance.queryFailed'),
+        updatedAt: Date.now()
+      }
+    };
+  }
+}
+
+async function queryAllBalances() {
+  if (!customModels.value.length) return;
+  balanceRefreshingAll.value = true;
+  try {
+    // 并发查询所有模型余额
+    await Promise.all(customModels.value.map(m => queryBalanceFor(m)));
+  } finally {
+    balanceRefreshingAll.value = false;
+  }
+}
+
+function formatBalance(value, currency) {
+  const v = Number(value) || 0;
+  // DeepSeek 余额以元为单位（如 10.00 表示 10 元），保留两位小数
+  const formatted = v.toFixed(2);
+  const cur = currency || 'CNY';
+  if (cur === 'CNY') return `¥${formatted}`;
+  if (cur === 'USD') return `$${formatted}`;
+  return `${formatted} ${cur}`;
+}
+
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const loc = locale.value === 'zh-CN' ? 'zh-CN' : 'en-US';
+  return d.toLocaleString(loc, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 </script>
 
 <style scoped>
@@ -1218,6 +1390,234 @@ const handleSave = () => {
   color: var(--text-tertiary);
   margin: 0;
 }
+
+/* ========== 账户余额查询 ========== */
+.balance-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.balance-refresh-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.balance-refresh-all-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.balance-refresh-all-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.balance-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.balance-empty {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  padding: 20px 0;
+  text-align: center;
+}
+
+.balance-card {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg-primary);
+}
+
+.balance-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.balance-provider-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.balance-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.balance-card-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balance-card-provider {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.balance-query-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.balance-query-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.balance-query-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.balance-card-body {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.balance-status {
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.balance-status.loading {
+  color: var(--text-tertiary);
+}
+
+.balance-status.unsupported {
+  color: var(--text-tertiary);
+}
+
+.balance-status.error {
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.balance-retry-btn {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.balance-retry-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.balance-available-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.balance-available-tag.available {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.balance-available-tag.unavailable {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.balance-amounts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.balance-amount-item {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.balance-amount-item.primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+}
+
+.balance-amount-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+}
+
+.balance-amount-item.primary .balance-amount-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.balance-amount-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-amount-item.primary .balance-amount-value {
+  color: #fff;
+  font-size: 17px;
+}
+
+.balance-updated {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+}
+
+.spin-icon {
+  animation: balance-spin 1s linear infinite;
+}
+
+@keyframes balance-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 
 .delete-confirm-actions {
   display: flex;

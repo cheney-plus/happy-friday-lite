@@ -14,6 +14,7 @@
 
 import { ChatOpenAI } from '@langchain/openai'
 import { createLogger } from './logger.js'
+import { recordUsage } from '../usage.js'
 
 const log = createLogger('Model')
 
@@ -44,6 +45,58 @@ export function createLangChainModel(modelConfig) {
   // @langchain/core v1.x 已移除 Runnable.bind()，改用 modelKwargs 在构造时注入
   const modelKwargs = buildThinkingKwargs(provider, enableThinking)
 
+  // 用量统计回调：DeepAgent 路径下，每次 LLM 调用结束都会触发 handleLLMEnd，
+  // 从 output.llmOutput 中提取 token 用量并落库。
+  // LangChain 的 llmOutput 有多种可能结构（均为 camelCase 字段）：
+  //   - { tokenUsage: { promptTokens, completionTokens, totalTokens } }  // 流式/非流式真实用量
+  //   - { estimatedTokenUsage: { promptTokens, completionTokens, totalTokens } }  // 流式估算用量
+  //   - { usage: { prompt_tokens, completion_tokens, total_tokens } }  // 原始 API 字段（snake_case）
+  // 此外，真实用量也可能存在于 generations[0][0].message.usage_metadata 中。
+  const usageCallback = {
+    handleLLMEnd(output) {
+      try {
+        // 优先从 llmOutput 提取，再回退到 message.usage_metadata
+        const llmOutput = output?.llmOutput
+        const raw = llmOutput?.tokenUsage || llmOutput?.estimatedTokenUsage || llmOutput?.usage
+
+        // message.usage_metadata 携带流式 API 返回的真实用量（优先级最高）
+        const msgMeta = output?.generations?.[0]?.[0]?.message?.usage_metadata
+
+        const promptTokens = Number(
+          msgMeta?.input_tokens ?? raw?.promptTokens ?? raw?.prompt_tokens ?? 0
+        ) || 0
+        const completionTokens = Number(
+          msgMeta?.output_tokens ?? raw?.completionTokens ?? raw?.completion_tokens ?? 0
+        ) || 0
+        const totalTokens = Number(
+          msgMeta?.total_tokens ?? raw?.totalTokens ?? raw?.total_tokens ?? (promptTokens + completionTokens)
+        ) || 0
+        const reasoningTokens = Number(
+          msgMeta?.output_token_details?.reasoning ?? raw?.completion_tokens_details?.reasoning_tokens ?? 0
+        ) || 0
+
+        if (promptTokens === 0 && completionTokens === 0) {
+          log.warn(`Agent 用量为 0，llmOutput=${JSON.stringify(llmOutput)}, msgMeta=${JSON.stringify(msgMeta)}`)
+          return
+        }
+
+        recordUsage({
+          modelId: modelConfig.id || '',
+          modelName: modelName || '',
+          provider: provider || '',
+          providerLabel: modelConfig.providerLabel || provider || '',
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          reasoningTokens,
+          source: 'agent'
+        })
+      } catch (e) {
+        log.warn(`用量统计回调异常: ${e.message}`)
+      }
+    }
+  }
+
   // 关键：baseURL 必须放在 configuration 参数里
   // 否则 OpenAI SDK 会使用默认的 https://api.openai.com/v1 导致连接失败
   const model = new ChatOpenAI({
@@ -53,7 +106,11 @@ export function createLangChainModel(modelConfig) {
       baseURL: lcBaseUrl
     },
     streaming: true,
-    modelKwargs
+    // 启用流式 usage 上报：SDK 会自动附加 stream_options.include_usage=true，
+    // 并在流结束时通过 handleLLMEnd 回调聚合出 usage 数据，用于 Token 用量统计
+    streamUsage: true,
+    modelKwargs,
+    callbacks: [usageCallback]
   })
 
   return model

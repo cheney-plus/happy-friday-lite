@@ -119,5 +119,26 @@
   "dialogConfirmTitle": "请确认",
   "runtimeLogs": "运行日志",
   "openLogDir": "打开日志目录",
-  "openLogDirFailed": "打开日志目录失败"
+  "openLogDirFailed": "打开日志目录失败",
+  "balance": {
+    "query": "查询余额",
+    "querying": "查询中...",
+    "refresh": "刷新",
+    "refreshAll": "刷新全部",
+    "available": "可用",
+    "totalBalance": "总余额",
+    "granted": "赠送余额",
+    "toppedUp": "充值余额",
+    "cashBalance": "现金余额",
+    "currency": "币种",
+    "notSupported": "该厂商暂不支持余额查询",
+    "queryFailed": "查询失败",
+    "noBalance": "暂无余额信息",
+    "account": "账户余额",
+    "accountAvailable": "账户可用",
+    "accountUnavailable": "账户不可用",
+    "lastUpdate": "更新于",
+    "supportedProvider": "支持查询",
+    "retry": "重试"
+  }
 }

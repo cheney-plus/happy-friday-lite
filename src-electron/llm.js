@@ -2,6 +2,24 @@ import https from 'https'
 import http from 'http'
 import { AppError } from './error.js'
 import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_ERROR, NOTE_AI_CHUNK, NOTE_AI_ERROR } from './events.js'
+import { recordUsage } from './usage.js'
+
+// 从 SSE 解析出的 usage 对象构造并落库一条用量记录
+function recordUsageFromChunk(parsed, model, source) {
+  if (!parsed || !parsed.usage) return
+  const u = parsed.usage
+  recordUsage({
+    modelId: model.id || '',
+    modelName: model.modelName || (parsed.model || ''),
+    provider: model.provider || '',
+    providerLabel: model.providerLabel || '',
+    promptTokens: u.prompt_tokens,
+    completionTokens: u.completion_tokens,
+    totalTokens: u.total_tokens || (Number(u.prompt_tokens || 0) + Number(u.completion_tokens || 0)),
+    reasoningTokens: u.completion_tokens_details?.reasoning_tokens || 0,
+    source
+  })
+}
 
 function buildApiUrl(baseUrl, provider) {
   // “其他”厂商的对话模型地址为完整的 URL，不做路径拼接
@@ -34,6 +52,9 @@ function buildStreamBody(model, messages, enableThinking) {
       body.thinking = { type: enableThinking ? 'enabled' : 'disabled' }
       break
   }
+
+  // 请求在最后一个 chunk 中返回 usage 字段，用于 Token 用量统计
+  body.stream_options = { include_usage: true }
 
   return body
 }
@@ -78,6 +99,7 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
       let buffer = ''
       let fullContent = ''
       let fullReasoning = ''
+      let lastUsage = null
 
       res.on('data', (chunk) => {
         // 兜底：cancel() 已通过 token.abort() => req.destroy() 中止请求，
@@ -100,6 +122,8 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
             const data = line.substring(6).trim()
 
             if (data === '[DONE]') {
+              // 流结束：若之前已收到 usage chunk 则落库
+              if (lastUsage) recordUsageFromChunk({ usage: lastUsage }, model, 'chat')
               resolve({ fullContent, fullReasoning })
               return
             }
@@ -116,6 +140,11 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
                 })
                 reject(AppError.llm(errorMsg))
                 return
+              }
+
+              // usage 通常出现在最后一个 chunk（choices 为空数组）
+              if (parsed.usage) {
+                lastUsage = parsed.usage
               }
 
               const reasoning = parsed.choices?.[0]?.delta?.reasoning_content
@@ -145,6 +174,8 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
       })
 
       res.on('end', () => {
+        // 部分厂商在 res 结束时未发送 [DONE]，但有 usage chunk
+        if (lastUsage) recordUsageFromChunk({ usage: lastUsage }, model, 'chat')
         resolve({ fullContent, fullReasoning })
       })
 
@@ -278,6 +309,10 @@ export function fimCompletion(model, prefix, suffix, cancelToken) {
         if (!parsed) return
 
         const completion = parsed.choices?.[0]?.message?.content?.trim() || ''
+        // FIM 非流式响应包含 usage 字段，落库统计
+        if (parsed?.usage) {
+          recordUsageFromChunk(parsed, model, 'fim')
+        }
         resolve({ completion })
       })
       .catch(err => {
@@ -340,6 +375,10 @@ export async function generateTitle(model, userMessage) {
     if (!response.ok) return null
 
     const parsed = await response.json()
+    // 标题生成非流式响应包含 usage 字段，落库统计
+    if (parsed?.usage) {
+      recordUsageFromChunk(parsed, model, 'title')
+    }
     return parsed.choices?.[0]?.message?.content?.trim() || ''
   }
 
@@ -389,6 +428,9 @@ function buildAgentStreamBody(model, messages, enableThinking) {
       body.thinking = { type: enableThinking ? 'enabled' : 'disabled' }
       break
   }
+
+  // 请求在最后一个 chunk 中返回 usage 字段，用于 Token 用量统计
+  body.stream_options = { include_usage: true }
 
   return body
 }
@@ -449,6 +491,7 @@ async function streamRound(mainWindow, url, body, model, requestId, sessionId, c
   let buffer = ''
   let fullContent = ''
   let fullReasoning = ''
+  let lastUsage = null
   const toolCallMap = {}
 
   try {
@@ -489,6 +532,11 @@ async function streamRound(mainWindow, url, body, model, requestId, sessionId, c
             error: errorMsg
           })
           throw AppError.llm(errorMsg)
+        }
+
+        // usage 通常出现在最后一个 chunk（choices 为空数组）
+        if (parsed.usage) {
+          lastUsage = parsed.usage
         }
 
         const delta = parsed.choices?.[0]?.delta
@@ -538,6 +586,9 @@ async function streamRound(mainWindow, url, body, model, requestId, sessionId, c
     .sort((a, b) => Number(a) - Number(b))
     .map(k => toolCallMap[k])
     .filter(tc => tc.function.name)
+
+  // 落库本轮 token 用量（RAG Agent 可能多轮，每轮分别记录）
+  if (lastUsage) recordUsageFromChunk({ usage: lastUsage }, model, 'agent')
 
   return { fullContent, fullReasoning, toolCalls }
 }
@@ -799,6 +850,7 @@ export function streamNoteAI(mainWindow, action, noteContent, selectedText, mode
 
       let buffer = ''
       let fullContent = ''
+      let lastUsage = null
 
       res.on('data', (chunk) => {
         if (cancelToken && cancelToken.cancelled) {
@@ -820,6 +872,7 @@ export function streamNoteAI(mainWindow, action, noteContent, selectedText, mode
             const data = line.substring(6).trim()
 
             if (data === '[DONE]') {
+              if (lastUsage) recordUsageFromChunk({ usage: lastUsage }, model, 'note_ai')
               resolve({ fullContent })
               return
             }
@@ -835,6 +888,10 @@ export function streamNoteAI(mainWindow, action, noteContent, selectedText, mode
                 })
                 reject(AppError.llm(errorMsg))
                 return
+              }
+
+              if (parsed.usage) {
+                lastUsage = parsed.usage
               }
 
               const content = parsed.choices?.[0]?.delta?.content
@@ -853,6 +910,7 @@ export function streamNoteAI(mainWindow, action, noteContent, selectedText, mode
       })
 
       res.on('end', () => {
+        if (lastUsage) recordUsageFromChunk({ usage: lastUsage }, model, 'note_ai')
         resolve({ fullContent })
       })
 

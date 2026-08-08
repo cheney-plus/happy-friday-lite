@@ -20,6 +20,8 @@ import { createBackup, restoreBackup } from './backup.js'
 import { cleanHistoryNow } from './historyClean.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
+import { getUsageStats, clearUsage } from './usage.js'
+import { queryBalance } from './balance.js'
 import { registerAgentCommands } from './agent/ipc.js'
 import { getLogDir } from './logger.js'
 import { getShareUrl, getNoteShareUrl } from './shareServer.js'
@@ -1293,6 +1295,43 @@ export function registerCommands(mainWindow) {
 
   // RAG 判断已移除：现在由 RAG Agent 通过 Function Calling 自主决定是否检索，
   // 不再需要单独的预判断请求。详见 llm.js 中的 streamChatWithRagAgent。
+
+  // ========== 用量统计与余额查询 ==========
+  // 获取 Token 用量统计：按时间范围（today/7d/30d/all）聚合
+  ipcMain.handle('usage-get-stats', (_event, args) => {
+    const range = (args && args.range) || 'all'
+    try {
+      return { success: true, data: getUsageStats(range) }
+    } catch (e) {
+      console.error('[IPC] usage-get-stats 错误:', e)
+      return { success: false, error: e.message, data: null }
+    }
+  })
+
+  // 清空所有用量记录
+  ipcMain.handle('usage-clear', () => {
+    try {
+      clearUsage()
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 查询单个模型的账户余额（仅支持部分厂商）
+  ipcMain.handle('model-query-balance', async (_event, args) => {
+    const model = args && args.model
+    if (!model) {
+      return { success: false, error: '缺少 model 参数' }
+    }
+    try {
+      const data = await queryBalance(model)
+      return { success: true, data }
+    } catch (e) {
+      console.error('[IPC] model-query-balance 错误:', e)
+      return { success: false, error: e.message, data: null }
+    }
+  })
 
   // ========== Agent 智能体相关命令 ==========
   // 设计参考：src/views/knowledge/agent/Agent智能体设计.md
