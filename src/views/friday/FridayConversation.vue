@@ -51,16 +51,6 @@
             </div>
             <div class="agent-footer">
               <div class="footer-left">
-                <button class="action-icon-btn" @click="handleAction('share', index)">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                  </svg>
-                  <span class="tooltip">分享</span>
-                </button>
                 <button class="action-icon-btn" @click="handleAction('add', index)">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -453,8 +443,6 @@ ${transcript}
 function handleAction(action, index) {
   if (action === 'rollback') {
     handleRollback(index);
-  } else if (action === 'share') {
-    handleShare(index);
   } else if (action === 'add') {
     saveMessageToNote(index);
   } else if (action === 'copy') {
@@ -519,40 +507,6 @@ async function handleCopyMessage(index) {
   } catch (err) {
     console.error('Failed to copy message:', err);
     showSaveToast('复制失败');
-  }
-}
-
-async function handleShare(index) {
-  const msg = messages.value[index];
-  if (!msg || msg.role !== 'assistant') return;
-
-  const content = msg.content || '';
-  if (!content.trim()) {
-    showSaveToast('消息内容为空');
-    return;
-  }
-
-  const textContent = stripMarkdown(content);
-
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: chatTitle.value,
-        text: textContent
-      });
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.error('Share failed:', err);
-      }
-    }
-  } else {
-    try {
-      await navigator.clipboard.writeText(textContent);
-      showSaveToast('已复制到剪贴板');
-    } catch (err) {
-      console.error('Share fallback failed:', err);
-      showSaveToast('分享失败');
-    }
   }
 }
 
