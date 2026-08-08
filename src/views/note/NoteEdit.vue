@@ -2,7 +2,7 @@
   <div class="note-edit" :class="{ 'is-dark': isDark }">
     <div class="note-edit-header">
       <div class="header-left">
-        <button class="header-btn" @click="goBack" :title="t('note.back')">
+        <button v-if="!isShareMode" class="header-btn" @click="goBack" :title="t('note.back')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
         </button>
       </div>
@@ -14,15 +14,15 @@
       </div>
 
       <div class="header-right">
-        <span class="save-status" :class="{ saved: isSaved }">
+        <span v-if="!isShareMode" class="save-status" :class="{ saved: isSaved }">
           <svg v-if="isSaved" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
           <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
           {{ isSaved ? t('note.saved') : t('note.unsaved') }}
         </span>
-        <button class="header-btn" :title="t('note.export')" @click="handleExport">
+        <button v-if="!isShareMode" class="header-btn" :title="t('note.export')" @click="handleExport">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </button>
-        <button class="header-btn" :title="t('note.more')" @click="toggleMoreMenu">
+        <button v-if="!isShareMode" class="header-btn" :title="t('note.more')" @click="toggleMoreMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
         </button>
       </div>
@@ -46,11 +46,13 @@
       <NoteEditor
         v-model="noteContent"
         :placeholder="t('note.editorPlaceholder')"
+        :note-id="noteId"
+        :share-mode="isShareMode"
         @change="onEditorChange"
       />
     </div>
 
-    <div class="note-edit-footer">
+    <div v-if="!isShareMode" class="note-edit-footer">
       <div class="footer-left">
         <span class="word-count">{{ wordCount }} {{ t('note.words') }}</span>
         <span class="char-count">{{ charCount }} {{ t('note.characters') }}</span>
@@ -69,6 +71,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/store';
 import { useNoteStore } from '@/store/modules/note';
+import { isElectronEnvironment } from '@/config/menu';
 import NoteEditor from './NoteEditor.vue';
 import { extractPlainText } from '@/utils/text';
 
@@ -79,6 +82,8 @@ const appStore = useAppStore();
 const noteStore = useNoteStore();
 
 const noteId = computed(() => route.params.id);
+// 分享模式：通过分享链接在浏览器中打开（只读查看），复用笔记界面
+const isShareMode = computed(() => route.meta?.share === true || !isElectronEnvironment());
 const isDark = computed(() => appStore.theme === 'dark');
 const noteTitle = ref('');
 const noteContent = ref('');
@@ -174,19 +179,36 @@ watch(() => noteStore.saving, (saving) => {
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside);
   const id = noteId.value;
-  if (id) {
-    const note = await noteStore.fetchNote(id);
-    if (note) {
-      noteTitle.value = note.title;
-      noteContent.value = note.content;
-      updateStats(extractPlainText(noteContent.value).replace(/\s+/g, ' ').trim());
+  if (!id) return;
+
+  if (isShareMode.value) {
+    // 分享模式：通过 HTTP 接口加载笔记内容（浏览器环境下无 IPC）
+    try {
+      const res = await fetch(`/api/share/note/${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (data && data.success && data.note) {
+        noteTitle.value = data.note.title || '未命名笔记';
+        noteContent.value = data.note.content || '';
+      }
+    } catch (err) {
+      console.error('Failed to load share note:', err);
     }
+    return;
+  }
+
+  const note = await noteStore.fetchNote(id);
+  if (note) {
+    noteTitle.value = note.title;
+    noteContent.value = note.content;
+    updateStats(extractPlainText(noteContent.value).replace(/\s+/g, ' ').trim());
   }
 });
 
 onBeforeUnmount(async () => {
   document.removeEventListener('click', handleClickOutside);
-  await noteStore.flushPendingSave();
+  if (!isShareMode.value) {
+    await noteStore.flushPendingSave();
+  }
 });
 
 onDeactivated(() => {

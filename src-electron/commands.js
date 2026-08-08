@@ -22,7 +22,7 @@ import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { registerAgentCommands } from './agent/ipc.js'
 import { getLogDir } from './logger.js'
-import { getShareUrl } from './shareServer.js'
+import { getShareUrl, getNoteShareUrl } from './shareServer.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -175,6 +175,15 @@ export function registerCommands(mainWindow) {
   // 生成内网分享链接：返回只读对话查看页面的 URL
   ipcMain.handle('get-share-link', (_event, args) => {
     const url = getShareUrl(args.sessionId)
+    if (!url) {
+      return { success: false, error: '分享服务未启动' }
+    }
+    return { success: true, url }
+  })
+
+  // 生成笔记内网分享链接
+  ipcMain.handle('get-note-share-link', (_event, args) => {
+    const url = getNoteShareUrl(args.noteId)
     if (!url) {
       return { success: false, error: '分享服务未启动' }
     }

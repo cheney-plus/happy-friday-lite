@@ -104,6 +104,23 @@ function serveShareApi(res, sessionId) {
   }
 }
 
+// 笔记分享数据接口：返回笔记内容（只读查看）
+function serveNoteShareApi(res, noteId) {
+  try {
+    const note = db.getNote(noteId)
+    if (!note) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ success: false, error: 'Note not found' }))
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ success: true, note }))
+  } catch (e) {
+    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ success: false, error: 'Note not found' }))
+  }
+}
+
 function handleRequest(req, res) {
   try {
     // 仅允许 GET 请求
@@ -119,6 +136,13 @@ function handleRequest(req, res) {
     if (url.pathname === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ ok: true }))
+      return
+    }
+
+    // 笔记分享数据接口 /api/share/note/:noteId（需在会话接口之前匹配）
+    const noteApiMatch = url.pathname.match(/^\/api\/share\/note\/(.+)$/)
+    if (noteApiMatch) {
+      serveNoteShareApi(res, decodeURIComponent(noteApiMatch[1]))
       return
     }
 
@@ -179,4 +203,11 @@ export function getShareUrl(sessionId) {
   if (!serverPort) return null
   const ip = getLocalIp()
   return `http://${ip}:${serverPort}/#/share/${encodeURIComponent(sessionId)}`
+}
+
+// 生成笔记分享链接
+export function getNoteShareUrl(noteId) {
+  if (!serverPort) return null
+  const ip = getLocalIp()
+  return `http://${ip}:${serverPort}/#/share/note/${encodeURIComponent(noteId)}`
 }

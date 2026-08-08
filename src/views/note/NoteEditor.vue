@@ -1,7 +1,7 @@
 <template>
   <div class="editor-page">
     <div class="editor-wrapper" :class="{ 'sidebar-collapsed': sidebarCollapsed }" :style="{ flex: '1 1 auto', minWidth: 0 }">
-      <div class="editor-toolbar" v-if="editor">
+      <div class="editor-toolbar" v-if="editor && !shareMode">
       <div class="toolbar-left-group">
       <!-- 第一组：撤销/重做、清除格式 -->
       <div class="tooltip-wrapper">
@@ -227,15 +227,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
           </button>
           <div v-if="showMoreMenu" class="dropdown-menu more-menu">
-            <div class="menu-item has-submenu" @mouseenter="showShareSubmenu = true; cancelShareSubmenuDelay(); checkShareSubmenuPosition($event)" @mouseleave="delayHideShareSubmenu">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-              分享
-              <svg class="submenu-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-              <div v-if="showShareSubmenu" class="submenu share-submenu" :class="{ 'align-left': shareSubmenuAlignLeft }" @mouseenter="cancelShareSubmenuDelay" @mouseleave="delayHideShareSubmenu">
-                <div class="menu-item" @click="shareLink">复制链接</div>
-                <div class="menu-item" @click="shareToWeChat">分享到微信</div>
-                <div class="menu-item" @click="shareToQQ">分享到 QQ</div>
-              </div>
+            <div class="menu-item" @click="shareLink">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              复制链接
             </div>
             <div class="menu-item" :class="{ disabled: isExportingPdf }" @click="exportPDF">
               <svg v-if="!isExportingPdf" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -264,9 +258,9 @@
       </div>
     </div>
 
-    <NoteBubbleMenu v-if="editor" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
+    <NoteBubbleMenu v-if="editor && !shareMode" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
 
-    <div v-if="!tocVisible" class="toc-btn" @click="emit('toggle-toc')">
+    <div v-if="!tocVisible && !shareMode" class="toc-btn" @click="emit('toggle-toc')">
       <span class="toc-char">目</span>
       <span class="toc-char">录</span>
     </div>
@@ -436,6 +430,13 @@
         {{ kbSaveToastMessage }}
       </div>
     </Transition>
+
+    <!-- 分享链接复制提示 -->
+    <Transition name="chat-toast-fade">
+      <div v-if="shareToastVisible" class="kb-save-toast">
+        {{ shareToastMessage }}
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -522,7 +523,8 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   noteId: { type: String, default: '' },
   tocVisible: { type: Boolean, default: false },
-  sidebarCollapsed: { type: Boolean, default: false }
+  sidebarCollapsed: { type: Boolean, default: false },
+  shareMode: { type: Boolean, default: false }
 });
 
 const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc', 'close-sidebar', 'close-toc']);
@@ -533,8 +535,6 @@ const showTextColorMenu = ref(false);
 const showHeadingMenu = ref(false);
 const showTableSubmenu = ref(false);
 const showMoreMenu = ref(false);
-const showShareSubmenu = ref(false);
-const shareSubmenuAlignLeft = ref(false);
 const tableRows = ref(0);
 const tableCols = ref(0);
 
@@ -656,40 +656,10 @@ const confirmImage = () => {
   closeImageDialog();
 };
 
-let shareSubmenuTimer = null;
-
-const delayHideShareSubmenu = () => {
-  shareSubmenuTimer = setTimeout(() => {
-    showShareSubmenu.value = false;
-  }, 150);
-};
-
-const cancelShareSubmenuDelay = () => {
-  if (shareSubmenuTimer) {
-    clearTimeout(shareSubmenuTimer);
-    shareSubmenuTimer = null;
-  }
-};
-
-const checkShareSubmenuPosition = (event) => {
-  const target = event.currentTarget;
-  const rect = target.getBoundingClientRect();
-  const windowWidth = window.innerWidth;
-  const submenuWidth = 140;
-  
-  if (rect.right + submenuWidth + 12 > windowWidth) {
-    shareSubmenuAlignLeft.value = true;
-  } else {
-    shareSubmenuAlignLeft.value = false;
-  }
-};
-
 // 更多菜单相关
 const toggleMoreMenu = (event) => {
   showMoreMenu.value = !showMoreMenu.value;
-  if (!showMoreMenu.value) {
-    showShareSubmenu.value = false;
-  } else {
+  if (showMoreMenu.value) {
     const target = event.currentTarget;
     const parent = target.parentElement;
     parent.focus();
@@ -698,12 +668,13 @@ const toggleMoreMenu = (event) => {
 
 const closeMoreMenu = () => {
   showMoreMenu.value = false;
-  showShareSubmenu.value = false;
 };
 
 const showKbDirDialog = ref(false);
 const kbSaveToastVisible = ref(false);
 const kbSaveToastMessage = ref('');
+const shareToastVisible = ref(false);
+const shareToastMessage = ref('');
 
 const handleAddContent = () => {
   showKbDirDialog.value = true;
@@ -739,25 +710,33 @@ const handleKbDirConfirm = async ({ path: destDir, name: kbName }) => {
   }
 };
 
-const shareLink = () => {
+// 复制内网分享链接：生成笔记的只读分享链接并复制到剪贴板
+const shareLink = async () => {
   showMoreMenu.value = false;
-  showShareSubmenu.value = false;
-  const url = window.location.href;
-  navigator.clipboard.writeText(url).then(() => {
-    alert('链接已复制到剪贴板');
-  });
+  if (!props.noteId) {
+    showShareToast('当前笔记无法分享');
+    return;
+  }
+  try {
+    const result = await electronService.invoke('get-note-share-link', { noteId: props.noteId });
+    if (result && result.success && result.url) {
+      await navigator.clipboard.writeText(result.url);
+      showShareToast('分享链接已复制到剪贴板');
+    } else {
+      showShareToast((result && result.error) || '生成分享链接失败');
+    }
+  } catch (err) {
+    console.error('Failed to get note share link:', err);
+    showShareToast('生成分享链接失败');
+  }
 };
 
-const shareToWeChat = () => {
-  alert('分享到微信功能开发中...');
-  showMoreMenu.value = false;
-  showShareSubmenu.value = false;
-};
-
-const shareToQQ = () => {
-  alert('分享到 QQ 功能开发中...');
-  showMoreMenu.value = false;
-  showShareSubmenu.value = false;
+const showShareToast = (message) => {
+  shareToastMessage.value = message;
+  shareToastVisible.value = true;
+  setTimeout(() => {
+    shareToastVisible.value = false;
+  }, 2500);
 };
 
 const isExportingPdf = ref(false);
@@ -2546,11 +2525,6 @@ const fixEmptyTableCells = (html) => {
   right: 0;
   left: auto;
   min-width: 160px;
-}
-
-.share-submenu {
-  left: calc(100% + 6px);
-  right: auto;
 }
 
 .ai-write-btn {

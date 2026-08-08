@@ -73,6 +73,13 @@ export const routes = [
     meta: { share: true }
   },
   {
+    // 笔记内网分享：复用笔记界面（只读）
+    path: '/share/note/:id',
+    name: 'share-note',
+    component: () => import('@/views/note/NoteEdit.vue'),
+    meta: { share: true }
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/knowledge'
   }

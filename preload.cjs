@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'save_message',
       'rollback_session',
       'get-share-link',
+      'get-note-share-link',
       'chat_with_memory',
       'chat_without_memory',
       'stop_chat',
