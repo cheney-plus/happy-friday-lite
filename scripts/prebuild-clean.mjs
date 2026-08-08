@@ -8,12 +8,34 @@
 //    PPTX/DOCX text extraction does not require it. The `!` glob exclusion
 //    in package.json `files` does not reliably prevent electron-builder's
 //    dependency walker from including it, so we remove it physically.
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const targetArch = process.argv[2] || process.arch
 const removeArch = targetArch === 'arm64' ? 'x64' : 'arm64'
 const nodeModules = 'node_modules'
+
+// ============================================================
+// Pre-flight check: verify all production dependencies are installed.
+// electron-builder silently omits packages missing from node_modules,
+// producing a broken asar that crashes at runtime with ERR_MODULE_NOT_FOUND.
+// ============================================================
+function verifyDependencies() {
+  const pkgJson = JSON.parse(readFileSync('package.json', 'utf-8'))
+  const deps = Object.keys(pkgJson.dependencies || {})
+  const missing = deps.filter((dep) => !existsSync(join(nodeModules, dep, 'package.json')))
+  if (missing.length > 0) {
+    console.error('[prebuild-clean] ERROR: The following dependencies are missing from node_modules:')
+    for (const dep of missing) {
+      console.error(`  - ${dep}`)
+    }
+    console.error('[prebuild-clean] Run `npm install` or `npm ci` before building.')
+    process.exit(1)
+  }
+  console.log(`[prebuild-clean] Verified ${deps.length} production dependencies are installed`)
+}
+
+verifyDependencies()
 
 let removed = 0
 
