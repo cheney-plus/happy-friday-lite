@@ -2661,7 +2661,44 @@ const fixEmptyTableCells = (html) => {
 .more-menu {
   right: 0;
   left: auto;
-  min-width: 160px;
+  min-width: 130px;
+  padding: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.more-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 400;
+  font-family: inherit;
+  border-radius: 5px;
+  letter-spacing: normal;
+  transition: background 0.12s;
+}
+
+.more-menu .menu-item svg {
+  width: 13px;
+  height: 13px;
+  color: var(--text-primary);
+}
+
+.more-menu .menu-item:hover:not(.disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.more-menu .menu-item:hover:not(.disabled) svg {
+  color: var(--text-primary);
 }
 
 .ai-write-btn {
@@ -2723,6 +2760,28 @@ const fixEmptyTableCells = (html) => {
 [data-theme='dark'] .menu-item.active {
   background-color: rgba(59, 130, 246, 0.25);
   color: #93c5fd;
+}
+
+[data-theme='dark'] .more-menu {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+[data-theme='dark'] .more-menu .menu-item {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .more-menu .menu-item svg {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .more-menu .menu-item:hover:not(.disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .more-menu .menu-item:hover:not(.disabled) svg {
+  color: var(--text-primary);
 }
 
 [data-theme='dark'] .submenu-arrow {
