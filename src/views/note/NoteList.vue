@@ -8,26 +8,26 @@
     >
       <div class="sidebar-inner">
         <div class="sidebar-topbar" v-if="!searchMode">
-          <button class="topbar-btn" @click="toggleSidebar" :title="sidebarCollapsed ? '' : '收起侧边栏'">
+          <button class="topbar-btn" @click="toggleSidebar" :title="sidebarCollapsed ? '' : t('note.sidebar.collapse')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
           </button>
           <div class="topbar-actions">
             <div class="new-note-btn-group" ref="newNoteBtnRef">
-              <button class="new-note-main-btn" @click="createNewNote" title="新建笔记">
+              <button class="new-note-main-btn" @click="createNewNote" :title="t('note.newNote')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
               </button>
-              <button class="new-note-dropdown-btn" @click.stop="toggleNewNoteMenu" title="更多选项">
+              <button class="new-note-dropdown-btn" @click.stop="toggleNewNoteMenu" :title="t('note.sidebar.moreOptions')">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button>
               <Teleport to="body">
                 <div v-if="newNoteMenuVisible" class="new-note-dropdown-menu" :style="newNoteMenuStyle" @click.stop>
                   <div class="dropdown-item" @click="createNewNote">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                    新建笔记
+                    {{ t('note.newNote') }}
                   </div>
                   <div class="dropdown-item" @click="openImportDialog">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                    导入笔记
+                    {{ t('note.sidebar.importNote') }}
                   </div>
                 </div>
               </Teleport>
@@ -45,7 +45,7 @@
             v-model="searchQuery"
             class="search-input"
             type="text"
-            placeholder="搜索(按ESC退出)..."
+            :placeholder="t('note.sidebar.searchPlaceholder')"
             @keydown.escape="exitSearchMode"
           />
         </div>
@@ -67,7 +67,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
               <div class="folder-info">
                 <span class="folder-item-name">{{ folder.name }}</span>
-                <span class="folder-count">{{ folder.count }}篇笔记</span>
+                <span class="folder-count">{{ t('note.sidebar.notesCount', { count: folder.count }) }}</span>
               </div>
               <div
                 v-if="folder.id !== 'all'"
@@ -88,11 +88,11 @@
             >
               <div class="folder-item-menu-option" @click="handleRenameNotebook">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                重命名
+                {{ t('note.folder.rename') }}
               </div>
               <div class="folder-item-menu-option danger" @click="handleDeleteNotebook">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                删除
+                {{ t('note.folder.delete') }}
               </div>
             </div>
           </Teleport>
@@ -127,7 +127,7 @@
         <div v-if="contextMenu.visible" class="context-menu" :style="contextMenu.style" @click.stop>
           <div class="context-item" @click="handleAction('addToKnowledge')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"></path></svg>
-            添加到知识库
+            {{ t('note.contextMenu.addToKnowledge') }}
             <svg class="arrow-right" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
           <div
@@ -136,7 +136,7 @@
             @mouseleave="hideNotebookSubmenuWithDelay"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-            移动到笔记本
+            {{ t('note.contextMenu.moveToNotebook') }}
             <svg class="arrow-right" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
           <div
@@ -148,12 +148,12 @@
           >
             <div class="submenu-item" @click="handleAction('createNewNotebook')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              新建笔记本
+              {{ t('note.contextMenu.newNotebook') }}
             </div>
             <div class="submenu-divider"></div>
             <div v-if="notebookStore.loading" class="submenu-item loading">
               <svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-              加载中...
+              {{ t('note.contextMenu.loading') }}
             </div>
             <template v-else-if="notebookStore.notebooks.length > 0">
               <div
@@ -166,16 +166,16 @@
                 {{ notebook.name }}
               </div>
             </template>
-            <div v-else class="submenu-item empty-hint">暂无笔记本</div>
+            <div v-else class="submenu-item empty-hint">{{ t('note.contextMenu.noNotebooks') }}</div>
           </div>
           <div class="context-item" @click="handleAction('duplicate')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            创建副本
+            {{ t('note.contextMenu.duplicate') }}
           </div>
           <div class="context-divider"></div>
           <div class="context-item danger" @click="handleAction('delete')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            删除
+            {{ t('note.contextMenu.delete') }}
           </div>
         </div>
       </Teleport>
@@ -183,7 +183,7 @@
 
       <div v-if="tocVisible" class="toc-overlay">
         <div class="toc-header">
-          <span class="toc-title">目录</span>
+          <span class="toc-title">{{ t('note.toc.title') }}</span>
           <button class="toc-close-btn" @click="tocVisible = false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
@@ -203,8 +203,8 @@
           </div>
           <div v-if="tocHeadings.length === 0" class="toc-empty">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            <p>暂无标题结构</p>
-            <p class="toc-empty-hint">添加标题后可在此查看目录</p>
+            <p>{{ t('note.toc.noStructure') }}</p>
+            <p class="toc-empty-hint">{{ t('note.toc.emptyHint') }}</p>
           </div>
         </div>
       </div>
@@ -220,7 +220,7 @@
       v-if="sidebarCollapsed"
       class="sidebar-expand-btn"
       @click="toggleSidebar"
-      title="展开侧边栏"
+      :title="t('note.sidebar.expand')"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
     </button>
@@ -255,7 +255,7 @@
           <div class="import-dialog-header">
             <div class="import-dialog-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 18 15 15"></polyline></svg>
-              导入
+              {{ t('note.importDialog.title') }}
             </div>
             <button class="import-dialog-close" @click="closeImportDialog">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -278,8 +278,8 @@
                 <line x1="14.5" y1="17" x2="10" y2="17" stroke-width="2"></line>
                 <polyline points="11.5 15.5 13.5 17 11.5 18.5" stroke-width="1.5"></polyline>
               </svg>
-              <div class="upload-text">MarkDown文件</div>
-              <div class="upload-hint">最多一次上传文件≤100个，单文件≤10MB 选择文件</div>
+              <div class="upload-text">{{ t('note.importDialog.markdownFile') }}</div>
+              <div class="upload-hint">{{ t('note.importDialog.uploadHint') }}</div>
               <input
                 ref="fileInputRef"
                 type="file"
@@ -301,7 +301,7 @@
           <div class="create-notebook-header">
             <div class="create-notebook-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-              创建笔记本
+              {{ t('note.folder.createNotebook') }}
             </div>
             <button class="create-notebook-close" @click="closeCreateNotebookDialog">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -313,7 +313,7 @@
               ref="notebookNameInputRef"
               v-model="newNotebookName"
               type="text"
-              placeholder="请输入笔记本的名称"
+              :placeholder="t('note.folder.namePlaceholder')"
               class="notebook-name-input"
               @keydown.enter="confirmCreateNotebook"
             />
@@ -325,7 +325,7 @@
               :disabled="!newNotebookName.trim()"
               @click="confirmCreateNotebook"
             >
-              确认
+              {{ t('note.confirm') }}
             </button>
           </div>
         </div>
@@ -336,7 +336,7 @@
           <div class="create-notebook-header">
             <div class="create-notebook-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              重命名笔记本
+              {{ t('note.folder.renameNotebook') }}
             </div>
             <button class="create-notebook-close" @click="closeRenameNotebookDialog">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -348,7 +348,7 @@
               ref="renameNotebookInputRef"
               v-model="renameNotebookNewName"
               type="text"
-              placeholder="请输入新的笔记本名称"
+              :placeholder="t('note.folder.renamePlaceholder')"
               class="notebook-name-input"
               @keydown.enter="confirmRenameNotebook"
             />
@@ -360,7 +360,7 @@
               :disabled="!renameNotebookNewName.trim()"
               @click="confirmRenameNotebook"
             >
-              确认
+              {{ t('note.confirm') }}
             </button>
           </div>
         </div>
@@ -383,7 +383,7 @@ import { marked } from 'marked';
 
 const LIST_MARKED_OPTIONS = { breaks: true, gfm: true };
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const noteStore = useNoteStore();
 const notebookStore = useNotebookStore();
 const tabStore = useTabStore();
@@ -492,7 +492,7 @@ const onResizeStart = (e) => {
 const folders = computed(() => {
   const allNotes = noteStore.notes;
   const allCount = allNotes.length;
-  const list = [{ id: 'all', name: '全部', count: allCount }];
+  const list = [{ id: 'all', name: t('note.sidebar.all'), count: allCount }];
   for (const nb of notebookStore.notebooks) {
     const nbCount = allNotes.filter(n => n.notebookId === nb.id).length;
     list.push({ id: nb.id, name: nb.name, count: nbCount });
@@ -502,7 +502,7 @@ const folders = computed(() => {
 
 const currentFolderName = computed(() => {
   const f = folders.value.find(f => f.id === currentFolder.value);
-  return f ? f.name : '全部';
+  return f ? f.name : t('note.sidebar.all');
 });
 
 const notes = computed(() => noteStore.notes);
@@ -557,22 +557,22 @@ const formatTime = (dateStr) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return '刚刚';
-    if (diffMin < 60) return `${diffMin}分钟前`;
+    if (diffMin < 1) return t('note.time.justNow');
+    if (diffMin < 60) return t('note.time.minutesAgo', { count: diffMin });
     const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour}小时前`;
+    if (diffHour < 24) return t('note.time.hoursAgo', { count: diffHour });
     const diffDay = Math.floor(diffHour / 24);
-    if (diffDay < 30) return `${diffDay}天前`;
-    return date.toLocaleDateString('zh-CN');
+    if (diffDay < 30) return t('note.time.daysAgo', { count: diffDay });
+    return date.toLocaleDateString(locale.value);
   } catch {
     return '';
   }
 };
 
 const getNotebookName = (notebookId) => {
-  if (!notebookId) return '未分类';
+  if (!notebookId) return t('note.sidebar.uncategorized');
   const notebook = notebookStore.notebooks.find(nb => nb.id === notebookId);
-  return notebook ? notebook.name : '未知笔记本';
+  return notebook ? notebook.name : t('note.sidebar.unknownNotebook');
 };
 
 const selectNote = (id) => {
@@ -649,7 +649,7 @@ const parseMarkdownTitle = (content) => {
     }
     return trimmed.length > 50 ? trimmed.substring(0, 50) : trimmed;
   }
-  return '新建笔记';
+  return t('note.newNote');
 };
 
 const readFileAsText = (file) => {
@@ -726,7 +726,7 @@ const onEditorChange = (content) => {
 
   const plainText = extractPlainText(content);
   const firstLine = (plainText.split('\n').find(line => line.trim() !== '') || '').trim();
-  const title = firstLine ? (firstLine.length > 20 ? firstLine.substring(0, 20) : firstLine) : '新建笔记';
+  const title = firstLine ? (firstLine.length > 20 ? firstLine.substring(0, 20) : firstLine) : t('note.newNote');
   const contentText = plainText.replace(/\s+/g, ' ').trim();
 
   noteStore.scheduleSave(note.id, title, content, contentText);
@@ -823,7 +823,7 @@ const handleDeleteNotebook = async () => {
 
   folderItemMenuVisible.value = false;
 
-  const confirmed = window.confirm(`确定要删除笔记本"${notebookName}"吗？\n\n注意：笔记本中的笔记不会被删除，但会变为"未分类"状态。`);
+  const confirmed = window.confirm(t('note.folder.deleteConfirm', { name: notebookName }));
   if (!confirmed) return;
 
   await notebookStore.deleteNotebook(notebookId);
@@ -984,7 +984,7 @@ const duplicateNote = async () => {
   const newNote = await electronService.invoke('create_note', {
     knowledgeBaseId: originalNote.knowledgeBaseId,
     notebookId: originalNote.notebookId,
-    title: originalNote.title + '-副本'
+    title: originalNote.title + t('note.sidebar.copySuffix')
   });
 
   if (newNote) {

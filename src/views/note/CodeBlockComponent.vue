@@ -30,11 +30,11 @@
         <option value="plaintext">Plain Text</option>
       </select>
       <div class="header-actions">
-        <button class="action-btn" :title="copied ? '已复制' : '复制代码'" @click="handleCopy">
+        <button class="action-btn" :title="copied ? t('note.codeBlock.copied') : t('note.codeBlock.copyCode')" @click="handleCopy">
           <svg v-if="!copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </button>
-        <button class="action-btn danger" title="删除代码块" @click="handleDelete">
+        <button class="action-btn danger" :title="t('note.codeBlock.deleteBlock')" @click="handleDelete">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
@@ -51,6 +51,9 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/vue-3';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
   node: Object,
