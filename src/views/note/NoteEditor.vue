@@ -397,9 +397,17 @@
           :placeholder="t('note.aiSidebar.inputPlaceholder')"
           :is-streaming="isStreaming"
           :note-references="noteReferences"
+          :show-reference-buttons="true"
+          :attachments="attachments"
+          :selectable-kb-list="selectableKbList"
+          dropdown-direction="up"
           @send="handleChatSend"
           @stop="handleChatStop"
           @remove-reference="removeNoteReference"
+          @select-note="showNoteDialog = true"
+          @select-kb-file="showKbFileDialog = true"
+          @select-kb="handleSelectKb"
+          @remove-attachment="removeAttachment"
         />
 
         <Transition name="chat-toast-fade">
@@ -415,6 +423,21 @@
       :visible="showKbDirDialog"
       @close="showKbDirDialog = false"
       @confirm="handleKbDirConfirm"
+    />
+
+    <!-- 选择笔记弹窗 -->
+    <SelectNoteDialog
+      :visible="showNoteDialog"
+      @close="showNoteDialog = false"
+      @confirm="handleNoteConfirm"
+    />
+
+    <!-- 选择知识库文件弹窗 -->
+    <KbFileDialog
+      :visible="showKbFileDialog"
+      :selectable-kb-list="selectableKbList"
+      @close="showKbFileDialog = false"
+      @select="handleKbFileSelect"
     />
 
     <!-- 笔记保存到知识库的提示 -->
@@ -483,6 +506,9 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3';
 import CodeBlockComponent from './CodeBlockComponent.vue';
 import NoteBubbleMenu from './NoteBubbleMenu.vue';
 import KbDirSelectDialog from '@/views/knowledge/components/KbDirSelectDialog.vue';
+import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue';
+import KbFileDialog from '@/views/knowledge/components/KbFileDialog.vue';
+import { DEFAULT_CATEGORIES } from '@/views/knowledge/constants';
 import { useAppStore } from '@/store';
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
@@ -1030,6 +1056,14 @@ const chatMessages = ref([]);
 const currentSessionId = ref('');
 const chatInputBoxRef = ref(null);
 
+// 引用笔记/文件、引用知识库相关
+const showNoteDialog = ref(false);
+const showKbFileDialog = ref(false);
+const attachments = ref([]);
+let attachmentIdCounter = 0;
+const kbList = ref(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)));
+const selectableKbList = computed(() => kbList.value.filter(c => c.id !== 'agent'));
+
 function saveChatSession() {
   const id = props.noteId;
   if (!id) return;
@@ -1060,6 +1094,7 @@ function resetChatSession() {
   currentSessionId.value = '';
   noteReferences.value = [];
   chatInputText.value = '';
+  attachments.value = [];
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -1103,6 +1138,7 @@ async function sendChatMessage(text) {
   }
 
   let fullMessage = text;
+  let displayContent = text;
 
   if (noteReferences.value.length > 0 && editor.value) {
     const docSize = editor.value.state.doc.content.size;
@@ -1120,14 +1156,48 @@ async function sendChatMessage(text) {
     }
   }
 
+  // 追加引用笔记/文件、知识库附件信息
+  // - 简洁引用格式附加到 fullMessage / displayContent（用户气泡 + 数据库存储）
+  // - 同时构造后端 attachments 元数据（kind: 'note'|'file'）用于注入 LLM 上下文
+  // - 知识库附件（type === 'kb'）单独提取 kbName / kbCategoryId 供后端 RAG 检索
+  const backendAttachments = [];
+  let kbName = '';
+  let kbCategoryId = '';
+
+  if (attachments.value.length > 0) {
+    const refLines = [];
+    for (const att of attachments.value) {
+      if (att.type === 'note') {
+        refLines.push(`${t('friday.refNote')}${att.name}`);
+        backendAttachments.push({ kind: 'note', name: att.name, noteId: att.noteId });
+      } else if (att.type === 'kb-file') {
+        refLines.push(`${t('friday.refDoc')}${att.name}`);
+        backendAttachments.push({ kind: 'file', name: att.name, path: att.path });
+      } else if (att.type === 'kb') {
+        refLines.push(`${t('friday.tagKb')}${att.name}`);
+        // 仅取第一个知识库作为 RAG 检索源（与 FridayChat 行为一致）
+        if (!kbName) {
+          kbName = att.name;
+          kbCategoryId = att.categoryId || '';
+        }
+      }
+    }
+    if (refLines.length > 0) {
+      const refBlock = '\n\n---\n' + refLines.join('\n');
+      fullMessage += refBlock;
+      displayContent += refBlock;
+    }
+  }
+
   chatMessages.value.push({
     role: 'user',
-    content: text,
+    content: displayContent,
     references: noteReferences.value.map(ref => ({ ...ref }))
   });
 
   chatInputText.value = '';
   noteReferences.value = [];
+  attachments.value = [];
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -1147,7 +1217,12 @@ async function sendChatMessage(text) {
       model: model,
       message: fullMessage,
       enableThinking: false,
-      systemPrompt
+      systemPrompt,
+      // 附件元数据：后端读取笔记/文件内容并注入 LLM 上下文（≤ 2,500 字符/条）
+      attachments: backendAttachments,
+      // 知识库 RAG：后端通过 Function Calling 自主决定是否检索
+      kbName,
+      kbCategoryId
     });
   } catch (err) {
     console.error('Chat invoke error:', err);
@@ -1172,6 +1247,88 @@ async function handleChatStop() {
     console.error('Stop chat error:', err);
   }
 }
+
+// 从磁盘扫描知识库列表
+const loadKbListFromDisk = async () => {
+  const api = window.electronAPI;
+  if (!api) return;
+  let dataDir = '';
+  try {
+    dataDir = await api.invoke('kb-get-data-dir');
+  } catch (e) {
+    console.error('Failed to get data dir:', e);
+    return;
+  }
+  if (!dataDir) return;
+  const baseDir = dataDir + '/knowledge';
+  for (const category of kbList.value) {
+    const catDir = baseDir + '/' + category.id;
+    try {
+      await api.invoke('kb-create-dir', { dirPath: catDir });
+      const entries = await api.invoke('kb-read-dir', { dirPath: catDir });
+      for (const entry of entries) {
+        if (entry.isDirectory && !category.items.some(i => i.name === entry.name)) {
+          category.items.push({
+            id: `kb-${category.id}-${entry.name}`,
+            name: entry.name,
+            coverIndex: null
+          });
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to load category ${category.id}:`, e);
+    }
+  }
+};
+
+// 引用笔记/文件、引用知识库相关事件处理
+const handleNoteConfirm = (selectedNotes) => {
+  if (!selectedNotes || selectedNotes.length === 0) return;
+  for (const note of selectedNotes) {
+    attachments.value.push({
+      id: ++attachmentIdCounter,
+      type: 'note',
+      typeLabel: t('friday.tagNote'),
+      name: note.title || t('friday.untitledNote'),
+      noteId: note.id
+    });
+  }
+  showNoteDialog.value = false;
+  nextTick(() => {
+    chatInputBoxRef.value?.focus();
+  });
+};
+
+const handleKbFileSelect = (file) => {
+  attachments.value.push({
+    id: ++attachmentIdCounter,
+    type: 'kb-file',
+    typeLabel: t('friday.tagFile'),
+    name: file.name,
+    path: file.path
+  });
+  showKbFileDialog.value = false;
+  nextTick(() => {
+    chatInputBoxRef.value?.focus();
+  });
+};
+
+const handleSelectKb = (kb) => {
+  attachments.value.push({
+    id: ++attachmentIdCounter,
+    type: 'kb',
+    typeLabel: t('friday.tagKb'),
+    name: kb.name,
+    categoryId: kb.categoryId || null
+  });
+  nextTick(() => {
+    chatInputBoxRef.value?.focus();
+  });
+};
+
+const removeAttachment = (idx) => {
+  attachments.value.splice(idx, 1);
+};
 
 const chatSaveToastVisible = ref(false);
 const chatSaveToastMessage = ref('');
@@ -1587,6 +1744,7 @@ onMounted(() => {
   setupChatListeners();
   setupFimListener();
   restoreChatSession();
+  loadKbListFromDisk();
 });
 
 onBeforeUnmount(() => {
