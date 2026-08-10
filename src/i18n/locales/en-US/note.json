@@ -1,6 +1,7 @@
 {
   "title": "Note Module",
   "placeholder": "Start writing your note...",
+  "titlePlaceholder": "Enter a title",
   "back": "Back",
   "undo": "Undo",
   "redo": "Redo",
@@ -96,6 +97,7 @@
     "defaultColor": "Default color",
     "body": "Body text",
     "bodyText": "Body text",
+    "title": "Title",
     "heading": "Heading",
     "heading1": "Heading 1",
     "heading2": "Heading 2",

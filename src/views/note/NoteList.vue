@@ -514,7 +514,7 @@ const tocHeadings = computed(() => {
   if (!note?.content) return [];
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = note.content;
-  const headingElements = tempDiv.querySelectorAll('h1, h2, h3');
+  const headingElements = tempDiv.querySelectorAll('h1:not([data-note-title]), h2, h3');
   return Array.from(headingElements).map((el, index) => ({
     level: parseInt(el.tagName[1]),
     text: el.textContent.trim(),
@@ -542,7 +542,7 @@ const handleCloseToc = () => {
 const scrollToHeading = (index) => {
   const editorContent = document.querySelector('.editor-content');
   if (!editorContent) return;
-  const headings = editorContent.querySelectorAll('h1, h2, h3');
+  const headings = editorContent.querySelectorAll('h1:not([data-note-title]), h2, h3');
   if (!headings[index]) return;
   const target = headings[index];
   const containerRect = editorContent.getBoundingClientRect();

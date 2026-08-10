@@ -25,7 +25,7 @@
       </div>
 
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" @click="editor.chain().focus().clearNodes().unsetAllMarks().run()">
+        <button class="toolbar-btn" @click="clearFormatting">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.clearFormat') }}</span>
@@ -155,14 +155,17 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHeadingMenu" class="dropdown-menu heading-menu">
-          <div class="menu-item" :class="{ active: !isHeadingActive }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 1 }) }" @click="setHeading(1)">
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('noteTitle'), disabled: !canSetNoteTitle }" @click="setNoteTitle">
+            <span class="note-title-menu-label">{{ t('note.toolbar.title') }}</span>
+          </div>
+          <div class="menu-item" :class="{ active: !isHeadingActive, disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 1 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(1)">
             <span style="font-size: 20px; font-weight: 600;">{{ t('note.toolbar.heading1') }}</span>
           </div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 2 }) }" @click="setHeading(2)">
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 2 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(2)">
             <span style="font-size: 17px; font-weight: 600;">{{ t('note.toolbar.heading2') }}</span>
           </div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }) }" @click="setHeading(3)">
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(3)">
             <span style="font-size: 15px; font-weight: 600;">{{ t('note.toolbar.heading3') }}</span>
           </div>
         </div>
@@ -459,6 +462,7 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
+import { Node } from '@tiptap/core';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
@@ -549,6 +553,72 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc', 'close-sidebar', 'close-toc']);
+
+const NoteTitle = Node.create({
+  name: 'noteTitle',
+  group: 'block',
+  content: 'inline*',
+  defining: true,
+
+  parseHTML() {
+    return [{ tag: 'h1[data-note-title]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['h1', { ...HTMLAttributes, 'data-note-title': 'true' }, 0];
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: () => {
+        if (!this.editor.isActive(this.name)) return false;
+
+        const { doc, selection } = this.editor.state;
+        const { $from } = selection;
+        const blockIndex = $from.index(0);
+        const nextBlock = blockIndex + 1 < doc.childCount ? doc.child(blockIndex + 1) : null;
+        const canReuseEmptyParagraph = selection.empty
+          && $from.parentOffset === $from.parent.content.size
+          && nextBlock?.type.name === 'paragraph'
+          && nextBlock.content.size === 0;
+
+        if (canReuseEmptyParagraph) {
+          return this.editor.chain().focus().setTextSelection($from.after(1) + 1).run();
+        }
+
+        return this.editor.chain().splitBlock().setNode('paragraph').run();
+      },
+    };
+  },
+});
+
+const prepareEditorContent = (content) => {
+  const container = document.createElement('div');
+  container.innerHTML = content || '';
+
+  if (container.querySelector('[data-note-title]')) {
+    return container.innerHTML;
+  }
+
+  const firstBlock = container.firstElementChild;
+  if (!firstBlock) {
+    container.innerHTML = '<h1 data-note-title="true"></h1>';
+    return container.innerHTML;
+  }
+
+  if (/^H[1-3]$/.test(firstBlock.tagName) || firstBlock.tagName === 'P') {
+    const title = document.createElement('h1');
+    title.setAttribute('data-note-title', 'true');
+    title.innerHTML = firstBlock.innerHTML;
+    firstBlock.replaceWith(title);
+  } else {
+    const title = document.createElement('h1');
+    title.setAttribute('data-note-title', 'true');
+    container.insertBefore(title, firstBlock);
+  }
+
+  return container.innerHTML;
+};
 
 const showInsertMenu = ref(false);
 const showHighlightMenu = ref(false);
@@ -765,6 +835,10 @@ const isExportingPdf = ref(false);
 const extractTitleFromContent = (html) => {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
+  const noteTitle = tempDiv.querySelector('[data-note-title]');
+  if (noteTitle?.textContent?.trim()) {
+    return noteTitle.textContent.trim().substring(0, 50);
+  }
   const firstHeading = tempDiv.querySelector('h1, h2, h3');
   if (firstHeading?.textContent?.trim()) {
     return firstHeading.textContent.trim().substring(0, 50);
@@ -1497,6 +1571,7 @@ const textColorPalette = [
 
 const editor = useEditor({
   extensions: [
+    NoteTitle,
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3],
@@ -1505,7 +1580,7 @@ const editor = useEditor({
     }),
     Underline,
     TextAlign.configure({
-      types: ['heading', 'paragraph'],
+      types: ['noteTitle', 'heading', 'paragraph'],
     }),
     Highlight.configure({
       multicolor: true,
@@ -1522,7 +1597,9 @@ const editor = useEditor({
       },
     }),
     Placeholder.configure({
-      placeholder: props.placeholder || t('note.placeholder'),
+      placeholder: ({ node }) => node.type.name === 'noteTitle'
+        ? t('note.titlePlaceholder')
+        : (props.placeholder || t('note.placeholder')),
     }),
     Superscript,
     Subscript,
@@ -1545,7 +1622,7 @@ const editor = useEditor({
       },
     }).configure({ lowlight }),
   ],
-  content: props.modelValue,
+  content: prepareEditorContent(props.modelValue),
   editorProps: {
     attributes: {
       class: 'prose-editor',
@@ -1645,6 +1722,7 @@ const editor = useEditor({
 
 const currentHeadingLabel = computed(() => {
   if (!editor.value) return t('note.toolbar.heading');
+  if (editor.value.isActive('noteTitle')) return t('note.toolbar.title');
   if (editor.value.isActive('heading', { level: 1 })) return t('note.toolbar.heading1');
   if (editor.value.isActive('heading', { level: 2 })) return t('note.toolbar.heading2');
   if (editor.value.isActive('heading', { level: 3 })) return t('note.toolbar.heading3');
@@ -1653,7 +1731,13 @@ const currentHeadingLabel = computed(() => {
 
 const isHeadingActive = computed(() => {
   if (!editor.value) return false;
-  return editor.value.isActive('heading');
+  return editor.value.isActive('noteTitle') || editor.value.isActive('heading');
+});
+
+const canSetNoteTitle = computed(() => {
+  if (!editor.value) return false;
+  const { $from } = editor.value.state.selection;
+  return $from.depth === 1 && $from.index(0) === 0;
 });
 
 const toggleInsertMenu = () => {
@@ -1707,11 +1791,27 @@ const setTextColor = (color) => {
 };
 
 const setHeading = (level) => {
+  if (editor.value?.isActive('noteTitle')) return;
   if (level === 0) {
     editor.value?.chain().focus().setParagraph().run();
   } else {
     editor.value?.chain().focus().toggleHeading({ level }).run();
   }
+  showHeadingMenu.value = false;
+};
+
+const clearFormatting = () => {
+  if (!editor.value) return;
+  const chain = editor.value.chain().focus().unsetAllMarks();
+  if (!editor.value.isActive('noteTitle')) {
+    chain.clearNodes();
+  }
+  chain.run();
+};
+
+const setNoteTitle = () => {
+  if (!canSetNoteTitle.value) return;
+  editor.value?.chain().focus().setNode('noteTitle').run();
   showHeadingMenu.value = false;
 };
 
@@ -1726,8 +1826,9 @@ const insertTable = (rows, cols) => {
 };
 
 watch(() => props.modelValue, (newValue) => {
-  if (editor.value && newValue !== editor.value.getHTML()) {
-    editor.value.commands.setContent(newValue);
+  const preparedContent = prepareEditorContent(newValue);
+  if (editor.value && preparedContent !== editor.value.getHTML()) {
+    editor.value.commands.setContent(preparedContent);
   }
 });
 
@@ -2313,6 +2414,14 @@ const fixEmptyTableCells = (html) => {
   height: 0;
 }
 
+:deep(.prose-editor h1[data-note-title].is-empty::before) {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  height: 0;
+}
+
 :deep(.prose-editor h1),
 :deep(.prose-editor h2),
 :deep(.prose-editor h3) {
@@ -2322,15 +2431,22 @@ const fixEmptyTableCells = (html) => {
 }
 
 :deep(.prose-editor h1) {
-  font-size: 28px;
+  font-size: 20px;
 }
 
 :deep(.prose-editor h2) {
-  font-size: 22px;
+  font-size: 18px;
 }
 
 :deep(.prose-editor h3) {
-  font-size: 18px;
+  font-size: 16px;
+}
+
+:deep(.prose-editor h1[data-note-title]) {
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0.2em 0 0.6em;
+  line-height: 1.25;
 }
 
 :deep(.prose-editor p) {
@@ -2349,6 +2465,14 @@ const fixEmptyTableCells = (html) => {
 
 :deep(.prose-editor ol) {
   list-style-type: decimal;
+}
+
+:deep(.prose-editor ol ol) {
+  list-style-type: lower-alpha;
+}
+
+:deep(.prose-editor ol ol ol) {
+  list-style-type: lower-roman;
 }
 
 :deep(.prose-editor li) {

@@ -1,6 +1,7 @@
 {
   "title": "笔记",
   "placeholder": "开始书写你的笔记...",
+  "titlePlaceholder": "请输入标题",
   "back": "返回",
   "undo": "撤销",
   "redo": "重做",
@@ -96,6 +97,7 @@
     "defaultColor": "默认颜色",
     "body": "正文",
     "bodyText": "正文",
+    "title": "标题",
     "heading": "标题",
     "heading1": "标题 1",
     "heading2": "标题 2",
