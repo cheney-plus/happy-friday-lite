@@ -158,16 +158,16 @@
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('noteTitle'), disabled: !canSetNoteTitle }" @click="setNoteTitle">
             <span class="note-title-menu-label">{{ t('note.toolbar.title') }}</span>
           </div>
-          <div class="menu-item" :class="{ active: !isHeadingActive, disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 1 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(1)">
-            <span style="font-size: 20px; font-weight: 600;">{{ t('note.toolbar.heading1') }}</span>
+            <span class="heading-level-1-label">{{ t('note.toolbar.heading1') }}</span>
           </div>
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 2 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(2)">
-            <span style="font-size: 17px; font-weight: 600;">{{ t('note.toolbar.heading2') }}</span>
+            <span class="heading-level-2-label">{{ t('note.toolbar.heading2') }}</span>
           </div>
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(3)">
-            <span style="font-size: 15px; font-weight: 600;">{{ t('note.toolbar.heading3') }}</span>
+            <span class="heading-level-3-label">{{ t('note.toolbar.heading3') }}</span>
           </div>
+          <div class="menu-item" :class="{ active: !isHeadingActive, disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
         </div>
       </div>
 
@@ -1721,12 +1721,12 @@ const editor = useEditor({
 });
 
 const currentHeadingLabel = computed(() => {
-  if (!editor.value) return t('note.toolbar.heading');
+  if (!editor.value) return t('note.toolbar.body');
   if (editor.value.isActive('noteTitle')) return t('note.toolbar.title');
   if (editor.value.isActive('heading', { level: 1 })) return t('note.toolbar.heading1');
   if (editor.value.isActive('heading', { level: 2 })) return t('note.toolbar.heading2');
   if (editor.value.isActive('heading', { level: 3 })) return t('note.toolbar.heading3');
-  return t('note.toolbar.heading');
+  return t('note.toolbar.body');
 });
 
 const isHeadingActive = computed(() => {
@@ -2326,6 +2326,26 @@ const fixEmptyTableCells = (html) => {
 
 .heading-preview {
   padding: 7px 14px;
+}
+
+.note-title-menu-label {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.heading-level-1-label {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.heading-level-2-label {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.heading-level-3-label {
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .highlight-menu,
