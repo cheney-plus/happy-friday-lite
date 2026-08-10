@@ -257,6 +257,31 @@
       </div>
     </div>
 
+    <Transition name="note-search-fade">
+      <div v-if="searchVisible" class="note-search-bar" :class="{ 'share-mode': shareMode }">
+        <Search :size="15" :stroke-width="2" class="note-search-icon" />
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          class="note-search-input"
+          type="text"
+          :placeholder="t('note.search.placeholder')"
+          @input="updateSearchQuery"
+          @keydown="handleSearchInputKeydown"
+        />
+        <span class="note-search-count">{{ searchResultCount ? searchCurrentIndex + 1 : 0 }}/{{ searchResultCount }}</span>
+        <button class="note-search-btn" :disabled="!searchResultCount" :title="t('note.search.previous')" @click="goToSearchMatch(-1)">
+          <ChevronUp :size="16" :stroke-width="2" />
+        </button>
+        <button class="note-search-btn" :disabled="!searchResultCount" :title="t('note.search.next')" @click="goToSearchMatch(1)">
+          <ChevronDown :size="16" :stroke-width="2" />
+        </button>
+        <button class="note-search-btn" :title="t('note.search.close')" @click="closeSearch">
+          <X :size="16" :stroke-width="2" />
+        </button>
+      </div>
+    </Transition>
+
     <NoteBubbleMenu v-if="editor && !shareMode" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
 
     <div v-if="!tocVisible && !shareMode" class="toc-btn" @click="emit('toggle-toc')">
@@ -465,7 +490,10 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
-import { Node } from '@tiptap/core';
+import { Extension, Node } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
@@ -556,6 +584,69 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc', 'close-sidebar', 'close-toc']);
+
+const searchVisible = ref(false);
+const searchQuery = ref('');
+const searchCurrentIndex = ref(0);
+const searchResultCount = ref(0);
+const searchInputRef = ref(null);
+const noteSearchPluginKey = new PluginKey('noteSearch');
+
+const createSearchPluginState = (doc, query, requestedIndex = 0) => {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) {
+    return { query, currentIndex: 0, positions: [], decorations: DecorationSet.empty };
+  }
+
+  const positions = [];
+  doc.descendants((node, position) => {
+    if (!node.isText || !node.text) return;
+    const text = node.text.toLocaleLowerCase();
+    let offset = 0;
+    while (offset <= text.length - normalizedQuery.length) {
+      const matchOffset = text.indexOf(normalizedQuery, offset);
+      if (matchOffset === -1) break;
+      positions.push({ from: position + matchOffset, to: position + matchOffset + normalizedQuery.length });
+      offset = matchOffset + normalizedQuery.length;
+    }
+  });
+
+  const currentIndex = positions.length
+    ? ((requestedIndex % positions.length) + positions.length) % positions.length
+    : 0;
+  const decorations = DecorationSet.create(doc, positions.map((match, index) => (
+    Decoration.inline(match.from, match.to, {
+      class: index === currentIndex ? 'note-search-match note-search-match-current' : 'note-search-match',
+    })
+  )));
+
+  return { query, currentIndex, positions, decorations };
+};
+
+const NoteSearch = Extension.create({
+  name: 'noteSearch',
+
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      key: noteSearchPluginKey,
+      state: {
+        init: (_, state) => createSearchPluginState(state.doc, ''),
+        apply: (transaction, previousState, _oldState, newState) => {
+          const meta = transaction.getMeta(noteSearchPluginKey);
+          if (!meta && !transaction.docChanged) return previousState;
+          return createSearchPluginState(
+            newState.doc,
+            meta?.query ?? previousState.query,
+            meta?.currentIndex ?? previousState.currentIndex,
+          );
+        },
+      },
+      props: {
+        decorations: state => noteSearchPluginKey.getState(state)?.decorations,
+      },
+    })];
+  },
+});
 
 const NoteTitle = Node.create({
   name: 'noteTitle',
@@ -1589,6 +1680,7 @@ const textColorPalette = [
 
 const editor = useEditor({
   extensions: [
+    NoteSearch,
     NoteTitle,
     SmallParagraph,
     StarterKit.configure({
@@ -1647,6 +1739,18 @@ const editor = useEditor({
       class: 'prose-editor',
     },
     handleKeyDown: (view, event) => {
+      if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        openSearch();
+        return true;
+      }
+
+      if (event.key === 'Escape' && searchVisible.value) {
+        event.preventDefault();
+        closeSearch();
+        return true;
+      }
+
       if (event.key === 'Tab' && fimCompletionVisible.value && fimCompletionText.value) {
         event.preventDefault();
         acceptFimCompletion();
@@ -1723,6 +1827,7 @@ const editor = useEditor({
     const html = editor.getHTML();
     emit('update:modelValue', html);
     emit('change', html);
+    syncSearchState();
 
     clearFimDebounce();
     cancelFimRequest();
@@ -1738,6 +1843,81 @@ const editor = useEditor({
     }
   },
 });
+
+const syncSearchState = () => {
+  if (!editor.value) return;
+  const pluginState = noteSearchPluginKey.getState(editor.value.state);
+  searchResultCount.value = pluginState?.positions.length || 0;
+  searchCurrentIndex.value = pluginState?.currentIndex || 0;
+};
+
+const scrollToCurrentSearchMatch = () => {
+  nextTick(() => {
+    const match = editor.value?.view.dom.querySelector('.note-search-match-current');
+    match?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  });
+};
+
+const dispatchSearch = (query, currentIndex = 0) => {
+  if (!editor.value) return;
+  const transaction = editor.value.state.tr.setMeta(noteSearchPluginKey, { query, currentIndex });
+  editor.value.view.dispatch(transaction);
+  syncSearchState();
+  if (query.trim() && searchResultCount.value) {
+    scrollToCurrentSearchMatch();
+  }
+};
+
+const openSearch = () => {
+  if (!editor.value) return;
+  if (!searchVisible.value && !searchQuery.value) {
+    const { from, to } = editor.value.state.selection;
+    if (from !== to) {
+      searchQuery.value = editor.value.state.doc.textBetween(from, to, ' ').trim();
+    }
+  }
+
+  searchVisible.value = true;
+  dispatchSearch(searchQuery.value, searchCurrentIndex.value);
+  nextTick(() => {
+    searchInputRef.value?.focus();
+    searchInputRef.value?.select();
+  });
+};
+
+const closeSearch = () => {
+  dispatchSearch('', 0);
+  searchVisible.value = false;
+  searchQuery.value = '';
+  editor.value?.commands.focus();
+};
+
+const updateSearchQuery = () => {
+  dispatchSearch(searchQuery.value, 0);
+};
+
+const goToSearchMatch = (direction) => {
+  if (!searchResultCount.value) return;
+  dispatchSearch(searchQuery.value, searchCurrentIndex.value + direction);
+  searchInputRef.value?.focus();
+};
+
+const handleSearchInputKeydown = (event) => {
+  if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    searchInputRef.value?.select();
+    return;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeSearch();
+    return;
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    goToSearchMatch(event.shiftKey ? -1 : 1);
+  }
+};
 
 const currentHeadingLabel = computed(() => {
   if (!editor.value) return t('note.toolbar.body');
@@ -1857,6 +2037,7 @@ watch(() => props.modelValue, (newValue) => {
   const preparedContent = prepareEditorContent(newValue);
   if (editor.value && preparedContent !== editor.value.getHTML()) {
     editor.value.commands.setContent(preparedContent);
+    nextTick(syncSearchState);
   }
 });
 
@@ -1984,6 +2165,98 @@ const fixEmptyTableCells = (html) => {
 
 .editor-wrapper.sidebar-collapsed {
   padding-left: 60px;
+}
+
+.note-search-bar {
+  position: absolute;
+  top: 48px;
+  right: 40px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  width: min(360px, calc(100% - 56px));
+  height: 38px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background-color: var(--bg-primary, #ffffff);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.note-search-bar.share-mode {
+  top: 12px;
+}
+
+.note-search-icon {
+  flex: 0 0 auto;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.note-search-input {
+  min-width: 0;
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary, #111827);
+  font: inherit;
+  font-size: 13px;
+}
+
+.note-search-count {
+  min-width: 42px;
+  color: var(--text-tertiary, #9ca3af);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.note-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.note-search-btn:hover:not(:disabled) {
+  background-color: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+.note-search-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+:deep(.note-search-match) {
+  border-radius: 2px;
+  background-color: #fde68a;
+}
+
+:deep(.note-search-match-current) {
+  background-color: #f59e0b;
+  color: #111827;
+}
+
+.note-search-fade-enter-active,
+.note-search-fade-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.note-search-fade-enter-from,
+.note-search-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 .fim-completion-bubble {

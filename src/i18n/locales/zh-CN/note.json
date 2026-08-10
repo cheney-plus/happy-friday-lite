@@ -201,6 +201,12 @@
     "copyCode": "复制代码",
     "deleteBlock": "删除代码块"
   },
+  "search": {
+    "placeholder": "搜索笔记内容",
+    "previous": "上一个匹配项",
+    "next": "下一个匹配项",
+    "close": "关闭搜索"
+  },
   "toast": {
     "savedToKb": "已保存到「{name}」知识库",
     "saveFailed": "保存失败",

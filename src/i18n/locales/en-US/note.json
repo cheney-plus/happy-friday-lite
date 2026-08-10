@@ -201,6 +201,12 @@
     "copyCode": "Copy code",
     "deleteBlock": "Delete code block"
   },
+  "search": {
+    "placeholder": "Search note",
+    "previous": "Previous match",
+    "next": "Next match",
+    "close": "Close search"
+  },
   "toast": {
     "savedToKb": "Saved to \"{name}\" knowledge base",
     "saveFailed": "Save failed",
