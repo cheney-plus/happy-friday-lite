@@ -167,7 +167,10 @@
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(3)">
             <span class="heading-level-3-label">{{ t('note.toolbar.heading3') }}</span>
           </div>
-          <div class="menu-item" :class="{ active: !isHeadingActive, disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
+          <div class="menu-item" :class="{ active: editor.isActive('paragraph'), disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
+          <div class="menu-item" :class="{ active: editor.isActive('smallParagraph'), disabled: editor.isActive('noteTitle') }" @click="setSmallBody">
+            <span class="small-body-label">{{ t('note.toolbar.smallBody') }}</span>
+          </div>
         </div>
       </div>
 
@@ -589,6 +592,21 @@ const NoteTitle = Node.create({
         return this.editor.chain().splitBlock().setNode('paragraph').run();
       },
     };
+  },
+});
+
+const SmallParagraph = Node.create({
+  name: 'smallParagraph',
+  priority: 1100,
+  group: 'block',
+  content: 'inline*',
+
+  parseHTML() {
+    return [{ tag: 'p[data-small-text]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['p', { ...HTMLAttributes, 'data-small-text': 'true' }, 0];
   },
 });
 
@@ -1572,6 +1590,7 @@ const textColorPalette = [
 const editor = useEditor({
   extensions: [
     NoteTitle,
+    SmallParagraph,
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3],
@@ -1580,7 +1599,7 @@ const editor = useEditor({
     }),
     Underline,
     TextAlign.configure({
-      types: ['noteTitle', 'heading', 'paragraph'],
+      types: ['noteTitle', 'smallParagraph', 'heading', 'paragraph'],
     }),
     Highlight.configure({
       multicolor: true,
@@ -1726,12 +1745,15 @@ const currentHeadingLabel = computed(() => {
   if (editor.value.isActive('heading', { level: 1 })) return t('note.toolbar.heading1');
   if (editor.value.isActive('heading', { level: 2 })) return t('note.toolbar.heading2');
   if (editor.value.isActive('heading', { level: 3 })) return t('note.toolbar.heading3');
+  if (editor.value.isActive('smallParagraph')) return t('note.toolbar.smallBody');
   return t('note.toolbar.body');
 });
 
 const isHeadingActive = computed(() => {
   if (!editor.value) return false;
-  return editor.value.isActive('noteTitle') || editor.value.isActive('heading');
+  return editor.value.isActive('noteTitle')
+    || editor.value.isActive('heading')
+    || editor.value.isActive('smallParagraph');
 });
 
 const canSetNoteTitle = computed(() => {
@@ -1812,6 +1834,12 @@ const clearFormatting = () => {
 const setNoteTitle = () => {
   if (!canSetNoteTitle.value) return;
   editor.value?.chain().focus().setNode('noteTitle').run();
+  showHeadingMenu.value = false;
+};
+
+const setSmallBody = () => {
+  if (editor.value?.isActive('noteTitle')) return;
+  editor.value?.chain().focus().setNode('smallParagraph').run();
   showHeadingMenu.value = false;
 };
 
@@ -2348,6 +2376,11 @@ const fixEmptyTableCells = (html) => {
   font-weight: 600;
 }
 
+.small-body-label {
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .highlight-menu,
 .text-color-menu {
   min-width: 280px;
@@ -2471,6 +2504,10 @@ const fixEmptyTableCells = (html) => {
 
 :deep(.prose-editor p) {
   margin: 0.4em 0;
+}
+
+:deep(.prose-editor p[data-small-text]) {
+  font-size: 14px;
 }
 
 :deep(.prose-editor ul),
