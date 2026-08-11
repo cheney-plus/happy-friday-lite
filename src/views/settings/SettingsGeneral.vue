@@ -329,7 +329,16 @@
           <div class="setting-item">
             <span class="item-label">{{ t('settings.runtimeLogs') }}</span>
             <div class="logs-actions">
-              <button class="text-btn" @click="openLogDir">{{ t('settings.openLogDir') }}</button>
+              <button v-if="runtimeLogsEnabled" class="text-btn" @click="openLogDir">{{ t('settings.openLogDir') }}</button>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  v-model="runtimeLogsEnabled"
+                  :aria-label="t('settings.runtimeLogsEnabled')"
+                  @change="saveRuntimeLogsConfig"
+                />
+                <span class="toggle-slider"></span>
+              </label>
             </div>
           </div>
           <div class="setting-item clickable" @click="showFeaturesModal = true">
@@ -605,6 +614,8 @@ const settings = reactive({
   noteFimCompletion: appStore.noteFimCompletion,
   scheduleDefaultView: appStore.scheduleDefaultView || 'month'
 });
+
+const runtimeLogsEnabled = ref(true);
 
 // ========== 通用提示弹窗（替代原生 alert/confirm） ==========
 const dialog = reactive({
@@ -1187,6 +1198,20 @@ const saveNoteFimCompletion = async () => {
   } catch (_e) {}
 };
 
+const saveRuntimeLogsConfig = async () => {
+  const nextValue = runtimeLogsEnabled.value;
+  try {
+    const config = await electronService.invoke('get-config');
+    if (!config) throw new Error('Failed to load config');
+    config.runtimeLogsEnabled = nextValue;
+    const result = await electronService.invoke('save-config', config);
+    if (result?.success === false) throw new Error(result.error || 'Failed to save config');
+  } catch (e) {
+    runtimeLogsEnabled.value = !nextValue;
+    notifyError(e.message || t('settings.runtimeLogsSaveFailed'));
+  }
+};
+
 const selectScheduleView = async (value) => {
   if (value !== 'week' && value !== 'month') return;
   settings.scheduleDefaultView = value;
@@ -1227,6 +1252,9 @@ onMounted(() => {
   initTheme();
   settings.displayMode = currentMode.value;
   currentLanguage.value = appStore.language || 'zh-CN';
+  electronService.invoke('get-config').then((config) => {
+    if (config) runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
+  });
   loadBackupConfig();
   loadHistoryConfig();
   loadRagStats();
@@ -2185,6 +2213,14 @@ const openAuthorEmail = () => {
   display: flex;
   gap: 8px;
   align-items: center;
+  height: 24px;
+}
+
+.logs-actions .text-btn {
+  height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 24px;
 }
 
 [data-theme='dark'] .theme-dropdown-menu {

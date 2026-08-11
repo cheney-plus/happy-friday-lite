@@ -10,7 +10,7 @@ import { checkAutoBackup } from './src-electron/backup.js'
 import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
 import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
-import { initLogger } from './src-electron/logger.js'
+import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -112,6 +112,14 @@ app.whenReady().then(async () => {
   // 2. 初始化数据目录与数据库（sql.js WASM 加载），期间 splash 持续显示
   //    渲染进程加载 JS bundle + Vue mount 通常比此处更慢，IPC 注册会先于首次 invoke 完成
   const dataDir = await ensureDataDir()
+  // 读取持久化配置后应用日志开关，兼容升级前已存在的配置文件。
+  try {
+    const configPath = path.join(dataDir, 'config.json')
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    setLoggingEnabled(config.runtimeLogsEnabled !== false)
+  } catch (e) {
+    console.warn('[Main] Failed to apply runtime log setting:', e.message)
+  }
 
   // 首次启动时为未设置头像的用户随机分配 5 个普通头像（稀有头像不参与默认分配）
   // 需在数据目录初始化后、IPC 注册前完成，确保前端首次 get-config 即可拿到头像

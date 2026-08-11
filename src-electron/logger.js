@@ -15,6 +15,7 @@ let logDir = null
 let logFilePath = null
 let originalConsole = null
 let initialized = false
+let loggingEnabled = false
 
 // 单个日志文件最大体积，超过则滚动
 const MAX_LOG_SIZE = 5 * 1024 * 1024 // 5 MB
@@ -49,7 +50,7 @@ function formatArgs(args) {
 
 // 同步追加写入一行，保证进程崩溃前日志已落盘
 function writeLine(level, args) {
-  if (!logFilePath) return
+  if (!loggingEnabled || !logFilePath) return
   const line = `[${formatTimestamp()}] [${level}] ${formatArgs(args)}\n`
   try {
     fs.appendFileSync(logFilePath, line, 'utf-8')
@@ -59,7 +60,7 @@ function writeLine(level, args) {
 }
 
 function rotateIfNeeded() {
-  if (!logFilePath) return
+  if (!loggingEnabled || !logFilePath) return
   let stat
   try {
     stat = fs.statSync(logFilePath)
@@ -91,12 +92,60 @@ function rotateIfNeeded() {
   }
 }
 
+function removeLogFiles() {
+  if (!logDir) return
+  for (const name of ['main.log', ...Array.from({ length: MAX_LOG_FILES }, (_, i) => `main.${i + 1}.log`)]) {
+    try {
+      fs.rmSync(path.join(logDir, name), { force: true })
+    } catch (_e) {
+      // 日志清理失败不应影响应用运行
+    }
+  }
+}
+
+function createLogFile() {
+  if (!logDir) return false
+  try {
+    fs.mkdirSync(logDir, { recursive: true })
+    logFilePath = path.join(logDir, 'main.log')
+    fs.appendFileSync(
+      logFilePath,
+      `\n========== Application start: ${formatTimestamp()} (pid=${process.pid}) ==========\n`,
+      'utf-8'
+    )
+    return true
+  } catch (e) {
+    logFilePath = null
+    return false
+  }
+}
+
+/**
+ * 动态切换文件日志。关闭时删除当前日志及所有滚动日志，开启时重新创建 main.log。
+ */
+export function setLoggingEnabled(enabled) {
+  if (!initialized) return false
+  const nextEnabled = Boolean(enabled)
+  if (nextEnabled === loggingEnabled && (!nextEnabled || logFilePath)) return true
+
+  if (!nextEnabled) {
+    loggingEnabled = false
+    logFilePath = null
+    removeLogFiles()
+    return true
+  }
+
+  loggingEnabled = createLogFile()
+  return loggingEnabled
+}
+
 /**
  * 初始化文件日志器，接管 console.* 与未捕获异常。
  * 应在主进程启动最早期（同步阶段）调用一次。
  * @param {string} baseDir 数据目录（与 config/db 同级）
+ * @param {boolean} enabled 是否启用文件日志
  */
-export function initLogger(baseDir) {
+export function initLogger(baseDir, enabled = true) {
   if (initialized) return
   if (!baseDir) {
     // 没有目录则不启用文件日志，避免影响启动
@@ -104,17 +153,11 @@ export function initLogger(baseDir) {
   }
 
   logDir = path.join(baseDir, 'logs')
-  try {
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true })
-    }
-  } catch (e) {
+  loggingEnabled = Boolean(enabled)
+  if (loggingEnabled && !createLogFile()) {
     // 目录创建失败，回退到仅控制台输出
-    console.error('[Logger] Failed to create log directory:', e)
-    return
+    console.error('[Logger] Failed to create log directory')
   }
-
-  logFilePath = path.join(logDir, 'main.log')
 
   // 保存原始 console 方法，日志器自身输出走原方法避免递归
   originalConsole = {
@@ -150,18 +193,7 @@ export function initLogger(baseDir) {
   })
 
   initialized = true
-
-  // 写入一条分隔标记，便于区分每次启动
-  try {
-    fs.appendFileSync(
-      logFilePath,
-      `\n========== Application start: ${formatTimestamp()} (pid=${process.pid}) ==========\n`,
-      'utf-8'
-    )
-  } catch (_e) {
-    // 忽略
-  }
-  originalConsole.log('[Logger] Initialized, log file:', logFilePath)
+  if (loggingEnabled) originalConsole.log('[Logger] Initialized, log file:', logFilePath)
 }
 
 /**

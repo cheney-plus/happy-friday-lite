@@ -4,6 +4,8 @@ export function defaultConfig() {
   return {
     language: 'zh-CN',
     theme: 'light',
+    // 主进程运行日志：默认开启，兼容已有版本的行为
+    runtimeLogsEnabled: true,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     noteFimCompletion: true,
     // 用户头像：由 set_avatar 工具写入，结构为 { dataUrl, name, rarity, updatedAt }

@@ -23,7 +23,7 @@ import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
 import { registerAgentCommands } from './agent/ipc.js'
-import { getLogDir } from './logger.js'
+import { getLogDir, setLoggingEnabled } from './logger.js'
 import { getShareUrl, getNoteShareUrl } from './shareServer.js'
 
 const cancelTokens = new CancellationTokens()
@@ -111,7 +111,14 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('save-config', (_event, config) => {
+    const previousConfig = loadConfig()
     const result = saveConfig(config)
+    if (previousConfig.runtimeLogsEnabled !== config.runtimeLogsEnabled) {
+      const enabled = setLoggingEnabled(config.runtimeLogsEnabled !== false)
+      if (!enabled && config.runtimeLogsEnabled !== false) {
+        return { success: false, error: 'Failed to enable runtime logs' }
+      }
+    }
     // 模型配置变更时清除 Embedding 缓存
     clearEmbeddingsCache()
     mainWindow.webContents.send(CONFIG_CHANGED, config)
