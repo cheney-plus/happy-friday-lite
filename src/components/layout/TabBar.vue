@@ -72,6 +72,7 @@ import {
   FolderKanban,
   FileText,
   CalendarDays,
+  Workflow,
   Bot,
   Clock,
   Settings
@@ -92,6 +93,7 @@ const iconMap = {
   FolderKanban,
   FileText,
   CalendarDays,
+  Workflow,
   Bot,
   Clock,
   Settings

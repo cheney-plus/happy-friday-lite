@@ -358,7 +358,7 @@ const showKbDropdown = ref(false);
 const showLinkDropdown = ref(false);
 const showNoteDialog = ref(false);
 const showKbFileDialog = ref(false);
-const currentMode = ref('chat');
+const currentMode = ref('agent');
 const modeDropdownStyle = ref({});
 const modelDropdownStyle = ref({});
 const kbDropdownStyle = ref({});
@@ -1158,8 +1158,8 @@ const handleFeatureClick = (id) => {
 }
 
 .model-dropdown {
-  min-width: 320px;
-  padding: 16px;
+  min-width: 280px;
+  padding: 10px;
 }
 
 .link-dropdown {
@@ -1520,33 +1520,33 @@ const handleFeatureClick = (id) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 14px;
+  padding-bottom: 9px;
 }
 
 .model-toggle-row {
-  padding-bottom: 14px;
+  padding-bottom: 9px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .model-think-row {
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: 9px;
+  padding-bottom: 9px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .model-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-primary);
 }
 
 .toggle-switch {
   position: relative;
-  width: 42px;
-  height: 24px;
+  width: 36px;
+  height: 20px;
   flex-shrink: 0;
 }
 
@@ -1568,8 +1568,8 @@ const handleFeatureClick = (id) => {
 .toggle-slider::before {
   content: '';
   position: absolute;
-  height: 18px;
-  width: 18px;
+  height: 14px;
+  width: 14px;
   left: 3px;
   bottom: 3px;
   background: white;
@@ -1583,23 +1583,23 @@ const handleFeatureClick = (id) => {
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 .think-tabs {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   background: var(--bg-secondary);
-  border-radius: 10px;
-  padding: 3px;
+  border-radius: 7px;
+  padding: 2px;
 }
 
 .think-tab {
-  padding: 5px 14px;
+  padding: 4px 10px;
   border: none;
   background: transparent;
-  border-radius: 8px;
-  font-size: 12.5px;
+  border-radius: 5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -1617,17 +1617,17 @@ const handleFeatureClick = (id) => {
 }
 
 .model-model-list {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .model-item {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 7px 8px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.12s ease;
-  gap: 10px;
+  gap: 8px;
 }
 
 .model-item:hover {
@@ -1639,9 +1639,9 @@ const handleFeatureClick = (id) => {
 }
 
 .model-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -1649,20 +1649,20 @@ const handleFeatureClick = (id) => {
 .model-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   flex: 1;
   min-width: 0;
 }
 
 .model-name {
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
 .model-embedding-name {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
