@@ -616,6 +616,13 @@ const closeAllDropdowns = () => {
   showLinkDropdown.value = false;
 };
 
+const handleDocumentScroll = (event) => {
+  if (event.target instanceof Element && event.target.closest('.dropdown-overlay')) {
+    return;
+  }
+  closeAllDropdowns();
+};
+
 // 从磁盘扫描知识库列表
 const loadKbListFromDisk = async () => {
   const api = window.electronAPI;
@@ -731,13 +738,13 @@ const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
 };
 
 onMounted(() => {
-  document.addEventListener('scroll', closeAllDropdowns, true);
+  document.addEventListener('scroll', handleDocumentScroll, true);
   // loadCustomModels() 由 onActivated 统一触发（keep-alive 首次挂载时 onActivated 也会执行）
   loadKbListFromDisk();
 });
 
 onUnmounted(() => {
-  document.removeEventListener('scroll', closeAllDropdowns, true);
+  document.removeEventListener('scroll', handleDocumentScroll, true);
 });
 
 onDeactivated(() => {
@@ -1618,11 +1625,35 @@ const handleFeatureClick = (id) => {
 
 .model-model-list {
   margin-top: 8px;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.model-model-list::-webkit-scrollbar {
+  width: 2px;
+}
+
+.model-model-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.model-model-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.model-model-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
 
 .model-item {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
+  min-height: 42px;
   padding: 7px 8px;
   border-radius: 8px;
   cursor: pointer;
