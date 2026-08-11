@@ -15,6 +15,27 @@
     "triggerTime": "触发时间",
     "triggerType": "触发类型",
     "selectTime": "选择时间",
+    "hour": "时",
+    "minute": "分",
+    "selectDateTime": "选择日期和时间",
+    "dayOfMonth": "第 {day} 天",
+    "weekdays": "选择星期",
+    "weekdaysShort": {
+      "mon": "一",
+      "tue": "二",
+      "wed": "三",
+      "thu": "四",
+      "fri": "五",
+      "sat": "六",
+      "sun": "日"
+    },
+    "every": "每",
+    "intervalValue": "间隔数量",
+    "intervalUnits": {
+      "minutes": "分钟",
+      "hours": "小时",
+      "days": "天"
+    },
     "instruction": "你希望 Happy Friday 做什么？",
     "instructionHint": "描述任务目标、所需输入和预期结果",
     "instructionPlaceholder": "描述任务内容和希望获得的结果，例如整理新闻摘要、分析数据或生成每日工作报告。",

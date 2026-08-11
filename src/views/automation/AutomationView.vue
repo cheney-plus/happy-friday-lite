@@ -225,7 +225,7 @@
 
             <div class="trigger-section">
               <span class="field-label">{{ t('automation.createModal.triggerTime') }}</span>
-              <div class="trigger-fields">
+              <div :class="['trigger-fields', { 'is-monthly': triggerType === 'monthly' }]">
                 <div class="form-select custom-dropdown" @click.stop>
                   <button class="dropdown-trigger" type="button" @click.stop="toggleTriggerMenu">
                     <span>{{ currentTriggerLabel }}</span>
@@ -246,15 +246,76 @@
                     </div>
                   </Transition>
                 </div>
-                <label class="time-field">
-                  <span v-if="!triggerTime" class="time-placeholder">{{ t('automation.createModal.selectTime') }}</span>
-                  <input
-                    v-model="triggerTime"
-                    type="time"
-                    :class="{ 'has-value': triggerTime }"
-                    :aria-label="t('automation.createModal.selectTime')"
-                  />
-                  <Clock3 :size="17" :stroke-width="1.8" />
+                <label v-if="triggerType === 'daily'" class="time-field">
+                  <input v-model="triggerTime" type="time" :aria-label="t('automation.createModal.selectTime')" @click="openNativePicker" />
+                </label>
+
+                <template v-else-if="triggerType === 'monthly'">
+                  <div class="form-select custom-dropdown" @click.stop>
+                    <button class="dropdown-trigger" type="button" @click.stop="toggleMonthlyDayMenu">
+                      <span>{{ t('automation.createModal.dayOfMonth', { day: monthlyDay }) }}</span>
+                      <ChevronDown :size="16" :stroke-width="2" :class="{ expanded: showMonthlyDayMenu }" />
+                    </button>
+                    <Transition name="dropdown-menu">
+                      <div v-if="showMonthlyDayMenu" class="month-day-menu">
+                        <button
+                          v-for="day in 31"
+                          :key="day"
+                          type="button"
+                          :class="{ active: monthlyDay === day }"
+                          @click="selectMonthlyDay(day)"
+                        >
+                          {{ day }}
+                        </button>
+                      </div>
+                    </Transition>
+                  </div>
+                  <label class="time-field"><input v-model="triggerTime" type="time" :aria-label="t('automation.createModal.selectTime')" @click="openNativePicker" /></label>
+                </template>
+
+                <template v-else-if="triggerType === 'weekly'">
+                  <label class="time-field"><input v-model="triggerTime" type="time" :aria-label="t('automation.createModal.selectTime')" @click="openNativePicker" /></label>
+                  <div class="weekday-picker" :aria-label="t('automation.createModal.weekdays')">
+                    <button
+                      v-for="day in weekdayOptions"
+                      :key="day.value"
+                      type="button"
+                      :class="{ active: weeklyDays.includes(day.value) }"
+                      :aria-pressed="weeklyDays.includes(day.value)"
+                      @click="toggleWeekday(day.value)"
+                    >
+                      {{ day.label }}
+                    </button>
+                  </div>
+                </template>
+
+                <div v-else-if="triggerType === 'interval'" class="interval-field">
+                  <span>{{ t('automation.createModal.every') }}</span>
+                  <input v-model.number="intervalValue" type="number" min="1" step="1" :aria-label="t('automation.createModal.intervalValue')" />
+                  <div class="interval-unit custom-dropdown" @click.stop>
+                    <button class="dropdown-trigger" type="button" @click.stop="toggleIntervalUnitMenu">
+                      <span>{{ currentIntervalUnitLabel }}</span>
+                      <ChevronDown :size="16" :stroke-width="2" :class="{ expanded: showIntervalUnitMenu }" />
+                    </button>
+                    <Transition name="dropdown-menu">
+                      <div v-if="showIntervalUnitMenu" class="dropdown-menu more-menu interval-unit-menu">
+                        <button
+                          v-for="unit in intervalUnitOptions"
+                          :key="unit.value"
+                          type="button"
+                          :class="['menu-item', { active: intervalUnit === unit.value }]"
+                          @click="selectIntervalUnit(unit.value)"
+                        >
+                          <span>{{ unit.label }}</span>
+                          <Check v-if="intervalUnit === unit.value" :size="13" :stroke-width="2.3" />
+                        </button>
+                      </div>
+                    </Transition>
+                  </div>
+                </div>
+
+                <label v-else class="datetime-field">
+                  <input v-model="onceDateTime" type="datetime-local" :aria-label="t('automation.createModal.selectDateTime')" />
                 </label>
               </div>
             </div>
@@ -319,7 +380,6 @@ import {
   Check,
   ChevronDown,
   CirclePlay,
-  Clock3,
   Cloud,
   Crosshair,
   Ellipsis,
@@ -338,6 +398,12 @@ import {
 const { t } = useI18n();
 const router = useRouter();
 
+const getCurrentLocalDateTime = () => {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
+
 const activeTab = ref('history');
 const statusFilter = ref('success');
 const taskFilter = ref('all');
@@ -351,9 +417,16 @@ const taskNameInput = ref(null);
 const taskName = ref('');
 const triggerType = ref('daily');
 const triggerTime = ref('');
+const monthlyDay = ref(1);
+const weeklyDays = ref(['mon']);
+const intervalValue = ref(1);
+const intervalUnit = ref('hours');
+const onceDateTime = ref(getCurrentLocalDateTime());
 const taskInstruction = ref('');
 const executionMode = ref('auto');
 const showTriggerMenu = ref(false);
+const showMonthlyDayMenu = ref(false);
+const showIntervalUnitMenu = ref(false);
 const showModeMenu = ref(false);
 const showStatusMenu = ref(false);
 const showTaskMenu = ref(false);
@@ -402,6 +475,23 @@ const modeOptions = computed(() => [
   { value: 'focused', label: t('automation.createModal.focusedMode') }
 ]);
 
+const weekdayOptions = computed(() => [
+  { value: 'mon', label: t('automation.createModal.weekdaysShort.mon') },
+  { value: 'tue', label: t('automation.createModal.weekdaysShort.tue') },
+  { value: 'wed', label: t('automation.createModal.weekdaysShort.wed') },
+  { value: 'thu', label: t('automation.createModal.weekdaysShort.thu') },
+  { value: 'fri', label: t('automation.createModal.weekdaysShort.fri') },
+  { value: 'sat', label: t('automation.createModal.weekdaysShort.sat') },
+  { value: 'sun', label: t('automation.createModal.weekdaysShort.sun') }
+]);
+
+const intervalUnitOptions = computed(() => [
+  { value: 'minutes', label: t('automation.createModal.intervalUnits.minutes') },
+  { value: 'hours', label: t('automation.createModal.intervalUnits.hours') },
+  { value: 'days', label: t('automation.createModal.intervalUnits.days') }
+]);
+
+
 const currentTriggerLabel = computed(() => (
   triggerOptions.value.find(option => option.value === triggerType.value)?.label || ''
 ));
@@ -409,6 +499,11 @@ const currentTriggerLabel = computed(() => (
 const currentModeLabel = computed(() => (
   modeOptions.value.find(option => option.value === executionMode.value)?.label || ''
 ));
+
+const currentIntervalUnitLabel = computed(() => (
+  intervalUnitOptions.value.find(option => option.value === intervalUnit.value)?.label || ''
+));
+
 
 const currentStatusLabel = computed(() => (
   statusOptions.value.find(option => option.value === statusFilter.value)?.label || ''
@@ -422,11 +517,22 @@ const formattedDateRange = computed(() => (
   `${startDate.value.replaceAll('-', '/')} - ${endDate.value.replaceAll('-', '/')}`
 ));
 
+const isTriggerComplete = computed(() => {
+  if (triggerType.value === 'interval') return Number.isInteger(intervalValue.value) && intervalValue.value > 0;
+  if (triggerType.value === 'once') return onceDateTime.value.length > 0;
+  if (triggerType.value === 'weekly') return weeklyDays.value.length > 0 && triggerTime.value.length > 0;
+  return triggerTime.value.length > 0;
+});
+
 const canCreateTask = computed(() => (
   taskName.value.trim().length > 0
-  && triggerTime.value.length > 0
+  && isTriggerComplete.value
   && taskInstruction.value.trim().length > 0
 ));
+
+const openNativePicker = (event) => {
+  event.currentTarget.showPicker?.();
+};
 
 const openManualCreate = () => {
   manualCreateVisible.value = true;
@@ -436,27 +542,67 @@ const openManualCreate = () => {
 const closeManualCreate = () => {
   manualCreateVisible.value = false;
   showTriggerMenu.value = false;
+  showMonthlyDayMenu.value = false;
+  showIntervalUnitMenu.value = false;
   showModeMenu.value = false;
 };
 
 const closeDropdowns = () => {
   showTriggerMenu.value = false;
+  showMonthlyDayMenu.value = false;
+  showIntervalUnitMenu.value = false;
   showModeMenu.value = false;
 };
 
 const toggleTriggerMenu = () => {
   showTriggerMenu.value = !showTriggerMenu.value;
+  showMonthlyDayMenu.value = false;
+  showIntervalUnitMenu.value = false;
+  showModeMenu.value = false;
+};
+
+const toggleMonthlyDayMenu = () => {
+  showMonthlyDayMenu.value = !showMonthlyDayMenu.value;
+  showTriggerMenu.value = false;
+  showIntervalUnitMenu.value = false;
+  showModeMenu.value = false;
+};
+
+const toggleIntervalUnitMenu = () => {
+  showIntervalUnitMenu.value = !showIntervalUnitMenu.value;
+  showTriggerMenu.value = false;
+  showMonthlyDayMenu.value = false;
   showModeMenu.value = false;
 };
 
 const toggleModeMenu = () => {
   showModeMenu.value = !showModeMenu.value;
   showTriggerMenu.value = false;
+  showMonthlyDayMenu.value = false;
+  showIntervalUnitMenu.value = false;
 };
 
 const selectTrigger = (value) => {
   triggerType.value = value;
   showTriggerMenu.value = false;
+  showMonthlyDayMenu.value = false;
+  showIntervalUnitMenu.value = false;
+};
+
+const selectMonthlyDay = (day) => {
+  monthlyDay.value = day;
+  showMonthlyDayMenu.value = false;
+};
+
+const toggleWeekday = (day) => {
+  weeklyDays.value = weeklyDays.value.includes(day)
+    ? weeklyDays.value.filter(value => value !== day)
+    : [...weeklyDays.value, day];
+};
+
+const selectIntervalUnit = (unit) => {
+  intervalUnit.value = unit;
+  showIntervalUnitMenu.value = false;
 };
 
 const selectMode = (value) => {
@@ -1234,7 +1380,9 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 
 .form-field > input,
 .form-select,
-.time-field {
+.time-field,
+.datetime-field,
+.interval-field {
   height: 40px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -1259,6 +1407,8 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 .form-field > input:focus,
 .form-select:focus-within,
 .time-field:focus-within,
+.datetime-field:focus-within,
+.interval-field:focus-within,
 .instruction-editor:focus-within {
   border-color: var(--text-tertiary);
   box-shadow: 0 0 0 3px var(--bg-hover);
@@ -1270,8 +1420,13 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
   gap: 10px;
 }
 
+.trigger-fields.is-monthly {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .form-select,
 .time-field,
+.datetime-field,
 .mode-select {
   position: relative;
   display: flex;
@@ -1281,48 +1436,140 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 .time-field input {
   width: 100%;
   height: 100%;
+  padding: 0 12px;
   border: 0;
   outline: 0;
-  appearance: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.time-field input::-webkit-calendar-picker-indicator {
+  margin-left: 8px;
+  cursor: pointer;
+}
+
+.datetime-field {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.datetime-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
   background: transparent;
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
 }
 
-.time-field input {
-  padding: 0 38px 0 12px;
-}
-
-.time-field > svg {
+.month-day-menu {
   position: absolute;
-  right: 12px;
-  color: var(--text-secondary);
-  pointer-events: none;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: min(100%, 320px);
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  background: var(--bg-primary);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
 }
 
-.time-field input::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  cursor: pointer;
-}
-
-.time-field input {
-  position: relative;
-  z-index: 1;
-  color: transparent;
-  cursor: pointer;
-}
-
-.time-field input.has-value {
+.month-day-menu button {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
 }
 
-.time-placeholder {
-  position: absolute;
-  left: 12px;
-  color: var(--text-tertiary);
+.month-day-menu button:hover,
+.month-day-menu button.active {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+.weekday-picker {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.weekday-picker button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
   font-size: 13px;
-  pointer-events: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.weekday-picker button:hover {
+  border-color: var(--text-tertiary);
+}
+
+.weekday-picker button.active {
+  border-color: var(--text-primary);
+  background: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+.interval-field {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: auto minmax(56px, 1fr) minmax(92px, 1fr);
+  align-items: stretch;
+  min-width: 0;
+  overflow: visible;
+}
+
+.interval-field > span {
+  padding: 0 11px;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.interval-field > input {
+  min-width: 0;
+  padding: 0 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.interval-unit {
+  position: relative;
+  min-width: 0;
+  border-left: 1px solid var(--border-color);
+}
+
+.interval-unit-menu {
+  width: 100%;
 }
 
 .custom-dropdown {
@@ -1660,6 +1907,11 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 
   .trigger-fields {
     grid-template-columns: 1fr;
+  }
+
+  .datetime-field,
+  .interval-field {
+    grid-column: auto;
   }
 }
 </style>

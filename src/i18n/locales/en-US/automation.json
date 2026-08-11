@@ -15,6 +15,27 @@
     "triggerTime": "Trigger time",
     "triggerType": "Trigger type",
     "selectTime": "Select a time",
+    "hour": "Hour",
+    "minute": "Minute",
+    "selectDateTime": "Select date and time",
+    "dayOfMonth": "Day {day}",
+    "weekdays": "Select weekdays",
+    "weekdaysShort": {
+      "mon": "M",
+      "tue": "T",
+      "wed": "W",
+      "thu": "T",
+      "fri": "F",
+      "sat": "S",
+      "sun": "S"
+    },
+    "every": "Every",
+    "intervalValue": "Interval value",
+    "intervalUnits": {
+      "minutes": "minutes",
+      "hours": "hours",
+      "days": "days"
+    },
     "instruction": "What should Happy Friday do?",
     "instructionHint": "Describe the goal, required input, and expected result",
     "instructionPlaceholder": "Describe the task and expected result, such as summarizing news, analyzing data, or preparing a daily report.",
