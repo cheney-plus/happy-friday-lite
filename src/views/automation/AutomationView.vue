@@ -48,7 +48,6 @@
         <div class="task-summary">
           <Cloud :size="18" :stroke-width="1.8" class="task-cloud-icon" />
           <strong>{{ t('automation.sample.taskName') }}</strong>
-          <span class="workspace-tag">{{ t('automation.sample.workspace') }}</span>
           <span class="task-schedule">{{ t('automation.configured.schedule') }}</span>
         </div>
         <div class="task-actions">
@@ -132,7 +131,15 @@
 
       <section class="run-history">
         <h2>{{ t('automation.groups.today') }}</h2>
-        <article class="run-item">
+        <article
+          :class="['run-item', { selected: selectedRunId === 'sample-run' }]"
+          role="button"
+          tabindex="0"
+          :aria-pressed="selectedRunId === 'sample-run'"
+          @click="selectRun('sample-run')"
+          @keydown.enter.prevent="selectRun('sample-run')"
+          @keydown.space.prevent="selectRun('sample-run')"
+        >
           <div class="status-track" aria-hidden="true">
             <span class="success-dot"><Check :size="13" :stroke-width="3" /></span>
             <span class="track-line"></span>
@@ -140,7 +147,6 @@
           <div class="run-content">
             <div class="run-title-row">
               <strong>{{ t('automation.sample.taskName') }}</strong>
-              <span class="workspace-tag">{{ t('automation.sample.workspace') }}</span>
             </div>
             <p>
               <span>{{ t('automation.sample.trigger') }}</span>
@@ -352,6 +358,7 @@ const showModeMenu = ref(false);
 const showStatusMenu = ref(false);
 const showTaskMenu = ref(false);
 const showDateMenu = ref(false);
+const selectedRunId = ref('sample-run');
 let toastTimer = null;
 
 const tabs = computed(() => [
@@ -495,6 +502,10 @@ const selectStatus = (value) => {
 const selectTask = (value) => {
   taskFilter.value = value;
   showTaskMenu.value = false;
+};
+
+const selectRun = (runId) => {
+  selectedRunId.value = runId;
 };
 
 const openTemplates = () => {
@@ -676,9 +687,9 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 }
 
 .configured-task {
-  min-height: 68px;
+  min-height: 56px;
   margin-top: 14px;
-  padding: 14px 16px;
+  padding: 10px 16px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   display: flex;
@@ -1039,7 +1050,19 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 .run-item {
   display: flex;
   margin-top: 18px;
-  margin-left: 18px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.run-item:hover {
+  background: var(--bg-secondary);
+}
+
+.run-item:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .status-track {
@@ -1082,15 +1105,6 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 .run-title-row strong {
   font-size: 14px;
   font-weight: 600;
-}
-
-.workspace-tag {
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 17px;
 }
 
 .run-content p {
