@@ -124,7 +124,7 @@
       </div>
 
       <Teleport to="body">
-        <div v-if="contextMenu.visible" class="context-menu" :style="contextMenu.style" @click.stop>
+        <div ref="contextMenuRef" v-if="contextMenu.visible" class="context-menu" :style="contextMenu.style" @click.stop>
           <div class="context-item" @click="handleAction('addToKnowledge')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"></path></svg>
             {{ t('note.contextMenu.addToKnowledge') }}
@@ -141,6 +141,7 @@
           </div>
           <div
             v-if="notebookSubmenuVisible"
+            ref="notebookSubmenuRef"
             class="notebook-submenu"
             :style="notebookSubmenuStyle"
             @mouseenter="cancelHideNotebookSubmenu"
@@ -406,6 +407,8 @@ let newNoteMenuStyle = reactive({ left: '0px', top: '0px' });
 
 const notebookSubmenuVisible = ref(false);
 let notebookSubmenuStyle = reactive({ left: '0px', top: '0px' });
+const contextMenuRef = ref(null);
+const notebookSubmenuRef = ref(null);
 const createNotebookDialogVisible = ref(false);
 const newNotebookName = ref('');
 const notebookNameInputRef = ref(null);
@@ -840,27 +843,45 @@ const contextMenu = reactive({
   visible: false,
   x: 0,
   y: 0,
+  bottom: null,
   targetNoteId: null,
   targetNote: null,
   get style() {
     return {
       left: `${this.x}px`,
-      top: `${this.y}px`
+      top: this.bottom === null ? `${this.y}px` : 'auto',
+      bottom: this.bottom === null ? 'auto' : `${this.bottom}px`
     };
   }
 });
 
-const showContextMenu = (e, note) => {
+const MENU_VIEWPORT_GAP = 8;
+const CONTEXT_MENU_ESTIMATED_HEIGHT = 180;
+
+const showContextMenu = async (e, note) => {
   contextMenu.visible = true;
   contextMenu.x = e.clientX;
   contextMenu.y = e.clientY;
+  contextMenu.bottom = e.clientY + CONTEXT_MENU_ESTIMATED_HEIGHT > window.innerHeight - MENU_VIEWPORT_GAP
+    ? window.innerHeight - e.clientY
+    : null;
   contextMenu.targetNoteId = note.id;
   contextMenu.targetNote = note;
   notebookSubmenuVisible.value = false;
+
+  await nextTick();
+  const menuRect = contextMenuRef.value?.getBoundingClientRect();
+  if (menuRect) {
+    contextMenu.x = Math.max(MENU_VIEWPORT_GAP, Math.min(e.clientX, window.innerWidth - menuRect.width - MENU_VIEWPORT_GAP));
+    contextMenu.bottom = e.clientY + menuRect.height > window.innerHeight - MENU_VIEWPORT_GAP
+      ? window.innerHeight - e.clientY
+      : null;
+  }
 };
 
 const hideContextMenu = () => {
   contextMenu.visible = false;
+  contextMenu.bottom = null;
   contextMenu.targetNoteId = null;
   contextMenu.targetNote = null;
   notebookSubmenuVisible.value = false;
@@ -875,24 +896,35 @@ const showNotebookSubmenu = async () => {
     notebookSubmenuHideTimer = null;
   }
 
-  await nextTick();
-  const menuEl = document.querySelector('.context-menu');
-  if (menuEl) {
-    const menuItemEl = menuEl.querySelector('.has-submenu');
-    if (menuItemEl) {
-      const itemRect = menuItemEl.getBoundingClientRect();
-      notebookSubmenuStyle.left = `${itemRect.right + 4}px`;
-      notebookSubmenuStyle.top = `${itemRect.top}px`;
-    }
-  }
-
   notebookSubmenuVisible.value = true;
+  await nextTick();
+  positionNotebookSubmenu();
 
   try {
     await notebookStore.fetchNotebooks();
+    await nextTick();
+    positionNotebookSubmenu();
   } catch (error) {
     console.error('Failed to fetch notebooks:', error);
   }
+};
+
+const positionNotebookSubmenu = () => {
+  const menuItemEl = contextMenuRef.value?.querySelector('.has-submenu');
+  const submenuRect = notebookSubmenuRef.value?.getBoundingClientRect();
+  if (!menuItemEl || !submenuRect) return;
+
+  const itemRect = menuItemEl.getBoundingClientRect();
+  const opensRight = itemRect.right + 4 + submenuRect.width <= window.innerWidth - MENU_VIEWPORT_GAP;
+  const left = opensRight
+    ? itemRect.right + 4
+    : Math.max(MENU_VIEWPORT_GAP, itemRect.left - submenuRect.width - 4);
+  const top = itemRect.top + submenuRect.height <= window.innerHeight - MENU_VIEWPORT_GAP
+    ? itemRect.top
+    : Math.max(MENU_VIEWPORT_GAP, itemRect.bottom - submenuRect.height);
+
+  notebookSubmenuStyle.left = `${left}px`;
+  notebookSubmenuStyle.top = `${top}px`;
 };
 
 const hideNotebookSubmenuWithDelay = () => {
@@ -1752,6 +1784,8 @@ onDeactivated(() => {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.08);
   padding: 6px 0;
   min-width: 180px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   animation: dropdown-in 0.12s ease-out;
 }
 
@@ -1808,6 +1842,8 @@ onDeactivated(() => {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.08);
   padding: 6px 0;
   min-width: 160px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   animation: dropdown-in 0.12s ease-out;
 }
 
@@ -1842,6 +1878,8 @@ onDeactivated(() => {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
   padding: 4px 0;
   min-width: 140px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   animation: dropdown-in 0.1s ease-out;
 }
 
