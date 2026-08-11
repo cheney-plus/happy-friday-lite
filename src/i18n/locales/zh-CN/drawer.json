@@ -126,7 +126,7 @@
     "sourceAgent": "Agent",
     "sourceRag": "知识库",
     "sourceTitle": "标题生成",
-    "sourceFim": "代码补全",
+    "sourceFim": "笔记补全",
     "sourceNoteAi": "笔记AI",
     "sourceUnknown": "未知",
     "loadFailed": "加载用量数据失败",
