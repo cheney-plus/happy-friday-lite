@@ -250,6 +250,39 @@ async function initDatabase() {
     );
   `)
 
+  // automation_tasks: 本地 DeepAgent 定时任务。cronExpression 使用本机时区的五字段 Cron。
+  db.run(`
+    CREATE TABLE IF NOT EXISTS automation_tasks (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      instruction TEXT NOT NULL,
+      modelId TEXT NOT NULL,
+      triggerType TEXT NOT NULL,
+      triggerConfig TEXT NOT NULL,
+      cronExpression TEXT,
+      nextRunAt TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      lastRunAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `)
+
+  // automation_runs: 每次自动或手动执行都保留独立的审计记录与 Agent 输出。
+  db.run(`
+    CREATE TABLE IF NOT EXISTS automation_runs (
+      id TEXT PRIMARY KEY,
+      taskId TEXT NOT NULL,
+      trigger TEXT NOT NULL DEFAULT 'schedule',
+      status TEXT NOT NULL DEFAULT 'running',
+      startedAt TEXT NOT NULL,
+      completedAt TEXT,
+      durationMs INTEGER,
+      output TEXT,
+      error TEXT
+    );
+  `)
+
   db.run('CREATE INDEX IF NOT EXISTS idx_messages_sessionId ON messages(sessionId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_notebookId ON notes(notebookId)')
@@ -264,6 +297,10 @@ async function initDatabase() {
   db.run('CREATE INDEX IF NOT EXISTS idx_agent_memories_namespace ON agent_memories(namespace)')
   db.run('CREATE INDEX IF NOT EXISTS idx_agent_tool_logs_threadId ON agent_tool_logs(threadId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_agent_tool_logs_requestId ON agent_tool_logs(requestId)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_automation_tasks_enabled ON automation_tasks(enabled)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_automation_tasks_nextRunAt ON automation_tasks(nextRunAt)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_taskId ON automation_runs(taskId)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_startedAt ON automation_runs(startedAt)')
 
   saveDb()
   await migrateFromJson()
@@ -372,6 +409,17 @@ function normalizeEvent(row) {
 function normalizeNote(row) {
   if (!row) return row
   row.isDeleted = !!row.isDeleted
+  return row
+}
+
+function normalizeAutomationTask(row) {
+  if (!row) return row
+  row.enabled = !!row.enabled
+  try {
+    row.triggerConfig = JSON.parse(row.triggerConfig || '{}')
+  } catch (_e) {
+    row.triggerConfig = {}
+  }
   return row
 }
 
@@ -718,6 +766,123 @@ export function updateScheduleEvent(eventId, args) {
 export function deleteScheduleEvent(eventId) {
   db.run('DELETE FROM schedule_events WHERE id = ?', [eventId])
   saveDb()
+}
+
+// ========== Automation tasks ==========
+
+export function createAutomationTask(args) {
+  const now = nowISO()
+  const id = generateId()
+  db.run(
+    `INSERT INTO automation_tasks
+      (id, name, instruction, modelId, triggerType, triggerConfig, cronExpression, nextRunAt, enabled, lastRunAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      args.name || '',
+      args.instruction || '',
+      args.modelId || '',
+      args.triggerType || 'daily',
+      JSON.stringify(args.triggerConfig || {}),
+      args.cronExpression || null,
+      args.nextRunAt || null,
+      args.enabled === false ? 0 : 1,
+      null,
+      now,
+      now
+    ]
+  )
+  saveDb()
+  return normalizeAutomationTask(queryOne('SELECT * FROM automation_tasks WHERE id = ?', [id]))
+}
+
+export function getAutomationTasks() {
+  return queryAll('SELECT * FROM automation_tasks ORDER BY createdAt DESC').map(normalizeAutomationTask)
+}
+
+export function getAutomationTask(taskId) {
+  return normalizeAutomationTask(queryOne('SELECT * FROM automation_tasks WHERE id = ?', [taskId]))
+}
+
+export function updateAutomationTask(taskId, args) {
+  const fields = []
+  const values = []
+  const valuesByField = {
+    name: args.name,
+    instruction: args.instruction,
+    modelId: args.modelId,
+    triggerType: args.triggerType,
+    cronExpression: args.cronExpression,
+    nextRunAt: args.nextRunAt,
+    lastRunAt: args.lastRunAt
+  }
+  for (const [field, value] of Object.entries(valuesByField)) {
+    if (value !== undefined) {
+      fields.push(`${field} = ?`)
+      values.push(value)
+    }
+  }
+  if (args.triggerConfig !== undefined) {
+    fields.push('triggerConfig = ?')
+    values.push(JSON.stringify(args.triggerConfig || {}))
+  }
+  if (args.enabled !== undefined) {
+    fields.push('enabled = ?')
+    values.push(args.enabled ? 1 : 0)
+  }
+  if (fields.length === 0) return getAutomationTask(taskId)
+  fields.push('updatedAt = ?')
+  values.push(nowISO(), taskId)
+  db.run(`UPDATE automation_tasks SET ${fields.join(', ')} WHERE id = ?`, values)
+  saveDb()
+  return getAutomationTask(taskId)
+}
+
+export function deleteAutomationTask(taskId) {
+  db.run('DELETE FROM automation_tasks WHERE id = ?', [taskId])
+  saveDb()
+}
+
+export function createAutomationRun({ taskId, trigger = 'schedule' }) {
+  const id = generateId()
+  const startedAt = nowISO()
+  db.run(
+    'INSERT INTO automation_runs (id, taskId, trigger, status, startedAt) VALUES (?, ?, ?, ?, ?)',
+    [id, taskId, trigger, 'running', startedAt]
+  )
+  saveDb()
+  return queryOne('SELECT * FROM automation_runs WHERE id = ?', [id])
+}
+
+export function completeAutomationRun(runId, { status, output = '', error = '' }) {
+  const existing = queryOne('SELECT * FROM automation_runs WHERE id = ?', [runId])
+  if (!existing) return null
+  const completedAt = nowISO()
+  const durationMs = Math.max(0, new Date(completedAt).getTime() - new Date(existing.startedAt).getTime())
+  db.run(
+    'UPDATE automation_runs SET status = ?, completedAt = ?, durationMs = ?, output = ?, error = ? WHERE id = ?',
+    [status, completedAt, durationMs, output, error, runId]
+  )
+  saveDb()
+  return queryOne('SELECT * FROM automation_runs WHERE id = ?', [runId])
+}
+
+export function getAutomationRuns(filters = {}) {
+  const { status, taskId, startDate, endDate, limit = 200 } = filters
+  const clauses = []
+  const values = []
+  if (status && status !== 'all') { clauses.push('status = ?'); values.push(status) }
+  if (taskId && taskId !== 'all') { clauses.push('taskId = ?'); values.push(taskId) }
+  if (startDate) { clauses.push('startedAt >= ?'); values.push(new Date(`${startDate}T00:00:00`).toISOString()) }
+  if (endDate) { clauses.push('startedAt <= ?'); values.push(new Date(`${endDate}T23:59:59.999`).toISOString()) }
+  values.push(Math.min(Math.max(Number(limit) || 200, 1), 500))
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  return queryAll(
+    `SELECT runs.*, tasks.name AS taskName FROM automation_runs runs
+     LEFT JOIN automation_tasks tasks ON tasks.id = runs.taskId
+     ${where} ORDER BY startedAt DESC LIMIT ?`,
+    values
+  )
 }
 
 export function createNotebook(name, description) {

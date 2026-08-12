@@ -1,0 +1,192 @@
+/**
+ * Local DeepAgent automation scheduler.
+ *
+ * LangGraph deployments expose `client.crons.create(...)`; this Electron app has
+ * no deployment service, so tasks and run records are persisted locally and a
+ * minute scheduler invokes the existing DeepAgent factory directly.
+ */
+
+import { createLogger } from './agent/logger.js'
+import { createAgentWithContext } from './agent/index.js'
+import { getDataDir, loadConfig } from './config.js'
+import * as db from './db.js'
+
+const log = createLogger('Automation')
+const WEEKDAY_TO_CRON = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
+const activeTaskIds = new Set()
+let timer = null
+let mainWindow = null
+let lastTickMinute = ''
+
+function pad(value) {
+  return String(value).padStart(2, '0')
+}
+
+function localDateKey(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function parseTime(time) {
+  const [hours = '0', minutes = '0'] = String(time || '00:00').split(':')
+  return { hour: Math.min(23, Math.max(0, Number(hours) || 0)), minute: Math.min(59, Math.max(0, Number(minutes) || 0)) }
+}
+
+export function buildCronExpression(triggerType, triggerConfig = {}) {
+  const { hour, minute } = parseTime(triggerConfig.time)
+  if (triggerType === 'daily') return `${minute} ${hour} * * *`
+  if (triggerType === 'weekly') {
+    const days = (triggerConfig.weekdays || []).map(day => WEEKDAY_TO_CRON[day]).filter(Number.isInteger)
+    return `${minute} ${hour} * * ${days.length ? days.join(',') : '*'}`
+  }
+  if (triggerType === 'monthly') return `${minute} ${hour} ${Math.min(31, Math.max(1, Number(triggerConfig.day) || 1))} * *`
+  return null
+}
+
+export function getNextRunAt(task, from = new Date()) {
+  const config = task.triggerConfig || {}
+  if (task.triggerType === 'once') {
+    const scheduled = new Date(config.dateTime)
+    return Number.isNaN(scheduled.getTime()) || scheduled <= from ? null : scheduled.toISOString()
+  }
+  if (task.triggerType === 'interval') {
+    const unitMs = { minutes: 60_000, hours: 3_600_000, days: 86_400_000 }[config.unit] || 3_600_000
+    const intervalMs = Math.max(1, Number(config.value) || 1) * unitMs
+    const previous = task.lastRunAt ? new Date(task.lastRunAt).getTime() : null
+    const next = previous && previous > from.getTime() - intervalMs ? previous + intervalMs : from.getTime() + intervalMs
+    return new Date(next).toISOString()
+  }
+  const { hour, minute } = parseTime(config.time)
+  const cursor = new Date(from)
+  cursor.setSeconds(0, 0)
+  cursor.setMinutes(cursor.getMinutes() + 1)
+  for (let i = 0; i < 366 * 24 * 60; i += 1) {
+    const dayOfWeek = cursor.getDay()
+    const dayOfMonth = cursor.getDate()
+    const weeklyMatch = task.triggerType !== 'weekly' || (config.weekdays || []).some(day => WEEKDAY_TO_CRON[day] === dayOfWeek)
+    const monthlyMatch = task.triggerType !== 'monthly' || dayOfMonth === Math.min(31, Math.max(1, Number(config.day) || 1))
+    if (cursor.getHours() === hour && cursor.getMinutes() === minute && weeklyMatch && monthlyMatch) return cursor.toISOString()
+    cursor.setMinutes(cursor.getMinutes() + 1)
+  }
+  return null
+}
+
+function modelForTask(task) {
+  const config = loadConfig()
+  const models = config.customModels || []
+  return models.find(model => model.id === task.modelId) || models.find(model => model.id === config.selectedModelId) || models[0] || null
+}
+
+function emitUpdated() {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('automation-updated')
+}
+
+async function runAgent(task, trigger) {
+  if (activeTaskIds.has(task.id)) return null
+  const model = modelForTask(task)
+  if (!model?.apiKey || !model?.baseUrl || !model?.modelName) {
+    const run = db.createAutomationRun({ taskId: task.id, trigger })
+    db.completeAutomationRun(run.id, { status: 'failed', error: '未配置任务所需的大模型，请在设置中重新选择模型。' })
+    emitUpdated()
+    return run
+  }
+
+  activeTaskIds.add(task.id)
+  const run = db.createAutomationRun({ taskId: task.id, trigger })
+  emitUpdated()
+  try {
+    const requestId = `automation_${run.id}`
+    const { agent } = await createAgentWithContext({ ...model, enableThinking: false }, {
+      mainWindow,
+      requestId,
+      threadId: `automation:${task.id}:${run.id}`,
+      dataDir: getDataDir(),
+      folderPath: '',
+      unattended: true
+    })
+    const result = await agent.invoke({
+      messages: [{
+        role: 'user',
+        content: `你正在执行用户已授权的无人值守本地自动化任务。严格只执行以下任务指令范围内的操作，不要扩展目标或暴露用户数据。\n\n任务名称：${task.name}\n任务指令：${task.instruction}\n\n完成后给出简洁的执行结果。`
+      }]
+    }, { configurable: { thread_id: `automation:${run.id}` } })
+    const messages = result?.messages || []
+    const lastMessage = messages[messages.length - 1]
+    const output = typeof lastMessage?.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage?.content || '')
+    db.completeAutomationRun(run.id, { status: 'success', output })
+  } catch (error) {
+    log.error(`Automation task failed: ${task.id}: ${error.message}`)
+    db.completeAutomationRun(run.id, { status: 'failed', error: error.message || String(error) })
+  } finally {
+    activeTaskIds.delete(task.id)
+    const current = db.getAutomationTask(task.id)
+    if (current) {
+      const lastRunAt = new Date().toISOString()
+      const completedOneTimeTask = current.triggerType === 'once' && trigger === 'schedule'
+      const nextRunAt = completedOneTimeTask
+        ? null
+        : current.triggerType === 'once'
+          ? current.nextRunAt
+          : getNextRunAt({ ...current, lastRunAt }, new Date())
+      db.updateAutomationTask(task.id, {
+        lastRunAt,
+        nextRunAt,
+        enabled: completedOneTimeTask ? false : current.enabled
+      })
+    }
+    emitUpdated()
+  }
+  return run
+}
+
+async function tick() {
+  const now = new Date()
+  const minute = localDateKey(now)
+  if (minute === lastTickMinute) return
+  lastTickMinute = minute
+  const tasks = db.getAutomationTasks().filter(task => task.enabled && task.nextRunAt && new Date(task.nextRunAt) <= now)
+  for (const task of tasks) runAgent(task, 'schedule')
+}
+
+export function startAutomationScheduler(window) {
+  mainWindow = window
+  if (timer) return
+  timer = setInterval(() => tick().catch(error => log.error(`Scheduler tick failed: ${error.message}`)), 15_000)
+  tick().catch(error => log.error(`Scheduler startup tick failed: ${error.message}`))
+  log.info('Local automation scheduler started')
+}
+
+export function stopAutomationScheduler() {
+  if (timer) clearInterval(timer)
+  timer = null
+  mainWindow = null
+}
+
+export function createAutomationTask(args) {
+  const triggerConfig = args.triggerConfig || {}
+  const task = db.createAutomationTask({
+    ...args,
+    triggerConfig,
+    cronExpression: buildCronExpression(args.triggerType, triggerConfig)
+  })
+  const nextRunAt = getNextRunAt(task)
+  const saved = db.updateAutomationTask(task.id, { nextRunAt })
+  emitUpdated()
+  return saved
+}
+
+export function updateAutomationTask(taskId, args) {
+  const existing = db.getAutomationTask(taskId)
+  if (!existing) return null
+  const merged = { ...existing, ...args, triggerConfig: args.triggerConfig || existing.triggerConfig }
+  const cronExpression = buildCronExpression(merged.triggerType, merged.triggerConfig)
+  const nextRunAt = merged.enabled === false ? null : getNextRunAt(merged)
+  const saved = db.updateAutomationTask(taskId, { ...args, cronExpression, nextRunAt })
+  emitUpdated()
+  return saved
+}
+
+export async function runAutomationTaskNow(taskId) {
+  const task = db.getAutomationTask(taskId)
+  if (!task) throw new Error('自动化任务不存在')
+  return runAgent(task, 'manual')
+}

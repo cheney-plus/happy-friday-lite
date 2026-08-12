@@ -12,6 +12,7 @@ import { initPythonEnv } from './src-electron/python-env.js'
 import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
+import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -133,6 +134,8 @@ app.whenReady().then(async () => {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
   }
 
+  startAutomationScheduler(mainWindow)
+
   // 3. 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
   try {
     kbWatcherHandle = startKnowledgeWatcher(mainWindow, dataDir)
@@ -198,6 +201,7 @@ app.on('window-all-closed', function () {
     powerBlockerId = null
   }
   stopShareServer()
+  stopAutomationScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()

@@ -65,7 +65,8 @@
     "schedule": "Daily at 20:00",
     "more": "More actions",
     "runNow": "Run now",
-    "enableTask": "Enable task"
+    "enableTask": "Enable task",
+    "delete": "Delete task"
   },
   "templates": {
     "aiNews": {
@@ -116,6 +117,17 @@
   "groups": {
     "today": "Today"
   },
+  "history": {
+    "manual": "Manual trigger",
+    "scheduled": "Scheduled trigger"
+  },
+  "schedule": {
+    "daily": "Daily at {time}",
+    "weekly": "Weekly at {time}",
+    "monthly": "Monthly on day {day} at {time}",
+    "interval": "Every {value} {unit}",
+    "once": "One time {time}"
+  },
   "sample": {
     "taskName": "Send email",
     "workspace": "Work",
@@ -124,6 +136,8 @@
     "duration": "51s"
   },
   "empty": {
-    "configured": "No automation tasks configured yet"
+    "configured": "No automation tasks configured yet",
+    "history": "No runs yet",
+    "deletedTask": "Deleted task"
   }
 }

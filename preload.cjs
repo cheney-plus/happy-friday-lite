@@ -99,6 +99,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'usage-get-stats',
       'usage-clear',
       'model-query-balance',
+      'automation-list-tasks',
+      'automation-list-runs',
+      'automation-create-task',
+      'automation-update-task',
+      'automation-delete-task',
+      'automation-run-task',
       'agent-invoke',
       'agent-stop',
       'agent-tool-approval-resume',
@@ -157,6 +163,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-tool-call',
       'agent-tool-result',
       'agent-tool-approval',
+      'automation-updated',
       'kb-directory-changed'
     ]
     if (validChannels.includes(channel)) {

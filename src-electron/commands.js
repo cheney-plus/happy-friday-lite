@@ -25,6 +25,11 @@ import { queryBalance } from './balance.js'
 import { registerAgentCommands } from './agent/ipc.js'
 import { getLogDir, setLoggingEnabled } from './logger.js'
 import { getShareUrl, getNoteShareUrl } from './shareServer.js'
+import {
+  createAutomationTask,
+  updateAutomationTask,
+  runAutomationTaskNow
+} from './automation.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -1338,6 +1343,28 @@ export function registerCommands(mainWindow) {
       console.error('[IPC] model-query-balance 错误:', e)
       return { success: false, error: e.message, data: null }
     }
+  })
+
+  // ========== Local DeepAgent automation ==========
+  ipcMain.handle('automation-list-tasks', () => db.getAutomationTasks())
+  ipcMain.handle('automation-list-runs', (_event, filters) => db.getAutomationRuns(filters || {}))
+  ipcMain.handle('automation-create-task', (_event, args) => createAutomationTask(args || {}))
+  ipcMain.handle('automation-update-task', (_event, args) => {
+    if (!args?.taskId) throw new Error('缺少任务 ID')
+    return updateAutomationTask(args.taskId, args)
+  })
+  ipcMain.handle('automation-delete-task', (_event, args) => {
+    if (!args?.taskId) throw new Error('缺少任务 ID')
+    db.deleteAutomationTask(args.taskId)
+    return { ok: true }
+  })
+  ipcMain.handle('automation-run-task', async (_event, args) => {
+    if (!args?.taskId) throw new Error('缺少任务 ID')
+    if (!db.getAutomationTask(args.taskId)) throw new Error('自动化任务不存在')
+    runAutomationTaskNow(args.taskId).catch(error => {
+      console.error('[Automation] 手动执行任务失败:', error)
+    })
+    return { ok: true }
   })
 
   // ========== Agent 智能体相关命令 ==========
