@@ -15,6 +15,8 @@
     "triggerTime": "触发时间",
     "triggerType": "触发类型",
     "selectTime": "选择时间",
+    "selectModel": "选择模型",
+    "noModel": "暂无可用模型，请先在设置中添加模型。",
     "hour": "时",
     "minute": "分",
     "selectDateTime": "选择日期和时间",

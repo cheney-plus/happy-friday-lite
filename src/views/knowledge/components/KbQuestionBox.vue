@@ -395,11 +395,13 @@ const handleSend = () => {
 
 onMounted(() => {
   document.addEventListener('scroll', handleDocumentScroll, true);
+  document.addEventListener('click', closeAllDropdowns);
   loadCustomModels();
 });
 
 onUnmounted(() => {
   document.removeEventListener('scroll', handleDocumentScroll, true);
+  document.removeEventListener('click', closeAllDropdowns);
 });
 
 onActivated(() => {

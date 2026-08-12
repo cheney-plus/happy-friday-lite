@@ -246,9 +246,12 @@
                     </div>
                   </Transition>
                 </div>
-                <label v-if="triggerType === 'daily'" class="time-field">
-                  <input v-model="triggerTime" type="time" :aria-label="t('automation.createModal.selectTime')" @click="openNativePicker" />
-                </label>
+                <div v-if="triggerType === 'daily'" class="time-field custom-dropdown" @click.stop>
+                  <button class="compact-time-trigger" type="button" @click.stop="toggleTimeMenu">
+                    <span>{{ triggerTime }}</span><ChevronDown :size="14" :class="{ expanded: showTimeMenu }" />
+                  </button>
+                  <Transition name="dropdown-menu"><div v-if="showTimeMenu" class="compact-time-menu"><div><span>{{ t('automation.createModal.hour') }}</span><button v-for="hour in timeHours" :key="hour" type="button" :class="{ active: selectedHour === hour }" @click="selectTimePart('hour', hour)">{{ hour }}</button></div><div><span>{{ t('automation.createModal.minute') }}</span><button v-for="minute in timeMinutes" :key="minute" type="button" :class="{ active: selectedMinute === minute }" @click="selectTimePart('minute', minute)">{{ minute }}</button></div></div></Transition>
+                </div>
 
                 <template v-else-if="triggerType === 'monthly'">
                   <div class="form-select custom-dropdown" @click.stop>
@@ -270,11 +273,11 @@
                       </div>
                     </Transition>
                   </div>
-                  <label class="time-field"><input v-model="triggerTime" type="time" :aria-label="t('automation.createModal.selectTime')" @click="openNativePicker" /></label>
+                  <div class="time-field custom-dropdown" @click.stop><button class="compact-time-trigger" type="button" @click.stop="toggleTimeMenu"><span>{{ triggerTime }}</span><ChevronDown :size="14" :class="{ expanded: showTimeMenu }" /></button><Transition name="dropdown-menu"><div v-if="showTimeMenu" class="compact-time-menu"><div><span>{{ t('automation.createModal.hour') }}</span><button v-for="hour in timeHours" :key="hour" type="button" :class="{ active: selectedHour === hour }" @click="selectTimePart('hour', hour)">{{ hour }}</button></div><div><span>{{ t('automation.createModal.minute') }}</span><button v-for="minute in timeMinutes" :key="minute" type="button" :class="{ active: selectedMinute === minute }" @click="selectTimePart('minute', minute)">{{ minute }}</button></div></div></Transition></div>
                 </template>
 
                 <template v-else-if="triggerType === 'weekly'">
-                  <label class="time-field"><input v-model="triggerTime" type="time" :aria-label="t('automation.createModal.selectTime')" @click="openNativePicker" /></label>
+                  <div class="time-field custom-dropdown" @click.stop><button class="compact-time-trigger" type="button" @click.stop="toggleTimeMenu"><span>{{ triggerTime }}</span><ChevronDown :size="14" :class="{ expanded: showTimeMenu }" /></button><Transition name="dropdown-menu"><div v-if="showTimeMenu" class="compact-time-menu"><div><span>{{ t('automation.createModal.hour') }}</span><button v-for="hour in timeHours" :key="hour" type="button" :class="{ active: selectedHour === hour }" @click="selectTimePart('hour', hour)">{{ hour }}</button></div><div><span>{{ t('automation.createModal.minute') }}</span><button v-for="minute in timeMinutes" :key="minute" type="button" :class="{ active: selectedMinute === minute }" @click="selectTimePart('minute', minute)">{{ minute }}</button></div></div></Transition></div>
                   <div class="weekday-picker" :aria-label="t('automation.createModal.weekdays')">
                     <button
                       v-for="day in weekdayOptions"
@@ -332,23 +335,27 @@
                   maxlength="2000"
                 ></textarea>
                 <div class="editor-toolbar">
-                  <div class="mode-select custom-dropdown" @click.stop>
-                    <button class="dropdown-trigger" type="button" @click.stop="toggleModeMenu">
-                      <span>{{ currentModeLabel }}</span>
-                      <ChevronDown :size="14" :stroke-width="2" :class="{ expanded: showModeMenu }" />
+                  <div class="automation-model-select custom-dropdown" @click.stop>
+                    <button class="automation-model-trigger" type="button" @click.stop="toggleModelMenu">
+                      <img v-if="selectedModel" :src="selectedModel.icon" class="automation-model-icon" alt="" />
+                      <Globe2 v-else :size="15" :stroke-width="1.8" />
+                      <span>{{ currentModelName }}</span>
+                      <ChevronDown :size="13" :stroke-width="2" :class="{ expanded: showModelMenu }" />
                     </button>
                     <Transition name="dropdown-menu">
-                      <div v-if="showModeMenu" class="dropdown-menu more-menu mode-menu">
+                      <div v-if="showModelMenu" class="automation-model-menu">
                         <button
-                          v-for="option in modeOptions"
-                          :key="option.value"
+                          v-for="model in modelList"
+                          :key="model.id"
                           type="button"
-                          :class="['menu-item', { active: executionMode === option.value }]"
-                          @click="selectMode(option.value)"
+                          :class="['automation-model-item', { active: selectedModelId === model.id }]"
+                          @click="selectModel(model.id)"
                         >
-                          <span>{{ option.label }}</span>
-                          <Check v-if="executionMode === option.value" :size="13" :stroke-width="2.3" />
+                          <img :src="model.icon" class="automation-model-icon" alt="" />
+                          <span>{{ model.name }}</span>
+                          <Check v-if="selectedModelId === model.id" :size="15" :stroke-width="2.3" />
                         </button>
+                        <p v-if="modelList.length === 0" class="automation-model-empty">{{ t('automation.createModal.noModel') }}</p>
                       </div>
                     </Transition>
                   </div>
@@ -372,7 +379,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import {
@@ -385,6 +392,7 @@ import {
   Ellipsis,
   FilePlus2,
   Glasses,
+  Globe2,
   Info,
   LineChart,
   MessageCirclePlus,
@@ -404,6 +412,8 @@ const getCurrentLocalDateTime = () => {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 };
 
+const getCurrentLocalTime = () => getCurrentLocalDateTime().slice(11);
+
 const activeTab = ref('history');
 const statusFilter = ref('success');
 const taskFilter = ref('all');
@@ -416,23 +426,28 @@ const manualCreateVisible = ref(false);
 const taskNameInput = ref(null);
 const taskName = ref('');
 const triggerType = ref('daily');
-const triggerTime = ref('');
+const triggerTime = ref(getCurrentLocalTime());
+const showTimeMenu = ref(false);
 const monthlyDay = ref(1);
 const weeklyDays = ref(['mon']);
 const intervalValue = ref(1);
 const intervalUnit = ref('hours');
 const onceDateTime = ref(getCurrentLocalDateTime());
 const taskInstruction = ref('');
-const executionMode = ref('auto');
+const selectedModelId = ref('');
+const customModels = ref([]);
 const showTriggerMenu = ref(false);
 const showMonthlyDayMenu = ref(false);
 const showIntervalUnitMenu = ref(false);
-const showModeMenu = ref(false);
+const showModelMenu = ref(false);
 const showStatusMenu = ref(false);
 const showTaskMenu = ref(false);
 const showDateMenu = ref(false);
 const selectedRunId = ref('sample-run');
 let toastTimer = null;
+
+const timeHours = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
+const timeMinutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
 
 const tabs = computed(() => [
   { key: 'configured', label: t('automation.tabs.configured') },
@@ -470,10 +485,23 @@ const taskOptions = computed(() => [
   { value: 'sendEmail', label: t('automation.sample.taskName') }
 ]);
 
-const modeOptions = computed(() => [
-  { value: 'auto', label: t('automation.createModal.autoMode') },
-  { value: 'focused', label: t('automation.createModal.focusedMode') }
-]);
+const providerIcons = {
+  doubao: new URL('@/assets/images/豆包.png', import.meta.url).href,
+  qwen: new URL('@/assets/images/千问.png', import.meta.url).href,
+  zhipu: new URL('@/assets/images/智谱logo.png', import.meta.url).href,
+  deepseek: new URL('@/assets/images/deepseek.png', import.meta.url).href,
+  kimi: new URL('@/assets/images/kimi-icon.png', import.meta.url).href,
+  minimax: new URL('@/assets/images/MiniMax.png', import.meta.url).href,
+  other: new URL('@/assets/images/其他模型.png', import.meta.url).href
+};
+
+const modelList = computed(() => customModels.value.map(model => ({
+  id: model.id,
+  name: `${model.providerLabel} ${model.modelName}`,
+  icon: providerIcons[model.provider] || providerIcons.other
+})));
+
+const selectedModel = computed(() => modelList.value.find(model => model.id === selectedModelId.value));
 
 const weekdayOptions = computed(() => [
   { value: 'mon', label: t('automation.createModal.weekdaysShort.mon') },
@@ -496,9 +524,11 @@ const currentTriggerLabel = computed(() => (
   triggerOptions.value.find(option => option.value === triggerType.value)?.label || ''
 ));
 
-const currentModeLabel = computed(() => (
-  modeOptions.value.find(option => option.value === executionMode.value)?.label || ''
-));
+const currentModelName = computed(() => selectedModel.value?.name || t('automation.createModal.selectModel'));
+
+const selectedHour = computed(() => triggerTime.value.split(':')[0]);
+const selectedMinute = computed(() => triggerTime.value.split(':')[1]);
+
 
 const currentIntervalUnitLabel = computed(() => (
   intervalUnitOptions.value.find(option => option.value === intervalUnit.value)?.label || ''
@@ -530,11 +560,22 @@ const canCreateTask = computed(() => (
   && taskInstruction.value.trim().length > 0
 ));
 
-const openNativePicker = (event) => {
-  event.currentTarget.showPicker?.();
+const toggleTimeMenu = () => {
+  showTimeMenu.value = !showTimeMenu.value;
+  showTriggerMenu.value = false;
+  showMonthlyDayMenu.value = false;
+  showIntervalUnitMenu.value = false;
+  showModelMenu.value = false;
+};
+
+const selectTimePart = (part, value) => {
+  const [hour, minute] = triggerTime.value.split(':');
+  triggerTime.value = part === 'hour' ? `${value}:${minute}` : `${hour}:${value}`;
 };
 
 const openManualCreate = () => {
+  triggerTime.value = getCurrentLocalTime();
+  onceDateTime.value = getCurrentLocalDateTime();
   manualCreateVisible.value = true;
   nextTick(() => taskNameInput.value?.focus());
 };
@@ -542,42 +583,48 @@ const openManualCreate = () => {
 const closeManualCreate = () => {
   manualCreateVisible.value = false;
   showTriggerMenu.value = false;
+  showTimeMenu.value = false;
   showMonthlyDayMenu.value = false;
   showIntervalUnitMenu.value = false;
-  showModeMenu.value = false;
+  showModelMenu.value = false;
 };
 
 const closeDropdowns = () => {
   showTriggerMenu.value = false;
+  showTimeMenu.value = false;
   showMonthlyDayMenu.value = false;
   showIntervalUnitMenu.value = false;
-  showModeMenu.value = false;
+  showModelMenu.value = false;
 };
 
 const toggleTriggerMenu = () => {
   showTriggerMenu.value = !showTriggerMenu.value;
+  showTimeMenu.value = false;
   showMonthlyDayMenu.value = false;
   showIntervalUnitMenu.value = false;
-  showModeMenu.value = false;
+  showModelMenu.value = false;
 };
 
 const toggleMonthlyDayMenu = () => {
   showMonthlyDayMenu.value = !showMonthlyDayMenu.value;
   showTriggerMenu.value = false;
+  showTimeMenu.value = false;
   showIntervalUnitMenu.value = false;
-  showModeMenu.value = false;
+  showModelMenu.value = false;
 };
 
 const toggleIntervalUnitMenu = () => {
   showIntervalUnitMenu.value = !showIntervalUnitMenu.value;
   showTriggerMenu.value = false;
+  showTimeMenu.value = false;
   showMonthlyDayMenu.value = false;
-  showModeMenu.value = false;
+  showModelMenu.value = false;
 };
 
-const toggleModeMenu = () => {
-  showModeMenu.value = !showModeMenu.value;
+const toggleModelMenu = () => {
+  showModelMenu.value = !showModelMenu.value;
   showTriggerMenu.value = false;
+  showTimeMenu.value = false;
   showMonthlyDayMenu.value = false;
   showIntervalUnitMenu.value = false;
 };
@@ -585,6 +632,7 @@ const toggleModeMenu = () => {
 const selectTrigger = (value) => {
   triggerType.value = value;
   showTriggerMenu.value = false;
+  showTimeMenu.value = false;
   showMonthlyDayMenu.value = false;
   showIntervalUnitMenu.value = false;
 };
@@ -605,9 +653,10 @@ const selectIntervalUnit = (unit) => {
   showIntervalUnitMenu.value = false;
 };
 
-const selectMode = (value) => {
-  executionMode.value = value;
-  showModeMenu.value = false;
+const selectModel = (modelId) => {
+  selectedModelId.value = modelId;
+  localStorage.setItem('happy-friday-selected-model', modelId);
+  showModelMenu.value = false;
 };
 
 const closePageDropdowns = () => {
@@ -677,6 +726,18 @@ const showComingSoon = () => {
 };
 
 onBeforeUnmount(() => window.clearTimeout(toastTimer));
+
+onMounted(() => {
+  try {
+    customModels.value = JSON.parse(localStorage.getItem('happy-friday-custom-models') || '[]');
+    const savedModelId = localStorage.getItem('happy-friday-selected-model');
+    selectedModelId.value = customModels.value.some(model => model.id === savedModelId)
+      ? savedModelId
+      : (customModels.value[0]?.id || '');
+  } catch {
+    customModels.value = [];
+  }
+});
 </script>
 
 <style scoped>
@@ -1427,17 +1488,20 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 .form-select,
 .time-field,
 .datetime-field,
-.mode-select {
+.automation-model-select {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.time-field input {
+.compact-time-trigger {
   width: 100%;
   height: 100%;
   padding: 0 12px;
   border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   outline: 0;
   background: transparent;
   color: var(--text-primary);
@@ -1446,9 +1510,82 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
   cursor: pointer;
 }
 
-.time-field input::-webkit-calendar-picker-indicator {
-  margin-left: 8px;
+.compact-time-trigger svg {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  transition: transform 0.18s ease;
+}
+
+.compact-time-trigger svg.expanded {
+  transform: rotate(180deg);
+}
+
+.compact-time-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 154px;
+  padding: 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  background: var(--bg-primary);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.compact-time-menu > div {
+  max-height: 170px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--border-color) 65%, transparent) transparent;
+}
+
+.compact-time-menu > div > span {
+  padding: 1px 4px 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.compact-time-menu > div::-webkit-scrollbar {
+  width: 1px;
+}
+
+.compact-time-menu > div::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.compact-time-menu > div::-webkit-scrollbar-thumb {
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--border-color) 65%, transparent);
+}
+
+.compact-time-menu button {
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
+}
+
+.compact-time-menu button:hover,
+.compact-time-menu button.active {
+  background: var(--bg-hover);
+}
+
+.compact-time-menu button.active {
+  background: var(--text-primary);
+  color: var(--bg-primary);
 }
 
 .datetime-field {
@@ -1646,14 +1783,6 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
   color: var(--text-primary);
 }
 
-.mode-menu {
-  top: auto !important;
-  right: 0;
-  bottom: calc(100% + 6px);
-  left: auto !important;
-  min-width: 138px !important;
-}
-
 .dropdown-menu-enter-active,
 .dropdown-menu-leave-active {
   transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1664,16 +1793,6 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 .dropdown-menu-leave-to {
   opacity: 0;
   transform: translateY(-4px) scale(0.96);
-}
-
-.mode-select .dropdown-menu-enter-active,
-.mode-select .dropdown-menu-leave-active {
-  transform-origin: bottom;
-}
-
-.mode-select .dropdown-menu-enter-from,
-.mode-select .dropdown-menu-leave-to {
-  transform: translateY(4px) scale(0.96);
 }
 
 .instruction-label {
@@ -1713,25 +1832,114 @@ onBeforeUnmount(() => window.clearTimeout(toastTimer));
 .editor-toolbar {
   height: 42px;
   padding: 5px 8px;
-  border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: flex-end;
 }
 
-.mode-select {
-  width: 112px;
+.automation-model-select {
+  position: relative;
+}
+
+.automation-model-trigger {
   height: 30px;
+  max-width: 210px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-}
-
-.mode-select:hover {
-  background: var(--bg-hover);
-}
-
-.mode-select .dropdown-trigger {
-  padding: 0 8px 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
   font-size: 12.5px;
+  cursor: pointer;
+}
+
+.automation-model-trigger:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-tertiary);
+}
+
+.automation-model-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-model-trigger > svg:last-child {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.automation-model-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.automation-model-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 1010;
+  width: 250px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.automation-model-item {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.automation-model-item:hover,
+.automation-model-item.active {
+  background: var(--bg-secondary);
+}
+
+.automation-model-item.active {
+  color: #059669;
+}
+
+.automation-model-item span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-model-item svg {
+  flex: 0 0 auto;
+}
+
+.automation-model-empty {
+  padding: 12px 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .modal-footer {
