@@ -130,9 +130,6 @@
               </div>
               <svg v-if="modelSettings.modelId === model.id" class="model-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            <div v-if="modelList.length === 0" class="model-empty">
-              <span>暂无可用模型，请先在设置中配置</span>
-            </div>
           </div>
         </div>
       </div>
@@ -258,23 +255,10 @@ const SELECTED_MODEL_KEY = 'happy-friday-selected-model';
 const loadCustomModels = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      customModels.value = JSON.parse(stored);
-    }
+    customModels.value = stored ? JSON.parse(stored) : [];
     const selectedId = localStorage.getItem(SELECTED_MODEL_KEY);
-    if (selectedId) {
-      if (customModels.value.find(m => m.id === selectedId)) {
-        modelSettings.value.modelId = selectedId;
-      } else if (customModels.value.length > 0) {
-        modelSettings.value.modelId = customModels.value[0].id;
-      } else {
-        modelSettings.value.modelId = '';
-      }
-    } else if (customModels.value.length > 0) {
-      modelSettings.value.modelId = customModels.value[0].id;
-    } else {
-      modelSettings.value.modelId = '';
-    }
+    const exists = customModels.value.some(m => m.id === selectedId);
+    modelSettings.value.modelId = exists ? selectedId : (customModels.value[0]?.id || '');
   } catch (error) {
     console.error('Failed to load custom models:', error);
   }
@@ -317,7 +301,7 @@ const toggleModeDropdown = (event) => {
   showModeDropdown.value = !showModeDropdown.value;
   showModelDropdown.value = false;
   if (showModeDropdown.value) {
-    modeDropdownStyle.value = computeDropdownStyle(rect, 140);
+    modeDropdownStyle.value = computeDropdownStyle(rect);
   }
 };
 
@@ -327,30 +311,16 @@ const toggleModelDropdown = (event) => {
   showModelDropdown.value = !showModelDropdown.value;
   showModeDropdown.value = false;
   if (showModelDropdown.value) {
-    modelDropdownStyle.value = computeDropdownStyle(rect, 360);
+    modelDropdownStyle.value = computeDropdownStyle(rect);
   }
 };
 
-// 计算下拉位置：下方空间不足时向上弹出
-function computeDropdownStyle(rect, estimatedHeight) {
+// 所有输入框下拉菜单均锚定在触发按钮上方。
+function computeDropdownStyle(rect) {
   const gap = 8;
-  const spaceBelow = window.innerHeight - rect.bottom;
-  const spaceAbove = rect.top;
-  const needHeight = estimatedHeight + gap;
-
-  if (spaceBelow < needHeight && spaceAbove > spaceBelow) {
-    // 向上弹出
-    return {
-      position: 'fixed',
-      bottom: (window.innerHeight - rect.top + gap) + 'px',
-      left: rect.left + 'px',
-      zIndex: '9999'
-    };
-  }
-  // 默认向下弹出
   return {
     position: 'fixed',
-    top: rect.bottom + gap + 'px',
+    bottom: (window.innerHeight - rect.top + gap) + 'px',
     left: rect.left + 'px',
     zIndex: '9999'
   };
@@ -364,12 +334,18 @@ const selectMode = (mode) => {
 const selectModel = (modelId) => {
   modelSettings.value.modelId = modelId;
   localStorage.setItem(SELECTED_MODEL_KEY, modelId);
-  showModelDropdown.value = false;
 };
 
 const closeAllDropdowns = () => {
   showModeDropdown.value = false;
   showModelDropdown.value = false;
+};
+
+const handleDocumentScroll = (event) => {
+  if (event.target instanceof Element && event.target.closest('.dropdown-overlay')) {
+    return;
+  }
+  closeAllDropdowns();
 };
 
 const autoResize = () => {
@@ -418,12 +394,12 @@ const handleSend = () => {
 };
 
 onMounted(() => {
-  document.addEventListener('scroll', closeAllDropdowns, true);
+  document.addEventListener('scroll', handleDocumentScroll, true);
   loadCustomModels();
 });
 
 onUnmounted(() => {
-  document.removeEventListener('scroll', closeAllDropdowns, true);
+  document.removeEventListener('scroll', handleDocumentScroll, true);
 });
 
 onActivated(() => {
@@ -687,46 +663,45 @@ onActivated(() => {
 }
 
 .model-dropdown {
-  min-width: 320px;
-  padding: 16px;
+  min-width: 280px;
+  padding: 10px;
 }
 
 .model-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 14px;
+  padding-bottom: 9px;
 }
 
 .model-think-row {
-  padding-top: 0;
-  padding-bottom: 14px;
+  padding-bottom: 9px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .model-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-primary);
 }
 
 .think-tabs {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   background: var(--bg-secondary);
-  border-radius: 10px;
-  padding: 3px;
+  border-radius: 7px;
+  padding: 2px;
 }
 
 .think-tab {
-  padding: 5px 14px;
+  padding: 4px 10px;
   border: none;
   background: transparent;
-  border-radius: 8px;
-  font-size: 12.5px;
+  border-radius: 5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -744,17 +719,29 @@ onActivated(() => {
 }
 
 .model-model-list {
-  margin-top: 12px;
+  margin-top: 8px;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
 }
+
+.model-model-list::-webkit-scrollbar { width: 2px; }
+.model-model-list::-webkit-scrollbar-track { background: transparent; }
+.model-model-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+.model-model-list::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 
 .model-item {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  border-radius: 12px;
+  box-sizing: border-box;
+  min-height: 42px;
+  padding: 7px 8px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.12s ease;
-  gap: 10px;
+  gap: 8px;
 }
 
 .model-item:hover {
@@ -766,9 +753,9 @@ onActivated(() => {
 }
 
 .model-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -776,20 +763,20 @@ onActivated(() => {
 .model-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   flex: 1;
   min-width: 0;
 }
 
 .model-name {
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
 .model-embedding-name {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
@@ -804,10 +791,4 @@ onActivated(() => {
   flex-shrink: 0;
 }
 
-.model-empty {
-  padding: 16px 12px;
-  font-size: 13px;
-  color: var(--text-tertiary);
-  text-align: center;
-}
 </style>

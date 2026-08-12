@@ -164,17 +164,6 @@
 
           <div v-if="showModelDropdown" class="dropdown-overlay" :style="modelDropdownStyle" @click.stop>
             <div class="dropdown-panel model-dropdown">
-              <div class="model-row model-toggle-row">
-                <span class="model-label">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  {{ t('friday.webSearch') }}
-                </span>
-                <label class="toggle-switch">
-                  <input type="checkbox" v-model="modelSettings.webSearch">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-
               <div class="model-row model-think-row">
                 <span class="model-label">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -392,7 +381,6 @@ const currentModeLabel = computed(() => {
 });
 
 const modelSettings = ref({
-  webSearch: true,
   thinkMode: 'fast',
   modelId: ''
 });
@@ -1530,13 +1518,7 @@ const handleFeatureClick = (id) => {
   padding-bottom: 9px;
 }
 
-.model-toggle-row {
-  padding-bottom: 9px;
-  border-bottom: 1px solid var(--border-color);
-}
-
 .model-think-row {
-  padding-top: 9px;
   padding-bottom: 9px;
   border-bottom: 1px solid var(--border-color);
 }
@@ -1548,49 +1530,6 @@ const handleFeatureClick = (id) => {
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text-primary);
-}
-
-.toggle-switch {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: var(--text-tertiary);
-  border-radius: 24px;
-  transition: 0.25s ease;
-}
-
-.toggle-slider::before {
-  content: '';
-  position: absolute;
-  height: 14px;
-  width: 14px;
-  left: 3px;
-  bottom: 3px;
-  background: white;
-  border-radius: 50%;
-  transition: 0.25s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background-color: #10b981;
-}
-
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(16px);
 }
 
 .think-tabs {
