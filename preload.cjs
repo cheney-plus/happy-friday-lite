@@ -104,6 +104,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'automation-create-task',
       'automation-update-task',
       'automation-delete-task',
+      'automation-delete-run',
       'automation-run-task',
       'agent-invoke',
       'agent-stop',

@@ -544,8 +544,8 @@ const deleteTask = async (taskId) => {
 };
 
 const deleteRun = async (run) => {
-  const result = await electronService.invoke('automation-delete-run', { runId: run.id });
-  if (result?.ok) await loadRuns();
+  await electronService.invoke('automation-delete-run', { runId: run.id });
+  await loadRuns();
 };
 
 const openTemplates = () => {
@@ -1132,15 +1132,22 @@ onMounted(() => {
 
 .run-item {
   display: flex;
-  margin-top: 18px;
-  padding: 6px 10px;
+  margin-top: 8px;
+  padding: 9px 10px 9px 8px;
   border-radius: 8px;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .run-item:hover {
   background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.run-item.selected {
+  background: var(--bg-secondary);
+  border-color: var(--text-tertiary);
 }
 
 .run-item:focus-visible {
@@ -1149,7 +1156,7 @@ onMounted(() => {
 }
 
 .status-track {
-  width: 24px;
+  width: 22px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1157,8 +1164,8 @@ onMounted(() => {
 }
 
 .success-dot {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1167,25 +1174,45 @@ onMounted(() => {
   color: #fff;
 }
 
+.success-dot.is-failed {
+  background: #d9544d;
+}
+
+.success-dot.is-running {
+  background: #4f8fca;
+}
+
+.success-dot.is-running span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff;
+  animation: automation-running-pulse 1.3s ease-in-out infinite;
+}
+
 .track-line {
   width: 1px;
-  height: 44px;
-  margin-top: 8px;
+  height: 24px;
+  margin-top: 5px;
   background: var(--border-color);
+}
+
+.run-item:last-of-type .track-line {
+  opacity: 0;
 }
 
 .run-content {
   min-width: 0;
   flex: 1;
-  padding-left: 8px;
+  padding-left: 6px;
 }
 
 .run-title-row {
-  min-height: 20px;
+  min-height: 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .run-title-row strong {
@@ -1193,7 +1220,7 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -1202,10 +1229,31 @@ onMounted(() => {
   flex: 0 0 28px;
 }
 
+.run-status {
+  flex: 0 0 auto;
+  order: 2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(100, 166, 126, 0.13);
+  color: #3c8056;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.run-status.is-failed {
+  background: rgba(217, 84, 77, 0.12);
+  color: #bf433d;
+}
+
+.run-status.is-running {
+  background: rgba(79, 143, 202, 0.12);
+  color: #3577b2;
+}
+
 .run-more-button {
-  width: 28px;
-  height: 28px;
-  margin: -4px -4px -4px 0;
+  width: 24px;
+  height: 24px;
+  margin: -3px -3px -3px 0;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -1215,6 +1263,18 @@ onMounted(() => {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+}
+
+.run-more-button {
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.run-item:hover .run-more-button,
+.run-item.selected .run-more-button,
+.run-more-button:focus-visible,
+.run-more-actions:focus-within .run-more-button {
+  opacity: 1;
 }
 
 .run-more-button:hover {
@@ -1232,8 +1292,9 @@ onMounted(() => {
   top: calc(100% + 4px);
   right: -4px;
   z-index: 30;
-  min-width: 112px;
-  padding: 4px;
+  min-width: 0;
+  width: max-content;
+  padding: 3px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-primary);
@@ -1242,14 +1303,15 @@ onMounted(() => {
 
 .run-more-menu button {
   width: 100%;
-  min-height: 30px;
-  padding: 6px 8px;
+  min-height: 24px;
+  padding: 3px 6px;
+  white-space: nowrap;
   border: 0;
   border-radius: 4px;
   background: transparent;
   color: #d9544d;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
@@ -1260,10 +1322,31 @@ onMounted(() => {
 
 .run-content p {
   display: flex;
-  gap: 12px;
-  margin-top: 12px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.run-content p i {
+  width: 3px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.run-duration {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes automation-running-pulse {
+  50% { transform: scale(0.55); opacity: 0.55; }
 }
 
 .empty-state {

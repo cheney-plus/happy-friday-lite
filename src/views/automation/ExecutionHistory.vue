@@ -15,16 +15,22 @@
   </section>
   <section class="run-history">
     <h2>{{ t('automation.groups.today') }}</h2>
-    <article v-for="run in runs" :key="run.id" :class="['run-item', { selected: selectedRunId === run.id }]" role="button" tabindex="0" :aria-pressed="selectedRunId === run.id" @click="openRun(run)" @keydown.enter.prevent="openRun(run)" @keydown.space.prevent="openRun(run)">
-      <div class="status-track" aria-hidden="true"><span :class="['success-dot', `is-${run.status}`]"><Check :size="13" :stroke-width="3" /></span><span class="track-line"></span></div>
-      <div class="run-content"><div class="run-title-row"><strong>{{ run.taskName || t('automation.empty.deletedTask') }}</strong><div class="run-more-actions" @click.stop @keydown.stop><button class="run-more-button" type="button" :title="t('automation.configured.more')" :aria-label="t('automation.configured.more')" @click="openRunMenuId = openRunMenuId === run.id ? '' : run.id"><Ellipsis :size="18" :stroke-width="2" /></button><div v-if="openRunMenuId === run.id" class="run-more-menu"><button type="button" @click="deleteRun(run)">{{ t('automation.history.deleteRun') }}</button></div></div></div><p><span>{{ formatTrigger(run.trigger) }}</span><span>{{ formatDateTime(run.startedAt) }} - {{ formatDuration(run.durationMs) }}</span></p></div>
+    <article v-for="run in runs" :key="run.id" :class="['run-item', `is-${run.status}`, { selected: selectedRunId === run.id }]" role="button" tabindex="0" :aria-pressed="selectedRunId === run.id" @click="openRun(run)" @keydown.enter.prevent="openRun(run)" @keydown.space.prevent="openRun(run)">
+      <div class="status-track" aria-hidden="true"><span :class="['success-dot', `is-${run.status}`]"><Check v-if="run.status === 'success'" :size="12" :stroke-width="3" /><span v-else></span></span><span class="track-line"></span></div>
+      <div class="run-content">
+        <div class="run-title-row">
+          <strong>{{ run.taskName || t('automation.empty.deletedTask') }}</strong>
+          <div class="run-more-actions" @click.stop @keydown.stop><button class="run-more-button" type="button" :title="t('automation.configured.more')" :aria-label="t('automation.configured.more')" @click.stop="openRunMenuId = openRunMenuId === run.id ? '' : run.id"><Ellipsis :size="17" :stroke-width="2" /></button><div v-if="openRunMenuId === run.id" class="run-more-menu" @mousedown.stop @click.stop><button type="button" @click.stop.prevent="deleteRun(run)">{{ t('automation.history.deleteRun') }}</button></div></div>
+        </div>
+        <p><span>{{ formatTrigger(run.trigger) }}</span><i aria-hidden="true"></i><span>{{ formatDateTime(run.startedAt) }}</span><span class="run-duration">{{ formatDuration(run.durationMs) }}</span><span :class="['run-status', `is-${run.status}`]">{{ formatStatus(run.status) }}</span></p>
+      </div>
     </article>
     <p v-if="runs.length === 0" class="empty-state">{{ t('automation.empty.history') }}</p>
   </section>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CalendarDays, Check, ChevronDown, Ellipsis } from 'lucide-vue-next';
 
@@ -53,4 +59,9 @@ const deleteRun = (run) => { openRunMenuId.value = ''; if (selectedRunId.value =
 const formatDateTime = (value) => value ? new Intl.DateTimeFormat(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value)) : '-';
 const formatDuration = (durationMs) => durationMs == null ? t('automation.filters.running') : durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
 const formatTrigger = (trigger) => trigger === 'manual' ? t('automation.history.manual') : t('automation.history.scheduled');
+const formatStatus = (status) => t(`automation.filters.${status}`);
+const closeMenus = () => { openMenu.value = ''; openRunMenuId.value = ''; };
+
+onMounted(() => window.addEventListener('click', closeMenus));
+onBeforeUnmount(() => window.removeEventListener('click', closeMenus));
 </script>
