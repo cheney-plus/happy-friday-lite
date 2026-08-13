@@ -15,7 +15,7 @@
   </section>
   <section class="run-history">
     <h2>{{ t('automation.groups.today') }}</h2>
-    <article v-for="run in runs" :key="run.id" :class="['run-item', `is-${run.status}`, { selected: selectedRunId === run.id }]" role="button" tabindex="0" :aria-pressed="selectedRunId === run.id" @click="openRun(run)" @keydown.enter.prevent="openRun(run)" @keydown.space.prevent="openRun(run)">
+    <article v-for="run in runs" :key="run.id" :class="['run-item', `is-${run.status}`]" role="button" tabindex="0" @click="openRun(run)" @keydown.enter.prevent="openRun(run)" @keydown.space.prevent="openRun(run)">
       <div class="status-track" aria-hidden="true"><span :class="['success-dot', `is-${run.status}`]"><Check v-if="run.status === 'success'" :size="12" :stroke-width="3" /><span v-else></span></span><span class="track-line"></span></div>
       <div class="run-content">
         <div class="run-title-row">
@@ -42,7 +42,6 @@ const taskFilter = ref('all');
 const startDate = ref('');
 const endDate = ref('');
 const openMenu = ref('');
-const selectedRunId = ref('');
 const openRunMenuId = ref('');
 const statusOptions = computed(() => [{ value: 'all', label: t('automation.filters.all') }, { value: 'success', label: t('automation.filters.success') }, { value: 'failed', label: t('automation.filters.failed') }, { value: 'running', label: t('automation.filters.running') }]);
 const taskOptions = computed(() => [{ value: 'all', label: t('automation.filters.allExecutionTasks') }, ...props.tasks.map(task => ({ value: task.id, label: task.name }))]);
@@ -54,8 +53,8 @@ const toggle = (menu) => { openMenu.value = openMenu.value === menu ? '' : menu;
 const selectStatus = (value) => { statusFilter.value = value; openMenu.value = ''; loadRuns(); };
 const selectTask = (value) => { taskFilter.value = value; openMenu.value = ''; loadRuns(); };
 const applyDateRange = () => { if (startDate.value > endDate.value) endDate.value = startDate.value; loadRuns(); };
-const openRun = (run) => { selectedRunId.value = run.id; emit('open', run); };
-const deleteRun = (run) => { openRunMenuId.value = ''; if (selectedRunId.value === run.id) selectedRunId.value = ''; emit('delete', run); };
+const openRun = (run) => emit('open', run);
+const deleteRun = (run) => { openRunMenuId.value = ''; emit('delete', run); };
 const formatDateTime = (value) => value ? new Intl.DateTimeFormat(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value)) : '-';
 const formatDuration = (durationMs) => durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
 const formatTrigger = (trigger) => trigger === 'manual' ? t('automation.history.manual') : t('automation.history.scheduled');

@@ -291,6 +291,10 @@ const isThinking = computed(() => {
 });
 
 function goBack() {
+  if (route.query.from === 'automation') {
+    router.back();
+    return;
+  }
   router.push('/friday');
 }
 

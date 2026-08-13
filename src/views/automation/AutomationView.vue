@@ -386,6 +386,14 @@ const toggleTimeMenu = () => {
   showMonthlyDayMenu.value = false;
   showIntervalUnitMenu.value = false;
   showModelMenu.value = false;
+  if (showTimeMenu.value) {
+    nextTick(() => {
+      document.querySelectorAll('.compact-time-menu button.active').forEach((button) => {
+        const column = button.parentElement;
+        if (column) column.scrollTop = button.offsetTop - (column.clientHeight - button.offsetHeight) / 2;
+      });
+    });
+  }
 };
 
 const selectTimePart = (part, value) => {
@@ -530,7 +538,7 @@ const openRun = (run) => {
   router.push({
     name: 'friday-chat',
     params: { sessionId: run.sessionId },
-    query: { mode: 'agent', automationRun: run.id }
+    query: { mode: 'agent', automationRun: run.id, from: 'automation' }
   });
 };
 

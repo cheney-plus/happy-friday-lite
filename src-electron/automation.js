@@ -17,6 +17,7 @@ const WEEKDAY_TO_CRON = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6
 const activeTaskIds = new Set()
 const activeRuns = new Map()
 let timer = null
+let alignmentTimer = null
 let mainWindow = null
 
 function parseTime(time) {
@@ -233,15 +234,22 @@ async function tick() {
 
 export function startAutomationScheduler(window) {
   mainWindow = window
-  if (timer) return
-  timer = setInterval(() => tick().catch(error => log.error(`Scheduler tick failed: ${error.message}`)), 15_000)
+  if (timer || alignmentTimer) return
   tick().catch(error => log.error(`Scheduler startup tick failed: ${error.message}`))
+  const millisecondsToNextQuarter = 15_000 - (Date.now() % 15_000)
+  alignmentTimer = setTimeout(() => {
+    alignmentTimer = null
+    tick().catch(error => log.error(`Scheduler tick failed: ${error.message}`))
+    timer = setInterval(() => tick().catch(error => log.error(`Scheduler tick failed: ${error.message}`)), 15_000)
+  }, millisecondsToNextQuarter)
   log.info('Local automation scheduler started')
 }
 
 export function stopAutomationScheduler() {
   if (timer) clearInterval(timer)
+  if (alignmentTimer) clearTimeout(alignmentTimer)
   timer = null
+  alignmentTimer = null
   mainWindow = null
 }
 
