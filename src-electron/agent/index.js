@@ -95,6 +95,7 @@ export async function createAgent(modelConfig, options = {}) {
     mainWindow: null,
     threadId: null,
     requestId: null,
+    unattended: false,
     logger: createLogger('Tool'),
     emit: () => {} // 占位，运行时覆盖
   }
@@ -222,10 +223,11 @@ export async function createAgentWithContext(modelConfig, runtimeCtx) {
     mainWindow: runtimeCtx.mainWindow,
     threadId: runtimeCtx.threadId,
     requestId: runtimeCtx.requestId,
+    unattended: !!runtimeCtx.unattended,
     // 便捷推送 IPC 事件
-    emit: (event, payload) => {
+    emit: runtimeCtx.emit || ((event, payload) => {
       runtimeCtx.mainWindow?.webContents?.send(event, payload)
-    }
+    })
   })
 
   return { agent, rootDir }

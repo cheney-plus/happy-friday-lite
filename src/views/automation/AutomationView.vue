@@ -44,21 +44,30 @@
         </div>
       </div>
 
-      <article v-for="task in tasks" :key="task.id" class="configured-task">
+      <article
+        v-for="task in tasks"
+        :key="task.id"
+        class="configured-task"
+        role="button"
+        tabindex="0"
+        @click="openTaskEditor(task.id)"
+        @keydown.enter.prevent="openTaskEditor(task.id)"
+        @keydown.space.prevent="openTaskEditor(task.id)"
+      >
         <div class="task-summary">
           <Cloud :size="18" :stroke-width="1.8" class="task-cloud-icon" />
           <strong>{{ task.name }}</strong>
           <span class="task-schedule">{{ formatTaskSchedule(task) }}</span>
         </div>
         <div class="task-actions">
-          <button class="icon-button" type="button" :title="t('automation.configured.delete')" @click="deleteTask(task.id)">
+          <button class="icon-button" type="button" :title="t('automation.configured.delete')" @click.stop="deleteTask(task.id)">
             <X :size="18" :stroke-width="2" />
           </button>
-          <button class="icon-button" type="button" :title="t('automation.configured.runNow')" @click="runTask(task.id)">
+          <button class="icon-button" type="button" :title="t('automation.configured.runNow')" @click.stop="runTask(task.id)">
             <CirclePlay :size="18" :stroke-width="1.8" />
           </button>
           <label class="toggle-switch">
-            <input :checked="task.enabled" type="checkbox" :aria-label="t('automation.configured.enableTask')" @change="setTaskEnabled(task, $event.target.checked)" />
+            <input :checked="task.enabled" type="checkbox" :aria-label="t('automation.configured.enableTask')" @click.stop @change="setTaskEnabled(task, $event.target.checked)" />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -139,9 +148,9 @@
           role="button"
           tabindex="0"
           :aria-pressed="selectedRunId === run.id"
-          @click="selectRun(run.id)"
-          @keydown.enter.prevent="selectRun(run.id)"
-          @keydown.space.prevent="selectRun(run.id)"
+          @click="openRun(run)"
+          @keydown.enter.prevent="openRun(run)"
+          @keydown.space.prevent="openRun(run)"
         >
           <div class="status-track" aria-hidden="true">
             <span :class="['success-dot', `is-${run.status}`]"><Check :size="13" :stroke-width="3" /></span>
@@ -206,7 +215,7 @@
           @keydown.esc="closeManualCreate"
         >
           <header class="modal-header">
-            <h2 id="automation-create-title">{{ t('automation.createModal.title') }}</h2>
+            <h2 id="automation-create-title">{{ editingTaskId ? t('automation.createModal.editTitle') : t('automation.createModal.title') }}</h2>
             <div class="modal-header-actions">
               <button class="template-link" type="button" @click="openTemplates">
                 {{ t('automation.createModal.fromTemplate') }}
@@ -374,7 +383,7 @@
                 {{ t('automation.createModal.cancel') }}
               </button>
               <button class="modal-button submit" type="submit" :disabled="!canCreateTask">
-                {{ t('automation.createModal.create') }}
+                {{ editingTaskId ? t('automation.createModal.save') : t('automation.createModal.create') }}
               </button>
             </footer>
           </form>
@@ -431,6 +440,7 @@ const tasks = ref([]);
 const runs = ref([]);
 const toastVisible = ref(false);
 const manualCreateVisible = ref(false);
+const editingTaskId = ref('');
 const taskNameInput = ref(null);
 const taskName = ref('');
 const triggerType = ref('daily');
@@ -585,14 +595,42 @@ const selectTimePart = (part, value) => {
 };
 
 const openManualCreate = () => {
+  editingTaskId.value = '';
+  taskName.value = '';
+  taskInstruction.value = '';
+  triggerType.value = 'daily';
+  monthlyDay.value = 1;
+  weeklyDays.value = ['mon'];
+  intervalValue.value = 1;
+  intervalUnit.value = 'hours';
   triggerTime.value = getCurrentLocalTime();
   onceDateTime.value = getCurrentLocalDateTime();
   manualCreateVisible.value = true;
   nextTick(() => taskNameInput.value?.focus());
 };
 
+const openTaskEditor = (taskId) => {
+  const task = tasks.value.find(item => item.id === taskId);
+  if (!task) return;
+  const config = task.triggerConfig || {};
+  editingTaskId.value = task.id;
+  taskName.value = task.name;
+  taskInstruction.value = task.instruction;
+  selectedModelId.value = task.modelId;
+  triggerType.value = task.triggerType;
+  triggerTime.value = config.time || getCurrentLocalTime();
+  monthlyDay.value = config.day || 1;
+  weeklyDays.value = config.weekdays || ['mon'];
+  intervalValue.value = config.value || 1;
+  intervalUnit.value = config.unit || 'hours';
+  onceDateTime.value = config.dateTime || getCurrentLocalDateTime();
+  manualCreateVisible.value = true;
+  nextTick(() => taskNameInput.value?.focus());
+};
+
 const closeManualCreate = () => {
   manualCreateVisible.value = false;
+  editingTaskId.value = '';
   showTriggerMenu.value = false;
   showTimeMenu.value = false;
   showMonthlyDayMenu.value = false;
@@ -713,8 +751,14 @@ const selectTask = (value) => {
   loadRuns();
 };
 
-const selectRun = (runId) => {
-  selectedRunId.value = runId;
+const openRun = (run) => {
+  selectedRunId.value = run.id;
+  if (!run.sessionId) return;
+  router.push({
+    name: 'friday-chat',
+    params: { sessionId: run.sessionId },
+    query: { mode: 'agent', automation: 'true' }
+  });
 };
 
 const formatDateTime = (value) => value ? new Intl.DateTimeFormat(undefined, {
@@ -793,14 +837,17 @@ const handleCreateTask = async () => {
         : triggerType.value === 'interval'
           ? { value: intervalValue.value, unit: intervalUnit.value }
           : { dateTime: onceDateTime.value };
-  const created = await electronService.invoke('automation-create-task', {
+  const payload = {
     name: taskName.value.trim(),
     instruction: taskInstruction.value.trim(),
     modelId: model.id,
     triggerType: triggerType.value,
     triggerConfig
-  });
-  if (!created) return;
+  };
+  const saved = editingTaskId.value
+    ? await electronService.invoke('automation-update-task', { ...payload, taskId: editingTaskId.value })
+    : await electronService.invoke('automation-create-task', payload);
+  if (!saved) return;
   taskName.value = '';
   taskInstruction.value = '';
   closeManualCreate();
@@ -956,14 +1003,14 @@ onMounted(() => {
 }
 
 .local-task-notice {
-  min-height: 48px;
-  padding: 9px 12px;
+  min-height: 38px;
+  padding: 6px 10px;
   border: 1px solid color-mix(in srgb, var(--accent-color) 24%, transparent);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 14px;
   background: var(--accent-light);
   font-size: 13px;
 }
@@ -975,7 +1022,7 @@ onMounted(() => {
 }
 
 .notice-message {
-  gap: 9px;
+  gap: 7px;
 }
 
 .notice-message svg {
@@ -984,21 +1031,21 @@ onMounted(() => {
 }
 
 .keep-awake-control {
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
   color: var(--text-secondary);
 }
 
 .configured-task {
-  min-height: 56px;
-  margin-top: 14px;
-  padding: 10px 16px;
+  min-height: 46px;
+  margin-top: 10px;
+  padding: 6px 12px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 14px;
   background: var(--bg-primary);
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
@@ -1016,11 +1063,11 @@ onMounted(() => {
 
 .task-summary {
   min-width: 0;
-  gap: 10px;
+  gap: 8px;
 }
 
 .task-summary strong {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1032,18 +1079,18 @@ onMounted(() => {
 
 .task-schedule {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
 .task-actions {
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
 .icon-button {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -1063,8 +1110,8 @@ onMounted(() => {
 
 .toggle-switch {
   position: relative;
-  width: 36px;
-  height: 20px;
+  width: 32px;
+  height: 18px;
   display: inline-block;
   flex-shrink: 0;
 }
@@ -1087,8 +1134,8 @@ onMounted(() => {
 .toggle-slider::before {
   content: '';
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   top: 2px;
   left: 2px;
   border-radius: 50%;
@@ -1102,7 +1149,7 @@ onMounted(() => {
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(16px);
+  transform: translateX(14px);
 }
 
 .toggle-switch input:focus-visible + .toggle-slider {

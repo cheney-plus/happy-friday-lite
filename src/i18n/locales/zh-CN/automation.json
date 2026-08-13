@@ -8,6 +8,7 @@
   },
   "createModal": {
     "title": "新建自动化任务",
+    "editTitle": "编辑自动化任务",
     "fromTemplate": "从模板创建",
     "close": "关闭",
     "taskName": "任务名称",
@@ -46,6 +47,7 @@
     "focusedMode": "专注模式",
     "cancel": "取消",
     "create": "创建",
+    "save": "保存",
     "triggers": {
       "monthly": "每月",
       "weekly": "每周",

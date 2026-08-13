@@ -273,6 +273,7 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS automation_runs (
       id TEXT PRIMARY KEY,
       taskId TEXT NOT NULL,
+      sessionId TEXT,
       trigger TEXT NOT NULL DEFAULT 'schedule',
       status TEXT NOT NULL DEFAULT 'running',
       startedAt TEXT NOT NULL,
@@ -282,6 +283,13 @@ async function initDatabase() {
       error TEXT
     );
   `)
+
+  // 迁移：早期自动化运行记录没有关联可查看详情的 Agent 会话。
+  try {
+    db.run('ALTER TABLE automation_runs ADD COLUMN sessionId TEXT')
+  } catch (_e) {
+    // 列已存在，忽略
+  }
 
   db.run('CREATE INDEX IF NOT EXISTS idx_messages_sessionId ON messages(sessionId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
@@ -300,6 +308,7 @@ async function initDatabase() {
   db.run('CREATE INDEX IF NOT EXISTS idx_automation_tasks_enabled ON automation_tasks(enabled)')
   db.run('CREATE INDEX IF NOT EXISTS idx_automation_tasks_nextRunAt ON automation_tasks(nextRunAt)')
   db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_taskId ON automation_runs(taskId)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_sessionId ON automation_runs(sessionId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_startedAt ON automation_runs(startedAt)')
 
   saveDb()
@@ -488,9 +497,12 @@ export function getSession(sessionId) {
 }
 
 export function deleteSession(sessionId) {
+  db.run('DELETE FROM automation_runs WHERE sessionId = ?', [sessionId])
+  const automationRunsDeleted = db.getRowsModified()
   db.run('DELETE FROM messages WHERE sessionId = ?', [sessionId])
   db.run('DELETE FROM sessions WHERE id = ?', [sessionId])
   saveDb()
+  return { automationRunsDeleted }
 }
 
 export function updateSessionTitle(sessionId, title) {
@@ -843,12 +855,12 @@ export function deleteAutomationTask(taskId) {
   saveDb()
 }
 
-export function createAutomationRun({ taskId, trigger = 'schedule' }) {
+export function createAutomationRun({ taskId, sessionId = null, trigger = 'schedule' }) {
   const id = generateId()
   const startedAt = nowISO()
   db.run(
-    'INSERT INTO automation_runs (id, taskId, trigger, status, startedAt) VALUES (?, ?, ?, ?, ?)',
-    [id, taskId, trigger, 'running', startedAt]
+    'INSERT INTO automation_runs (id, taskId, sessionId, trigger, status, startedAt) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, taskId, sessionId, trigger, 'running', startedAt]
   )
   saveDb()
   return queryOne('SELECT * FROM automation_runs WHERE id = ?', [id])

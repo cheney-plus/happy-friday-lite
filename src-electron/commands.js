@@ -178,7 +178,10 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('delete_session', (_event, args) => {
-    db.deleteSession(args.sessionId)
+    const result = db.deleteSession(args.sessionId)
+    if (result.automationRunsDeleted > 0) {
+      mainWindow.webContents.send('automation-updated')
+    }
     return true
   })
 

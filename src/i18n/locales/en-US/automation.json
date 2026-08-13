@@ -8,6 +8,7 @@
   },
   "createModal": {
     "title": "Create automation task",
+    "editTitle": "Edit automation task",
     "fromTemplate": "Create from template",
     "close": "Close",
     "taskName": "Task name",
@@ -46,6 +47,7 @@
     "focusedMode": "Focused mode",
     "cancel": "Cancel",
     "create": "Create",
+    "save": "Save",
     "triggers": {
       "monthly": "Monthly",
       "weekly": "Weekly",

@@ -83,39 +83,92 @@ function emitUpdated() {
 async function runAgent(task, trigger) {
   if (activeTaskIds.has(task.id)) return null
   const model = modelForTask(task)
+  const session = db.createSession(task.name, 'agent')
+  const instruction = `执行自动化任务（${trigger === 'manual' ? '手动触发' : '定时触发'}）：${task.instruction}`
+  db.saveMessage(session.id, 'user', instruction)
+  db.updateSessionTimestamp(session.id)
   if (!model?.apiKey || !model?.baseUrl || !model?.modelName) {
-    const run = db.createAutomationRun({ taskId: task.id, trigger })
-    db.completeAutomationRun(run.id, { status: 'failed', error: '未配置任务所需的大模型，请在设置中重新选择模型。' })
+    const run = db.createAutomationRun({ taskId: task.id, sessionId: session.id, trigger })
+    const error = '未配置任务所需的大模型，请在设置中重新选择模型。'
+    db.saveMessage(session.id, 'assistant', error)
+    db.completeAutomationRun(run.id, { status: 'failed', error })
     emitUpdated()
     return run
   }
 
   activeTaskIds.add(task.id)
-  const run = db.createAutomationRun({ taskId: task.id, trigger })
+  const run = db.createAutomationRun({ taskId: task.id, sessionId: session.id, trigger })
   emitUpdated()
   try {
     const requestId = `automation_${run.id}`
+    const segments = []
+    let currentTextSegment = null
+    const appendText = (content) => {
+      if (!content) return
+      if (!currentTextSegment) {
+        currentTextSegment = { type: 'text', content }
+        segments.push(currentTextSegment)
+      } else {
+        currentTextSegment.content += content
+      }
+    }
+    const completeTool = (payload) => {
+      const toolSegment = [...segments].reverse().find(segment => segment.type === 'tool' && segment.toolCallId === payload.toolCallId)
+      if (toolSegment) {
+        toolSegment.status = payload.status === 'error' ? 'error' : 'success'
+        toolSegment.output = payload.output || ''
+      }
+    }
     const { agent } = await createAgentWithContext({ ...model, enableThinking: false }, {
       mainWindow,
       requestId,
-      threadId: `automation:${task.id}:${run.id}`,
+      threadId: session.id,
       dataDir: getDataDir(),
       folderPath: '',
-      unattended: true
+      unattended: true,
+      emit: (event, payload) => {
+        if (event === 'agent-tool-call') {
+          currentTextSegment = null
+          segments.push({
+            type: 'tool',
+            toolCallId: payload.toolCallId,
+            toolName: payload.toolName,
+            arguments: payload.arguments,
+            status: 'running',
+            output: '',
+            requireApproval: false
+          })
+        } else if (event === 'agent-tool-result') {
+          completeTool(payload)
+        }
+      }
     })
-    const result = await agent.invoke({
+    const stream = await agent.streamEvents({
       messages: [{
         role: 'user',
         content: `你正在执行用户已授权的无人值守本地自动化任务。严格只执行以下任务指令范围内的操作，不要扩展目标或暴露用户数据。\n\n任务名称：${task.name}\n任务指令：${task.instruction}\n\n完成后给出简洁的执行结果。`
       }]
-    }, { configurable: { thread_id: `automation:${run.id}` } })
-    const messages = result?.messages || []
-    const lastMessage = messages[messages.length - 1]
-    const output = typeof lastMessage?.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage?.content || '')
+    }, { version: 'v2', configurable: { thread_id: session.id } })
+    let output = ''
+    for await (const event of stream) {
+      if (event.event === 'on_chat_model_stream') {
+        const content = event.data?.chunk?.content
+        const text = typeof content === 'string'
+          ? content
+          : Array.isArray(content) ? content.map(item => typeof item === 'string' ? item : (item?.text || '')).join('') : ''
+        appendText(text)
+        output += text
+      }
+    }
+    db.saveMessage(session.id, 'assistant', output, segments.length ? { segments } : null)
+    db.updateSessionTimestamp(session.id)
     db.completeAutomationRun(run.id, { status: 'success', output })
   } catch (error) {
     log.error(`Automation task failed: ${task.id}: ${error.message}`)
-    db.completeAutomationRun(run.id, { status: 'failed', error: error.message || String(error) })
+    const errorMessage = error.message || String(error)
+    db.saveMessage(session.id, 'assistant', errorMessage)
+    db.updateSessionTimestamp(session.id)
+    db.completeAutomationRun(run.id, { status: 'failed', error: errorMessage })
   } finally {
     activeTaskIds.delete(task.id)
     const current = db.getAutomationTask(task.id)
