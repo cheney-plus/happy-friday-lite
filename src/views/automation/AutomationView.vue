@@ -1,5 +1,5 @@
 <template>
-  <div class="automation-page" @click="closePageDropdowns">
+  <div class="automation-page">
     <header class="page-header">
       <div class="heading-group">
         <h1>{{ t('automation.title') }}</h1>
@@ -29,186 +29,24 @@
       </button>
     </nav>
 
-    <section v-if="activeTab === 'configured'" class="configured-panel">
-      <div class="local-task-notice">
-        <div class="notice-message">
-          <Info :size="17" :stroke-width="2" />
-          <span>{{ t('automation.configured.localTaskNotice') }}</span>
-        </div>
-        <div class="keep-awake-control">
-          <span>{{ t('automation.configured.keepAwake') }}</span>
-          <label class="toggle-switch">
-            <input v-model="keepAwake" type="checkbox" :aria-label="t('automation.configured.keepAwake')" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <article
-        v-for="task in tasks"
-        :key="task.id"
-        class="configured-task"
-        role="button"
-        tabindex="0"
-        @click="openTaskEditor(task.id)"
-        @keydown.enter.prevent="openTaskEditor(task.id)"
-        @keydown.space.prevent="openTaskEditor(task.id)"
-      >
-        <div class="task-summary">
-          <Cloud :size="18" :stroke-width="1.8" class="task-cloud-icon" />
-          <strong>{{ task.name }}</strong>
-          <span class="task-schedule">{{ formatTaskSchedule(task) }}</span>
-        </div>
-        <div class="task-actions">
-          <button class="icon-button" type="button" :title="t('automation.configured.delete')" @click.stop="deleteTask(task.id)">
-            <X :size="18" :stroke-width="2" />
-          </button>
-          <button class="icon-button" type="button" :title="t('automation.configured.runNow')" @click.stop="runTask(task.id)">
-            <CirclePlay :size="18" :stroke-width="1.8" />
-          </button>
-          <label class="toggle-switch">
-            <input :checked="task.enabled" type="checkbox" :aria-label="t('automation.configured.enableTask')" @click.stop @change="setTaskEnabled(task, $event.target.checked)" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </article>
-      <p v-if="tasks.length === 0" class="empty-state">{{ t('automation.empty.configured') }}</p>
-    </section>
-
-    <template v-else-if="activeTab === 'history'">
-      <section class="filters" aria-label="filters">
-        <div class="select-control custom-dropdown" @click.stop>
-          <button class="dropdown-trigger" type="button" @click.stop="toggleStatusMenu">
-            <span>{{ currentStatusLabel }}</span>
-            <ChevronDown :size="16" :stroke-width="2" :class="{ expanded: showStatusMenu }" />
-          </button>
-          <Transition name="dropdown-menu">
-            <div v-if="showStatusMenu" class="dropdown-menu more-menu history-filter-menu">
-              <button
-                v-for="option in statusOptions"
-                :key="option.value"
-                type="button"
-                :class="['menu-item', { active: statusFilter === option.value }]"
-                @click="selectStatus(option.value)"
-              >
-                <span>{{ option.label }}</span>
-                <Check v-if="statusFilter === option.value" :size="13" :stroke-width="2.3" />
-              </button>
-            </div>
-          </Transition>
-        </div>
-
-        <div class="select-control task-source custom-dropdown" @click.stop>
-          <button class="dropdown-trigger" type="button" @click.stop="toggleTaskMenu">
-            <span>{{ currentTaskLabel }}</span>
-            <ChevronDown :size="16" :stroke-width="2" :class="{ expanded: showTaskMenu }" />
-          </button>
-          <Transition name="dropdown-menu">
-            <div v-if="showTaskMenu" class="dropdown-menu more-menu history-filter-menu">
-              <button
-                v-for="option in taskOptions"
-                :key="option.value"
-                type="button"
-                :class="['menu-item', { active: taskFilter === option.value }]"
-                @click="selectTask(option.value)"
-              >
-                <span>{{ option.label }}</span>
-                <Check v-if="taskFilter === option.value" :size="13" :stroke-width="2.3" />
-              </button>
-            </div>
-          </Transition>
-        </div>
-
-        <div class="date-control custom-dropdown" @click.stop>
-          <button class="date-range-trigger" type="button" @click.stop="toggleDateMenu">
-            <span>{{ formattedDateRange }}</span>
-            <CalendarDays :size="18" :stroke-width="1.8" aria-hidden="true" />
-          </button>
-          <Transition name="dropdown-menu">
-            <div v-if="showDateMenu" class="date-range-menu">
-              <label>
-                <span>{{ t('automation.filters.startDate') }}</span>
-                <input v-model="startDate" type="date" :max="endDate" @change="normalizeDateRange" />
-              </label>
-              <label>
-                <span>{{ t('automation.filters.endDate') }}</span>
-                <input v-model="endDate" type="date" :min="startDate" @change="normalizeDateRange" />
-              </label>
-            </div>
-          </Transition>
-        </div>
-      </section>
-
-      <section class="run-history">
-        <h2>{{ t('automation.groups.today') }}</h2>
-        <article
-          v-for="run in runs"
-          :key="run.id"
-          :class="['run-item', { selected: selectedRunId === run.id }]"
-          role="button"
-          tabindex="0"
-          :aria-pressed="selectedRunId === run.id"
-          @click="openRun(run)"
-          @keydown.enter.prevent="openRun(run)"
-          @keydown.space.prevent="openRun(run)"
-        >
-          <div class="status-track" aria-hidden="true">
-            <span :class="['success-dot', `is-${run.status}`]"><Check :size="13" :stroke-width="3" /></span>
-            <span class="track-line"></span>
-          </div>
-          <div class="run-content">
-            <div class="run-title-row">
-              <strong>{{ run.taskName || t('automation.empty.deletedTask') }}</strong>
-              <div class="run-more-actions" @click.stop @keydown.stop>
-                <button
-                  class="run-more-button"
-                  type="button"
-                  :title="t('automation.configured.more')"
-                  :aria-label="t('automation.configured.more')"
-                  @click="toggleRunMenu(run.id)"
-                >
-                  <Ellipsis :size="18" :stroke-width="2" />
-                </button>
-                <div v-if="openRunMenuId === run.id" class="run-more-menu">
-                  <button type="button" @click="deleteRun(run)">
-                    {{ t('automation.history.deleteRun') }}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <p>
-              <span>{{ formatRunTrigger(run.trigger) }}</span>
-              <span>{{ formatDateTime(run.startedAt) }} - {{ formatDuration(run.durationMs) }}</span>
-            </p>
-          </div>
-        </article>
-        <p v-if="runs.length === 0" class="empty-state">{{ t('automation.empty.history') }}</p>
-      </section>
-    </template>
-
-    <section v-else class="template-grid">
-      <button
-        v-for="item in taskTemplates"
-        :key="item.key"
-        class="template-card"
-        type="button"
-        @click="showComingSoon"
-      >
-        <span :class="['template-preview', `is-${item.variant}`]" aria-hidden="true">
-          <span v-if="item.variant === 'window'" class="preview-dots">
-            <i></i><i></i><i></i>
-          </span>
-          <span class="preview-lines">
-            <i></i><i></i><i></i>
-          </span>
-          <component :is="item.icon" :size="20" :stroke-width="1.8" class="preview-icon" />
-        </span>
-        <span class="template-copy">
-          <strong>{{ item.title }}</strong>
-          <span>{{ item.description }}</span>
-        </span>
-      </button>
-    </section>
+    <ConfiguredTasks
+      v-if="activeTab === 'configured'"
+      v-model:keep-awake="keepAwake"
+      :tasks="tasks"
+      @edit="openTaskEditor"
+      @delete="deleteTask"
+      @run="runTask"
+      @set-enabled="setTaskEnabled"
+    />
+    <ExecutionHistory
+      v-else-if="activeTab === 'history'"
+      :tasks="tasks"
+      :runs="runs"
+      @open="openRun"
+      @delete="deleteRun"
+      @load-runs="loadRuns"
+    />
+    <TaskTemplates v-else @select="showComingSoon" />
 
     <Transition name="toast">
       <div v-if="toastVisible" class="toast" role="status">
@@ -412,24 +250,15 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { electronService } from '@/services/electron';
+import ConfiguredTasks from './ConfiguredTasks.vue';
+import ExecutionHistory from './ExecutionHistory.vue';
+import TaskTemplates from './TaskTemplates.vue';
 import {
-  CalendarDays,
   Check,
   ChevronDown,
-  CirclePlay,
-  Cloud,
-  Crosshair,
-  Ellipsis,
-  FilePlus2,
-  Glasses,
   Globe2,
   Info,
-  LineChart,
   MessageCirclePlus,
-  ScanSearch,
-  Sparkles,
-  TestTubeDiagonal,
-  Bug,
   X
 } from 'lucide-vue-next';
 
@@ -445,10 +274,6 @@ const getCurrentLocalDateTime = () => {
 const getCurrentLocalTime = () => getCurrentLocalDateTime().slice(11);
 
 const activeTab = ref('configured');
-const statusFilter = ref('all');
-const taskFilter = ref('all');
-const startDate = ref('');
-const endDate = ref('');
 const keepAwake = ref(false);
 const tasks = ref([]);
 const runs = ref([]);
@@ -472,11 +297,6 @@ const showTriggerMenu = ref(false);
 const showMonthlyDayMenu = ref(false);
 const showIntervalUnitMenu = ref(false);
 const showModelMenu = ref(false);
-const showStatusMenu = ref(false);
-const showTaskMenu = ref(false);
-const showDateMenu = ref(false);
-const selectedRunId = ref('');
-const openRunMenuId = ref('');
 let removeAutomationListener = null;
 let toastTimer = null;
 
@@ -489,35 +309,12 @@ const tabs = computed(() => [
   { key: 'templates', label: t('automation.tabs.templates') }
 ]);
 
-const taskTemplates = computed(() => [
-  { key: 'aiNews', icon: Sparkles, variant: 'window', title: t('automation.templates.aiNews.title'), description: t('automation.templates.aiNews.description') },
-  { key: 'brandSentiment', icon: Glasses, variant: 'window', title: t('automation.templates.brandSentiment.title'), description: t('automation.templates.brandSentiment.description') },
-  { key: 'competitorTracking', icon: Crosshair, variant: 'window', title: t('automation.templates.competitorTracking.title'), description: t('automation.templates.competitorTracking.description') },
-  { key: 'stockAlerts', icon: LineChart, variant: 'window', title: t('automation.templates.stockAlerts.title'), description: t('automation.templates.stockAlerts.description') },
-  { key: 'securityScan', icon: ScanSearch, variant: 'code', title: t('automation.templates.securityScan.title'), description: t('automation.templates.securityScan.description') },
-  { key: 'commitBugs', icon: Bug, variant: 'code', title: t('automation.templates.commitBugs.title'), description: t('automation.templates.commitBugs.description') },
-  { key: 'testCoverage', icon: TestTubeDiagonal, variant: 'code', title: t('automation.templates.testCoverage.title'), description: t('automation.templates.testCoverage.description') },
-  { key: 'dailyChanges', icon: FilePlus2, variant: 'code', title: t('automation.templates.dailyChanges.title'), description: t('automation.templates.dailyChanges.description') }
-]);
-
 const triggerOptions = computed(() => [
   { value: 'monthly', label: t('automation.createModal.triggers.monthly') },
   { value: 'weekly', label: t('automation.createModal.triggers.weekly') },
   { value: 'daily', label: t('automation.createModal.triggers.daily') },
   { value: 'interval', label: t('automation.createModal.triggers.interval') },
   { value: 'once', label: t('automation.createModal.triggers.once') }
-]);
-
-const statusOptions = computed(() => [
-  { value: 'all', label: t('automation.filters.all') },
-  { value: 'success', label: t('automation.filters.success') },
-  { value: 'failed', label: t('automation.filters.failed') },
-  { value: 'running', label: t('automation.filters.running') }
-]);
-
-const taskOptions = computed(() => [
-  { value: 'all', label: t('automation.filters.allExecutionTasks') },
-  ...tasks.value.map(task => ({ value: task.id, label: task.name }))
 ]);
 
 const providerIcons = {
@@ -569,19 +366,6 @@ const currentIntervalUnitLabel = computed(() => (
   intervalUnitOptions.value.find(option => option.value === intervalUnit.value)?.label || ''
 ));
 
-
-const currentStatusLabel = computed(() => (
-  statusOptions.value.find(option => option.value === statusFilter.value)?.label || ''
-));
-
-const currentTaskLabel = computed(() => (
-  taskOptions.value.find(option => option.value === taskFilter.value)?.label || ''
-));
-
-const formattedDateRange = computed(() => startDate.value && endDate.value
-  ? `${startDate.value.replaceAll('-', '/')} - ${endDate.value.replaceAll('-', '/')}`
-  : t('automation.filters.selectDate')
-);
 
 const isTriggerComplete = computed(() => {
   if (triggerType.value === 'interval') return Number.isInteger(intervalValue.value) && intervalValue.value > 0;
@@ -723,52 +507,7 @@ const selectModel = (modelId) => {
   showModelMenu.value = false;
 };
 
-const closePageDropdowns = () => {
-  showStatusMenu.value = false;
-  showTaskMenu.value = false;
-  showDateMenu.value = false;
-  openRunMenuId.value = '';
-};
-
-const toggleStatusMenu = () => {
-  showStatusMenu.value = !showStatusMenu.value;
-  showTaskMenu.value = false;
-  showDateMenu.value = false;
-};
-
-const toggleTaskMenu = () => {
-  showTaskMenu.value = !showTaskMenu.value;
-  showStatusMenu.value = false;
-  showDateMenu.value = false;
-};
-
-const toggleDateMenu = () => {
-  showDateMenu.value = !showDateMenu.value;
-  showStatusMenu.value = false;
-  showTaskMenu.value = false;
-};
-
-const normalizeDateRange = () => {
-  if (startDate.value > endDate.value) {
-    endDate.value = startDate.value;
-  }
-  loadRuns();
-};
-
-const selectStatus = (value) => {
-  statusFilter.value = value;
-  showStatusMenu.value = false;
-  loadRuns();
-};
-
-const selectTask = (value) => {
-  taskFilter.value = value;
-  showTaskMenu.value = false;
-  loadRuns();
-};
-
 const openRun = (run) => {
-  selectedRunId.value = run.id;
   if (!run.sessionId) return;
   router.push({
     name: 'friday-chat',
@@ -777,39 +516,12 @@ const openRun = (run) => {
   });
 };
 
-const formatDateTime = (value) => value ? new Intl.DateTimeFormat(undefined, {
-  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
-}).format(new Date(value)) : '-';
-
-const formatDuration = (durationMs) => {
-  if (durationMs == null) return t('automation.filters.running');
-  return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
-};
-
-const formatRunTrigger = (trigger) => trigger === 'manual'
-  ? t('automation.history.manual')
-  : t('automation.history.scheduled');
-
-const formatTaskSchedule = (task) => {
-  const config = task.triggerConfig || {};
-  if (task.triggerType === 'daily') return t('automation.schedule.daily', { time: config.time });
-  if (task.triggerType === 'weekly') return t('automation.schedule.weekly', { time: config.time });
-  if (task.triggerType === 'monthly') return t('automation.schedule.monthly', { day: config.day, time: config.time });
-  if (task.triggerType === 'interval') return t('automation.schedule.interval', { value: config.value, unit: intervalUnitOptions.value.find(item => item.value === config.unit)?.label || config.unit });
-  return t('automation.schedule.once', { time: config.dateTime?.replace('T', ' ') || '-' });
-};
-
 const loadTasks = async () => {
   tasks.value = await electronService.invoke('automation-list-tasks') || [];
 };
 
-const loadRuns = async () => {
-  runs.value = await electronService.invoke('automation-list-runs', {
-    status: statusFilter.value,
-    taskId: taskFilter.value,
-    startDate: startDate.value,
-    endDate: endDate.value
-  }) || [];
+const loadRuns = async (filters = {}) => {
+  runs.value = await electronService.invoke('automation-list-runs', filters) || [];
 };
 
 const refreshAutomation = async () => {
@@ -832,14 +544,8 @@ const deleteTask = async (taskId) => {
 };
 
 const deleteRun = async (run) => {
-  openRunMenuId.value = '';
   const result = await electronService.invoke('automation-delete-run', { runId: run.id });
-  if (result?.ok && selectedRunId.value === run.id) selectedRunId.value = '';
-  await loadRuns();
-};
-
-const toggleRunMenu = (runId) => {
-  openRunMenuId.value = openRunMenuId.value === runId ? '' : runId;
+  if (result?.ok) await loadRuns();
 };
 
 const openTemplates = () => {
@@ -910,7 +616,7 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
+<style>
 .automation-page {
   position: relative;
   min-height: 100%;
