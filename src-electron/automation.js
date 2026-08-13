@@ -9,11 +9,13 @@
 import { createLogger } from './agent/logger.js'
 import { createAgentWithContext } from './agent/index.js'
 import { getDataDir, loadConfig } from './config.js'
+import { CHAT_CHUNK, CHAT_DONE, CHAT_ERROR } from './events.js'
 import * as db from './db.js'
 
 const log = createLogger('Automation')
 const WEEKDAY_TO_CRON = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
 const activeTaskIds = new Set()
+const activeRuns = new Map()
 let timer = null
 let mainWindow = null
 
@@ -71,6 +73,21 @@ function emitUpdated() {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('automation-updated')
 }
 
+function emitStream(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
+}
+
+export function getActiveAutomationRun(runId) {
+  const activeRun = activeRuns.get(runId)
+  if (!activeRun) return null
+  return {
+    requestId: activeRun.requestId,
+    sessionId: activeRun.sessionId,
+    output: activeRun.output,
+    segments: activeRun.segments
+  }
+}
+
 async function runAgent(task, trigger) {
   if (activeTaskIds.has(task.id)) return null
   const model = modelForTask(task)
@@ -89,10 +106,12 @@ async function runAgent(task, trigger) {
 
   activeTaskIds.add(task.id)
   const run = db.createAutomationRun({ taskId: task.id, taskName: task.name, sessionId: session.id, trigger })
+  const requestId = `automation_${run.id}`
+  const activeRun = { requestId, sessionId: session.id, output: '', segments: [] }
+  activeRuns.set(run.id, activeRun)
   emitUpdated()
   try {
-    const requestId = `automation_${run.id}`
-    const segments = []
+    const segments = activeRun.segments
     let currentTextSegment = null
     const appendText = (content) => {
       if (!content) return
@@ -102,6 +121,8 @@ async function runAgent(task, trigger) {
       } else {
         currentTextSegment.content += content
       }
+      activeRun.output += content
+      emitStream(CHAT_CHUNK, { requestId, sessionId: session.id, content })
     }
     const completeTool = (payload) => {
       const toolSegment = [...segments].reverse().find(segment => segment.type === 'tool' && segment.toolCallId === payload.toolCallId)
@@ -129,8 +150,10 @@ async function runAgent(task, trigger) {
             output: '',
             requireApproval: false
           })
+          emitStream('agent-tool-call', payload)
         } else if (event === 'agent-tool-result') {
           completeTool(payload)
+          emitStream('agent-tool-result', payload)
         }
       }
     })
@@ -140,7 +163,6 @@ async function runAgent(task, trigger) {
         content: `你正在执行用户已授权的无人值守本地自动化任务。严格只执行以下任务指令范围内的操作，不要扩展目标或暴露用户数据。\n\n任务名称：${task.name}\n任务指令：${task.instruction}\n\n完成后给出简洁的执行结果。`
       }]
     }, { version: 'v2', configurable: { thread_id: session.id } })
-    let output = ''
     for await (const event of stream) {
       if (event.event === 'on_chat_model_stream') {
         const content = event.data?.chunk?.content
@@ -148,20 +170,30 @@ async function runAgent(task, trigger) {
           ? content
           : Array.isArray(content) ? content.map(item => typeof item === 'string' ? item : (item?.text || '')).join('') : ''
         appendText(text)
-        output += text
       }
     }
-    db.saveMessage(session.id, 'assistant', output, segments.length ? { segments } : null)
+    const assistantMessage = db.saveMessage(session.id, 'assistant', activeRun.output, segments.length ? { segments } : null)
     db.updateSessionTimestamp(session.id)
-    db.completeAutomationRun(run.id, { status: 'success', output })
+    db.completeAutomationRun(run.id, { status: 'success', output: activeRun.output })
+    emitStream(CHAT_DONE, {
+      requestId,
+      sessionId: session.id,
+      fullContent: activeRun.output,
+      reasoningContent: '',
+      messageId: assistantMessage.id
+    })
   } catch (error) {
     log.error(`Automation task failed: ${task.id}: ${error.message}`)
     const errorMessage = error.message || String(error)
-    db.saveMessage(session.id, 'assistant', errorMessage)
+    const assistantMessage = db.saveMessage(session.id, 'assistant', errorMessage)
     db.updateSessionTimestamp(session.id)
     db.completeAutomationRun(run.id, { status: 'failed', error: errorMessage })
+    emitStream(CHAT_ERROR, { requestId, sessionId: session.id, error: errorMessage })
+    // Keep a completed failure readable from the shared Friday session.
+    emitStream(CHAT_DONE, { requestId, sessionId: session.id, fullContent: errorMessage, reasoningContent: '', messageId: assistantMessage.id })
   } finally {
     activeTaskIds.delete(task.id)
+    activeRuns.delete(run.id)
     const current = db.getAutomationTask(task.id)
     if (current) {
       const lastRunAt = new Date().toISOString()

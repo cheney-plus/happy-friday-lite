@@ -27,6 +27,7 @@ import { getLogDir, setLoggingEnabled } from './logger.js'
 import { getShareUrl, getNoteShareUrl } from './shareServer.js'
 import {
   createAutomationTask,
+  getActiveAutomationRun,
   updateAutomationTask,
   runAutomationTaskNow
 } from './automation.js'
@@ -1351,6 +1352,10 @@ export function registerCommands(mainWindow) {
   // ========== Local DeepAgent automation ==========
   ipcMain.handle('automation-list-tasks', () => db.getAutomationTasks())
   ipcMain.handle('automation-list-runs', (_event, filters) => db.getAutomationRuns(filters || {}))
+  ipcMain.handle('automation-get-active-run', (_event, args) => {
+    if (!args?.runId) throw new Error('缺少执行记录 ID')
+    return getActiveAutomationRun(args.runId)
+  })
   ipcMain.handle('automation-create-task', (_event, args) => createAutomationTask(args || {}))
   ipcMain.handle('automation-update-task', (_event, args) => {
     if (!args?.taskId) throw new Error('缺少任务 ID')

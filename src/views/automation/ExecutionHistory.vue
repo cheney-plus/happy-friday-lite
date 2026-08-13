@@ -22,7 +22,7 @@
           <strong>{{ run.taskName || t('automation.title') }}</strong>
           <div class="run-more-actions" @click.stop @keydown.stop><button class="run-more-button" type="button" :title="t('automation.configured.more')" :aria-label="t('automation.configured.more')" @click.stop="openRunMenuId = openRunMenuId === run.id ? '' : run.id"><Ellipsis :size="17" :stroke-width="2" /></button><div v-if="openRunMenuId === run.id" class="run-more-menu" @mousedown.stop @click.stop><button type="button" @click.stop.prevent="deleteRun(run)">{{ t('automation.history.deleteRun') }}</button></div></div>
         </div>
-        <p><span>{{ formatTrigger(run.trigger) }}</span><i aria-hidden="true"></i><span>{{ formatDateTime(run.startedAt) }}</span><span class="run-duration">{{ formatDuration(run.durationMs) }}</span><span :class="['run-status', `is-${run.status}`]">{{ formatStatus(run.status) }}</span></p>
+        <p><span>{{ formatTrigger(run.trigger) }}</span><i aria-hidden="true"></i><span>{{ formatDateTime(run.startedAt) }}</span><span v-if="run.durationMs != null" class="run-duration">{{ formatDuration(run.durationMs) }}</span><span :class="['run-status', `is-${run.status}`]">{{ formatStatus(run.status) }}</span></p>
       </div>
     </article>
     <p v-if="runs.length === 0" class="empty-state">{{ t('automation.empty.history') }}</p>
@@ -57,7 +57,7 @@ const applyDateRange = () => { if (startDate.value > endDate.value) endDate.valu
 const openRun = (run) => { selectedRunId.value = run.id; emit('open', run); };
 const deleteRun = (run) => { openRunMenuId.value = ''; if (selectedRunId.value === run.id) selectedRunId.value = ''; emit('delete', run); };
 const formatDateTime = (value) => value ? new Intl.DateTimeFormat(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value)) : '-';
-const formatDuration = (durationMs) => durationMs == null ? t('automation.filters.running') : durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
+const formatDuration = (durationMs) => durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
 const formatTrigger = (trigger) => trigger === 'manual' ? t('automation.history.manual') : t('automation.history.scheduled');
 const formatStatus = (status) => t(`automation.filters.${status}`);
 const closeMenus = () => { openMenu.value = ''; openRunMenuId.value = ''; };

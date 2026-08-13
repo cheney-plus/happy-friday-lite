@@ -13,7 +13,7 @@
         <span class="header-time">{{ chatTime }}</span>
       </div>
 
-      <button v-if="!isShareMode && !isAutomationSession" class="header-btn knowledge-btn" @click="handleAddToKnowledge">
+      <button v-if="!isShareMode" class="header-btn knowledge-btn" @click="handleAddToKnowledge">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
@@ -49,7 +49,7 @@
                 />
               </template>
             </div>
-            <div v-if="!isShareMode && !isAutomationSession" class="agent-footer">
+            <div v-if="!isShareMode" class="agent-footer">
               <div class="footer-left">
                 <button class="action-icon-btn" @click="handleAction('add', index)">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -137,7 +137,7 @@
     </main>
 
     <ChatInputBox
-      v-if="!isShareMode && !isAutomationSession"
+      v-if="!isShareMode"
       v-model="inputText"
       placeholder="输入消息..."
       :is-streaming="isStreaming"
@@ -277,8 +277,6 @@ const showBackBtn = computed(() => route.query.hideBack !== 'true');
 // 分享模式：通过分享链接在浏览器中打开（复用对话界面，隐藏输入框与操作按钮）
 // 触发条件：路由 meta.share 标记 或 运行在非 Electron 环境（浏览器）
 const isShareMode = computed(() => route.meta?.share === true || !electronService.isElectron);
-const isAutomationSession = computed(() => route.query.automation === 'true');
-
 // Agent 模式"思考中"指示器：流式执行中且未在输出文本时显示
 // 触发场景：1) 尚未收到任何段；2) 上一段是工具调用（工具结束后等待 LLM 下一轮思考）
 const isThinking = computed(() => {
@@ -293,7 +291,7 @@ const isThinking = computed(() => {
 });
 
 function goBack() {
-  router.push(isAutomationSession.value ? '/automation' : '/friday');
+  router.push('/friday');
 }
 
 function handleAddToKnowledge() {
@@ -914,6 +912,24 @@ async function initConversation() {
         }
       }
     } catch {}
+  }
+
+  const automationRunId = route.query.automationRun;
+  if (automationRunId) {
+    activeRequestId = `automation_${automationRunId}`;
+    const activeRun = await electronService.invoke('automation-get-active-run', { runId: automationRunId });
+    if (activeRun?.requestId === activeRequestId) {
+      isStreaming.value = true;
+      streamingContent.value = activeRun.output || '';
+      agentSegments.value = (activeRun.segments || []).map(segment => ({
+        ...segment,
+        id: segment.id || segment.toolCallId || `automation-segment-${Math.random().toString(36).slice(2, 8)}`,
+        isStreaming: segment.type === 'text'
+      }));
+    } else if (currentSessionId.value) {
+      // The run may finish between loading history and asking for its live state.
+      await loadSessionHistory(currentSessionId.value);
+    }
   }
 
   const query = route.query.q;
