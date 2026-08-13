@@ -121,7 +121,8 @@
   },
   "history": {
     "manual": "手动触发",
-    "scheduled": "定时触发"
+    "scheduled": "定时触发",
+    "deleteRun": "删除"
   },
   "schedule": {
     "daily": "每天 {time}",

@@ -121,7 +121,8 @@
   },
   "history": {
     "manual": "Manual trigger",
-    "scheduled": "Scheduled trigger"
+    "scheduled": "Scheduled trigger",
+    "deleteRun": "Delete"
   },
   "schedule": {
     "daily": "Daily at {time}",

@@ -159,13 +159,27 @@
           <div class="run-content">
             <div class="run-title-row">
               <strong>{{ run.taskName || t('automation.empty.deletedTask') }}</strong>
+              <div class="run-more-actions" @click.stop @keydown.stop>
+                <button
+                  class="run-more-button"
+                  type="button"
+                  :title="t('automation.configured.more')"
+                  :aria-label="t('automation.configured.more')"
+                  @click="toggleRunMenu(run.id)"
+                >
+                  <Ellipsis :size="18" :stroke-width="2" />
+                </button>
+                <div v-if="openRunMenuId === run.id" class="run-more-menu">
+                  <button type="button" @click="deleteRun(run)">
+                    {{ t('automation.history.deleteRun') }}
+                  </button>
+                </div>
+              </div>
             </div>
             <p>
               <span>{{ formatRunTrigger(run.trigger) }}</span>
               <span>{{ formatDateTime(run.startedAt) }} - {{ formatDuration(run.durationMs) }}</span>
             </p>
-            <p v-if="run.error" class="run-error">{{ run.error }}</p>
-            <p v-else-if="run.output" class="run-output">{{ run.output }}</p>
           </div>
         </article>
         <p v-if="runs.length === 0" class="empty-state">{{ t('automation.empty.history') }}</p>
@@ -462,6 +476,7 @@ const showStatusMenu = ref(false);
 const showTaskMenu = ref(false);
 const showDateMenu = ref(false);
 const selectedRunId = ref('');
+const openRunMenuId = ref('');
 let removeAutomationListener = null;
 let toastTimer = null;
 
@@ -712,6 +727,7 @@ const closePageDropdowns = () => {
   showStatusMenu.value = false;
   showTaskMenu.value = false;
   showDateMenu.value = false;
+  openRunMenuId.value = '';
 };
 
 const toggleStatusMenu = () => {
@@ -813,6 +829,17 @@ const runTask = async (taskId) => {
 const deleteTask = async (taskId) => {
   await electronService.invoke('automation-delete-task', { taskId });
   await refreshAutomation();
+};
+
+const deleteRun = async (run) => {
+  openRunMenuId.value = '';
+  const result = await electronService.invoke('automation-delete-run', { runId: run.id });
+  if (result?.ok && selectedRunId.value === run.id) selectedRunId.value = '';
+  await loadRuns();
+};
+
+const toggleRunMenu = (runId) => {
+  openRunMenuId.value = openRunMenuId.value === runId ? '' : runId;
 };
 
 const openTemplates = () => {
@@ -1074,7 +1101,7 @@ onMounted(() => {
 
 .task-cloud-icon {
   flex-shrink: 0;
-  color: var(--text-secondary);
+  color: #2f80ed;
 }
 
 .task-schedule {
@@ -1442,6 +1469,8 @@ onMounted(() => {
 }
 
 .run-content {
+  min-width: 0;
+  flex: 1;
   padding-left: 8px;
 }
 
@@ -1449,12 +1478,78 @@ onMounted(() => {
   min-height: 20px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .run-title-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
+}
+
+.run-more-actions {
+  position: relative;
+  flex: 0 0 28px;
+}
+
+.run-more-button {
+  width: 28px;
+  height: 28px;
+  margin: -4px -4px -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.run-more-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.run-more-button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
+.run-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: -4px;
+  z-index: 30;
+  min-width: 112px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.run-more-menu button {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #d9544d;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.run-more-menu button:hover {
+  background: var(--bg-hover);
 }
 
 .run-content p {

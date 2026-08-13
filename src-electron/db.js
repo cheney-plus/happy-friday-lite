@@ -855,6 +855,19 @@ export function deleteAutomationTask(taskId) {
   saveDb()
 }
 
+export function deleteAutomationRun(runId) {
+  const run = queryOne('SELECT sessionId FROM automation_runs WHERE id = ?', [runId])
+  if (!run) return false
+
+  db.run('DELETE FROM automation_runs WHERE id = ?', [runId])
+  if (run.sessionId) {
+    db.run('DELETE FROM messages WHERE sessionId = ?', [run.sessionId])
+    db.run('DELETE FROM sessions WHERE id = ?', [run.sessionId])
+  }
+  saveDb()
+  return true
+}
+
 export function createAutomationRun({ taskId, sessionId = null, trigger = 'schedule' }) {
   const id = generateId()
   const startedAt = nowISO()

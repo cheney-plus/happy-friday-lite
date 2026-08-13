@@ -1361,6 +1361,12 @@ export function registerCommands(mainWindow) {
     db.deleteAutomationTask(args.taskId)
     return { ok: true }
   })
+  ipcMain.handle('automation-delete-run', (_event, args) => {
+    if (!args?.runId) throw new Error('缺少执行记录 ID')
+    const deleted = db.deleteAutomationRun(args.runId)
+    if (deleted) mainWindow.webContents.send('automation-updated')
+    return { ok: deleted }
+  })
   ipcMain.handle('automation-run-task', async (_event, args) => {
     if (!args?.taskId) throw new Error('缺少任务 ID')
     if (!db.getAutomationTask(args.taskId)) throw new Error('自动化任务不存在')
