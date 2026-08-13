@@ -19,7 +19,7 @@
       <div class="status-track" aria-hidden="true"><span :class="['success-dot', `is-${run.status}`]"><Check v-if="run.status === 'success'" :size="12" :stroke-width="3" /><span v-else></span></span><span class="track-line"></span></div>
       <div class="run-content">
         <div class="run-title-row">
-          <strong>{{ run.taskName || t('automation.empty.deletedTask') }}</strong>
+          <strong>{{ run.taskName || t('automation.title') }}</strong>
           <div class="run-more-actions" @click.stop @keydown.stop><button class="run-more-button" type="button" :title="t('automation.configured.more')" :aria-label="t('automation.configured.more')" @click.stop="openRunMenuId = openRunMenuId === run.id ? '' : run.id"><Ellipsis :size="17" :stroke-width="2" /></button><div v-if="openRunMenuId === run.id" class="run-more-menu" @mousedown.stop @click.stop><button type="button" @click.stop.prevent="deleteRun(run)">{{ t('automation.history.deleteRun') }}</button></div></div>
         </div>
         <p><span>{{ formatTrigger(run.trigger) }}</span><i aria-hidden="true"></i><span>{{ formatDateTime(run.startedAt) }}</span><span class="run-duration">{{ formatDuration(run.durationMs) }}</span><span :class="['run-status', `is-${run.status}`]">{{ formatStatus(run.status) }}</span></p>

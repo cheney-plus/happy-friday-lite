@@ -16,15 +16,6 @@ const WEEKDAY_TO_CRON = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6
 const activeTaskIds = new Set()
 let timer = null
 let mainWindow = null
-let lastTickMinute = ''
-
-function pad(value) {
-  return String(value).padStart(2, '0')
-}
-
-function localDateKey(date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
 
 function parseTime(time) {
   const [hours = '0', minutes = '0'] = String(time || '00:00').split(':')
@@ -88,7 +79,7 @@ async function runAgent(task, trigger) {
   db.saveMessage(session.id, 'user', instruction)
   db.updateSessionTimestamp(session.id)
   if (!model?.apiKey || !model?.baseUrl || !model?.modelName) {
-    const run = db.createAutomationRun({ taskId: task.id, sessionId: session.id, trigger })
+    const run = db.createAutomationRun({ taskId: task.id, taskName: task.name, sessionId: session.id, trigger })
     const error = '未配置任务所需的大模型，请在设置中重新选择模型。'
     db.saveMessage(session.id, 'assistant', error)
     db.completeAutomationRun(run.id, { status: 'failed', error })
@@ -97,7 +88,7 @@ async function runAgent(task, trigger) {
   }
 
   activeTaskIds.add(task.id)
-  const run = db.createAutomationRun({ taskId: task.id, sessionId: session.id, trigger })
+  const run = db.createAutomationRun({ taskId: task.id, taskName: task.name, sessionId: session.id, trigger })
   emitUpdated()
   try {
     const requestId = `automation_${run.id}`
@@ -193,11 +184,19 @@ async function runAgent(task, trigger) {
 
 async function tick() {
   const now = new Date()
-  const minute = localDateKey(now)
-  if (minute === lastTickMinute) return
-  lastTickMinute = minute
   const tasks = db.getAutomationTasks().filter(task => task.enabled && task.nextRunAt && new Date(task.nextRunAt) <= now)
-  for (const task of tasks) runAgent(task, 'schedule')
+  for (const task of tasks) {
+    // Claim the due occurrence before starting asynchronous work. This makes each
+    // 15-second scheduler check resilient to edits made near a minute boundary.
+    const nextRunAt = task.triggerType === 'once'
+      ? null
+      : getNextRunAt({ ...task, lastRunAt: now.toISOString() }, now)
+    db.updateAutomationTask(task.id, {
+      nextRunAt,
+      enabled: task.triggerType === 'once' ? false : task.enabled
+    })
+    runAgent(task, 'schedule')
+  }
 }
 
 export function startAutomationScheduler(window) {

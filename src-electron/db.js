@@ -273,6 +273,7 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS automation_runs (
       id TEXT PRIMARY KEY,
       taskId TEXT NOT NULL,
+      taskName TEXT,
       sessionId TEXT,
       trigger TEXT NOT NULL DEFAULT 'schedule',
       status TEXT NOT NULL DEFAULT 'running',
@@ -290,6 +291,22 @@ async function initDatabase() {
   } catch (_e) {
     // 列已存在，忽略
   }
+
+  // 迁移：运行记录保留任务标题快照，避免任务删除后历史标题丢失。
+  try {
+    db.run('ALTER TABLE automation_runs ADD COLUMN taskName TEXT')
+  } catch (_e) {
+    // 列已存在，忽略
+  }
+  db.run(`
+    UPDATE automation_runs
+    SET taskName = COALESCE(
+      taskName,
+      (SELECT name FROM automation_tasks WHERE automation_tasks.id = automation_runs.taskId),
+      (SELECT title FROM sessions WHERE sessions.id = automation_runs.sessionId)
+    )
+    WHERE taskName IS NULL OR taskName = ''
+  `)
 
   db.run('CREATE INDEX IF NOT EXISTS idx_messages_sessionId ON messages(sessionId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
@@ -868,12 +885,12 @@ export function deleteAutomationRun(runId) {
   return true
 }
 
-export function createAutomationRun({ taskId, sessionId = null, trigger = 'schedule' }) {
+export function createAutomationRun({ taskId, taskName = '', sessionId = null, trigger = 'schedule' }) {
   const id = generateId()
   const startedAt = nowISO()
   db.run(
-    'INSERT INTO automation_runs (id, taskId, sessionId, trigger, status, startedAt) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, taskId, sessionId, trigger, 'running', startedAt]
+    'INSERT INTO automation_runs (id, taskId, taskName, sessionId, trigger, status, startedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, taskId, taskName, sessionId, trigger, 'running', startedAt]
   )
   saveDb()
   return queryOne('SELECT * FROM automation_runs WHERE id = ?', [id])
@@ -903,7 +920,7 @@ export function getAutomationRuns(filters = {}) {
   values.push(Math.min(Math.max(Number(limit) || 200, 1), 500))
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
   return queryAll(
-    `SELECT runs.*, tasks.name AS taskName FROM automation_runs runs
+    `SELECT runs.*, COALESCE(runs.taskName, tasks.name) AS taskName FROM automation_runs runs
      LEFT JOIN automation_tasks tasks ON tasks.id = runs.taskId
      ${where} ORDER BY startedAt DESC LIMIT ?`,
     values

@@ -46,13 +46,7 @@
       @delete="deleteRun"
       @load-runs="loadRuns"
     />
-    <TaskTemplates v-else @select="showComingSoon" />
-
-    <Transition name="toast">
-      <div v-if="toastVisible" class="toast" role="status">
-        {{ t('automation.actions.comingSoon') }}
-      </div>
-    </Transition>
+    <TaskTemplates v-else @select="openTemplate" />
   </div>
 
   <Teleport to="body">
@@ -277,7 +271,6 @@ const activeTab = ref('configured');
 const keepAwake = ref(false);
 const tasks = ref([]);
 const runs = ref([]);
-const toastVisible = ref(false);
 const manualCreateVisible = ref(false);
 const editingTaskId = ref('');
 const taskNameInput = ref(null);
@@ -298,7 +291,6 @@ const showMonthlyDayMenu = ref(false);
 const showIntervalUnitMenu = ref(false);
 const showModelMenu = ref(false);
 let removeAutomationListener = null;
-let toastTimer = null;
 
 const timeHours = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
 const timeMinutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
@@ -334,6 +326,13 @@ const modelList = computed(() => customModels.value.map(model => ({
 })));
 
 const selectedModel = computed(() => modelList.value.find(model => model.id === selectedModelId.value));
+
+const resolveModelId = (preferredModelId = '') => {
+  if (preferredModelId && customModels.value.some(model => model.id === preferredModelId)) return preferredModelId;
+  const savedModelId = localStorage.getItem('happy-friday-selected-model');
+  if (customModels.value.some(model => model.id === savedModelId)) return savedModelId;
+  return customModels.value[0]?.id || '';
+};
 
 const weekdayOptions = computed(() => [
   { value: 'mon', label: t('automation.createModal.weekdaysShort.mon') },
@@ -378,6 +377,7 @@ const canCreateTask = computed(() => (
   taskName.value.trim().length > 0
   && isTriggerComplete.value
   && taskInstruction.value.trim().length > 0
+  && !!selectedModel.value
 ));
 
 const toggleTimeMenu = () => {
@@ -404,6 +404,7 @@ const openManualCreate = () => {
   intervalUnit.value = 'hours';
   triggerTime.value = getCurrentLocalTime();
   onceDateTime.value = getCurrentLocalDateTime();
+  selectedModelId.value = resolveModelId();
   manualCreateVisible.value = true;
   nextTick(() => taskNameInput.value?.focus());
 };
@@ -423,6 +424,23 @@ const openTaskEditor = (taskId) => {
   intervalValue.value = config.value || 1;
   intervalUnit.value = config.unit || 'hours';
   onceDateTime.value = config.dateTime || getCurrentLocalDateTime();
+  manualCreateVisible.value = true;
+  nextTick(() => taskNameInput.value?.focus());
+};
+
+const openTemplate = (template) => {
+  const config = template.triggerConfig || {};
+  editingTaskId.value = '';
+  taskName.value = template.name || '';
+  taskInstruction.value = template.instruction || '';
+  triggerType.value = template.triggerType || 'daily';
+  triggerTime.value = config.time || getCurrentLocalTime();
+  monthlyDay.value = config.day || 1;
+  weeklyDays.value = [...(config.weekdays || ['mon'])];
+  intervalValue.value = config.value || 1;
+  intervalUnit.value = config.unit || 'hours';
+  onceDateTime.value = config.dateTime || getCurrentLocalDateTime();
+  selectedModelId.value = resolveModelId(template.modelId);
   manualCreateVisible.value = true;
   nextTick(() => taskNameInput.value?.focus());
 };
@@ -559,12 +577,12 @@ const openFridayHome = () => {
 
 const handleCreateTask = async () => {
   if (!canCreateTask.value) return;
-  const model = customModels.value.find(item => item.id === selectedModelId.value);
+  const model = selectedModel.value;
   if (!model) return;
   const triggerConfig = triggerType.value === 'daily'
     ? { time: triggerTime.value }
     : triggerType.value === 'weekly'
-      ? { time: triggerTime.value, weekdays: weeklyDays.value }
+      ? { time: triggerTime.value, weekdays: [...weeklyDays.value] }
       : triggerType.value === 'monthly'
         ? { time: triggerTime.value, day: monthlyDay.value }
         : triggerType.value === 'interval'
@@ -588,16 +606,7 @@ const handleCreateTask = async () => {
   await refreshAutomation();
 };
 
-const showComingSoon = () => {
-  toastVisible.value = true;
-  window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
-    toastVisible.value = false;
-  }, 2200);
-};
-
 onBeforeUnmount(() => {
-  window.clearTimeout(toastTimer);
   removeAutomationListener?.();
 });
 
@@ -620,7 +629,7 @@ onMounted(() => {
 .automation-page {
   position: relative;
   min-height: 100%;
-  padding: 28px 24px 40px;
+  padding: 56px 48px 48px;
   background: var(--bg-primary);
   color: var(--text-primary);
 }
@@ -705,12 +714,12 @@ onMounted(() => {
 
 .tab-button {
   position: relative;
-  height: 34px;
+  height: 38px;
   border: 0;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 550;
   cursor: pointer;
 }
@@ -817,13 +826,13 @@ onMounted(() => {
 }
 
 .task-actions {
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
 }
 
 .icon-button {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -831,7 +840,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
@@ -841,10 +850,41 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+.has-tooltip {
+  position: relative;
+}
+
+.has-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  width: max-content;
+  max-width: 160px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.has-tooltip:hover::after,
+.has-tooltip:focus-within::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .toggle-switch {
   position: relative;
-  width: 32px;
-  height: 18px;
+  width: 30px;
+  height: 17px;
   display: inline-block;
   flex-shrink: 0;
 }
@@ -867,8 +907,8 @@ onMounted(() => {
 .toggle-slider::before {
   content: '';
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   top: 2px;
   left: 2px;
   border-radius: 50%;
@@ -882,7 +922,7 @@ onMounted(() => {
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(14px);
+  transform: translateX(13px);
 }
 
 .toggle-switch input:focus-visible + .toggle-slider {
@@ -2033,34 +2073,9 @@ onMounted(() => {
   transform: translateY(8px) scale(0.99);
 }
 
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 30px;
-  z-index: 1100;
-  transform: translateX(-50%);
-  padding: 10px 16px;
-  border-radius: 7px;
-  background: var(--text-primary);
-  color: var(--bg-primary);
-  font-size: 13px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-}
-
-.toast-enter-active,
-.toast-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translate(-50%, 6px);
-}
-
 @media (max-width: 860px) {
   .automation-page {
-    padding: 24px 20px 36px;
+    padding: 44px 32px 40px;
   }
 
   .tabs {
@@ -2074,7 +2089,7 @@ onMounted(() => {
 
 @media (max-width: 560px) {
   .automation-page {
-    padding: 20px 16px 32px;
+    padding: 36px 20px 36px;
   }
 
   .heading-group h1 {

@@ -1,0 +1,74 @@
+[
+  {
+    "key": "aiNews",
+    "variant": "window",
+    "modelId": null,
+    "name": "每日 AI 新闻简报",
+    "triggerType": "daily",
+    "triggerConfig": { "time": "08:30" },
+    "instruction": "每天检索过去 24 小时的 AI 行业重要新闻，筛选 5 至 8 条最值得关注的内容。用简洁中文输出新闻标题、来源、核心事实和可能影响；最后补充不超过三条趋势观察。"
+  },
+  {
+    "key": "brandSentiment",
+    "variant": "window",
+    "modelId": null,
+    "name": "品牌舆情监控周报",
+    "triggerType": "weekly",
+    "triggerConfig": { "time": "09:00", "weekdays": ["mon"] },
+    "instruction": "每周汇总过去七天与品牌相关的公开新闻、社区讨论和用户反馈。按正面、中性、负面分类，列出主要话题、代表观点和潜在风险，并给出三条可执行的跟进建议。"
+  },
+  {
+    "key": "competitorTracking",
+    "variant": "window",
+    "modelId": null,
+    "name": "每周竞品动态追踪",
+    "triggerType": "weekly",
+    "triggerConfig": { "time": "10:00", "weekdays": ["mon"] },
+    "instruction": "每周追踪主要竞品的产品更新、定价变化、融资消息、重要客户案例和社区反馈。输出按竞品归类的摘要，并标记可能影响我们产品策略的变化。"
+  },
+  {
+    "key": "stockAlerts",
+    "variant": "window",
+    "modelId": null,
+    "name": "股价监控与预警",
+    "triggerType": "daily",
+    "triggerConfig": { "time": "16:30" },
+    "instruction": "检查我关注的股票当日价格表现和重要市场新闻。仅在单日涨跌幅明显、成交量异常或出现重大新闻时发出预警；说明触发原因、相关数据和需要继续关注的风险。"
+  },
+  {
+    "key": "securityScan",
+    "variant": "code",
+    "modelId": null,
+    "name": "安全漏洞扫描",
+    "triggerType": "weekly",
+    "triggerConfig": { "time": "09:30", "weekdays": ["fri"] },
+    "instruction": "扫描当前代码仓库中最近变更的代码和依赖配置，识别经过验证的中高风险安全问题。报告漏洞位置、风险原因、影响范围和建议修复方案；不要修改任何文件。"
+  },
+  {
+    "key": "commitBugs",
+    "variant": "code",
+    "modelId": null,
+    "name": "扫描提交发现 Bug",
+    "triggerType": "daily",
+    "triggerConfig": { "time": "18:00" },
+    "instruction": "分析当前仓库最近一天的代码提交，重点检查逻辑错误、边界条件、空值处理、错误处理和潜在回归。仅报告置信度较高的问题，给出文件位置、原因和修复建议；不要直接修改代码。"
+  },
+  {
+    "key": "testCoverage",
+    "variant": "code",
+    "modelId": null,
+    "name": "补充测试覆盖",
+    "triggerType": "weekly",
+    "triggerConfig": { "time": "15:00", "weekdays": ["wed"] },
+    "instruction": "检查当前仓库最近变更的高风险代码，识别缺少自动化测试覆盖的逻辑。列出建议补充的测试场景、优先级和对应文件；不要直接创建或修改测试文件。"
+  },
+  {
+    "key": "dailyChanges",
+    "variant": "code",
+    "modelId": null,
+    "name": "每日变更摘要",
+    "triggerType": "daily",
+    "triggerConfig": { "time": "18:30" },
+    "instruction": "汇总当前仓库过去一天的代码变更。按功能、修复、重构和风险分类，说明主要影响的模块与待关注事项，生成一份简洁、适合团队同步的工程日报。"
+  }
+]

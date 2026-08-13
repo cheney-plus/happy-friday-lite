@@ -6,10 +6,10 @@
     </div>
     <article v-for="task in tasks" :key="task.id" class="configured-task" role="button" tabindex="0" @click="emit('edit', task.id)" @keydown.enter.prevent="emit('edit', task.id)" @keydown.space.prevent="emit('edit', task.id)">
       <div class="task-summary"><Cloud :size="18" :stroke-width="1.8" class="task-cloud-icon" /><strong>{{ task.name }}</strong><span class="task-schedule">{{ formatSchedule(task) }}</span></div>
-      <div class="task-actions">
-        <button class="icon-button" type="button" :title="t('automation.configured.delete')" @click.stop="emit('delete', task.id)"><X :size="18" :stroke-width="2" /></button>
-        <button class="icon-button" type="button" :title="t('automation.configured.runNow')" @click.stop="emit('run', task.id)"><CirclePlay :size="18" :stroke-width="1.8" /></button>
-        <label class="toggle-switch"><input :checked="task.enabled" type="checkbox" :aria-label="t('automation.configured.enableTask')" @click.stop @change="emit('set-enabled', task, $event.target.checked)" /><span class="toggle-slider"></span></label>
+      <div class="task-actions" @click.stop @keydown.stop>
+        <button class="icon-button has-tooltip" type="button" :title="t('automation.configured.delete')" :data-tooltip="t('automation.configured.delete')" @click="emit('delete', task.id)"><X :size="16" :stroke-width="2" /></button>
+        <button class="icon-button has-tooltip" type="button" :title="t('automation.configured.runNow')" :data-tooltip="t('automation.configured.runNow')" @click="emit('run', task.id)"><CirclePlay :size="16" :stroke-width="1.8" /></button>
+        <label class="toggle-switch has-tooltip" :title="t('automation.configured.enableTask')" :data-tooltip="t('automation.configured.enableTask')"><input :checked="task.enabled" type="checkbox" :aria-label="t('automation.configured.enableTask')" @change="emit('set-enabled', task, $event.target.checked)" /><span class="toggle-slider"></span></label>
       </div>
     </article>
     <p v-if="tasks.length === 0" class="empty-state">{{ t('automation.empty.configured') }}</p>
