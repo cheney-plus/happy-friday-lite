@@ -23,6 +23,10 @@ import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
 import { registerAgentCommands } from './agent/ipc.js'
+import {
+  registerHarnessCommands,
+  syncHarnessConfigurationIfRunning
+} from './harness/index.js'
 import { getLogDir, setLoggingEnabled } from './logger.js'
 import { getShareUrl, getNoteShareUrl } from './shareServer.js'
 import {
@@ -130,6 +134,9 @@ export function registerCommands(mainWindow) {
     // 模型配置变更时清除 Embedding 缓存
     clearEmbeddingsCache()
     mainWindow.webContents.send(CONFIG_CHANGED, config)
+    syncHarnessConfigurationIfRunning().catch(error => {
+      console.warn('[Commands] Failed to sync Harness model config:', error.message)
+    })
     return result
   })
 
@@ -1390,6 +1397,7 @@ export function registerCommands(mainWindow) {
   // Agent 模式提供工具调用能力（知识检索、笔记/日程操作、文件操作），
   // 支持 HITL 审批。会话复用 sessions 表，与普通对话历史一致。
   registerAgentCommands(mainWindow)
+  registerHarnessCommands(mainWindow)
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')
 }

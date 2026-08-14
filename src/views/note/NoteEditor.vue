@@ -2696,7 +2696,7 @@ const fixEmptyTableCells = (html) => {
 .editor-content {
   flex: 1;
   overflow-y: auto;
-  margin-top: 4px;
+  margin-top: 16px;
   padding-bottom: 40px;
   padding-right: 40px;
 }

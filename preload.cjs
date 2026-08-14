@@ -124,7 +124,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-read-memory',
       'agent-write-memory',
       'agent-get-avatar-history',
-      'agent-set-avatar'
+      'agent-set-avatar',
+      'harness-start',
+      'harness-status',
+      'harness-restart',
+      'harness-sync-config'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -166,7 +170,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-tool-result',
       'agent-tool-approval',
       'automation-updated',
-      'kb-directory-changed'
+      'kb-directory-changed',
+      'harness-status-changed'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

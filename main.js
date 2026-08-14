@@ -13,6 +13,7 @@ import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
 import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
+import { stopHarnessSidecar } from './src-electron/harness/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -46,6 +47,7 @@ initLogger(
 let mainWindow = null
 let kbWatcherHandle = null
 let powerBlockerId = null
+let shutdownStarted = false
 
 async function ensureDataDir() {
   const dataDir = isDev
@@ -209,10 +211,17 @@ app.on('window-all-closed', function () {
 })
 
 // 应用退出前关闭 Agent MCP 连接（stdio 子进程等），避免残留进程
-app.on('before-quit', () => {
-  import('./src-electron/agent/mcp.js')
-    .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections())
-    .catch(() => {})
+app.on('before-quit', (event) => {
+  if (shutdownStarted) return
+  event.preventDefault()
+  Promise.allSettled([
+    import('./src-electron/agent/mcp.js')
+      .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections()),
+    stopHarnessSidecar()
+  ]).finally(() => {
+    shutdownStarted = true
+    app.quit()
+  })
 })
 
 ipcMain.on('window-minimize', () => {

@@ -7,9 +7,10 @@
         <div class="content-wrapper">
           <router-view v-slot="{ Component }">
             <keep-alive :max="8">
-              <component :is="Component" :key="route.fullPath" />
+              <component v-if="!isHarnessRoute" :is="Component" :key="route.fullPath" />
             </keep-alive>
           </router-view>
+          <DeepSeekHarness v-if="hasVisitedHarness" v-show="isHarnessRoute" />
         </div>
       </main>
     </div>
@@ -19,7 +20,8 @@
 <script setup>
 import Sidebar from '@/components/layout/Sidebar.vue';
 import TabBar from '@/components/layout/TabBar.vue';
-import { computed, onMounted, onUnmounted, watch } from 'vue';
+import DeepSeekHarness from '@/views/harness/DeepSeekHarness.vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useAppStore, useTabStore } from '@/store';
 import { electronService } from '@/services/electron';
 import { setI18nLanguage } from '@/i18n';
@@ -35,8 +37,18 @@ const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
 
 // 分享视图：隐藏侧边栏/标签栏，全屏展示对话界面
 const isShareView = computed(() => route.meta?.share === true || !isElectronEnvironment());
+const isHarnessRoute = computed(() => route.name === 'harness');
+const hasVisitedHarness = ref(false);
 
 let unlistenConfig = null;
+
+watch(
+  () => route.name,
+  (name) => {
+    if (name === 'harness') hasVisitedHarness.value = true;
+  },
+  { immediate: true }
+);
 
 watch(
   () => route.fullPath,

@@ -1,10 +1,10 @@
-// Cross-build helper: ensure the target platform/arch's @zvec native bindings
-// are installed before electron-builder packages the app, or restore the
-// host's bindings after a cross-arch build.
+// Cross-build helper: ensure target platform/arch native bindings are installed
+// before electron-builder packages the app, or restore the host's bindings
+// after a cross-arch build.
 //
-// @zvec/bindings-<platform>-<arch> declares os/cpu filters, so `npm install`
-// skips mismatched packages on a foreign host. We use `npm pack` to download
-// the tarball and extract it manually into node_modules, bypassing the check.
+// These packages declare os/cpu filters, so `npm install` skips mismatched
+// packages on a foreign host. We use `npm pack` to download their tarballs and
+// extract them manually into node_modules, bypassing those filters.
 //
 // Usage:
 //   node prebuild-install.mjs                      restore host binding (process.platform + process.arch)
@@ -26,18 +26,33 @@ if (a1 && a2) {
   platform = process.platform; arch = process.arch
 }
 
-const PKG = `@zvec/bindings-${platform}-${arch}@0.5.0`
-const target = `node_modules/@zvec/bindings-${platform}-${arch}`
-const marker = join(target, 'zvec_node_binding.node')
+const nativePackages = [
+  {
+    name: `@zvec/bindings-${platform}-${arch}`,
+    version: '0.5.0',
+    marker: 'zvec_node_binding.node',
+  },
+  {
+    name: `@koromix/koffi-${platform}-${arch}`,
+    version: '3.1.5',
+    marker: `${platform}_${arch}/koffi.node`,
+  },
+]
 
-if (existsSync(marker)) {
-  console.log(`[prebuild-install] ${PKG} already installed, skipping`)
-} else {
-  console.log(`[prebuild-install] Downloading ${PKG} via npm pack...`)
-  const tmpDir = mkdtempSync(join(tmpdir(), `zvec-${platform}-${arch}-`))
+function installNativePackage({ name, version, marker }) {
+  const pkg = `${name}@${version}`
+  const target = `node_modules/${name}`
+
+  if (existsSync(join(target, marker))) {
+    console.log(`[prebuild-install] ${pkg} already installed, skipping`)
+    return
+  }
+
+  console.log(`[prebuild-install] Downloading ${pkg} via npm pack...`)
+  const tmpDir = mkdtempSync(join(tmpdir(), `${name.replace('/', '-')}-`))
   try {
-    execSync(`npm pack ${PKG} --pack-destination ${tmpDir}`, { stdio: 'pipe' })
-    const tarball = join(tmpDir, `zvec-bindings-${platform}-${arch}-0.5.0.tgz`)
+    execSync(`npm pack ${pkg} --pack-destination ${tmpDir}`, { stdio: 'pipe' })
+    const tarball = join(tmpDir, `${name.replace('@', '').replace('/', '-')}-${version}.tgz`)
     if (!existsSync(tarball)) {
       throw new Error(`npm pack did not produce expected tarball at ${tarball}`)
     }
@@ -51,12 +66,14 @@ if (existsSync(marker)) {
       throw new Error(`tar extraction did not produce expected 'package' dir`)
     }
 
-    mkdirSync('node_modules/@zvec', { recursive: true })
+    mkdirSync(join('node_modules', name.substring(0, name.lastIndexOf('/'))), { recursive: true })
     rmSync(target, { recursive: true, force: true })
     cpSync(extracted, target, { recursive: true })
 
-    console.log(`[prebuild-install] Installed ${PKG} -> ${target}`)
+    console.log(`[prebuild-install] Installed ${pkg} -> ${target}`)
   } finally {
     rmSync(tmpDir, { recursive: true, force: true })
   }
 }
+
+for (const nativePackage of nativePackages) installNativePackage(nativePackage)

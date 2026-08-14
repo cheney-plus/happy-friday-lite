@@ -73,6 +73,7 @@ import {
   FileText,
   CalendarDays,
   Workflow,
+  BrainCircuit,
   Bot,
   Clock,
   Settings
@@ -94,6 +95,7 @@ const iconMap = {
   FileText,
   CalendarDays,
   Workflow,
+  BrainCircuit,
   Bot,
   Clock,
   Settings
