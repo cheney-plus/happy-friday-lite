@@ -37,11 +37,15 @@ jobs:
           - os: ubuntu-24.04
             arch: x64
             arch-flag: --x64
+            build-target: --linux
             platform-key: linux-x64
             artifact-name: HappyFriday-Linux-x64
           - os: ubuntu-24.04-arm
             arch: arm64
             arch-flag: --arm64
+            # electron-builder ships FPM only for x86, so an ARM64 runner
+            # cannot create a .deb. AppImage is built without FPM.
+            build-target: --linux AppImage
             platform-key: linux-arm64
             artifact-name: HappyFriday-Linux-arm64
 
@@ -54,6 +58,12 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+
+      - name: Setup Python for native modules
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Remove Chinese npm mirrors (CI uses official sources)
         run: rm -f .npmrc
@@ -68,6 +78,9 @@ jobs:
         # dsh currently declares a Linux-only native package as a direct dependency.
         # --force lets npm install the remaining dependencies on every runner OS.
         run: npm ci --legacy-peer-deps --force
+        env:
+          # node-gyp bundled by node-pty still imports distutils, removed in Python 3.12.
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: Build frontend
         run: npm run build
@@ -80,9 +93,10 @@ jobs:
           node scripts/prebuild-clean.mjs ${{ matrix.arch }}
 
       - name: Build Electron app (Linux ${{ matrix.arch }})
-        run: npx electron-builder --linux ${{ matrix.arch-flag }}
+        run: npx electron-builder ${{ matrix.build-target }} ${{ matrix.arch-flag }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: List build artifacts
         run: ls -lh release/ || true
@@ -117,12 +131,26 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Setup Python for native modules
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup MSVC build tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Remove Chinese npm mirrors (CI uses official sources)
         run: rm -f .npmrc
         shell: bash
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps --force
+        env:
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
+          npm_config_msvs_version: '2022'
 
       - name: Build frontend
         run: npm run build
@@ -137,6 +165,8 @@ jobs:
         run: npx electron-builder --win --x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
+          GYP_MSVS_VERSION: '2022'
 
       - name: List build artifacts
         run: ls -lh release/ || true
@@ -152,7 +182,8 @@ jobs:
 
   # ──────────────────────────────────────────────────────────────────────
   # macOS 构建（arm64 + x64）
-  # 每个架构使用原生 runner，避免将错误架构的 node-pty 打进发布包。
+  # 在 Intel runner 交叉构建 ARM64：electron-builder 会为目标架构重建
+  # 原生依赖，且可避免 ARM runner 上 APFS DMG 创建的 hdiutil 兼容性问题。
   # ──────────────────────────────────────────────────────────────────────
   build-macos:
     name: Build macOS (${{ matrix.arch }})
@@ -163,7 +194,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-13
             arch: arm64
             arch-flag: --arm64
             artifact-name: HappyFriday-macOS-arm64
@@ -182,12 +213,20 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Setup Python for native modules
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Remove Chinese npm mirrors (CI uses official sources)
         run: rm -f .npmrc
         shell: bash
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps --force
+        env:
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: Build frontend
         run: npm run build
@@ -203,6 +242,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USE_HARD_LINKS: false
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: List build artifacts
         run: ls -lh release/ || true
