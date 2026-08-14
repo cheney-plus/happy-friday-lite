@@ -131,26 +131,12 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Setup Python for native modules
-        id: setup-python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Setup MSVC build tools
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
       - name: Remove Chinese npm mirrors (CI uses official sources)
         run: rm -f .npmrc
         shell: bash
 
       - name: Install npm dependencies
         run: npm ci --legacy-peer-deps --force
-        env:
-          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
-          npm_config_msvs_version: '2022'
 
       - name: Build frontend
         run: npm run build
@@ -161,12 +147,17 @@ jobs:
         run: |
           node scripts/prebuild-install.mjs win32 x64
 
+      - name: Verify Windows node-pty prebuilds
+        run: |
+          node -e "const fs=require('fs'); for (const file of ['pty.node','conpty.node','conpty_console_list.node']) { const filename='node_modules/node-pty/prebuilds/win32-x64/'+file; if (!fs.existsSync(filename)) throw new Error('Missing '+filename); }"
+
       - name: Build Electron app (Windows x64)
-        run: npx electron-builder --win --x64
+        # node-pty 1.1.0 ships Electron-compatible Node-API prebuilds for
+        # Windows x64. Rebuilding it invokes node-gyp unnecessarily and fails
+        # on newer GitHub Windows images when detecting Visual Studio.
+        run: npx electron-builder --win --x64 --config.npmRebuild=false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
-          GYP_MSVS_VERSION: '2022'
 
       - name: List build artifacts
         run: ls -lh release/ || true

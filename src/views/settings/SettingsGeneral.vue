@@ -91,6 +91,27 @@
         </div>
       </div>
 
+      <!-- 功能模块 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.modules') }}</div>
+        <div class="group-content">
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.scheduleModule') }}</span>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="moduleVisibility.schedule" @change="saveModuleVisibility" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.automationModule') }}</span>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="moduleVisibility.automation" @change="saveModuleVisibility" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- AI工具 -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.aiTools') }}</div>
@@ -613,6 +634,11 @@ const settings = reactive({
   messageNotify: false,
   noteFimCompletion: appStore.noteFimCompletion,
   scheduleDefaultView: appStore.scheduleDefaultView || 'month'
+});
+
+const moduleVisibility = reactive({
+  schedule: appStore.sidebarModules.schedule !== false,
+  automation: appStore.sidebarModules.automation !== false
 });
 
 const runtimeLogsEnabled = ref(true);
@@ -1198,6 +1224,24 @@ const saveNoteFimCompletion = async () => {
   } catch (_e) {}
 };
 
+const saveModuleVisibility = async () => {
+  const previous = { ...appStore.sidebarModules };
+  const next = {
+    schedule: moduleVisibility.schedule,
+    automation: moduleVisibility.automation
+  };
+  appStore.setSidebarModules(next);
+  try {
+    const config = await electronService.invoke('get-config');
+    if (!config) throw new Error('Failed to load config');
+    config.sidebarModules = next;
+    await electronService.invoke('save-config', config);
+  } catch (_e) {
+    Object.assign(moduleVisibility, previous);
+    appStore.setSidebarModules(previous);
+  }
+};
+
 const saveRuntimeLogsConfig = async () => {
   const nextValue = runtimeLogsEnabled.value;
   try {
@@ -1253,7 +1297,14 @@ onMounted(() => {
   settings.displayMode = currentMode.value;
   currentLanguage.value = appStore.language || 'zh-CN';
   electronService.invoke('get-config').then((config) => {
-    if (config) runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
+    if (config) {
+      runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
+      Object.assign(moduleVisibility, {
+        schedule: config.sidebarModules?.schedule !== false,
+        automation: config.sidebarModules?.automation !== false
+      });
+      appStore.setSidebarModules(moduleVisibility);
+    }
   });
   loadBackupConfig();
   loadHistoryConfig();

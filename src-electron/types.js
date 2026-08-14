@@ -8,6 +8,11 @@ export function defaultConfig() {
     runtimeLogsEnabled: true,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     noteFimCompletion: true,
+    // 侧边栏可选功能模块：默认全部开启，兼容旧配置时缺失字段也视为开启
+    sidebarModules: {
+      schedule: true,
+      automation: true
+    },
     // 用户头像：由 set_avatar 工具写入，结构为 { dataUrl, name, rarity, updatedAt }
     // 为 null 时前端回退到默认头像 src/assets/images/user.png
     avatar: null,

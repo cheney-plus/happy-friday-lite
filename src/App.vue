@@ -131,6 +131,7 @@ onMounted(async () => {
         if (config.scheduleDefaultView) {
           appStore.setScheduleDefaultView(config.scheduleDefaultView);
         }
+        appStore.setSidebarModules(config.sidebarModules);
         if (config.avatar !== undefined) {
           appStore.setAvatar(config.avatar);
         }
@@ -154,6 +155,9 @@ onMounted(async () => {
       }
       if (data.scheduleDefaultView) {
         appStore.setScheduleDefaultView(data.scheduleDefaultView);
+      }
+      if (data.sidebarModules !== undefined) {
+        appStore.setSidebarModules(data.sidebarModules);
       }
       if (data.avatar !== undefined) {
         appStore.setAvatar(data.avatar);
