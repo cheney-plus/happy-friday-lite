@@ -909,6 +909,20 @@ export function completeAutomationRun(runId, { status, output = '', error = '' }
   return queryOne('SELECT * FROM automation_runs WHERE id = ?', [runId])
 }
 
+export function recoverInterruptedAutomationRuns() {
+  const completedAt = nowISO()
+  db.run(
+    `UPDATE automation_runs
+     SET status = 'failed', completedAt = ?, durationMs = MAX(0, CAST((julianday(?) - julianday(startedAt)) * 86400000 AS INTEGER)),
+         error = '应用在任务完成前退出，执行已中断。'
+     WHERE status = 'running'`,
+    [completedAt, completedAt]
+  )
+  const recovered = db.getRowsModified()
+  if (recovered > 0) saveDb()
+  return recovered
+}
+
 export function getAutomationRuns(filters = {}) {
   const { status, taskId, startDate, endDate, limit = 200 } = filters
   const clauses = []

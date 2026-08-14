@@ -28,6 +28,8 @@ import { getShareUrl, getNoteShareUrl } from './shareServer.js'
 import {
   createAutomationTask,
   getActiveAutomationRun,
+  isAutomationRunActive,
+  isAutomationTaskRunning,
   updateAutomationTask,
   runAutomationTaskNow
 } from './automation.js'
@@ -1368,6 +1370,7 @@ export function registerCommands(mainWindow) {
   })
   ipcMain.handle('automation-delete-run', (_event, args) => {
     if (!args?.runId) throw new Error('缺少执行记录 ID')
+    if (isAutomationRunActive(args.runId)) return { ok: false, error: '任务正在执行，无法删除执行记录' }
     const deleted = db.deleteAutomationRun(args.runId)
     if (deleted) mainWindow.webContents.send('automation-updated')
     return { ok: deleted }
@@ -1375,6 +1378,7 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('automation-run-task', async (_event, args) => {
     if (!args?.taskId) throw new Error('缺少任务 ID')
     if (!db.getAutomationTask(args.taskId)) throw new Error('自动化任务不存在')
+    if (isAutomationTaskRunning(args.taskId)) return { ok: false, error: '任务正在执行' }
     runAutomationTaskNow(args.taskId).catch(error => {
       console.error('[Automation] 手动执行任务失败:', error)
     })

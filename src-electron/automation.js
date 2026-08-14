@@ -78,6 +78,24 @@ function emitStream(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
 }
 
+function scheduleTaskAfterRun(task, trigger) {
+  if (trigger === 'manual') return
+  const current = db.getAutomationTask(task.id)
+  if (!current) return
+  const lastRunAt = new Date().toISOString()
+  const completedOneTimeTask = current.triggerType === 'once' && trigger === 'schedule'
+  const nextRunAt = !current.enabled || completedOneTimeTask
+    ? null
+    : current.triggerType === 'once'
+      ? current.nextRunAt
+      : getNextRunAt({ ...current, lastRunAt }, new Date())
+  db.updateAutomationTask(task.id, {
+    lastRunAt,
+    nextRunAt,
+    enabled: completedOneTimeTask ? false : current.enabled
+  })
+}
+
 export function getActiveAutomationRun(runId) {
   const activeRun = activeRuns.get(runId)
   if (!activeRun) return null
@@ -87,6 +105,14 @@ export function getActiveAutomationRun(runId) {
     output: activeRun.output,
     segments: activeRun.segments
   }
+}
+
+export function isAutomationTaskRunning(taskId) {
+  return activeTaskIds.has(taskId)
+}
+
+export function isAutomationRunActive(runId) {
+  return activeRuns.has(runId)
 }
 
 async function runAgent(task, trigger) {
@@ -101,6 +127,7 @@ async function runAgent(task, trigger) {
     const error = '未配置任务所需的大模型，请在设置中重新选择模型。'
     db.saveMessage(session.id, 'assistant', error)
     db.completeAutomationRun(run.id, { status: 'failed', error })
+    scheduleTaskAfterRun(task, trigger)
     emitUpdated()
     return run
   }
@@ -195,21 +222,7 @@ async function runAgent(task, trigger) {
   } finally {
     activeTaskIds.delete(task.id)
     activeRuns.delete(run.id)
-    const current = db.getAutomationTask(task.id)
-    if (current) {
-      const lastRunAt = new Date().toISOString()
-      const completedOneTimeTask = current.triggerType === 'once' && trigger === 'schedule'
-      const nextRunAt = completedOneTimeTask
-        ? null
-        : current.triggerType === 'once'
-          ? current.nextRunAt
-          : getNextRunAt({ ...current, lastRunAt }, new Date())
-      db.updateAutomationTask(task.id, {
-        lastRunAt,
-        nextRunAt,
-        enabled: completedOneTimeTask ? false : current.enabled
-      })
-    }
+    scheduleTaskAfterRun(task, trigger)
     emitUpdated()
   }
   return run
@@ -218,23 +231,14 @@ async function runAgent(task, trigger) {
 async function tick() {
   const now = new Date()
   const tasks = db.getAutomationTasks().filter(task => task.enabled && task.nextRunAt && new Date(task.nextRunAt) <= now)
-  for (const task of tasks) {
-    // Claim the due occurrence before starting asynchronous work. This makes each
-    // 15-second scheduler check resilient to edits made near a minute boundary.
-    const nextRunAt = task.triggerType === 'once'
-      ? null
-      : getNextRunAt({ ...task, lastRunAt: now.toISOString() }, now)
-    db.updateAutomationTask(task.id, {
-      nextRunAt,
-      enabled: task.triggerType === 'once' ? false : task.enabled
-    })
-    runAgent(task, 'schedule')
-  }
+  for (const task of tasks) runAgent(task, 'schedule')
 }
 
 export function startAutomationScheduler(window) {
   mainWindow = window
   if (timer || alignmentTimer) return
+  const recoveredRuns = db.recoverInterruptedAutomationRuns()
+  if (recoveredRuns > 0) log.warn(`Marked ${recoveredRuns} interrupted automation run(s) as failed`)
   tick().catch(error => log.error(`Scheduler startup tick failed: ${error.message}`))
   const millisecondsToNextQuarter = 15_000 - (Date.now() % 15_000)
   alignmentTimer = setTimeout(() => {
@@ -271,7 +275,11 @@ export function updateAutomationTask(taskId, args) {
   if (!existing) return null
   const merged = { ...existing, ...args, triggerConfig: args.triggerConfig || existing.triggerConfig }
   const cronExpression = buildCronExpression(merged.triggerType, merged.triggerConfig)
-  const nextRunAt = merged.enabled === false ? null : getNextRunAt(merged)
+  const scheduleChanged = args.triggerType !== undefined || args.triggerConfig !== undefined
+  const scheduleTask = scheduleChanged && merged.triggerType === 'interval'
+    ? { ...merged, lastRunAt: null }
+    : merged
+  const nextRunAt = merged.enabled === false ? null : getNextRunAt(scheduleTask)
   const saved = db.updateAutomationTask(taskId, { ...args, cronExpression, nextRunAt })
   emitUpdated()
   return saved

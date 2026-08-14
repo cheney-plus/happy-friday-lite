@@ -2,7 +2,6 @@
   <section class="configured-panel">
     <div class="local-task-notice">
       <div class="notice-message"><Info :size="17" :stroke-width="2" /><span>{{ t('automation.configured.localTaskNotice') }}</span></div>
-      <div class="keep-awake-control"><span>{{ t('automation.configured.keepAwake') }}</span><label class="toggle-switch"><input v-model="keepAwake" type="checkbox" :aria-label="t('automation.configured.keepAwake')" /><span class="toggle-slider"></span></label></div>
     </div>
     <article v-for="task in tasks" :key="task.id" class="configured-task" role="button" tabindex="0" @click="emit('edit', task.id)" @keydown.enter.prevent="emit('edit', task.id)" @keydown.space.prevent="emit('edit', task.id)">
       <div class="task-summary"><Cloud :size="18" :stroke-width="1.8" class="task-cloud-icon" /><strong>{{ task.name }}</strong><span class="task-schedule">{{ formatSchedule(task) }}</span></div>
@@ -22,7 +21,6 @@ import { useI18n } from 'vue-i18n';
 import { CirclePlay, Cloud, X } from 'lucide-vue-next';
 
 const props = defineProps({ tasks: { type: Array, required: true } });
-const keepAwake = defineModel('keepAwake', { type: Boolean, default: false });
 const emit = defineEmits(['edit', 'delete', 'run', 'set-enabled']);
 const { t } = useI18n();
 const intervalUnits = computed(() => [

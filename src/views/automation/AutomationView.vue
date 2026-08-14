@@ -31,7 +31,6 @@
 
     <ConfiguredTasks
       v-if="activeTab === 'configured'"
-      v-model:keep-awake="keepAwake"
       :tasks="tasks"
       @edit="openTaskEditor"
       @delete="deleteTask"
@@ -268,7 +267,6 @@ const getCurrentLocalDateTime = () => {
 const getCurrentLocalTime = () => getCurrentLocalDateTime().slice(11);
 
 const activeTab = ref('configured');
-const keepAwake = ref(false);
 const tasks = ref([]);
 const runs = ref([]);
 const manualCreateVisible = ref(false);
@@ -560,7 +558,8 @@ const setTaskEnabled = async (task, enabled) => {
 };
 
 const runTask = async (taskId) => {
-  await electronService.invoke('automation-run-task', { taskId });
+  const result = await electronService.invoke('automation-run-task', { taskId });
+  if (!result?.ok) return;
   await loadRuns();
 };
 
@@ -570,7 +569,8 @@ const deleteTask = async (taskId) => {
 };
 
 const deleteRun = async (run) => {
-  await electronService.invoke('automation-delete-run', { runId: run.id });
+  const result = await electronService.invoke('automation-delete-run', { runId: run.id });
+  if (!result?.ok) return;
   await loadRuns();
 };
 
@@ -765,8 +765,7 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.notice-message,
-.keep-awake-control {
+.notice-message {
   display: flex;
   align-items: center;
 }
@@ -778,12 +777,6 @@ onMounted(() => {
 .notice-message svg {
   flex-shrink: 0;
   color: var(--accent-color);
-}
-
-.keep-awake-control {
-  gap: 8px;
-  flex-shrink: 0;
-  color: var(--text-secondary);
 }
 
 .configured-task {
@@ -2115,7 +2108,6 @@ onMounted(() => {
     gap: 12px;
   }
 
-  .keep-awake-control,
   .task-actions {
     width: 100%;
     justify-content: flex-end;
