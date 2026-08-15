@@ -2,9 +2,9 @@
   <div class="friday-container" @click="closeAllDropdowns">
     <div class="friday-content">
       <div class="logo-section">
-        <div class="logo-badge">{{ t('friday.badge') }}</div>
         <div class="logo-main">
-          <img :src="logoImage" alt="Friday" class="logo-image" />
+          <img :src="logoImage" alt="Friday" class="logo-image" draggable="false" />
+          <img :src="happyFridayTextImage" alt="Happy Friday" class="happy-friday-text-image" draggable="false" />
         </div>
         <p class="logo-subtitle">{{ t('friday.greeting') }}</p>
       </div>
@@ -335,10 +335,11 @@ const inputText = ref('');
 const textareaRef = ref(null);
 
 const isDark = computed(() => appStore.theme === 'dark');
-const logoImage = computed(() => {
+const logoImage = new URL('@/assets/images/friday-w.png', import.meta.url).href;
+const happyFridayTextImage = computed(() => {
   return isDark.value
-    ? new URL('@/assets/images/friday-b.png', import.meta.url).href
-    : new URL('@/assets/images/friday-w.png', import.meta.url).href;
+    ? new URL('@/assets/images/HPTEXT-w.png', import.meta.url).href
+    : new URL('@/assets/images/HPTEXT-b.png', import.meta.url).href;
 });
 
 const showModeDropdown = ref(false);
@@ -829,21 +830,6 @@ const handleFeatureClick = (id) => {
   gap: 8px;
 }
 
-.logo-badge {
-  padding: 4px 12px;
-  background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
-  color: #065f46;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 12px;
-  margin-bottom: 4px;
-}
-
-[data-theme='dark'] .logo-badge {
-  background: linear-gradient(135deg, #065f46 0%, #047857 100%);
-  color: #d1fae5;
-}
-
 .logo-main {
   display: flex;
   align-items: center;
@@ -860,12 +846,22 @@ const handleFeatureClick = (id) => {
   width: auto;
   object-fit: contain;
   margin: 0;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.happy-friday-text-image {
+  width: min(360px, 88vw);
+  height: auto;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .logo-subtitle {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 400;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   letter-spacing: 3px;
   margin: 0;
 }

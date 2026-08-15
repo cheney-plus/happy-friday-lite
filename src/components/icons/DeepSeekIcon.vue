@@ -27,7 +27,7 @@ const iconStyle = computed(() => {
 .deepseek-icon {
   display: block;
   flex: 0 0 auto;
-  background-color: #000;
+  background-color: currentColor;
   -webkit-mask: var(--deepseek-icon) center / contain no-repeat;
   mask: var(--deepseek-icon) center / contain no-repeat;
 }

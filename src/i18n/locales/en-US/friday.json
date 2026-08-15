@@ -1,8 +1,7 @@
 {
   "title": "Friday Module",
   "placeholder": "Ask Friday anything",
-  "badge": "Personalized Knowledge AI Assistant",
-  "greeting": "Hello, I'm Friday!",
+  "greeting": "What would you like Friday to do for you?",
   "remove": "Remove",
   "referenceNoteFile": "Reference Note/File",
   "referenceKb": "Reference Knowledge Base",
