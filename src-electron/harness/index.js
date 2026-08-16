@@ -29,6 +29,7 @@ let startPromise = null
 let generation = 0
 let activeModelSignature = null
 let recentOutput = []
+let startupDiagnostic = null
 let state = {
   status: 'idle',
   url: null,
@@ -246,10 +247,13 @@ function probe(url) {
 }
 
 function failureDetail(fallback) {
-  return recentOutput.find(line => line.includes('Error: dsh:'))
+  return startupDiagnostic
+    || recentOutput.find(line => line.includes('Error: dsh:'))
     || recentOutput.find(line => /^error(?:\s+\[[^\]]+\])?:/i.test(line))
     || recentOutput.find(line => /cannot find package/i.test(line))
-    || recentOutput.at(-1)
+    // Node appends this footer after an unhandled exception. It contains no
+    // diagnostic information and used to hide the real startup failure.
+    || [...recentOutput].reverse().find(line => !/^Node\.js v\d+(?:\.\d+){1,2}$/i.test(line))
     || fallback
 }
 
@@ -260,6 +264,9 @@ async function waitUntilReady(url, child, expectedGeneration) {
       throw new Error('Harness startup was superseded')
     }
     if (child.exitCode !== null) {
+      // `exit` can be emitted before stderr has flushed. Give its diagnostic
+      // output a brief chance to reach `captureOutput` before selecting it.
+      await new Promise(resolve => setTimeout(resolve, 50))
       throw new Error(failureDetail(`Harness exited with code ${child.exitCode}`))
     }
     if (child.harnessSpawnError) throw child.harnessSpawnError
@@ -276,6 +283,13 @@ function captureOutput(stream) {
     for (const line of chunk.split(/\r?\n/)) {
       const value = line.trim()
       if (!value) continue
+      if (!startupDiagnostic && (
+        value.includes('Error: dsh:')
+        || /^error(?:\s+\[[^\]]+\])?:/i.test(value)
+        || /cannot find package/i.test(value)
+      )) {
+        startupDiagnostic = value
+      }
       recentOutput.push(value)
       if (recentOutput.length > 30) recentOutput.shift()
     }
@@ -310,6 +324,7 @@ async function bootHarness() {
     const url = `http://127.0.0.1:${port}`
     const cli = resolveHarnessCli()
     recentOutput = []
+    startupDiagnostic = null
 
     const child = spawn(
       process.execPath,
