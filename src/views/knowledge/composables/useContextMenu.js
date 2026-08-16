@@ -20,7 +20,8 @@ export function useContextMenu() {
     visible: false,
     x: 0,
     y: 0,
-    item: null
+    item: null,
+    items: []
   });
 
   function showContextMenu(event, categoryId, item) {
@@ -47,16 +48,19 @@ export function useContextMenu() {
     fileContextMenu.visible = false;
   }
 
-  function showFileItemContextMenu(event, item) {
+  function showFileItemContextMenu(event, itemOrItems) {
+    const items = Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems];
     fileItemContextMenu.visible = true;
     fileItemContextMenu.x = event.clientX;
     fileItemContextMenu.y = event.clientY;
-    fileItemContextMenu.item = item;
+    fileItemContextMenu.item = items[0] || null;
+    fileItemContextMenu.items = items;
   }
 
   function hideFileItemContextMenu() {
     fileItemContextMenu.visible = false;
     fileItemContextMenu.item = null;
+    fileItemContextMenu.items = [];
   }
 
   return {

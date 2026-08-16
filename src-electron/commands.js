@@ -792,6 +792,36 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  // 桌面拖放同时支持文件和文件夹，并在主进程按实际文件类型执行格式过滤。
+  ipcMain.handle('kb-copy-drop-items', async (_event, args) => {
+    const { srcPaths, destDir, allowedExtensions } = args
+    if (!Array.isArray(srcPaths) || !destDir) return { success: false, error: 'Missing parameters' }
+    const copied = []
+    const failed = []
+    for (const srcPath of srcPaths) {
+      try {
+        const stat = fs.statSync(srcPath)
+        if (stat.isDirectory()) {
+          const destPath = path.join(destDir, path.basename(srcPath))
+          copyDirectoryRecursive(srcPath, destPath, allowedExtensions)
+          copied.push(destPath)
+        } else {
+          const ext = path.extname(srcPath).slice(1).toLowerCase()
+          if (allowedExtensions && allowedExtensions.length && !allowedExtensions.includes(ext)) {
+            failed.push({ path: srcPath, error: 'Unsupported file type' })
+            continue
+          }
+          const destPath = path.join(destDir, path.basename(srcPath))
+          fs.copyFileSync(srcPath, destPath)
+          copied.push(destPath)
+        }
+      } catch (e) {
+        failed.push({ path: srcPath, error: e.message })
+      }
+    }
+    return { success: failed.length === 0, copied, failed }
+  })
+
   // 抓取网页原始 HTML（在主进程执行以规避渲染进程跨域限制）
   // 正文清洗交由渲染进程的 @mozilla/readability 完成，这里只负责抓取
   ipcMain.handle('kb-fetch-webpage', async (_event, args) => {

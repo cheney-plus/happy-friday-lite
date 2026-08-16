@@ -110,7 +110,7 @@
       @close="hideFileItemContextMenu"
     >
       <div
-        v-if="canBuildIndex(fileItemContextMenu.item)"
+        v-if="canBuildIndex(fileItemContextMenu.items)"
         class="context-menu-item"
         @mousedown="handleBuildIndex"
       >
@@ -121,7 +121,7 @@
         </svg>
         <span>构建索引</span>
       </div>
-      <div class="context-menu-item" @mousedown="handleRenameFile">
+      <div v-if="fileItemContextMenu.items.length === 1" class="context-menu-item" @mousedown="handleRenameFile">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -373,7 +373,8 @@ function confirmDelete() {
   showDeleteConfirm.value = false;
 
   if (pendingDeleteFile.value) {
-    deleteFileOrFolder(pendingDeleteFile.value);
+    const items = Array.isArray(pendingDeleteFile.value) ? pendingDeleteFile.value : [pendingDeleteFile.value];
+    Promise.all(items.map(deleteFileOrFolder));
     pendingDeleteFile.value = null;
     return;
   }
@@ -399,15 +400,16 @@ function handleRenameFile() {
 }
 
 // 判断文件是否可以构建索引（非文件夹 + 非工作区）
-function canBuildIndex(item) {
-  return item && !item.isDirectory && currentCategoryId.value !== 'agent';
+function canBuildIndex(items) {
+  return Array.isArray(items) && items.some(item => !item.isDirectory) && currentCategoryId.value !== 'agent';
 }
 
 // 右键"构建索引"：手动触发单个文件的向量化，弹窗显示进度
 function handleBuildIndex() {
-  const item = fileItemContextMenu.item;
+  const items = fileItemContextMenu.items.filter(item => !item.isDirectory && item.path);
   hideFileItemContextMenu();
-  if (!item || !item.path) return;
+  if (!items.length) return;
+  const item = items[0];
 
   // 立即弹出进度弹窗
   buildIndexState.visible = true;
@@ -418,7 +420,7 @@ function handleBuildIndex() {
   buildIndexState.totalChunks = 0;
   buildIndexState.status = 'processing';
 
-  electronService.invoke('rag-build-index', { filePath: item.path })
+  Promise.all(items.map(file => electronService.invoke('rag-build-index', { filePath: file.path })))
     .catch(e => console.error('[RAG] build-index failed:', e));
 }
 
@@ -451,14 +453,16 @@ function onBuildTaskComplete(data) {
 }
 
 function handleDeleteFile() {
-  const item = fileItemContextMenu.item;
+  const items = fileItemContextMenu.items;
   hideFileItemContextMenu();
-  if (!item) return;
-  pendingDeleteFile.value = item;
-  if (item.isDirectory) {
-    deleteConfirmMessage.value = `删除「${item.name}」会导致该文件夹下所有文件被删除，是否确认删除？`;
+  if (!items.length) return;
+  pendingDeleteFile.value = items;
+  if (items.length > 1) {
+    deleteConfirmMessage.value = `确认删除选中的 ${items.length} 个项目？此操作不可撤销。`;
+  } else if (items[0].isDirectory) {
+    deleteConfirmMessage.value = `删除「${items[0].name}」会导致该文件夹下所有文件被删除，是否确认删除？`;
   } else {
-    deleteConfirmMessage.value = `确认删除「${item.name}」？此操作不可撤销。`;
+    deleteConfirmMessage.value = `确认删除「${items[0].name}」？此操作不可撤销。`;
   }
   showDeleteConfirm.value = true;
 }

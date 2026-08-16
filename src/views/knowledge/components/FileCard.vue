@@ -1,6 +1,7 @@
 <template>
   <div
     class="file-card"
+    :class="{ selected }"
     @click="$emit('open', file)"
     @dblclick="$emit('open', file)"
     @contextmenu.prevent.stop="$emit('contextmenu', $event)"
@@ -41,7 +42,8 @@ import { getFileIconComponent, getTypeLabel, formatDate, formatFileSize } from '
 
 const props = defineProps({
   file: { type: Object, required: true },
-  ragRefreshKey: { type: Number, default: 0 }
+  ragRefreshKey: { type: Number, default: 0 },
+  selected: { type: Boolean, default: false }
 });
 
 defineEmits(['open', 'contextmenu']);
@@ -165,6 +167,11 @@ $type-colors: (
 
   &:hover {
     background: var(--bg-hover);
+  }
+
+  &.selected {
+    background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+    outline: 1px solid color-mix(in srgb, var(--accent-color) 32%, transparent);
   }
 
   &:active {

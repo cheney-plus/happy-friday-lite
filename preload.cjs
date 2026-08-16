@@ -1,7 +1,11 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+
+  getPathForFile(file) {
+    return webUtils.getPathForFile(file)
+  },
 
   invoke(channel, ...args) {
     const validChannels = [
@@ -67,6 +71,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-path-exists',
       'kb-copy-file',
       'kb-copy-folder',
+      'kb-copy-drop-items',
       'kb-fetch-webpage',
       'kb-save-webpage',
       'kb-save-note',
