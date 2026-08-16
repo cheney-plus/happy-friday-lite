@@ -98,6 +98,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
+      - name: Verify packaged Linux native modules (${{ matrix.arch }})
+        run: node scripts/verify-packaged-native-modules.mjs ${{ matrix.arch }}
+
       - name: List build artifacts
         run: ls -lh release/ || true
         shell: bash
