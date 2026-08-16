@@ -39,7 +39,7 @@
 
 ### Friday 智能助手
 
-![Friday 智能助手首页](docs/resource/PixPin_2026-07-11_03-30-42.png)
+![Friday 智能助手首页](docs/resource/PixPin_2026-08-15_16-51-10.png)
 
 ![Friday 对话与代码执行](docs/resource/PixPin_2026-07-11_03-31-58.png)
 
