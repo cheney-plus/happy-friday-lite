@@ -11,8 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "node scripts/prebuild-install.mjs x64 && node scripts/prebuild-clean.mjs x64 && node scripts/fix-langgraph-sdk.mjs && vite build && electron-builder --linux --x64 && node scripts/verify-packaged-native-modules.mjs x64 && node scripts/prebuild-install.mjs",
-    "electron:build:arm64": "node scripts/prebuild-install.mjs arm64 && node scripts/prebuild-clean.mjs arm64 && node scripts/fix-langgraph-sdk.mjs && vite build && electron-builder --linux --arm64 && node scripts/verify-packaged-native-modules.mjs arm64 && node scripts/prebuild-install.mjs",
+    "electron:build": "node scripts/prebuild-install.mjs x64 && node scripts/prebuild-clean.mjs x64 && node scripts/fix-langgraph-sdk.mjs && vite build && electron-builder --linux --x64 --config.npmRebuild=false && node scripts/verify-packaged-native-modules.mjs x64 && node scripts/prebuild-install.mjs",
+    "electron:build:arm64": "node scripts/prebuild-install.mjs arm64 && node scripts/prebuild-clean.mjs arm64 && node scripts/fix-langgraph-sdk.mjs && vite build && electron-builder --linux --arm64 --config.npmRebuild=false && node scripts/verify-packaged-native-modules.mjs arm64 && node scripts/prebuild-install.mjs",
     "electron:build:all": "npm run electron:build && npm run electron:build:arm64",
     "start": "electron .",
     "postinstall": "node scripts/fix-langgraph-sdk.mjs"
