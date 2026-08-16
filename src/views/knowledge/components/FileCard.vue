@@ -170,8 +170,8 @@ $type-colors: (
   }
 
   &.selected {
-    background: color-mix(in srgb, var(--accent-color) 8%, transparent);
-    outline: 1px solid color-mix(in srgb, var(--accent-color) 32%, transparent);
+    background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
+    outline: 1px solid color-mix(in srgb, var(--text-secondary) 38%, transparent);
   }
 
   &:active {

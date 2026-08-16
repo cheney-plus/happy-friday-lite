@@ -1347,7 +1347,7 @@ onBeforeUnmount(() => {
     position: relative;
 
     &.is-dropping {
-      outline: 2px dashed var(--accent-color);
+      outline: 2px dashed var(--text-secondary);
       outline-offset: -6px;
     }
 
@@ -1358,8 +1358,8 @@ onBeforeUnmount(() => {
     .selection-marquee {
       position: absolute;
       pointer-events: none;
-      background: color-mix(in srgb, var(--accent-color) 6%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
+      background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--text-secondary) 55%, transparent);
       border-radius: 10px;
       z-index: 5;
     }
@@ -1371,7 +1371,7 @@ onBeforeUnmount(() => {
       align-items: center;
       justify-content: center;
       pointer-events: none;
-      color: var(--accent-color);
+      color: var(--text-secondary);
       font-size: 14px;
       font-weight: 500;
       background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
@@ -1417,7 +1417,7 @@ onBeforeUnmount(() => {
         }
 
         &.selected {
-          background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+          background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
         }
 
         .col-name {
