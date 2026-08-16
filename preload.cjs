@@ -1,7 +1,11 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+
+  getPathForFile(file) {
+    return webUtils.getPathForFile(file)
+  },
 
   invoke(channel, ...args) {
     const validChannels = [
@@ -67,6 +71,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-path-exists',
       'kb-copy-file',
       'kb-copy-folder',
+      'kb-copy-drop-items',
       'kb-fetch-webpage',
       'kb-save-webpage',
       'kb-save-note',
@@ -99,6 +104,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'usage-get-stats',
       'usage-clear',
       'model-query-balance',
+      'automation-list-tasks',
+      'automation-list-runs',
+      'automation-get-active-run',
+      'automation-create-task',
+      'automation-update-task',
+      'automation-delete-task',
+      'automation-delete-run',
+      'automation-run-task',
       'agent-invoke',
       'agent-stop',
       'agent-tool-approval-resume',
@@ -116,7 +129,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-read-memory',
       'agent-write-memory',
       'agent-get-avatar-history',
-      'agent-set-avatar'
+      'agent-set-avatar',
+      'harness-start',
+      'harness-status',
+      'harness-restart',
+      'harness-sync-config'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -157,7 +174,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-tool-call',
       'agent-tool-result',
       'agent-tool-approval',
-      'kb-directory-changed'
+      'automation-updated',
+      'kb-directory-changed',
+      'harness-status-changed'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

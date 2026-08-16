@@ -1,0 +1,16 @@
+{
+  "title": "DeepSeek Harness",
+  "starting": "正在启动 DeepSeek Harness",
+  "startingDetail": "正在同步统一模型配置并连接 Happy Friday 工具。",
+  "modelRequired": "需要配置模型",
+  "modelRequiredDetail": "Harness 使用设置中统一选择的模型，请先添加并选择一个完整的模型配置。",
+  "openSettings": "打开模型设置",
+  "startFailed": "Harness 启动失败",
+  "unknownError": "未知错误",
+  "retry": "重试",
+  "refresh": "刷新 Harness",
+  "restart": "重启 Harness",
+  "openExternal": "在浏览器中打开",
+  "toolCount": "{count} 个 Friday 工具",
+  "noModel": "未选择模型"
+}

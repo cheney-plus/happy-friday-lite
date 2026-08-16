@@ -11,7 +11,7 @@
             <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
           </svg>
         </button>
-        <span class="tooltip">撤销</span>
+        <span class="tooltip">{{ t('note.toolbar.undo') }}</span>
       </div>
 
       <div class="tooltip-wrapper">
@@ -21,21 +21,21 @@
             <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
           </svg>
         </button>
-        <span class="tooltip">重做</span>
+        <span class="tooltip">{{ t('note.toolbar.redo') }}</span>
       </div>
 
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" @click="editor.chain().focus().clearNodes().unsetAllMarks().run()">
+        <button class="toolbar-btn" @click="clearFormatting">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
         </button>
-        <span class="tooltip">清除格式</span>
+        <span class="tooltip">{{ t('note.toolbar.clearFormat') }}</span>
       </div>
 
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('link') }" @click="addLink" :disabled="!hasSelection">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
         </button>
-        <span class="tooltip">链接</span>
+        <span class="tooltip">{{ t('note.toolbar.link') }}</span>
       </div>
 
       <div class="toolbar-divider"></div>
@@ -44,13 +44,13 @@
       <div class="dropdown-wrapper">
         <button class="toolbar-btn dropdown-toggle" @click="toggleInsertMenu" :class="{ active: showInsertMenu }">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-          插入
+          {{ t('note.toolbar.insert') }}
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showInsertMenu" class="dropdown-menu insert-menu">
           <div class="menu-item has-submenu" @mouseenter="openTablePicker" @mouseleave="delayHideTableSubmenu">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
-            表格
+            {{ t('note.toolbar.table') }}
             <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             <div v-if="showTableSubmenu" class="submenu table-submenu table-picker" @mouseenter="cancelTableSubmenuDelay" @mouseleave="delayHideTableSubmenu">
               <div class="table-picker-info">{{ tableRows }} × {{ tableCols }}</div>
@@ -67,19 +67,19 @@
           </div>
           <div class="menu-item" @click="addImage">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-            图片
+            {{ t('note.toolbar.image') }}
           </div>
           <div class="menu-item" @click="editor.chain().focus().toggleCodeBlock().run()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-            代码块
+            {{ t('note.toolbar.codeBlock') }}
           </div>
           <div class="menu-item" @click="editor.chain().focus().setHorizontalRule().run()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line></svg>
-            分割线
+            {{ t('note.toolbar.divider') }}
           </div>
           <div class="menu-item" @click="editor.chain().focus().toggleBlockquote().run()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 1 1 1 1z"></path></svg>
-            引用
+            {{ t('note.toolbar.quote') }}
           </div>
         </div>
       </div>
@@ -91,25 +91,25 @@
         <button class="toolbar-btn" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">
           <span style="font-weight: 700; font-size: 14px;">B</span>
         </button>
-        <span class="tooltip">粗体</span>
+        <span class="tooltip">{{ t('note.toolbar.bold') }}</span>
       </div>
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()">
           <span style="font-style: italic; font-size: 14px;">I</span>
         </button>
-        <span class="tooltip">斜体</span>
+        <span class="tooltip">{{ t('note.toolbar.italic') }}</span>
       </div>
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('underline') }" @click="editor.chain().focus().toggleUnderline().run()">
           <span style="text-decoration: underline; font-size: 14px;">U</span>
         </button>
-        <span class="tooltip">下划线</span>
+        <span class="tooltip">{{ t('note.toolbar.underline') }}</span>
       </div>
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()">
           <span style="text-decoration: line-through; font-size: 14px;">S</span>
         </button>
-        <span class="tooltip">删除线</span>
+        <span class="tooltip">{{ t('note.toolbar.strike') }}</span>
       </div>
 
       <div class="dropdown-wrapper">
@@ -118,13 +118,13 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHighlightMenu" class="dropdown-menu highlight-menu">
-          <div class="text-color-header">背景颜色</div>
-          <button class="default-color-btn" @click="setHighlight('transparent')">无背景</button>
+          <div class="text-color-header">{{ t('note.toolbar.backgroundColor') }}</div>
+          <button class="default-color-btn" @click="setHighlight('transparent')">{{ t('note.toolbar.noBackground') }}</button>
           <div class="color-picker-grid highlight-grid">
             <div class="color-option" v-for="color in highlightColorPalette" :key="color"
                  :style="{ backgroundColor: color, border: color === '#ffffff' ? '1px solid #e5e7eb' : 'none' }"
                  @click="setHighlight(color)"
-                 :title="color === 'transparent' ? '取消高亮' : color"></div>
+                 :title="color === 'transparent' ? t('note.toolbar.removeHighlight') : color"></div>
           </div>
         </div>
       </div>
@@ -135,8 +135,8 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showTextColorMenu" class="dropdown-menu text-color-menu">
-          <div class="text-color-header">文字颜色</div>
-          <button class="default-color-btn" @click="setTextColor('inherit')">默认颜色</button>
+          <div class="text-color-header">{{ t('note.toolbar.textColor') }}</div>
+          <button class="default-color-btn" @click="setTextColor('inherit')">{{ t('note.toolbar.defaultColor') }}</button>
           <div class="color-picker-grid text-color-grid">
             <div class="color-option" v-for="color in textColorPalette" :key="color"
                  :style="{ backgroundColor: color, border: color === '#ffffff' ? '1px solid #e5e7eb' : 'none' }"
@@ -155,15 +155,21 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHeadingMenu" class="dropdown-menu heading-menu">
-          <div class="menu-item" :class="{ active: !isHeadingActive }" @click="setHeading(0)">正文</div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 1 }) }" @click="setHeading(1)">
-            <span style="font-size: 20px; font-weight: 600;">标题 1</span>
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('noteTitle'), disabled: !canSetNoteTitle }" @click="setNoteTitle">
+            <span class="note-title-menu-label">{{ t('note.toolbar.title') }}</span>
           </div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 2 }) }" @click="setHeading(2)">
-            <span style="font-size: 17px; font-weight: 600;">标题 2</span>
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 1 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(1)">
+            <span class="heading-level-1-label">{{ t('note.toolbar.heading1') }}</span>
           </div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }) }" @click="setHeading(3)">
-            <span style="font-size: 15px; font-weight: 600;">标题 3</span>
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 2 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(2)">
+            <span class="heading-level-2-label">{{ t('note.toolbar.heading2') }}</span>
+          </div>
+          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(3)">
+            <span class="heading-level-3-label">{{ t('note.toolbar.heading3') }}</span>
+          </div>
+          <div class="menu-item" :class="{ active: editor.isActive('paragraph'), disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
+          <div class="menu-item" :class="{ active: editor.isActive('smallParagraph'), disabled: editor.isActive('noteTitle') }" @click="setSmallBody">
+            <span class="small-body-label">{{ t('note.toolbar.smallBody') }}</span>
           </div>
         </div>
       </div>
@@ -175,19 +181,19 @@
         <button class="toolbar-btn" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
         </button>
-        <span class="tooltip">无序列表</span>
+        <span class="tooltip">{{ t('note.toolbar.bulletList') }}</span>
       </div>
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg>
         </button>
-        <span class="tooltip">有序列表</span>
+        <span class="tooltip">{{ t('note.toolbar.orderedList') }}</span>
       </div>
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('taskList') }" @click="editor.chain().focus().toggleTaskList().run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
         </button>
-        <span class="tooltip">任务列表</span>
+        <span class="tooltip">{{ t('note.toolbar.taskList') }}</span>
       </div>
 
       <div class="toolbar-divider"></div>
@@ -197,19 +203,19 @@
         <button class="toolbar-btn" :class="{ active: editor.isActive({ textAlign: 'left' }) }" @click="editor.chain().focus().setTextAlign('left').run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="15" y1="12" x2="3" y2="12"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
         </button>
-        <span class="tooltip">左对齐</span>
+        <span class="tooltip">{{ t('note.toolbar.alignLeft') }}</span>
       </div>
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive({ textAlign: 'center' }) }" @click="editor.chain().focus().setTextAlign('center').run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="17" y1="12" x2="7" y2="12"></line><line x1="19" y1="18" x2="5" y2="18"></line></svg>
         </button>
-        <span class="tooltip">居中对齐</span>
+        <span class="tooltip">{{ t('note.toolbar.alignCenter') }}</span>
       </div>
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive({ textAlign: 'right' }) }" @click="editor.chain().focus().setTextAlign('right').run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="12" x2="9" y2="12"></line><line x1="21" y1="18" x2="7" y2="18"></line></svg>
         </button>
-        <span class="tooltip">右对齐</span>
+        <span class="tooltip">{{ t('note.toolbar.alignRight') }}</span>
       </div>
       </div>
 
@@ -219,7 +225,7 @@
           <button class="toolbar-btn" @click="handleAddContent">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
-          <span class="tooltip">添加到知识库</span>
+          <span class="tooltip">{{ t('note.toolbar.addToKnowledge') }}</span>
         </div>
 
         <div class="dropdown-wrapper more-menu-wrapper" tabindex="-1" @blur="closeMoreMenu">
@@ -229,16 +235,16 @@
           <div v-if="showMoreMenu" class="dropdown-menu more-menu">
             <div class="menu-item" @click="shareLink">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-              复制链接
+              {{ t('note.toolbar.copyLink') }}
             </div>
             <div class="menu-item" :class="{ disabled: isExportingPdf }" @click="exportPDF">
               <svg v-if="!isExportingPdf" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               <span v-else class="export-spinner"></span>
-              {{ isExportingPdf ? '导出中...' : '导出 PDF' }}
+              {{ isExportingPdf ? t('note.toolbar.exporting') : t('note.toolbar.exportPdf') }}
             </div>
             <div class="menu-item" @click="exportMarkdown">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-              导出 Markdown
+              {{ t('note.toolbar.exportMarkdown') }}
             </div>
 
           </div>
@@ -246,16 +252,41 @@
 
         <button v-if="showAIWriteBtn" class="toolbar-btn ai-write-btn" @click="openAIWrite">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
-          Friday 助理
+          {{ t('note.aiSidebar.assistant') }}
         </button>
       </div>
     </div>
 
+    <Transition name="note-search-fade">
+      <div v-if="searchVisible" class="note-search-bar" :class="{ 'share-mode': shareMode }">
+        <Search :size="15" :stroke-width="2" class="note-search-icon" />
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          class="note-search-input"
+          type="text"
+          :placeholder="t('note.search.placeholder')"
+          @input="updateSearchQuery"
+          @keydown="handleSearchInputKeydown"
+        />
+        <span class="note-search-count">{{ searchResultCount ? searchCurrentIndex + 1 : 0 }}/{{ searchResultCount }}</span>
+        <button class="note-search-btn" :disabled="!searchResultCount" :title="t('note.search.previous')" @click="goToSearchMatch(-1)">
+          <ChevronUp :size="16" :stroke-width="2" />
+        </button>
+        <button class="note-search-btn" :disabled="!searchResultCount" :title="t('note.search.next')" @click="goToSearchMatch(1)">
+          <ChevronDown :size="16" :stroke-width="2" />
+        </button>
+        <button class="note-search-btn" :title="t('note.search.close')" @click="closeSearch">
+          <X :size="16" :stroke-width="2" />
+        </button>
+      </div>
+    </Transition>
+
     <NoteBubbleMenu v-if="editor && !shareMode" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
 
     <div v-if="!tocVisible && !shareMode" class="toc-btn" @click="emit('toggle-toc')">
-      <span class="toc-char">目</span>
-      <span class="toc-char">录</span>
+      <span class="toc-char">{{ t('note.toc.char1') }}</span>
+      <span class="toc-char">{{ t('note.toc.char2') }}</span>
     </div>
 
     <EditorContent :editor="editor" class="editor-content" />
@@ -273,12 +304,12 @@
     <div v-if="showLinkDialog" class="dialog-overlay" @click.self="closeLinkDialog">
       <div class="dialog">
         <div class="dialog-header">
-          <h3>{{ isEditingLink ? '编辑链接' : '插入链接' }}</h3>
+          <h3>{{ isEditingLink ? t('note.linkDialog.editTitle') : t('note.linkDialog.insertTitle') }}</h3>
           <button class="dialog-close" @click="closeLinkDialog">×</button>
         </div>
         <div class="dialog-body">
           <div class="form-group">
-            <label>链接地址</label>
+            <label>{{ t('note.linkDialog.address') }}</label>
             <input
               ref="linkUrlInput"
               v-model="linkUrl"
@@ -290,9 +321,9 @@
           </div>
         </div>
         <div class="dialog-footer">
-          <button class="btn btn-secondary" @click="closeLinkDialog">取消</button>
-          <button v-if="isEditingLink && editor?.isActive('link')" class="btn btn-danger" @click="removeLink">删除链接</button>
-          <button class="btn btn-primary" @click="confirmLink" :disabled="!linkUrl">{{ isEditingLink ? '更新' : '插入' }}</button>
+          <button class="btn btn-secondary" @click="closeLinkDialog">{{ t('note.cancel') }}</button>
+          <button v-if="isEditingLink && editor?.isActive('link')" class="btn btn-danger" @click="removeLink">{{ t('note.linkDialog.remove') }}</button>
+          <button class="btn btn-primary" @click="confirmLink" :disabled="!linkUrl">{{ isEditingLink ? t('note.linkDialog.update') : t('note.linkDialog.insert') }}</button>
         </div>
       </div>
     </div>
@@ -301,12 +332,12 @@
     <div v-if="showImageDialog" class="dialog-overlay" @click.self="closeImageDialog">
       <div class="dialog">
         <div class="dialog-header">
-          <h3>插入图片</h3>
+          <h3>{{ t('note.imageDialog.title') }}</h3>
           <button class="dialog-close" @click="closeImageDialog">×</button>
         </div>
         <div class="dialog-body">
           <div class="form-group">
-            <label>图片地址</label>
+            <label>{{ t('note.imageDialog.address') }}</label>
             <input
               ref="imageUrlInput"
               v-model="imageUrl"
@@ -317,19 +348,19 @@
             />
           </div>
           <div class="form-group">
-            <label>替代文本（可选）</label>
+            <label>{{ t('note.imageDialog.altLabel') }}</label>
             <input
               v-model="imageAlt"
               type="text"
-              placeholder="图片描述"
+              :placeholder="t('note.imageDialog.altPlaceholder')"
               @keyup.enter="confirmImage"
               class="form-input"
             />
           </div>
         </div>
         <div class="dialog-footer">
-          <button class="btn btn-secondary" @click="closeImageDialog">取消</button>
-          <button class="btn btn-primary" @click="confirmImage" :disabled="!imageUrl">插入</button>
+          <button class="btn btn-secondary" @click="closeImageDialog">{{ t('note.cancel') }}</button>
+          <button class="btn btn-primary" @click="confirmImage" :disabled="!imageUrl">{{ t('note.imageDialog.insert') }}</button>
         </div>
       </div>
     </div>
@@ -343,7 +374,7 @@
             <div class="sidebar-avatar">
               <span class="sidebar-avatar-icon">✦</span>
             </div>
-            <span class="sidebar-title">Friday 助理</span>
+            <span class="sidebar-title">{{ t('note.aiSidebar.assistant') }}</span>
           </div>
           <button class="sidebar-close-btn" @click="closeAISidebar">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -363,8 +394,8 @@
                   <path d="M2 12l10 5 10-5"></path>
                 </svg>
               </div>
-              <span class="sidebar-empty-text">向 Friday 提问，可获取写作帮助</span>
-              <span class="sidebar-empty-hint">主人，我可以使用写作Agent帮您修改这篇笔记</span>
+              <span class="sidebar-empty-text">{{ t('note.aiSidebar.askFriday') }}</span>
+              <span class="sidebar-empty-hint">{{ t('note.aiSidebar.emptyHint') }}</span>
             </div>
 
             <template v-for="(msg, index) in chatMessages" :key="index">
@@ -394,12 +425,20 @@
         <ChatInputBox
           ref="chatInputBoxRef"
           v-model="chatInputText"
-          placeholder="输入消息..."
+          :placeholder="t('note.aiSidebar.inputPlaceholder')"
           :is-streaming="isStreaming"
           :note-references="noteReferences"
+          :show-reference-buttons="true"
+          :attachments="attachments"
+          :selectable-kb-list="selectableKbList"
+          dropdown-direction="up"
           @send="handleChatSend"
           @stop="handleChatStop"
           @remove-reference="removeNoteReference"
+          @select-note="showNoteDialog = true"
+          @select-kb-file="showKbFileDialog = true"
+          @select-kb="handleSelectKb"
+          @remove-attachment="removeAttachment"
         />
 
         <Transition name="chat-toast-fade">
@@ -415,6 +454,21 @@
       :visible="showKbDirDialog"
       @close="showKbDirDialog = false"
       @confirm="handleKbDirConfirm"
+    />
+
+    <!-- 选择笔记弹窗 -->
+    <SelectNoteDialog
+      :visible="showNoteDialog"
+      @close="showNoteDialog = false"
+      @confirm="handleNoteConfirm"
+    />
+
+    <!-- 选择知识库文件弹窗 -->
+    <KbFileDialog
+      :visible="showKbFileDialog"
+      :selectable-kb-list="selectableKbList"
+      @close="showKbFileDialog = false"
+      @select="handleKbFileSelect"
     />
 
     <!-- 笔记保存到知识库的提示 -->
@@ -436,6 +490,10 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
+import { Extension, Node } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
@@ -483,11 +541,16 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3';
 import CodeBlockComponent from './CodeBlockComponent.vue';
 import NoteBubbleMenu from './NoteBubbleMenu.vue';
 import KbDirSelectDialog from '@/views/knowledge/components/KbDirSelectDialog.vue';
+import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue';
+import KbFileDialog from '@/views/knowledge/components/KbFileDialog.vue';
+import { DEFAULT_CATEGORIES } from '@/views/knowledge/constants';
 import { useAppStore } from '@/store';
+import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 
 const EDITOR_MARKED_OPTIONS = { gfm: true, breaks: false };
 
+const { t } = useI18n();
 const appStore = useAppStore();
 
 const lowlight = createLowlight();
@@ -512,7 +575,7 @@ lowlight.register('ini', ini);
 lowlight.register('diff', diff);
 
 const props = defineProps({
-  placeholder: { type: String, default: '开始写作...' },
+  placeholder: { type: String, default: '' },
   modelValue: { type: String, default: '' },
   noteId: { type: String, default: '' },
   tocVisible: { type: Boolean, default: false },
@@ -521,6 +584,150 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue', 'change', 'toggle-toc', 'close-sidebar', 'close-toc']);
+
+const searchVisible = ref(false);
+const searchQuery = ref('');
+const searchCurrentIndex = ref(0);
+const searchResultCount = ref(0);
+const searchInputRef = ref(null);
+const noteSearchPluginKey = new PluginKey('noteSearch');
+
+const createSearchPluginState = (doc, query, requestedIndex = 0) => {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) {
+    return { query, currentIndex: 0, positions: [], decorations: DecorationSet.empty };
+  }
+
+  const positions = [];
+  doc.descendants((node, position) => {
+    if (!node.isText || !node.text) return;
+    const text = node.text.toLocaleLowerCase();
+    let offset = 0;
+    while (offset <= text.length - normalizedQuery.length) {
+      const matchOffset = text.indexOf(normalizedQuery, offset);
+      if (matchOffset === -1) break;
+      positions.push({ from: position + matchOffset, to: position + matchOffset + normalizedQuery.length });
+      offset = matchOffset + normalizedQuery.length;
+    }
+  });
+
+  const currentIndex = positions.length
+    ? ((requestedIndex % positions.length) + positions.length) % positions.length
+    : 0;
+  const decorations = DecorationSet.create(doc, positions.map((match, index) => (
+    Decoration.inline(match.from, match.to, {
+      class: index === currentIndex ? 'note-search-match note-search-match-current' : 'note-search-match',
+    })
+  )));
+
+  return { query, currentIndex, positions, decorations };
+};
+
+const NoteSearch = Extension.create({
+  name: 'noteSearch',
+
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      key: noteSearchPluginKey,
+      state: {
+        init: (_, state) => createSearchPluginState(state.doc, ''),
+        apply: (transaction, previousState, _oldState, newState) => {
+          const meta = transaction.getMeta(noteSearchPluginKey);
+          if (!meta && !transaction.docChanged) return previousState;
+          return createSearchPluginState(
+            newState.doc,
+            meta?.query ?? previousState.query,
+            meta?.currentIndex ?? previousState.currentIndex,
+          );
+        },
+      },
+      props: {
+        decorations: state => noteSearchPluginKey.getState(state)?.decorations,
+      },
+    })];
+  },
+});
+
+const NoteTitle = Node.create({
+  name: 'noteTitle',
+  group: 'block',
+  content: 'inline*',
+  defining: true,
+
+  parseHTML() {
+    return [{ tag: 'h1[data-note-title]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['h1', { ...HTMLAttributes, 'data-note-title': 'true' }, 0];
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: () => {
+        if (!this.editor.isActive(this.name)) return false;
+
+        const { doc, selection } = this.editor.state;
+        const { $from } = selection;
+        const blockIndex = $from.index(0);
+        const nextBlock = blockIndex + 1 < doc.childCount ? doc.child(blockIndex + 1) : null;
+        const canReuseEmptyParagraph = selection.empty
+          && $from.parentOffset === $from.parent.content.size
+          && nextBlock?.type.name === 'paragraph'
+          && nextBlock.content.size === 0;
+
+        if (canReuseEmptyParagraph) {
+          return this.editor.chain().focus().setTextSelection($from.after(1) + 1).run();
+        }
+
+        return this.editor.chain().splitBlock().setNode('paragraph').run();
+      },
+    };
+  },
+});
+
+const SmallParagraph = Node.create({
+  name: 'smallParagraph',
+  priority: 1100,
+  group: 'block',
+  content: 'inline*',
+
+  parseHTML() {
+    return [{ tag: 'p[data-small-text]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['p', { ...HTMLAttributes, 'data-small-text': 'true' }, 0];
+  },
+});
+
+const prepareEditorContent = (content) => {
+  const container = document.createElement('div');
+  container.innerHTML = content || '';
+
+  if (container.querySelector('[data-note-title]')) {
+    return container.innerHTML;
+  }
+
+  const firstBlock = container.firstElementChild;
+  if (!firstBlock) {
+    container.innerHTML = '<h1 data-note-title="true"></h1>';
+    return container.innerHTML;
+  }
+
+  if (/^H[1-3]$/.test(firstBlock.tagName) || firstBlock.tagName === 'P') {
+    const title = document.createElement('h1');
+    title.setAttribute('data-note-title', 'true');
+    title.innerHTML = firstBlock.innerHTML;
+    firstBlock.replaceWith(title);
+  } else {
+    const title = document.createElement('h1');
+    title.setAttribute('data-note-title', 'true');
+    container.insertBefore(title, firstBlock);
+  }
+
+  return container.innerHTML;
+};
 
 const showInsertMenu = ref(false);
 const showHighlightMenu = ref(false);
@@ -688,18 +895,18 @@ const handleKbDirConfirm = async ({ path: destDir, name: kbName }) => {
     showKbDirDialog.value = false;
 
     if (result.success) {
-      kbSaveToastMessage.value = `已保存到「${kbName}」知识库`;
+      kbSaveToastMessage.value = t('note.toast.savedToKb', { name: kbName });
       kbSaveToastVisible.value = true;
       setTimeout(() => {
         kbSaveToastVisible.value = false;
       }, 2500);
     } else {
-      alert(`保存失败: ${result.error}`);
+      alert(t('note.toast.saveFailed', { error: result.error }));
     }
   } catch (error) {
     console.error('保存到知识库失败:', error);
     showKbDirDialog.value = false;
-    alert(`保存失败: ${error}`);
+    alert(t('note.toast.saveFailed', { error }));
   }
 };
 
@@ -707,20 +914,20 @@ const handleKbDirConfirm = async ({ path: destDir, name: kbName }) => {
 const shareLink = async () => {
   showMoreMenu.value = false;
   if (!props.noteId) {
-    showShareToast('当前笔记无法分享');
+    showShareToast(t('note.toast.cannotShare'));
     return;
   }
   try {
     const result = await electronService.invoke('get-note-share-link', { noteId: props.noteId });
     if (result && result.success && result.url) {
       await navigator.clipboard.writeText(result.url);
-      showShareToast('分享链接已复制到剪贴板');
+      showShareToast(t('note.toast.shareLinkCopied'));
     } else {
-      showShareToast((result && result.error) || '生成分享链接失败');
+      showShareToast((result && result.error) || t('note.toast.shareLinkFailed'));
     }
   } catch (err) {
     console.error('Failed to get note share link:', err);
-    showShareToast('生成分享链接失败');
+    showShareToast(t('note.toast.shareLinkFailed'));
   }
 };
 
@@ -737,6 +944,10 @@ const isExportingPdf = ref(false);
 const extractTitleFromContent = (html) => {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
+  const noteTitle = tempDiv.querySelector('[data-note-title]');
+  if (noteTitle?.textContent?.trim()) {
+    return noteTitle.textContent.trim().substring(0, 50);
+  }
   const firstHeading = tempDiv.querySelector('h1, h2, h3');
   if (firstHeading?.textContent?.trim()) {
     return firstHeading.textContent.trim().substring(0, 50);
@@ -745,7 +956,7 @@ const extractTitleFromContent = (html) => {
   if (firstParagraph?.textContent?.trim()) {
     return firstParagraph.textContent.trim().substring(0, 50);
   }
-  return '未命名笔记';
+  return t('note.untitled');
 };
 
 const exportPDF = async () => {
@@ -770,7 +981,7 @@ const filePath = await electronService.saveFile({
     await electronService.invoke('export_html_to_pdf', { html, savePath: filePath });
   } catch (error) {
     console.error('导出 PDF 失败:', error);
-    alert(`导出 PDF 失败: ${error}`);
+    alert(t('note.toast.exportPdfFailed', { error }));
   } finally {
     isExportingPdf.value = false;
   }
@@ -814,7 +1025,7 @@ const exportMarkdown = async () => {
     await electronService.invoke('export_markdown', { markdown, savePath: filePath });
   } catch (error) {
     console.error('导出 Markdown 失败:', error);
-    alert(`导出 Markdown 失败: ${error}`);
+    alert(t('note.toast.exportMarkdownFailed', { error }));
   }
 };
 
@@ -1028,6 +1239,14 @@ const chatMessages = ref([]);
 const currentSessionId = ref('');
 const chatInputBoxRef = ref(null);
 
+// 引用笔记/文件、引用知识库相关
+const showNoteDialog = ref(false);
+const showKbFileDialog = ref(false);
+const attachments = ref([]);
+let attachmentIdCounter = 0;
+const kbList = ref(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)));
+const selectableKbList = computed(() => kbList.value.filter(c => c.id !== 'agent'));
+
 function saveChatSession() {
   const id = props.noteId;
   if (!id) return;
@@ -1058,6 +1277,7 @@ function resetChatSession() {
   currentSessionId.value = '';
   noteReferences.value = [];
   chatInputText.value = '';
+  attachments.value = [];
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -1096,11 +1316,12 @@ async function sendChatMessage(text) {
 
   const model = loadModelConfig();
   if (!model) {
-    alert('未配置大模型，请先在设置中添加自己的模型');
+    alert(t('note.aiSidebar.noModelConfigured'));
     return;
   }
 
   let fullMessage = text;
+  let displayContent = text;
 
   if (noteReferences.value.length > 0 && editor.value) {
     const docSize = editor.value.state.doc.content.size;
@@ -1114,18 +1335,52 @@ async function sendChatMessage(text) {
     }).filter(t => t.trim());
 
     if (refTexts.length > 0) {
-      fullMessage += '\n\n---\n引用笔记内容：\n' + refTexts.map((t, i) => `【引用${i + 1}】\n${t}`).join('\n\n');
+      fullMessage += '\n\n---\n' + t('note.aiSidebar.referenceContent') + '\n' + refTexts.map((txt, i) => t('note.aiSidebar.referenceItem', { index: i + 1, content: txt })).join('\n\n');
+    }
+  }
+
+  // 追加引用笔记/文件、知识库附件信息
+  // - 简洁引用格式附加到 fullMessage / displayContent（用户气泡 + 数据库存储）
+  // - 同时构造后端 attachments 元数据（kind: 'note'|'file'）用于注入 LLM 上下文
+  // - 知识库附件（type === 'kb'）单独提取 kbName / kbCategoryId 供后端 RAG 检索
+  const backendAttachments = [];
+  let kbName = '';
+  let kbCategoryId = '';
+
+  if (attachments.value.length > 0) {
+    const refLines = [];
+    for (const att of attachments.value) {
+      if (att.type === 'note') {
+        refLines.push(`${t('friday.refNote')}${att.name}`);
+        backendAttachments.push({ kind: 'note', name: att.name, noteId: att.noteId });
+      } else if (att.type === 'kb-file') {
+        refLines.push(`${t('friday.refDoc')}${att.name}`);
+        backendAttachments.push({ kind: 'file', name: att.name, path: att.path });
+      } else if (att.type === 'kb') {
+        refLines.push(`${t('friday.tagKb')}${att.name}`);
+        // 仅取第一个知识库作为 RAG 检索源（与 FridayChat 行为一致）
+        if (!kbName) {
+          kbName = att.name;
+          kbCategoryId = att.categoryId || '';
+        }
+      }
+    }
+    if (refLines.length > 0) {
+      const refBlock = '\n\n---\n' + refLines.join('\n');
+      fullMessage += refBlock;
+      displayContent += refBlock;
     }
   }
 
   chatMessages.value.push({
     role: 'user',
-    content: text,
+    content: displayContent,
     references: noteReferences.value.map(ref => ({ ...ref }))
   });
 
   chatInputText.value = '';
   noteReferences.value = [];
+  attachments.value = [];
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -1136,13 +1391,7 @@ async function sendChatMessage(text) {
   isDoneReceived = false;
 
   const noteContent = editor.value ? editor.value.getText() : '';
-  const systemPrompt = `你是 Friday，一个定制化个人知识智能服务助手。你友好、专业，善于帮助用户解答问题和完成任务。
-
-当前用户正在编辑一篇笔记，以下是笔记的完整内容：
-
-${noteContent}
-
-请基于笔记内容来回答用户的问题。用户可能会引用笔记中的部分内容进行提问，请重点关注引用的内容，同时结合笔记全文上下文来给出准确、有价值的回答。`;
+  const systemPrompt = t('note.aiSidebar.systemPrompt', { noteContent });
 
   try {
     await electronService.invoke('chat_with_memory', {
@@ -1151,7 +1400,12 @@ ${noteContent}
       model: model,
       message: fullMessage,
       enableThinking: false,
-      systemPrompt
+      systemPrompt,
+      // 附件元数据：后端读取笔记/文件内容并注入 LLM 上下文（≤ 2,500 字符/条）
+      attachments: backendAttachments,
+      // 知识库 RAG：后端通过 Function Calling 自主决定是否检索
+      kbName,
+      kbCategoryId
     });
   } catch (err) {
     console.error('Chat invoke error:', err);
@@ -1177,6 +1431,88 @@ async function handleChatStop() {
   }
 }
 
+// 从磁盘扫描知识库列表
+const loadKbListFromDisk = async () => {
+  const api = window.electronAPI;
+  if (!api) return;
+  let dataDir = '';
+  try {
+    dataDir = await api.invoke('kb-get-data-dir');
+  } catch (e) {
+    console.error('Failed to get data dir:', e);
+    return;
+  }
+  if (!dataDir) return;
+  const baseDir = dataDir + '/knowledge';
+  for (const category of kbList.value) {
+    const catDir = baseDir + '/' + category.id;
+    try {
+      await api.invoke('kb-create-dir', { dirPath: catDir });
+      const entries = await api.invoke('kb-read-dir', { dirPath: catDir });
+      for (const entry of entries) {
+        if (entry.isDirectory && !category.items.some(i => i.name === entry.name)) {
+          category.items.push({
+            id: `kb-${category.id}-${entry.name}`,
+            name: entry.name,
+            coverIndex: null
+          });
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to load category ${category.id}:`, e);
+    }
+  }
+};
+
+// 引用笔记/文件、引用知识库相关事件处理
+const handleNoteConfirm = (selectedNotes) => {
+  if (!selectedNotes || selectedNotes.length === 0) return;
+  for (const note of selectedNotes) {
+    attachments.value.push({
+      id: ++attachmentIdCounter,
+      type: 'note',
+      typeLabel: t('friday.tagNote'),
+      name: note.title || t('friday.untitledNote'),
+      noteId: note.id
+    });
+  }
+  showNoteDialog.value = false;
+  nextTick(() => {
+    chatInputBoxRef.value?.focus();
+  });
+};
+
+const handleKbFileSelect = (file) => {
+  attachments.value.push({
+    id: ++attachmentIdCounter,
+    type: 'kb-file',
+    typeLabel: t('friday.tagFile'),
+    name: file.name,
+    path: file.path
+  });
+  showKbFileDialog.value = false;
+  nextTick(() => {
+    chatInputBoxRef.value?.focus();
+  });
+};
+
+const handleSelectKb = (kb) => {
+  attachments.value.push({
+    id: ++attachmentIdCounter,
+    type: 'kb',
+    typeLabel: t('friday.tagKb'),
+    name: kb.name,
+    categoryId: kb.categoryId || null
+  });
+  nextTick(() => {
+    chatInputBoxRef.value?.focus();
+  });
+};
+
+const removeAttachment = (idx) => {
+  attachments.value.splice(idx, 1);
+};
+
 const chatSaveToastVisible = ref(false);
 const chatSaveToastMessage = ref('');
 
@@ -1196,7 +1532,7 @@ function handleChatAction(type, index) {
 
     const content = msg.content || '';
     if (!content.trim()) {
-      showChatSaveToast('消息内容为空，无法保存');
+      showChatSaveToast(t('note.aiSidebar.emptyContent'));
       return;
     }
 
@@ -1204,9 +1540,9 @@ function handleChatAction(type, index) {
       const endPos = editor.value.state.doc.content.size;
       const htmlContent = marked.parse(content, EDITOR_MARKED_OPTIONS);
       editor.value.chain().focus().insertContentAt(endPos - 1, htmlContent).run();
-      showChatSaveToast('已追加到笔记末尾');
+      showChatSaveToast(t('note.aiSidebar.appendedToNote'));
     } else {
-      showChatSaveToast('保存失败');
+      showChatSaveToast(t('note.toast.saveFailedShort'));
     }
     return;
   }
@@ -1344,6 +1680,9 @@ const textColorPalette = [
 
 const editor = useEditor({
   extensions: [
+    NoteSearch,
+    NoteTitle,
+    SmallParagraph,
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3],
@@ -1352,7 +1691,7 @@ const editor = useEditor({
     }),
     Underline,
     TextAlign.configure({
-      types: ['heading', 'paragraph'],
+      types: ['noteTitle', 'smallParagraph', 'heading', 'paragraph'],
     }),
     Highlight.configure({
       multicolor: true,
@@ -1369,7 +1708,9 @@ const editor = useEditor({
       },
     }),
     Placeholder.configure({
-      placeholder: props.placeholder,
+      placeholder: ({ node }) => node.type.name === 'noteTitle'
+        ? t('note.titlePlaceholder')
+        : (props.placeholder || t('note.placeholder')),
     }),
     Superscript,
     Subscript,
@@ -1392,12 +1733,24 @@ const editor = useEditor({
       },
     }).configure({ lowlight }),
   ],
-  content: props.modelValue,
+  content: prepareEditorContent(props.modelValue),
   editorProps: {
     attributes: {
       class: 'prose-editor',
     },
     handleKeyDown: (view, event) => {
+      if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        openSearch();
+        return true;
+      }
+
+      if (event.key === 'Escape' && searchVisible.value) {
+        event.preventDefault();
+        closeSearch();
+        return true;
+      }
+
       if (event.key === 'Tab' && fimCompletionVisible.value && fimCompletionText.value) {
         event.preventDefault();
         acceptFimCompletion();
@@ -1474,6 +1827,7 @@ const editor = useEditor({
     const html = editor.getHTML();
     emit('update:modelValue', html);
     emit('change', html);
+    syncSearchState();
 
     clearFimDebounce();
     cancelFimRequest();
@@ -1490,17 +1844,102 @@ const editor = useEditor({
   },
 });
 
+const syncSearchState = () => {
+  if (!editor.value) return;
+  const pluginState = noteSearchPluginKey.getState(editor.value.state);
+  searchResultCount.value = pluginState?.positions.length || 0;
+  searchCurrentIndex.value = pluginState?.currentIndex || 0;
+};
+
+const scrollToCurrentSearchMatch = () => {
+  nextTick(() => {
+    const match = editor.value?.view.dom.querySelector('.note-search-match-current');
+    match?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  });
+};
+
+const dispatchSearch = (query, currentIndex = 0) => {
+  if (!editor.value) return;
+  const transaction = editor.value.state.tr.setMeta(noteSearchPluginKey, { query, currentIndex });
+  editor.value.view.dispatch(transaction);
+  syncSearchState();
+  if (query.trim() && searchResultCount.value) {
+    scrollToCurrentSearchMatch();
+  }
+};
+
+const openSearch = () => {
+  if (!editor.value) return;
+  if (!searchVisible.value && !searchQuery.value) {
+    const { from, to } = editor.value.state.selection;
+    if (from !== to) {
+      searchQuery.value = editor.value.state.doc.textBetween(from, to, ' ').trim();
+    }
+  }
+
+  searchVisible.value = true;
+  dispatchSearch(searchQuery.value, searchCurrentIndex.value);
+  nextTick(() => {
+    searchInputRef.value?.focus();
+    searchInputRef.value?.select();
+  });
+};
+
+const closeSearch = () => {
+  dispatchSearch('', 0);
+  searchVisible.value = false;
+  searchQuery.value = '';
+  editor.value?.commands.focus();
+};
+
+const updateSearchQuery = () => {
+  dispatchSearch(searchQuery.value, 0);
+};
+
+const goToSearchMatch = (direction) => {
+  if (!searchResultCount.value) return;
+  dispatchSearch(searchQuery.value, searchCurrentIndex.value + direction);
+  searchInputRef.value?.focus();
+};
+
+const handleSearchInputKeydown = (event) => {
+  if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    searchInputRef.value?.select();
+    return;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeSearch();
+    return;
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    goToSearchMatch(event.shiftKey ? -1 : 1);
+  }
+};
+
 const currentHeadingLabel = computed(() => {
-  if (!editor.value) return '标题';
-  if (editor.value.isActive('heading', { level: 1 })) return '标题 1';
-  if (editor.value.isActive('heading', { level: 2 })) return '标题 2';
-  if (editor.value.isActive('heading', { level: 3 })) return '标题 3';
-  return '标题';
+  if (!editor.value) return t('note.toolbar.body');
+  if (editor.value.isActive('noteTitle')) return t('note.toolbar.title');
+  if (editor.value.isActive('heading', { level: 1 })) return t('note.toolbar.heading1');
+  if (editor.value.isActive('heading', { level: 2 })) return t('note.toolbar.heading2');
+  if (editor.value.isActive('heading', { level: 3 })) return t('note.toolbar.heading3');
+  if (editor.value.isActive('smallParagraph')) return t('note.toolbar.smallBody');
+  return t('note.toolbar.body');
 });
 
 const isHeadingActive = computed(() => {
   if (!editor.value) return false;
-  return editor.value.isActive('heading');
+  return editor.value.isActive('noteTitle')
+    || editor.value.isActive('heading')
+    || editor.value.isActive('smallParagraph');
+});
+
+const canSetNoteTitle = computed(() => {
+  if (!editor.value) return false;
+  const { $from } = editor.value.state.selection;
+  return $from.depth === 1 && $from.index(0) === 0;
 });
 
 const toggleInsertMenu = () => {
@@ -1554,11 +1993,33 @@ const setTextColor = (color) => {
 };
 
 const setHeading = (level) => {
+  if (editor.value?.isActive('noteTitle')) return;
   if (level === 0) {
     editor.value?.chain().focus().setParagraph().run();
   } else {
     editor.value?.chain().focus().toggleHeading({ level }).run();
   }
+  showHeadingMenu.value = false;
+};
+
+const clearFormatting = () => {
+  if (!editor.value) return;
+  const chain = editor.value.chain().focus().unsetAllMarks();
+  if (!editor.value.isActive('noteTitle')) {
+    chain.clearNodes();
+  }
+  chain.run();
+};
+
+const setNoteTitle = () => {
+  if (!canSetNoteTitle.value) return;
+  editor.value?.chain().focus().setNode('noteTitle').run();
+  showHeadingMenu.value = false;
+};
+
+const setSmallBody = () => {
+  if (editor.value?.isActive('noteTitle')) return;
+  editor.value?.chain().focus().setNode('smallParagraph').run();
   showHeadingMenu.value = false;
 };
 
@@ -1573,8 +2034,10 @@ const insertTable = (rows, cols) => {
 };
 
 watch(() => props.modelValue, (newValue) => {
-  if (editor.value && newValue !== editor.value.getHTML()) {
-    editor.value.commands.setContent(newValue);
+  const preparedContent = prepareEditorContent(newValue);
+  if (editor.value && preparedContent !== editor.value.getHTML()) {
+    editor.value.commands.setContent(preparedContent);
+    nextTick(syncSearchState);
   }
 });
 
@@ -1591,6 +2054,7 @@ onMounted(() => {
   setupChatListeners();
   setupFimListener();
   restoreChatSession();
+  loadKbListFromDisk();
 });
 
 onBeforeUnmount(() => {
@@ -1701,6 +2165,98 @@ const fixEmptyTableCells = (html) => {
 
 .editor-wrapper.sidebar-collapsed {
   padding-left: 60px;
+}
+
+.note-search-bar {
+  position: absolute;
+  top: 48px;
+  right: 40px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  width: min(360px, calc(100% - 56px));
+  height: 38px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background-color: var(--bg-primary, #ffffff);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.note-search-bar.share-mode {
+  top: 12px;
+}
+
+.note-search-icon {
+  flex: 0 0 auto;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.note-search-input {
+  min-width: 0;
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary, #111827);
+  font: inherit;
+  font-size: 13px;
+}
+
+.note-search-count {
+  min-width: 42px;
+  color: var(--text-tertiary, #9ca3af);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.note-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.note-search-btn:hover:not(:disabled) {
+  background-color: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+.note-search-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+:deep(.note-search-match) {
+  border-radius: 2px;
+  background-color: #fde68a;
+}
+
+:deep(.note-search-match-current) {
+  background-color: #f59e0b;
+  color: #111827;
+}
+
+.note-search-fade-enter-active,
+.note-search-fade-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.note-search-fade-enter-from,
+.note-search-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 .fim-completion-bubble {
@@ -2073,6 +2629,31 @@ const fixEmptyTableCells = (html) => {
   padding: 7px 14px;
 }
 
+.note-title-menu-label {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.heading-level-1-label {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.heading-level-2-label {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.heading-level-3-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.small-body-label {
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .highlight-menu,
 .text-color-menu {
   min-width: 280px;
@@ -2115,7 +2696,7 @@ const fixEmptyTableCells = (html) => {
 .editor-content {
   flex: 1;
   overflow-y: auto;
-  margin-top: 4px;
+  margin-top: 16px;
   padding-bottom: 40px;
   padding-right: 40px;
 }
@@ -2159,6 +2740,14 @@ const fixEmptyTableCells = (html) => {
   height: 0;
 }
 
+:deep(.prose-editor h1[data-note-title].is-empty::before) {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  height: 0;
+}
+
 :deep(.prose-editor h1),
 :deep(.prose-editor h2),
 :deep(.prose-editor h3) {
@@ -2168,19 +2757,30 @@ const fixEmptyTableCells = (html) => {
 }
 
 :deep(.prose-editor h1) {
-  font-size: 28px;
+  font-size: 20px;
 }
 
 :deep(.prose-editor h2) {
-  font-size: 22px;
+  font-size: 18px;
 }
 
 :deep(.prose-editor h3) {
-  font-size: 18px;
+  font-size: 16px;
+}
+
+:deep(.prose-editor h1[data-note-title]) {
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0.2em 0 0.6em;
+  line-height: 1.25;
 }
 
 :deep(.prose-editor p) {
   margin: 0.4em 0;
+}
+
+:deep(.prose-editor p[data-small-text]) {
+  font-size: 14px;
 }
 
 :deep(.prose-editor ul),
@@ -2195,6 +2795,14 @@ const fixEmptyTableCells = (html) => {
 
 :deep(.prose-editor ol) {
   list-style-type: decimal;
+}
+
+:deep(.prose-editor ol ol) {
+  list-style-type: lower-alpha;
+}
+
+:deep(.prose-editor ol ol ol) {
+  list-style-type: lower-roman;
 }
 
 :deep(.prose-editor li) {
@@ -2507,7 +3115,44 @@ const fixEmptyTableCells = (html) => {
 .more-menu {
   right: 0;
   left: auto;
-  min-width: 160px;
+  min-width: 130px;
+  padding: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.more-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 400;
+  font-family: inherit;
+  border-radius: 5px;
+  letter-spacing: normal;
+  transition: background 0.12s;
+}
+
+.more-menu .menu-item svg {
+  width: 13px;
+  height: 13px;
+  color: var(--text-primary);
+}
+
+.more-menu .menu-item:hover:not(.disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.more-menu .menu-item:hover:not(.disabled) svg {
+  color: var(--text-primary);
 }
 
 .ai-write-btn {
@@ -2569,6 +3214,28 @@ const fixEmptyTableCells = (html) => {
 [data-theme='dark'] .menu-item.active {
   background-color: rgba(59, 130, 246, 0.25);
   color: #93c5fd;
+}
+
+[data-theme='dark'] .more-menu {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+[data-theme='dark'] .more-menu .menu-item {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .more-menu .menu-item svg {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .more-menu .menu-item:hover:not(.disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .more-menu .menu-item:hover:not(.disabled) svg {
+  color: var(--text-primary);
 }
 
 [data-theme='dark'] .submenu-arrow {

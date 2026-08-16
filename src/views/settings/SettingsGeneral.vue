@@ -91,6 +91,27 @@
         </div>
       </div>
 
+      <!-- 功能模块 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.modules') }}</div>
+        <div class="group-content">
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.scheduleModule') }}</span>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="moduleVisibility.schedule" @change="saveModuleVisibility" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.automationModule') }}</span>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="moduleVisibility.automation" @change="saveModuleVisibility" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- AI工具 -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.aiTools') }}</div>
@@ -329,7 +350,16 @@
           <div class="setting-item">
             <span class="item-label">{{ t('settings.runtimeLogs') }}</span>
             <div class="logs-actions">
-              <button class="text-btn" @click="openLogDir">{{ t('settings.openLogDir') }}</button>
+              <button v-if="runtimeLogsEnabled" class="text-btn" @click="openLogDir">{{ t('settings.openLogDir') }}</button>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  v-model="runtimeLogsEnabled"
+                  :aria-label="t('settings.runtimeLogsEnabled')"
+                  @change="saveRuntimeLogsConfig"
+                />
+                <span class="toggle-slider"></span>
+              </label>
             </div>
           </div>
           <div class="setting-item clickable" @click="showFeaturesModal = true">
@@ -605,6 +635,13 @@ const settings = reactive({
   noteFimCompletion: appStore.noteFimCompletion,
   scheduleDefaultView: appStore.scheduleDefaultView || 'month'
 });
+
+const moduleVisibility = reactive({
+  schedule: appStore.sidebarModules.schedule !== false,
+  automation: appStore.sidebarModules.automation !== false
+});
+
+const runtimeLogsEnabled = ref(true);
 
 // ========== 通用提示弹窗（替代原生 alert/confirm） ==========
 const dialog = reactive({
@@ -1187,6 +1224,38 @@ const saveNoteFimCompletion = async () => {
   } catch (_e) {}
 };
 
+const saveModuleVisibility = async () => {
+  const previous = { ...appStore.sidebarModules };
+  const next = {
+    schedule: moduleVisibility.schedule,
+    automation: moduleVisibility.automation
+  };
+  appStore.setSidebarModules(next);
+  try {
+    const config = await electronService.invoke('get-config');
+    if (!config) throw new Error('Failed to load config');
+    config.sidebarModules = next;
+    await electronService.invoke('save-config', config);
+  } catch (_e) {
+    Object.assign(moduleVisibility, previous);
+    appStore.setSidebarModules(previous);
+  }
+};
+
+const saveRuntimeLogsConfig = async () => {
+  const nextValue = runtimeLogsEnabled.value;
+  try {
+    const config = await electronService.invoke('get-config');
+    if (!config) throw new Error('Failed to load config');
+    config.runtimeLogsEnabled = nextValue;
+    const result = await electronService.invoke('save-config', config);
+    if (result?.success === false) throw new Error(result.error || 'Failed to save config');
+  } catch (e) {
+    runtimeLogsEnabled.value = !nextValue;
+    notifyError(e.message || t('settings.runtimeLogsSaveFailed'));
+  }
+};
+
 const selectScheduleView = async (value) => {
   if (value !== 'week' && value !== 'month') return;
   settings.scheduleDefaultView = value;
@@ -1227,6 +1296,16 @@ onMounted(() => {
   initTheme();
   settings.displayMode = currentMode.value;
   currentLanguage.value = appStore.language || 'zh-CN';
+  electronService.invoke('get-config').then((config) => {
+    if (config) {
+      runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
+      Object.assign(moduleVisibility, {
+        schedule: config.sidebarModules?.schedule !== false,
+        automation: config.sidebarModules?.automation !== false
+      });
+      appStore.setSidebarModules(moduleVisibility);
+    }
+  });
   loadBackupConfig();
   loadHistoryConfig();
   loadRagStats();
@@ -2185,6 +2264,14 @@ const openAuthorEmail = () => {
   display: flex;
   gap: 8px;
   align-items: center;
+  height: 24px;
+}
+
+.logs-actions .text-btn {
+  height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 24px;
 }
 
 [data-theme='dark'] .theme-dropdown-menu {

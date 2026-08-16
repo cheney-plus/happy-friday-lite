@@ -1,0 +1,146 @@
+{
+  "title": "Automation",
+  "description": "Configure and manage automated tasks so Happy Friday can run workflows on schedule.",
+  "actions": {
+    "manualCreate": "Create manually",
+    "createInChat": "Create in chat",
+    "comingSoon": "Creation will be available in a future release"
+  },
+  "createModal": {
+    "title": "Create automation task",
+    "editTitle": "Edit automation task",
+    "fromTemplate": "Create from template",
+    "close": "Close",
+    "taskName": "Task name",
+    "taskNamePlaceholder": "Enter a task name",
+    "triggerTime": "Trigger time",
+    "triggerType": "Trigger type",
+    "selectTime": "Select a time",
+    "selectModel": "Select a model",
+    "noModel": "No models available. Add a model in Settings first.",
+    "hour": "Hour",
+    "minute": "Minute",
+    "selectDateTime": "Select date and time",
+    "dayOfMonth": "Day {day}",
+    "weekdays": "Select weekdays",
+    "weekdaysShort": {
+      "mon": "M",
+      "tue": "T",
+      "wed": "W",
+      "thu": "T",
+      "fri": "F",
+      "sat": "S",
+      "sun": "S"
+    },
+    "every": "Every",
+    "intervalValue": "Interval value",
+    "intervalUnits": {
+      "minutes": "minutes",
+      "hours": "hours",
+      "days": "days"
+    },
+    "instruction": "What should Happy Friday do?",
+    "instructionHint": "Describe the goal, required input, and expected result",
+    "instructionPlaceholder": "Describe the task and expected result, such as summarizing news, analyzing data, or preparing a daily report.",
+    "executionMode": "Execution mode",
+    "autoMode": "Auto mode",
+    "focusedMode": "Focused mode",
+    "cancel": "Cancel",
+    "create": "Create",
+    "save": "Save",
+    "triggers": {
+      "monthly": "Monthly",
+      "weekly": "Weekly",
+      "daily": "Daily",
+      "interval": "At intervals",
+      "once": "One time"
+    }
+  },
+  "tabs": {
+    "configured": "Configured",
+    "history": "Run history",
+    "templates": "Templates"
+  },
+  "configured": {
+    "localTaskNotice": "Local tasks run only while the computer is kept awake",
+    "keepAwake": "Keep computer awake",
+    "schedule": "Daily at 20:00",
+    "more": "More actions",
+    "runNow": "Run now",
+    "enableTask": "Enable task",
+    "delete": "Delete task"
+  },
+  "templates": {
+    "aiNews": {
+      "title": "Daily AI news brief",
+      "description": "Receive a morning digest of AI industry news and trend analysis"
+    },
+    "brandSentiment": {
+      "title": "Weekly brand sentiment report",
+      "description": "Track brand mentions and feedback across social media and communities each week"
+    },
+    "competitorTracking": {
+      "title": "Weekly competitor tracking",
+      "description": "Monitor competitor product updates, community feedback, and important news"
+    },
+    "stockAlerts": {
+      "title": "Stock monitoring and alerts",
+      "description": "Track selected stock prices daily and alert on unusual movement"
+    },
+    "securityScan": {
+      "title": "Security vulnerability scan",
+      "description": "Scan repositories regularly for verified medium and high-risk vulnerabilities"
+    },
+    "commitBugs": {
+      "title": "Scan commits for bugs",
+      "description": "Analyze recent commits for high-risk bugs with potentially serious impact"
+    },
+    "testCoverage": {
+      "title": "Improve test coverage",
+      "description": "Identify high-risk recent changes without tests and add missing coverage"
+    },
+    "dailyChanges": {
+      "title": "Daily change summary",
+      "description": "Summarize repository changes into a readable daily engineering report"
+    }
+  },
+  "filters": {
+    "all": "All",
+    "success": "Succeeded",
+    "failed": "Failed",
+    "running": "Running",
+    "allExecutionTasks": "All executed tasks",
+    "selectDate": "Select date",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "allCloudTasks": "All cloud tasks",
+    "localTasks": "Local tasks"
+  },
+  "groups": {
+    "today": "Today"
+  },
+  "history": {
+    "manual": "Manual trigger",
+    "scheduled": "Scheduled trigger",
+    "deleteRun": "Delete"
+  },
+  "schedule": {
+    "daily": "Daily at {time}",
+    "weekly": "Weekly at {time}",
+    "monthly": "Monthly on day {day} at {time}",
+    "interval": "Every {value} {unit}",
+    "once": "One time {time}"
+  },
+  "sample": {
+    "taskName": "Send email",
+    "workspace": "Work",
+    "trigger": "Manual trigger",
+    "time": "21:04",
+    "duration": "51s"
+  },
+  "empty": {
+    "configured": "No automation tasks configured yet",
+    "history": "No runs yet",
+    "deletedTask": "Deleted task"
+  }
+}

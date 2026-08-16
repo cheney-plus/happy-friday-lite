@@ -8,6 +8,10 @@ export const useAppStore = defineStore('app', {
     loading: false,
     noteFimCompletion: true,
     scheduleDefaultView: 'month',
+    sidebarModules: {
+      schedule: true,
+      automation: true
+    },
     // 用户头像：{ dataUrl, name, rarity, updatedAt } 或 null（回退到默认头像）
     avatar: null
   }),
@@ -26,6 +30,12 @@ export const useAppStore = defineStore('app', {
     },
     setScheduleDefaultView(value) {
       this.scheduleDefaultView = value
+    },
+    setSidebarModules(modules = {}) {
+      this.sidebarModules = {
+        schedule: modules.schedule !== false,
+        automation: modules.automation !== false
+      }
     },
     setAvatar(avatar) {
       this.avatar = avatar || null

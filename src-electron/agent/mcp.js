@@ -475,6 +475,7 @@ function buildLocalServer() {
 
 let localHttpServer = null
 let localPort = null
+const internalConsumers = new Set()
 
 function getConfiguredPort() {
   try {
@@ -572,8 +573,11 @@ async function handleHttpRequest(req, res) {
 /**
  * 启动本机 MCP HTTP 服务
  */
-export async function startLocalMcpServer() {
-  if (localHttpServer) return { success: true, port: localPort }
+export async function startLocalMcpServer({ persist = true } = {}) {
+  if (localHttpServer) {
+    if (persist) persistLocalConfig({ port: localPort, enabled: true })
+    return { success: true, port: localPort }
+  }
   localHttpServer = http.createServer((req, res) => {
     handleHttpRequest(req, res).catch((e) => {
       log.warn(`本机 MCP 请求处理异常: ${e.message}`)
@@ -590,7 +594,7 @@ export async function startLocalMcpServer() {
     port = await startListening(localHttpServer, 0)
   }
   localPort = port
-  persistLocalConfig({ port, enabled: true })
+  if (persist) persistLocalConfig({ port, enabled: true })
   log.info(`本机 MCP 服务已启动: http://127.0.0.1:${port}/mcp（暴露 ${getToolSpecs().length} 个工具）`)
   return { success: true, port }
 }
@@ -599,14 +603,41 @@ export async function startLocalMcpServer() {
  * 停止本机 MCP HTTP 服务
  */
 export async function stopLocalMcpServer() {
+  persistLocalConfig({ port: localPort, enabled: false })
+  if (internalConsumers.size > 0) {
+    return { success: true, keptAlive: true }
+  }
   if (!localHttpServer) {
-    persistLocalConfig({ port: localPort, enabled: false })
     return { success: true }
   }
   await new Promise((resolve) => localHttpServer.close(() => resolve()))
   localHttpServer = null
-  persistLocalConfig({ port: localPort, enabled: false })
   log.info('本机 MCP 服务已停止')
+  return { success: true }
+}
+
+export async function acquireLocalMcpServer(consumer) {
+  if (!consumer || typeof consumer !== 'string') {
+    throw new Error('MCP internal consumer name is required')
+  }
+  internalConsumers.add(consumer)
+  try {
+    return await startLocalMcpServer({ persist: false })
+  } catch (error) {
+    internalConsumers.delete(consumer)
+    throw error
+  }
+}
+
+export async function releaseLocalMcpServer(consumer) {
+  internalConsumers.delete(consumer)
+  if (internalConsumers.size > 0 || loadConfig()?.mcp?.localEnabled) {
+    return { success: true, keptAlive: true }
+  }
+  if (!localHttpServer) return { success: true }
+  await new Promise((resolve) => localHttpServer.close(() => resolve()))
+  localHttpServer = null
+  log.info('本机 MCP 服务已停止（无活跃消费者）')
   return { success: true }
 }
 

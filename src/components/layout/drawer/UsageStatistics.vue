@@ -185,7 +185,7 @@ const { t, locale } = useI18n()
 
 const emit = defineEmits(['close'])
 
-const range = ref('all')
+const range = ref('today')
 const loading = ref(false)
 const loadError = ref('')
 const stats = ref(null)

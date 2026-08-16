@@ -72,12 +72,15 @@ import {
   FolderKanban,
   FileText,
   CalendarDays,
+  Workflow,
+  BrainCircuit,
   Bot,
   Clock,
   Settings
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { electronService } from '@/services/electron';
+import DeepSeekIcon from '@/components/icons/DeepSeekIcon.vue';
 
 const tabStore = useTabStore();
 const appStore = useAppStore();
@@ -92,6 +95,9 @@ const iconMap = {
   FolderKanban,
   FileText,
   CalendarDays,
+  Workflow,
+  BrainCircuit,
+  DeepSeekIcon,
   Bot,
   Clock,
   Settings

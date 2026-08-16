@@ -9,7 +9,7 @@
 
       <div class="header-center">
         <div class="note-title-display">
-          {{ noteTitle || '新建笔记' }}
+          {{ noteTitle || t('note.newNote') }}
         </div>
       </div>
 
@@ -100,7 +100,7 @@ const onEditorChange = (content) => {
   const normalizedText = plainText.replace(/\s+/g, ' ').trim();
 
   const firstLine = (plainText.split('\n').find(line => line.trim() !== '') || '').trim();
-  noteTitle.value = firstLine ? (firstLine.length > 20 ? firstLine.substring(0, 20) : firstLine) : '新建笔记';
+  noteTitle.value = firstLine ? (firstLine.length > 20 ? firstLine.substring(0, 20) : firstLine) : t('note.newNote');
 
   updateStats(normalizedText);
   isSaved.value = false;
@@ -187,7 +187,7 @@ onMounted(async () => {
       const res = await fetch(`/api/share/note/${encodeURIComponent(id)}`);
       const data = await res.json();
       if (data && data.success && data.note) {
-        noteTitle.value = data.note.title || '未命名笔记';
+        noteTitle.value = data.note.title || t('note.untitledNote');
         noteContent.value = data.note.content || '';
       }
     } catch (err) {

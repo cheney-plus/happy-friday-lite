@@ -61,7 +61,7 @@ export function getCheckpointer() {
  * @returns {Promise<Object>} DeepAgent 实例
  */
 export async function createAgent(modelConfig, options = {}) {
-  const { folderPath = '' } = options
+  const { folderPath = '', unattended = false } = options
   log.info('====== 开始创建 DeepAgent ======')
   if (folderPath) {
     log.info(`用户当前工作目录（虚拟路径）: ${folderPath}`)
@@ -95,6 +95,7 @@ export async function createAgent(modelConfig, options = {}) {
     mainWindow: null,
     threadId: null,
     requestId: null,
+    unattended: false,
     logger: createLogger('Tool'),
     emit: () => {} // 占位，运行时覆盖
   }
@@ -105,7 +106,7 @@ export async function createAgent(modelConfig, options = {}) {
   log.info(`工具集构建完成: ${builtinTools.length} 内置 + ${mcpTools.length} MCP = ${tools.length} 个工具`)
 
   // 6. 构建 interruptOn 配置（需审批的工具）
-  const interruptOn = buildInterruptConfig()
+  const interruptOn = unattended ? {} : buildInterruptConfig()
   log.info(`interruptOn 配置: ${Object.keys(interruptOn).join(', ') || '无'}`)
 
   // 7. 加载 SKILL
@@ -211,7 +212,8 @@ export async function createAgent(modelConfig, options = {}) {
  */
 export async function createAgentWithContext(modelConfig, runtimeCtx) {
   const { agent, toolCtx, rootDir } = await createAgent(modelConfig, {
-    folderPath: runtimeCtx?.folderPath || ''
+    folderPath: runtimeCtx?.folderPath || '',
+    unattended: !!runtimeCtx?.unattended
   })
 
   // 动态注入运行时上下文
@@ -221,10 +223,11 @@ export async function createAgentWithContext(modelConfig, runtimeCtx) {
     mainWindow: runtimeCtx.mainWindow,
     threadId: runtimeCtx.threadId,
     requestId: runtimeCtx.requestId,
+    unattended: !!runtimeCtx.unattended,
     // 便捷推送 IPC 事件
-    emit: (event, payload) => {
+    emit: runtimeCtx.emit || ((event, payload) => {
       runtimeCtx.mainWindow?.webContents?.send(event, payload)
-    }
+    })
   })
 
   return { agent, rootDir }

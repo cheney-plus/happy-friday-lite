@@ -22,9 +22,8 @@ concurrency:
 jobs:
   # ──────────────────────────────────────────────────────────────────────
   # Linux 构建（x64 + arm64）
-  # arm64 在 x64 runner 上交叉构建：electron-builder 打包 .deb 依赖的 fpm
-  # 仅提供 linux-x86 二进制，无法在 ARM64 主机执行（Exec format error）。
-  # arm64 的原生绑定由 scripts/prebuild-install.mjs 下载预编译版本，无需交叉编译器。
+  # 每个架构使用对应的原生 runner。node-pty 等依赖包含原生二进制，
+  # 不能从 x64 runner 交叉打包到 ARM64。
   # ──────────────────────────────────────────────────────────────────────
   build-linux:
     name: Build Linux (${{ matrix.arch }})
@@ -35,14 +34,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             arch: x64
             arch-flag: --x64
+            build-target: --linux
             platform-key: linux-x64
             artifact-name: HappyFriday-Linux-x64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             arch: arm64
             arch-flag: --arm64
+            # electron-builder ships FPM only for x86, so an ARM64 runner
+            # cannot create a .deb. AppImage is built without FPM.
+            build-target: --linux AppImage
             platform-key: linux-arm64
             artifact-name: HappyFriday-Linux-arm64
 
@@ -56,6 +59,12 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Setup Python for native modules
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Remove Chinese npm mirrors (CI uses official sources)
         run: rm -f .npmrc
         shell: bash
@@ -66,7 +75,12 @@ jobs:
           sudo apt-get install -y libarchive-tools
 
       - name: Install npm dependencies
-        run: npm ci --legacy-peer-deps
+        # dsh currently declares a Linux-only native package as a direct dependency.
+        # --force lets npm install the remaining dependencies on every runner OS.
+        run: npm ci --legacy-peer-deps --force
+        env:
+          # node-gyp bundled by node-pty still imports distutils, removed in Python 3.12.
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: Build frontend
         run: npm run build
@@ -79,9 +93,10 @@ jobs:
           node scripts/prebuild-clean.mjs ${{ matrix.arch }}
 
       - name: Build Electron app (Linux ${{ matrix.arch }})
-        run: npx electron-builder --linux ${{ matrix.arch-flag }}
+        run: npx electron-builder ${{ matrix.build-target }} ${{ matrix.arch-flag }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: List build artifacts
         run: ls -lh release/ || true
@@ -121,20 +136,26 @@ jobs:
         shell: bash
 
       - name: Install npm dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --force
 
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Pre-build install & clean (target arch bindings only)
+      - name: Install Windows native bindings
         run: |
-          node scripts/prebuild-install.mjs x64
-          node scripts/prebuild-clean.mjs x64
+          node scripts/prebuild-install.mjs win32 x64
+
+      - name: Verify Windows node-pty prebuilds
+        run: |
+          node -e "const fs=require('fs'); for (const file of ['pty.node','conpty.node','conpty_console_list.node']) { const filename='node_modules/node-pty/prebuilds/win32-x64/'+file; if (!fs.existsSync(filename)) throw new Error('Missing '+filename); }"
 
       - name: Build Electron app (Windows x64)
-        run: npx electron-builder --win --x64
+        # node-pty 1.1.0 ships Electron-compatible Node-API prebuilds for
+        # Windows x64. Rebuilding it invokes node-gyp unnecessarily and fails
+        # on newer GitHub Windows images when detecting Visual Studio.
+        run: npx electron-builder --win --x64 --config.npmRebuild=false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -152,24 +173,25 @@ jobs:
 
   # ──────────────────────────────────────────────────────────────────────
   # macOS 构建（arm64 + x64）
-  # x64 通过 Rosetta 2 在 ARM64 主机上交叉构建
+  # 在 Intel runner 交叉构建 ARM64：electron-builder 会为目标架构重建
+  # 原生依赖，且可避免 ARM runner 上 APFS DMG 创建的 hdiutil 兼容性问题。
   # ──────────────────────────────────────────────────────────────────────
   build-macos:
     name: Build macOS (${{ matrix.arch }})
     if: ${{ inputs.platform == 'all' || inputs.platform == 'macos' }}
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: arm64
+          - os: macos-13
+            arch: arm64
             arch-flag: --arm64
-            platform-key: darwin-arm64
             artifact-name: HappyFriday-macOS-arm64
-          - arch: x64
+          - os: macos-13
+            arch: x64
             arch-flag: --x64
-            platform-key: darwin-x64
             artifact-name: HappyFriday-macOS-x64
 
     steps:
@@ -182,32 +204,36 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Setup Python for native modules
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Remove Chinese npm mirrors (CI uses official sources)
         run: rm -f .npmrc
         shell: bash
 
-      - name: Install Rosetta 2 (macOS x64 cross-build)
-        if: matrix.platform-key == 'darwin-x64'
-        run: sudo softwareupdate --install-rosetta --agree-to-license
-
       - name: Install npm dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --force
+        env:
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: Build frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Pre-build install & clean (target arch bindings only)
+      - name: Install macOS native bindings
         run: |
-          node scripts/prebuild-install.mjs ${{ matrix.arch }}
-          node scripts/prebuild-clean.mjs ${{ matrix.arch }}
+          node scripts/prebuild-install.mjs darwin ${{ matrix.arch }}
 
       - name: Build Electron app (macOS ${{ matrix.arch }})
         run: npx electron-builder --mac ${{ matrix.arch-flag }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USE_HARD_LINKS: false
+          npm_config_python: ${{ steps.setup-python.outputs.python-path }}
 
       - name: List build artifacts
         run: ls -lh release/ || true

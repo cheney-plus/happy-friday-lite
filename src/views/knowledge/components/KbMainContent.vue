@@ -179,7 +179,18 @@
     </div>
 
     <!-- 正常文件视图 -->
-    <div class="file-grid" :class="[viewMode, { 'is-empty': filteredFiles.length === 0 }]" v-else-if="selectedKB" @contextmenu.prevent="$emit('show-file-context-menu', $event)">
+    <div
+      ref="fileGridRef"
+      class="file-grid"
+      :class="[viewMode, { 'is-empty': filteredFiles.length === 0, 'is-dropping': isDraggingExternal }]"
+      v-else-if="selectedKB"
+      @contextmenu.prevent="handleGridContextMenu"
+      @mousedown.self="startMarqueeSelection"
+      @dragenter.prevent="onExternalDragEnter"
+      @dragover.prevent="onExternalDragOver"
+      @dragleave="onExternalDragLeave"
+      @drop.prevent="onExternalDrop($event, currentPath)"
+    >
       <!-- 列表视图 -->
       <template v-if="viewMode === 'list'">
         <div class="list-header">
@@ -192,8 +203,14 @@
           v-for="file in filteredFiles"
           :key="file.path"
           class="list-row"
-          @click="$emit('open-file', file)"
-          @contextmenu.stop.prevent="$emit('show-file-item-context-menu', $event, file)"
+          :data-file-path="file.path"
+          :class="{ selected: isSelected(file) }"
+          @mousedown.stop="selectFile(file, $event)"
+          @dblclick="$emit('open-file', file)"
+          @contextmenu.stop.prevent="handleItemContextMenu($event, file)"
+          @dragenter.prevent="file.isDirectory && onExternalDragEnter($event)"
+          @dragover.prevent="file.isDirectory && onExternalDragOver($event)"
+          @drop.stop.prevent="file.isDirectory && onExternalDrop($event, file.path)"
         >
           <div class="col-name">
             <component :is="getFileIconComponent(file.type)" class="row-icon" :class="file.type" />
@@ -209,18 +226,31 @@
 
       <!-- 宫格视图 -->
       <template v-else>
-        <FileCard
+        <div
           v-for="file in filteredFiles"
           :key="file.path"
-          :file="file"
-          :rag-refresh-key="ragRefreshKey"
-          @open="$emit('open-file', $event)"
-          @contextmenu="$emit('show-file-item-context-menu', $event, file)"
-        />
+          class="file-card-wrapper"
+          :data-file-path="file.path"
+          @mousedown.stop="selectFile(file, $event)"
+          @contextmenu.stop.prevent="handleItemContextMenu($event, file)"
+          @dragenter.prevent="file.isDirectory && onExternalDragEnter($event)"
+          @dragover.prevent="file.isDirectory && onExternalDragOver($event)"
+          @drop.stop.prevent="file.isDirectory && onExternalDrop($event, file.path)"
+        >
+          <FileCard
+            :file="file"
+            :selected="isSelected(file)"
+            :rag-refresh-key="ragRefreshKey"
+            @open="$emit('open-file', $event)"
+            @contextmenu="handleItemContextMenu($event, file)"
+          />
+        </div>
         <EmptyState v-if="filteredFiles.length === 0 && files.length > 0" variant="search" message="未找到匹配的文件" />
         <EmptyState v-if="files.length === 0" message="此文件夹为空" />
 
       </template>
+      <div v-if="marqueeStyle" class="selection-marquee" :style="marqueeStyle"></div>
+      <div v-if="isDraggingExternal" class="drop-hint">松开以复制到此目录</div>
     </div>
     <div class="empty-state" v-else>
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
@@ -385,6 +415,135 @@ const emit = defineEmits([
   'open-file',
   'open-search-result'
 ]);
+
+const fileGridRef = ref(null);
+const selectedPaths = ref(new Set());
+const marquee = ref(null);
+const isDraggingExternal = ref(false);
+let externalDragDepth = 0;
+
+const marqueeStyle = computed(() => {
+  if (!marquee.value) return null;
+  const { startX, startY, endX, endY } = marquee.value;
+  return {
+    left: Math.min(startX, endX) + 'px',
+    top: Math.min(startY, endY) + 'px',
+    width: Math.abs(endX - startX) + 'px',
+    height: Math.abs(endY - startY) + 'px'
+  };
+});
+
+function isSelected(file) {
+  return selectedPaths.value.has(file.path);
+}
+
+function selectFile(file, event) {
+  if (event.button !== 0) return;
+  const next = new Set(selectedPaths.value);
+  if (event.metaKey || event.ctrlKey) {
+    next.has(file.path) ? next.delete(file.path) : next.add(file.path);
+  } else {
+    next.clear();
+    next.add(file.path);
+  }
+  selectedPaths.value = next;
+}
+
+function selectedFiles(fallback) {
+  const selected = props.files.filter(file => selectedPaths.value.has(file.path));
+  return selected.length ? selected : (fallback ? [fallback] : []);
+}
+
+function handleItemContextMenu(event, file) {
+  if (!isSelected(file)) selectedPaths.value = new Set([file.path]);
+  emit('show-file-item-context-menu', event, selectedFiles(file));
+}
+
+function handleGridContextMenu(event) {
+  selectedPaths.value = new Set();
+  emit('show-file-context-menu', event);
+}
+
+function startMarqueeSelection(event) {
+  if (event.button !== 0 || !fileGridRef.value) return;
+  const rect = fileGridRef.value.getBoundingClientRect();
+  marquee.value = {
+    startX: event.clientX - rect.left + fileGridRef.value.scrollLeft,
+    startY: event.clientY - rect.top + fileGridRef.value.scrollTop,
+    endX: event.clientX - rect.left + fileGridRef.value.scrollLeft,
+    endY: event.clientY - rect.top + fileGridRef.value.scrollTop
+  };
+  selectedPaths.value = new Set();
+  document.addEventListener('mousemove', updateMarqueeSelection);
+  document.addEventListener('mouseup', finishMarqueeSelection, { once: true });
+}
+
+function updateMarqueeSelection(event) {
+  if (!marquee.value || !fileGridRef.value) return;
+  const grid = fileGridRef.value;
+  const rect = grid.getBoundingClientRect();
+  marquee.value.endX = event.clientX - rect.left + grid.scrollLeft;
+  marquee.value.endY = event.clientY - rect.top + grid.scrollTop;
+  const left = Math.min(marquee.value.startX, marquee.value.endX) + rect.left - grid.scrollLeft;
+  const top = Math.min(marquee.value.startY, marquee.value.endY) + rect.top - grid.scrollTop;
+  const right = Math.max(marquee.value.startX, marquee.value.endX) + rect.left - grid.scrollLeft;
+  const bottom = Math.max(marquee.value.startY, marquee.value.endY) + rect.top - grid.scrollTop;
+  const next = new Set();
+  grid.querySelectorAll('[data-file-path]').forEach(element => {
+    const item = element.getBoundingClientRect();
+    if (item.left < right && item.right > left && item.top < bottom && item.bottom > top) {
+      next.add(element.dataset.filePath);
+    }
+  });
+  selectedPaths.value = next;
+}
+
+function finishMarqueeSelection() {
+  marquee.value = null;
+  document.removeEventListener('mousemove', updateMarqueeSelection);
+}
+
+function onExternalDragEnter() {
+  externalDragDepth++;
+  isDraggingExternal.value = true;
+}
+
+function onExternalDragOver(event) {
+  event.dataTransfer.dropEffect = 'copy';
+  isDraggingExternal.value = true;
+}
+
+function onExternalDragLeave() {
+  externalDragDepth--;
+  if (externalDragDepth <= 0) {
+    externalDragDepth = 0;
+    isDraggingExternal.value = false;
+  }
+}
+
+async function onExternalDrop(event, destination) {
+  externalDragDepth = 0;
+  isDraggingExternal.value = false;
+  const api = window.electronAPI;
+  const paths = Array.from(event.dataTransfer?.files || []).map(file => {
+    try {
+      return file.path || api.getPathForFile?.(file);
+    } catch (e) {
+      return '';
+    }
+  }).filter(Boolean);
+  if (!api || !destination || paths.length === 0) return;
+  const result = await api.invoke('kb-copy-drop-items', {
+    srcPaths: paths,
+    destDir: destination,
+    allowedExtensions: props.currentCategoryId === 'agent' ? null : ALLOWED_EXTENSIONS
+  });
+  if (result?.failed?.length) {
+    uploadErrorMsg.value = '部分项目未复制：仅允许支持的文档格式，且同名文件会被覆盖。';
+    showUploadError.value = true;
+  }
+  emit('refresh');
+}
 
 const searchVisible = ref(false);
 const fileSearchQuery = ref('');
@@ -809,6 +968,11 @@ watch(fileSearchQuery, () => {
   searchTimer = setTimeout(performSearch, 250);
 });
 
+watch(() => props.files, () => {
+  const available = new Set((props.files || []).map(file => file.path));
+  selectedPaths.value = new Set([...selectedPaths.value].filter(path => available.has(path)));
+}, { deep: true });
+
 function handleSearchResultClick(file) {
   closeSearch();
   emit('open-search-result', file);
@@ -866,6 +1030,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  finishMarqueeSelection();
   // 清理防抖定时器，避免组件卸载后仍触发搜索
   if (searchTimer) {
     clearTimeout(searchTimer);
@@ -1179,6 +1344,39 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(auto-fill, 140px);
     gap: 16px 24px;
     align-content: start;
+    position: relative;
+
+    &.is-dropping {
+      outline: 2px dashed var(--text-secondary);
+      outline-offset: -6px;
+    }
+
+    .file-card-wrapper {
+      width: 140px;
+    }
+
+    .selection-marquee {
+      position: absolute;
+      pointer-events: none;
+      background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--text-secondary) 55%, transparent);
+      border-radius: 10px;
+      z-index: 5;
+    }
+
+    .drop-hint {
+      position: absolute;
+      inset: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 500;
+      background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+      z-index: 6;
+    }
 
     &.is-empty:not(.list) {
       align-content: center;
@@ -1216,6 +1414,10 @@ onBeforeUnmount(() => {
 
         &:hover {
           background: var(--bg-hover);
+        }
+
+        &.selected {
+          background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
         }
 
         .col-name {

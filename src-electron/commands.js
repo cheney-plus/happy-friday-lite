@@ -23,8 +23,20 @@ import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
 import { registerAgentCommands } from './agent/ipc.js'
-import { getLogDir } from './logger.js'
+import {
+  registerHarnessCommands,
+  syncHarnessConfigurationIfRunning
+} from './harness/index.js'
+import { getLogDir, setLoggingEnabled } from './logger.js'
 import { getShareUrl, getNoteShareUrl } from './shareServer.js'
+import {
+  createAutomationTask,
+  getActiveAutomationRun,
+  isAutomationRunActive,
+  isAutomationTaskRunning,
+  updateAutomationTask,
+  runAutomationTaskNow
+} from './automation.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -111,10 +123,20 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('save-config', (_event, config) => {
+    const previousConfig = loadConfig()
     const result = saveConfig(config)
+    if (previousConfig.runtimeLogsEnabled !== config.runtimeLogsEnabled) {
+      const enabled = setLoggingEnabled(config.runtimeLogsEnabled !== false)
+      if (!enabled && config.runtimeLogsEnabled !== false) {
+        return { success: false, error: 'Failed to enable runtime logs' }
+      }
+    }
     // 模型配置变更时清除 Embedding 缓存
     clearEmbeddingsCache()
     mainWindow.webContents.send(CONFIG_CHANGED, config)
+    syncHarnessConfigurationIfRunning().catch(error => {
+      console.warn('[Commands] Failed to sync Harness model config:', error.message)
+    })
     return result
   })
 
@@ -166,7 +188,10 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('delete_session', (_event, args) => {
-    db.deleteSession(args.sessionId)
+    const result = db.deleteSession(args.sessionId)
+    if (result.automationRunsDeleted > 0) {
+      mainWindow.webContents.send('automation-updated')
+    }
     return true
   })
 
@@ -767,6 +792,36 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  // 桌面拖放同时支持文件和文件夹，并在主进程按实际文件类型执行格式过滤。
+  ipcMain.handle('kb-copy-drop-items', async (_event, args) => {
+    const { srcPaths, destDir, allowedExtensions } = args
+    if (!Array.isArray(srcPaths) || !destDir) return { success: false, error: 'Missing parameters' }
+    const copied = []
+    const failed = []
+    for (const srcPath of srcPaths) {
+      try {
+        const stat = fs.statSync(srcPath)
+        if (stat.isDirectory()) {
+          const destPath = path.join(destDir, path.basename(srcPath))
+          copyDirectoryRecursive(srcPath, destPath, allowedExtensions)
+          copied.push(destPath)
+        } else {
+          const ext = path.extname(srcPath).slice(1).toLowerCase()
+          if (allowedExtensions && allowedExtensions.length && !allowedExtensions.includes(ext)) {
+            failed.push({ path: srcPath, error: 'Unsupported file type' })
+            continue
+          }
+          const destPath = path.join(destDir, path.basename(srcPath))
+          fs.copyFileSync(srcPath, destPath)
+          copied.push(destPath)
+        }
+      } catch (e) {
+        failed.push({ path: srcPath, error: e.message })
+      }
+    }
+    return { success: failed.length === 0, copied, failed }
+  })
+
   // 抓取网页原始 HTML（在主进程执行以规避渲染进程跨域限制）
   // 正文清洗交由渲染进程的 @mozilla/readability 完成，这里只负责抓取
   ipcMain.handle('kb-fetch-webpage', async (_event, args) => {
@@ -1333,11 +1388,46 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  // ========== Local DeepAgent automation ==========
+  ipcMain.handle('automation-list-tasks', () => db.getAutomationTasks())
+  ipcMain.handle('automation-list-runs', (_event, filters) => db.getAutomationRuns(filters || {}))
+  ipcMain.handle('automation-get-active-run', (_event, args) => {
+    if (!args?.runId) throw new Error('缺少执行记录 ID')
+    return getActiveAutomationRun(args.runId)
+  })
+  ipcMain.handle('automation-create-task', (_event, args) => createAutomationTask(args || {}))
+  ipcMain.handle('automation-update-task', (_event, args) => {
+    if (!args?.taskId) throw new Error('缺少任务 ID')
+    return updateAutomationTask(args.taskId, args)
+  })
+  ipcMain.handle('automation-delete-task', (_event, args) => {
+    if (!args?.taskId) throw new Error('缺少任务 ID')
+    db.deleteAutomationTask(args.taskId)
+    return { ok: true }
+  })
+  ipcMain.handle('automation-delete-run', (_event, args) => {
+    if (!args?.runId) throw new Error('缺少执行记录 ID')
+    if (isAutomationRunActive(args.runId)) return { ok: false, error: '任务正在执行，无法删除执行记录' }
+    const deleted = db.deleteAutomationRun(args.runId)
+    if (deleted) mainWindow.webContents.send('automation-updated')
+    return { ok: deleted }
+  })
+  ipcMain.handle('automation-run-task', async (_event, args) => {
+    if (!args?.taskId) throw new Error('缺少任务 ID')
+    if (!db.getAutomationTask(args.taskId)) throw new Error('自动化任务不存在')
+    if (isAutomationTaskRunning(args.taskId)) return { ok: false, error: '任务正在执行' }
+    runAutomationTaskNow(args.taskId).catch(error => {
+      console.error('[Automation] 手动执行任务失败:', error)
+    })
+    return { ok: true }
+  })
+
   // ========== Agent 智能体相关命令 ==========
   // 设计参考：src/views/knowledge/agent/Agent智能体设计.md
   // Agent 模式提供工具调用能力（知识检索、笔记/日程操作、文件操作），
   // 支持 HITL 审批。会话复用 sessions 表，与普通对话历史一致。
   registerAgentCommands(mainWindow)
+  registerHarnessCommands(mainWindow)
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')
 }

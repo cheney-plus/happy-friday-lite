@@ -10,7 +10,7 @@
       <div class="ai-output-panel" :class="{ 'is-dark': isDark }" @mousedown.stop.prevent>
       <div class="ai-output-header">
         <span class="ai-output-title">{{ actionTitle }}</span>
-        <button class="ai-output-close" @click="closeAIOutput" title="关闭">
+        <button class="ai-output-close" @click="closeAIOutput" :title="t('note.bubbleMenu.close')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -28,27 +28,27 @@
       <div class="ai-output-footer">
         <div class="footer-left">
           <span class="ai-badge">
-            内容由 AI 生成
+            {{ t('note.bubbleMenu.aiGenerated') }}
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               <polyline points="9 12 11 14 15 10"></polyline>
             </svg>
           </span>
-          <span class="char-count">已生成{{ charCount }}字</span>
+          <span class="char-count">{{ t('note.bubbleMenu.charsGenerated', { count: charCount }) }}</span>
         </div>
 
         <div class="footer-right">
-          <button class="footer-action-btn" :class="{ liked: isLiked }" @click="handleLike" title="点赞">
+          <button class="footer-action-btn" :class="{ liked: isLiked }" @click="handleLike" :title="t('note.bubbleMenu.like')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
             </svg>
           </button>
-          <button class="footer-action-btn" :class="{ disliked: isDisliked }" @click="handleDislike" title="点踩">
+          <button class="footer-action-btn" :class="{ disliked: isDisliked }" @click="handleDislike" :title="t('note.bubbleMenu.dislike')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
             </svg>
           </button>
-          <button class="footer-action-btn" :class="{ copied: isCopied }" @click="handleCopyOutput" title="复制">
+          <button class="footer-action-btn" :class="{ copied: isCopied }" @click="handleCopyOutput" :title="t('note.bubbleMenu.copy')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -59,7 +59,7 @@
 
       <div v-if="currentAction === 'interpret'" class="ai-output-actions single-action">
         <button class="action-btn primary" @click="handleReInterpret" :disabled="isStreaming || !aiOutputContent">
-          重新解读
+          {{ t('note.bubbleMenu.reInterpret') }}
         </button>
       </div>
 
@@ -69,20 +69,20 @@
             <polyline points="23 4 23 10 17 10"></polyline>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
           </svg>
-          重写
+          {{ t('note.bubbleMenu.rewrite') }}
         </button>
         <button class="action-btn danger" @click="handleDiscard" :disabled="isStreaming">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
-          弃用
+          {{ t('note.bubbleMenu.discard') }}
         </button>
         <button class="action-btn primary" @click="handleReplace" :disabled="isStreaming || !aiOutputContent">
-          替换
+          {{ t('note.bubbleMenu.replace') }}
         </button>
         <button class="action-btn primary-outline" @click="handleInsert" :disabled="isStreaming || !aiOutputContent">
-          插入
+          {{ t('note.bubbleMenu.insert') }}
         </button>
       </div>
     </div>
@@ -93,7 +93,7 @@
         ref="inputRef"
         v-model="inputText"
         class="ai-textarea"
-        :placeholder="selectedText ? `基于选中文本：${selectedText.slice(0, 50)}${selectedText.length > 50 ? '...' : ''}` : '输入问题，或从下方场景提问'"
+        :placeholder="selectedText ? t('note.bubbleMenu.basedOnSelection', { text: selectedText.slice(0, 50) + (selectedText.length > 50 ? '...' : '') }) : t('note.bubbleMenu.inputPlaceholder')"
         rows="1"
         @input="autoResize"
         @keydown.enter.exact.prevent="handleSend"
@@ -106,7 +106,7 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>
-              <span>AI 指令</span>
+              <span>{{ t('note.bubbleMenu.aiCommand') }}</span>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
@@ -114,7 +114,7 @@
 
             <Transition name="dropdown">
               <div v-if="showCommandMenu" class="command-menu" :class="{ 'menu-up': commandMenuDirection === 'up', 'menu-down': commandMenuDirection === 'down' }">
-                <div class="command-item" @click="selectCommand('翻译')">
+                <div class="command-item" @click="selectCommand('translate')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="m5 8 6 6"></path>
                     <path d="m4 14 6-6 2-3"></path>
@@ -123,46 +123,46 @@
                     <path d="m22 22-5-10-5 10"></path>
                     <path d="M14 18h6"></path>
                   </svg>
-                  <span>翻译</span>
+                  <span>{{ t('note.bubbleMenu.commands.translate') }}</span>
                 </div>
 
-                <div class="command-item" @click="selectCommand('总结')">
+                <div class="command-item" @click="selectCommand('summarize')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
                     <line x1="16" y1="13" x2="8" y2="13"></line>
                     <line x1="16" y1="17" x2="8" y2="17"></line>
                   </svg>
-                  <span>总结</span>
+                  <span>{{ t('note.bubbleMenu.commands.summarize') }}</span>
                 </div>
 
-                <div class="command-item" @click="selectCommand('续写')">
+                <div class="command-item" @click="selectCommand('continue_write')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 20h9"></path>
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                   </svg>
-                  <span>续写</span>
+                  <span>{{ t('note.bubbleMenu.commands.continueWrite') }}</span>
                 </div>
 
-                <div class="command-item" @click="selectCommand('语法修正')">
+                <div class="command-item" @click="selectCommand('fix_grammar')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="4 17 10 11 4 5"></polyline>
                     <line x1="12" y1="19" x2="20" y2="19"></line>
                   </svg>
-                  <span>语法修正</span>
+                  <span>{{ t('note.bubbleMenu.commands.fixGrammar') }}</span>
                 </div>
 
-                <div class="command-item" @click="selectCommand('生成任务计划')">
+                <div class="command-item" @click="selectCommand('generate_plan')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
                     <line x1="8" y1="2" x2="8" y2="6"></line>
                     <line x1="3" y1="10" x2="21" y2="10"></line>
                   </svg>
-                  <span>生成任务计划</span>
+                  <span>{{ t('note.bubbleMenu.commands.generatePlan') }}</span>
                 </div>
 
-                <div class="command-item" @click="selectCommand('生成表格')">
+                <div class="command-item" @click="selectCommand('generate_table')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="3" y1="9" x2="21" y2="9"></line>
@@ -170,7 +170,7 @@
                     <line x1="9" y1="3" x2="9" y2="21"></line>
                     <line x1="15" y1="3" x2="15" y2="21"></line>
                   </svg>
-                  <span>生成表格</span>
+                  <span>{{ t('note.bubbleMenu.commands.generateTable') }}</span>
                 </div>
               </div>
             </Transition>
@@ -185,7 +185,7 @@
               :class="{ active: inputText.trim() }"
               @click="handleSend"
               :disabled="!inputText.trim()"
-              title="发送"
+              :title="t('note.bubbleMenu.send')"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -198,58 +198,58 @@
     </div>
 
     <div v-else class="bubble-menu-container">
-      <button class="bubble-btn ai-write-btn" @click="openAIPanel" title="Friday 帮写">
+      <button class="bubble-btn ai-write-btn" @click="openAIPanel" :title="t('note.bubbleMenu.aiWrite')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
           <path d="M2 17l10 5 10-5"></path>
           <path d="M2 12l10 5 10-5"></path>
         </svg>
-        <span>帮写</span>
+        <span>{{ t('note.bubbleMenu.helpWrite') }}</span>
       </button>
 
       <div class="bubble-divider"></div>
 
-      <button class="bubble-btn" @click="handleInterpret" title="解读">
+      <button class="bubble-btn" @click="handleInterpret" :title="t('note.bubbleMenu.interpret')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="12" y1="16" x2="12" y2="12"></line>
           <line x1="12" y1="8" x2="12.01" y2="8"></line>
         </svg>
-        <span>解读</span>
+        <span>{{ t('note.bubbleMenu.interpret') }}</span>
       </button>
 
-      <button class="bubble-btn" @click="handleRefine" title="精炼">
+      <button class="bubble-btn" @click="handleRefine" :title="t('note.bubbleMenu.refine')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
         </svg>
-        <span>精炼</span>
+        <span>{{ t('note.bubbleMenu.refine') }}</span>
       </button>
 
-      <button class="bubble-btn" @click="handlePolish" title="润色">
+      <button class="bubble-btn" @click="handlePolish" :title="t('note.bubbleMenu.polish')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20h9"></path>
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
         </svg>
-        <span>润色</span>
+        <span>{{ t('note.bubbleMenu.polish') }}</span>
       </button>
 
-      <button class="bubble-btn" @click="handleExpand" title="扩写">
+      <button class="bubble-btn" @click="handleExpand" :title="t('note.bubbleMenu.expand')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 3 21 3 21 9"></polyline>
           <polyline points="9 21 3 21 3 15"></polyline>
           <line x1="21" y1="3" x2="14" y2="10"></line>
           <line x1="3" y1="21" x2="10" y2="14"></line>
         </svg>
-        <span>扩写</span>
+        <span>{{ t('note.bubbleMenu.expand') }}</span>
       </button>
 
       <div class="bubble-divider"></div>
 
-      <button class="bubble-btn chat-open-btn" @click="handleOpenInChat" title="对话中打开">
+      <button class="bubble-btn chat-open-btn" @click="handleOpenInChat" :title="t('note.bubbleMenu.openInChat')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
-        <span>对话中打开</span>
+        <span>{{ t('note.bubbleMenu.openInChat') }}</span>
       </button>
     </div>
   </BubbleMenu>
@@ -259,9 +259,12 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { BubbleMenu } from '@tiptap/vue-3/menus';
 import { marked } from 'marked';
+import { useI18n } from 'vue-i18n';
 import { electronService } from '../../services/electron.js';
 
 const AI_MARKED_OPTIONS = { breaks: true, gfm: true };
+
+const { t } = useI18n();
 
 const props = defineProps({
   editor: Object,
@@ -322,20 +325,21 @@ const getSelectedText = () => {
 };
 
 const actionTitle = computed(() => {
-  const titleMap = {
-    'interpret': '快速解读',
-    'refine': '精炼内容',
-    'polish': '快速润色',
-    'expand': '智能扩写',
-    'translate': '翻译',
-    'summarize': '总结',
-    'continue_write': '续写',
-    'fix_grammar': '语法修正',
-    'generate_plan': '生成任务计划',
-    'generate_table': '生成表格',
-    'custom': 'AI 帮写'
+  const keyMap = {
+    'interpret': 'quickInterpret',
+    'refine': 'refineContent',
+    'polish': 'quickPolish',
+    'expand': 'smartExpand',
+    'translate': 'commands.translate',
+    'summarize': 'commands.summarize',
+    'continue_write': 'commands.continueWrite',
+    'fix_grammar': 'commands.fixGrammar',
+    'generate_plan': 'commands.generatePlan',
+    'generate_table': 'commands.generateTable',
+    'custom': 'aiWrite'
   };
-  return titleMap[currentAction.value] || 'AI 处理';
+  const key = keyMap[currentAction.value];
+  return key ? t(`note.bubbleMenu.${key}`) : t('note.bubbleMenu.aiProcess');
 });
 
 const charCount = computed(() => {
@@ -382,7 +386,7 @@ function setupNoteAIListeners() {
   unlistenNoteAIError = electronService.listen('note-ai-error', (event) => {
     if (event.payload.requestId !== activeNoteAIRequestId) return;
     isStreaming.value = false;
-    aiOutputContent.value += `\n\n❌ 错误：${event.payload.error}`;
+    aiOutputContent.value += `\n\n❌ ${t('note.bubbleMenu.error', { error: event.payload.error })}`;
   });
 }
 
@@ -439,7 +443,7 @@ const startStreaming = async (action, userInstruction) => {
   const model = loadModelConfig();
   if (!model) {
     isStreaming.value = false;
-    aiOutputContent.value = '❌ 未配置大模型，请先在设置中添加自己的模型。';
+    aiOutputContent.value = `❌ ${t('note.bubbleMenu.noModelConfigured')}`;
     return;
   }
 
@@ -460,7 +464,7 @@ const startStreaming = async (action, userInstruction) => {
   } catch (err) {
     console.error('Note AI action error:', err);
     isStreaming.value = false;
-    aiOutputContent.value += `\n\n❌ 请求失败：${err.message || '未知错误'}`;
+    aiOutputContent.value += `\n\n❌ ${t('note.bubbleMenu.requestFailed', { message: err.message || t('note.bubbleMenu.unknownError') })}`;
   }
 };
 
@@ -564,18 +568,9 @@ const toggleCommandMenu = async (e) => {
   showCommandMenu.value = !showCommandMenu.value;
 };
 
-const COMMAND_ACTION_MAP = {
-  '翻译': 'translate',
-  '总结': 'summarize',
-  '续写': 'continue_write',
-  '语法修正': 'fix_grammar',
-  '生成任务计划': 'generate_plan',
-  '生成表格': 'generate_table'
-};
-
 const selectCommand = (command) => {
   showCommandMenu.value = false;
-  const action = COMMAND_ACTION_MAP[command];
+  const action = command;
   if (action) {
     startStreaming(action);
   }

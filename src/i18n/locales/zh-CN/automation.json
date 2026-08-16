@@ -1,0 +1,146 @@
+{
+  "title": "自动化",
+  "description": "配置和管理自动化任务，让 Happy Friday 按计划执行工作流。",
+  "actions": {
+    "manualCreate": "手动新建",
+    "createInChat": "在对话中创建",
+    "comingSoon": "创建功能将在后续版本中接入"
+  },
+  "createModal": {
+    "title": "新建自动化任务",
+    "editTitle": "编辑自动化任务",
+    "fromTemplate": "从模板创建",
+    "close": "关闭",
+    "taskName": "任务名称",
+    "taskNamePlaceholder": "请输入任务名称",
+    "triggerTime": "触发时间",
+    "triggerType": "触发类型",
+    "selectTime": "选择时间",
+    "selectModel": "选择模型",
+    "noModel": "暂无可用模型，请先在设置中添加模型。",
+    "hour": "时",
+    "minute": "分",
+    "selectDateTime": "选择日期和时间",
+    "dayOfMonth": "第 {day} 天",
+    "weekdays": "选择星期",
+    "weekdaysShort": {
+      "mon": "一",
+      "tue": "二",
+      "wed": "三",
+      "thu": "四",
+      "fri": "五",
+      "sat": "六",
+      "sun": "日"
+    },
+    "every": "每",
+    "intervalValue": "间隔数量",
+    "intervalUnits": {
+      "minutes": "分钟",
+      "hours": "小时",
+      "days": "天"
+    },
+    "instruction": "你希望 Happy Friday 做什么？",
+    "instructionHint": "描述任务目标、所需输入和预期结果",
+    "instructionPlaceholder": "描述任务内容和希望获得的结果，例如整理新闻摘要、分析数据或生成每日工作报告。",
+    "executionMode": "执行模式",
+    "autoMode": "自动模式",
+    "focusedMode": "专注模式",
+    "cancel": "取消",
+    "create": "创建",
+    "save": "保存",
+    "triggers": {
+      "monthly": "每月",
+      "weekly": "每周",
+      "daily": "每天",
+      "interval": "间隔触发",
+      "once": "一次性"
+    }
+  },
+  "tabs": {
+    "configured": "已配置",
+    "history": "执行历史",
+    "templates": "任务模板"
+  },
+  "configured": {
+    "localTaskNotice": "本地任务仅在「电脑保持唤醒」时运行",
+    "keepAwake": "保持电脑唤醒",
+    "schedule": "每天 20:00",
+    "more": "更多操作",
+    "runNow": "立即运行",
+    "enableTask": "启用任务",
+    "delete": "删除任务"
+  },
+  "templates": {
+    "aiNews": {
+      "title": "每日 AI 新闻简报",
+      "description": "每天早上推送 AI 行业热点新闻摘要与趋势分析"
+    },
+    "brandSentiment": {
+      "title": "品牌舆情监控周报",
+      "description": "每周自动抓取品牌在社交媒体和社区中的提及与评价，生成舆情摘要"
+    },
+    "competitorTracking": {
+      "title": "每周竞品动态追踪",
+      "description": "定期追踪竞品的产品更新、社区反馈和重要新闻"
+    },
+    "stockAlerts": {
+      "title": "股价监控与预警",
+      "description": "每天追踪关注的股票价格变动，异常波动时自动预警"
+    },
+    "securityScan": {
+      "title": "安全漏洞扫描",
+      "description": "定期扫描代码仓库，发现经过验证的中高危安全漏洞"
+    },
+    "commitBugs": {
+      "title": "扫描提交发现 Bug",
+      "description": "分析最近的代码提交，发现可能导致严重后果的高危 Bug"
+    },
+    "testCoverage": {
+      "title": "补充测试覆盖",
+      "description": "识别最近变更中缺少测试的高风险代码，自动补充测试"
+    },
+    "dailyChanges": {
+      "title": "每日变更摘要",
+      "description": "每天汇总代码仓库的变更情况，生成团队可读的工程日报"
+    }
+  },
+  "filters": {
+    "all": "全部",
+    "success": "成功",
+    "failed": "失败",
+    "running": "运行中",
+    "allExecutionTasks": "所有执行任务",
+    "selectDate": "选择日期",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "allCloudTasks": "所有云端任务",
+    "localTasks": "本地任务"
+  },
+  "groups": {
+    "today": "今天"
+  },
+  "history": {
+    "manual": "手动触发",
+    "scheduled": "定时触发",
+    "deleteRun": "删除"
+  },
+  "schedule": {
+    "daily": "每天 {time}",
+    "weekly": "每周 {time}",
+    "monthly": "每月 {day} 日 {time}",
+    "interval": "每 {value} {unit}",
+    "once": "一次性 {time}"
+  },
+  "sample": {
+    "taskName": "发邮件",
+    "workspace": "Work",
+    "trigger": "手动触发",
+    "time": "21:04",
+    "duration": "51s"
+  },
+  "empty": {
+    "configured": "暂无已配置的自动化任务",
+    "history": "暂无执行记录",
+    "deletedTask": "已删除任务"
+  }
+}

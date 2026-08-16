@@ -2,9 +2,9 @@
   <div class="friday-container" @click="closeAllDropdowns">
     <div class="friday-content">
       <div class="logo-section">
-        <div class="logo-badge">{{ t('friday.badge') }}</div>
         <div class="logo-main">
-          <img :src="logoImage" alt="Friday" class="logo-image" />
+          <img :src="logoImage" alt="Friday" class="logo-image" draggable="false" />
+          <img :src="happyFridayTextImage" alt="Happy Friday" class="happy-friday-text-image" draggable="false" />
         </div>
         <p class="logo-subtitle">{{ t('friday.greeting') }}</p>
       </div>
@@ -164,17 +164,6 @@
 
           <div v-if="showModelDropdown" class="dropdown-overlay" :style="modelDropdownStyle" @click.stop>
             <div class="dropdown-panel model-dropdown">
-              <div class="model-row model-toggle-row">
-                <span class="model-label">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  {{ t('friday.webSearch') }}
-                </span>
-                <label class="toggle-switch">
-                  <input type="checkbox" v-model="modelSettings.webSearch">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-
               <div class="model-row model-think-row">
                 <span class="model-label">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -346,10 +335,11 @@ const inputText = ref('');
 const textareaRef = ref(null);
 
 const isDark = computed(() => appStore.theme === 'dark');
-const logoImage = computed(() => {
+const logoImage = new URL('@/assets/images/friday-w.png', import.meta.url).href;
+const happyFridayTextImage = computed(() => {
   return isDark.value
-    ? new URL('@/assets/images/friday-b.png', import.meta.url).href
-    : new URL('@/assets/images/friday-w.png', import.meta.url).href;
+    ? new URL('@/assets/images/HPTEXT-w.png', import.meta.url).href
+    : new URL('@/assets/images/HPTEXT-b.png', import.meta.url).href;
 });
 
 const showModeDropdown = ref(false);
@@ -358,7 +348,7 @@ const showKbDropdown = ref(false);
 const showLinkDropdown = ref(false);
 const showNoteDialog = ref(false);
 const showKbFileDialog = ref(false);
-const currentMode = ref('chat');
+const currentMode = ref('agent');
 const modeDropdownStyle = ref({});
 const modelDropdownStyle = ref({});
 const kbDropdownStyle = ref({});
@@ -392,7 +382,6 @@ const currentModeLabel = computed(() => {
 });
 
 const modelSettings = ref({
-  webSearch: true,
   thinkMode: 'fast',
   modelId: ''
 });
@@ -616,6 +605,13 @@ const closeAllDropdowns = () => {
   showLinkDropdown.value = false;
 };
 
+const handleDocumentScroll = (event) => {
+  if (event.target instanceof Element && event.target.closest('.dropdown-overlay')) {
+    return;
+  }
+  closeAllDropdowns();
+};
+
 // 从磁盘扫描知识库列表
 const loadKbListFromDisk = async () => {
   const api = window.electronAPI;
@@ -731,13 +727,13 @@ const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
 };
 
 onMounted(() => {
-  document.addEventListener('scroll', closeAllDropdowns, true);
+  document.addEventListener('scroll', handleDocumentScroll, true);
   // loadCustomModels() 由 onActivated 统一触发（keep-alive 首次挂载时 onActivated 也会执行）
   loadKbListFromDisk();
 });
 
 onUnmounted(() => {
-  document.removeEventListener('scroll', closeAllDropdowns, true);
+  document.removeEventListener('scroll', handleDocumentScroll, true);
 });
 
 onDeactivated(() => {
@@ -834,21 +830,6 @@ const handleFeatureClick = (id) => {
   gap: 8px;
 }
 
-.logo-badge {
-  padding: 4px 12px;
-  background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
-  color: #065f46;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 12px;
-  margin-bottom: 4px;
-}
-
-[data-theme='dark'] .logo-badge {
-  background: linear-gradient(135deg, #065f46 0%, #047857 100%);
-  color: #d1fae5;
-}
-
 .logo-main {
   display: flex;
   align-items: center;
@@ -865,12 +846,22 @@ const handleFeatureClick = (id) => {
   width: auto;
   object-fit: contain;
   margin: 0;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.happy-friday-text-image {
+  width: min(360px, 88vw);
+  height: auto;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .logo-subtitle {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 400;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   letter-spacing: 3px;
   margin: 0;
 }
@@ -1158,8 +1149,8 @@ const handleFeatureClick = (id) => {
 }
 
 .model-dropdown {
-  min-width: 320px;
-  padding: 16px;
+  min-width: 280px;
+  padding: 10px;
 }
 
 .link-dropdown {
@@ -1520,86 +1511,37 @@ const handleFeatureClick = (id) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 14px;
-}
-
-.model-toggle-row {
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 9px;
 }
 
 .model-think-row {
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-bottom: 9px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .model-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-primary);
 }
 
-.toggle-switch {
-  position: relative;
-  width: 42px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: var(--text-tertiary);
-  border-radius: 24px;
-  transition: 0.25s ease;
-}
-
-.toggle-slider::before {
-  content: '';
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background: white;
-  border-radius: 50%;
-  transition: 0.25s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background-color: #10b981;
-}
-
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(18px);
-}
-
 .think-tabs {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   background: var(--bg-secondary);
-  border-radius: 10px;
-  padding: 3px;
+  border-radius: 7px;
+  padding: 2px;
 }
 
 .think-tab {
-  padding: 5px 14px;
+  padding: 4px 10px;
   border: none;
   background: transparent;
-  border-radius: 8px;
-  font-size: 12.5px;
+  border-radius: 5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -1617,17 +1559,41 @@ const handleFeatureClick = (id) => {
 }
 
 .model-model-list {
-  margin-top: 12px;
+  margin-top: 8px;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.model-model-list::-webkit-scrollbar {
+  width: 2px;
+}
+
+.model-model-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.model-model-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.model-model-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
 
 .model-item {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  border-radius: 12px;
+  box-sizing: border-box;
+  min-height: 42px;
+  padding: 7px 8px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.12s ease;
-  gap: 10px;
+  gap: 8px;
 }
 
 .model-item:hover {
@@ -1639,9 +1605,9 @@ const handleFeatureClick = (id) => {
 }
 
 .model-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -1649,20 +1615,20 @@ const handleFeatureClick = (id) => {
 .model-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   flex: 1;
   min-width: 0;
 }
 
 .model-name {
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
 .model-embedding-name {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;

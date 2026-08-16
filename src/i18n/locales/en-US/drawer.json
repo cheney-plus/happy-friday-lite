@@ -126,7 +126,7 @@
     "sourceAgent": "Agent",
     "sourceRag": "Knowledge",
     "sourceTitle": "Title",
-    "sourceFim": "Code completion",
+    "sourceFim": "Note completion",
     "sourceNoteAi": "Note AI",
     "sourceUnknown": "Unknown",
     "loadFailed": "Failed to load usage data",

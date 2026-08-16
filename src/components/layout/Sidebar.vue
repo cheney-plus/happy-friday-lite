@@ -16,7 +16,7 @@
 
       <nav class="sidebar-menu">
         <router-link
-          v-for="item in sidebarMenuConfig"
+          v-for="item in visibleSidebarMenuConfig"
           :key="item.key"
           :to="item.path"
           class="menu-item"
@@ -65,6 +65,11 @@ import defaultAvatar from '@/assets/images/user.png';
 const appStore = useAppStore();
 const router = useRouter();
 const { t } = useI18n();
+
+const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter((item) => {
+  if (item.key !== 'schedule' && item.key !== 'automation') return true;
+  return appStore.sidebarModules[item.key] !== false;
+}));
 
 // 用户头像：优先使用 set_avatar 工具写入的头像，否则回退到默认头像
 const avatarSrc = computed(() => appStore.avatar?.dataUrl || defaultAvatar);

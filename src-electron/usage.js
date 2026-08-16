@@ -138,8 +138,14 @@ export function getUsageStats(range = 'all') {
   const modelMap = new Map()
   // 按日期聚合（YYYY-MM-DD）
   const dayMap = new Map()
-  // 按来源聚合
-  const sourceMap = new Map()
+  // 按来源聚合：预初始化所有已知来源（含 title 归并到 chat），即使为 0 也显示
+  const sourceMap = new Map([
+    ['chat', { source: 'chat', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
+    ['agent', { source: 'agent', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
+    ['rag', { source: 'rag', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
+    ['note_ai', { source: 'note_ai', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
+    ['fim', { source: 'fim', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }]
+  ])
 
   for (const r of records) {
     totalPrompt += r.promptTokens
@@ -181,8 +187,8 @@ export function getUsageStats(range = 'all') {
     d.totalTokens += r.totalTokens
     d.requests += 1
 
-    // 来源聚合
-    const src = r.source || 'chat'
+    // 来源聚合：标题生成(title)归并到对话(chat)
+    const src = r.source === 'title' ? 'chat' : (r.source || 'chat')
     if (!sourceMap.has(src)) {
       sourceMap.set(src, { source: src, promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 })
     }

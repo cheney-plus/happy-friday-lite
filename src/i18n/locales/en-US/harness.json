@@ -1,0 +1,16 @@
+{
+  "title": "DeepSeek Harness",
+  "starting": "Starting DeepSeek Harness",
+  "startingDetail": "Syncing the shared model configuration and connecting Happy Friday tools.",
+  "modelRequired": "Model configuration required",
+  "modelRequiredDetail": "Harness uses the model selected in Settings. Add and select a complete model configuration first.",
+  "openSettings": "Open model settings",
+  "startFailed": "Harness failed to start",
+  "unknownError": "Unknown error",
+  "retry": "Retry",
+  "refresh": "Refresh Harness",
+  "restart": "Restart Harness",
+  "openExternal": "Open in browser",
+  "toolCount": "{count} Friday tools",
+  "noModel": "No model selected"
+}

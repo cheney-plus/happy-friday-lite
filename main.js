@@ -10,8 +10,10 @@ import { checkAutoBackup } from './src-electron/backup.js'
 import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
 import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
-import { initLogger } from './src-electron/logger.js'
+import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
+import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
+import { stopHarnessSidecar } from './src-electron/harness/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -45,6 +47,7 @@ initLogger(
 let mainWindow = null
 let kbWatcherHandle = null
 let powerBlockerId = null
+let shutdownStarted = false
 
 async function ensureDataDir() {
   const dataDir = isDev
@@ -112,6 +115,14 @@ app.whenReady().then(async () => {
   // 2. 初始化数据目录与数据库（sql.js WASM 加载），期间 splash 持续显示
   //    渲染进程加载 JS bundle + Vue mount 通常比此处更慢，IPC 注册会先于首次 invoke 完成
   const dataDir = await ensureDataDir()
+  // 读取持久化配置后应用日志开关，兼容升级前已存在的配置文件。
+  try {
+    const configPath = path.join(dataDir, 'config.json')
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    setLoggingEnabled(config.runtimeLogsEnabled !== false)
+  } catch (e) {
+    console.warn('[Main] Failed to apply runtime log setting:', e.message)
+  }
 
   // 首次启动时为未设置头像的用户随机分配 5 个普通头像（稀有头像不参与默认分配）
   // 需在数据目录初始化后、IPC 注册前完成，确保前端首次 get-config 即可拿到头像
@@ -124,6 +135,8 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
   }
+
+  startAutomationScheduler(mainWindow)
 
   // 3. 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
   try {
@@ -190,6 +203,7 @@ app.on('window-all-closed', function () {
     powerBlockerId = null
   }
   stopShareServer()
+  stopAutomationScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()
@@ -197,10 +211,17 @@ app.on('window-all-closed', function () {
 })
 
 // 应用退出前关闭 Agent MCP 连接（stdio 子进程等），避免残留进程
-app.on('before-quit', () => {
-  import('./src-electron/agent/mcp.js')
-    .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections())
-    .catch(() => {})
+app.on('before-quit', (event) => {
+  if (shutdownStarted) return
+  event.preventDefault()
+  Promise.allSettled([
+    import('./src-electron/agent/mcp.js')
+      .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections()),
+    stopHarnessSidecar()
+  ]).finally(() => {
+    shutdownStarted = true
+    app.quit()
+  })
 })
 
 ipcMain.on('window-minimize', () => {

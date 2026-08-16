@@ -108,7 +108,7 @@ export function buildLangChainTools(ctx) {
         toolCallId,
         toolName: name,
         arguments: args,
-        requireApproval: !!meta.requireApproval
+        requireApproval: !!meta.requireApproval && !ctx.unattended
       })
 
       let output = ''

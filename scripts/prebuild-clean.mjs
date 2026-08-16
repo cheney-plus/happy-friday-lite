@@ -1,8 +1,9 @@
 // Pre-build cleanup: remove packages that are not needed in the final app
 // but would otherwise get packaged by electron-builder's dependency walker.
 //
-// 1. Non-target arch @zvec native bindings (@zvec ships separate packages
-//    for linux-x64 and linux-arm64; only one is needed per build).
+// 1. Non-target arch @zvec and Koffi native bindings. Both packages ship
+//    separate packages for linux-x64 and linux-arm64; only one is needed per
+//    build.
 // 2. tesseract.js — a 44MB OCR library pulled in by officeparser's
 //    dependency tree. officeparser only uses it for optional OCR; basic
 //    PPTX/DOCX text extraction does not require it. The `!` glob exclusion
@@ -37,6 +38,34 @@ function verifyDependencies() {
 
 verifyDependencies()
 
+// node-pty does not publish a Linux ARM64 prebuild. electron-builder cannot
+// turn an x64 .node file into ARM64, so fail before producing a broken package.
+function verifyNodePtyArchitecture() {
+  const targetMachine = targetArch === 'arm64' ? 183 : 62 // ELF: AArch64 / x86-64
+  const targetLabel = targetArch === 'arm64' ? 'ARM64' : 'x64'
+  const nativeModule = join(nodeModules, 'node-pty', 'build', 'Release', 'pty.node')
+
+  if (!existsSync(nativeModule)) {
+    console.error(`[prebuild-clean] ERROR: Missing ${nativeModule}. Run npm install on the target architecture first.`)
+    process.exit(1)
+  }
+
+  const header = readFileSync(nativeModule).subarray(0, 20)
+  const machine = header.length >= 20 && header[0] === 0x7f && header.toString('ascii', 1, 4) === 'ELF'
+    ? header.readUInt16LE(18)
+    : null
+
+  if (machine !== targetMachine) {
+    console.error(`[prebuild-clean] ERROR: node-pty is not a Linux ${targetLabel} binary.`)
+    console.error(`[prebuild-clean] Build the Linux ${targetLabel} package on a Linux ${targetLabel} machine, then run npm run electron:build:${targetArch}.`)
+    process.exit(1)
+  }
+
+  console.log(`[prebuild-clean] Verified node-pty is a Linux ${targetLabel} binary`)
+}
+
+verifyNodePtyArchitecture()
+
 let removed = 0
 
 function getDirSize(dir) {
@@ -67,8 +96,9 @@ function removePkg(pkg, reason) {
   }
 }
 
-// 1. Non-target arch @zvec bindings
+// 1. Non-target arch native bindings
 removePkg(`@zvec/bindings-linux-${removeArch}`, `not needed for ${targetArch}`)
+removePkg(`@koromix/koffi-linux-${removeArch}`, `not needed for ${targetArch}`)
 
 // 2. tesseract.js — 44MB OCR library, not needed for basic office doc parsing
 removePkg('tesseract.js', 'OCR not used; saves ~44MB')
