@@ -197,12 +197,16 @@ function syncConfiguration(model, mcpUrl) {
       ? [
           {
             id: 'directory-picker',
-            name: '@deepseek-ai/dsh-host-directory-picker-browse'
+            disabled: true
           },
           {
             insert: [
               {
-                id: 'ui-directory-picker',
+                id: 'happy-friday-directory-picker',
+                name: '@deepseek-ai/dsh-host-directory-picker-browse'
+              },
+              {
+                id: 'happy-friday-directory-picker-ui',
                 name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
               }
             ]
