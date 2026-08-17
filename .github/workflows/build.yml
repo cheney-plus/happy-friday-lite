@@ -163,6 +163,7 @@ jobs:
         run: |
           node scripts/prebuild-install.mjs win32 x64
           node scripts/fix-dsh-directory-picker-electron.mjs
+          node scripts/fix-dsh-directory-picker-electron.mjs --check
 
       - name: Verify Windows node-pty prebuilds
         run: |

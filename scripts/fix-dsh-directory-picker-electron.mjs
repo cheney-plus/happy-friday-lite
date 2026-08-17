@@ -4,6 +4,7 @@
 // its IPC result unless Electron is explicitly asked to run as Node.
 //
 // The patch is idempotent and runs after every dependency installation.
+// Pass --check to verify a build input without changing it.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,6 +22,7 @@ const file = join(
 const marker = 'ELECTRON_RUN_AS_NODE: "1"'
 const original = 'const env = {\n\t\t...process.env,\n\t\tDSH_DIALOG_TITLE: data.title\n\t};'
 const replacement = 'const env = {\n\t\t...process.env,\n\t\tELECTRON_RUN_AS_NODE: "1",\n\t\tDSH_DIALOG_TITLE: data.title\n\t};'
+const checkOnly = process.argv.includes('--check')
 
 if (!existsSync(file)) {
   console.log('[fix-dsh-directory-picker-electron] target not found, skipping')
@@ -29,8 +31,14 @@ if (!existsSync(file)) {
 
 const source = readFileSync(file, 'utf8')
 if (source.includes(marker)) {
-  console.log('[fix-dsh-directory-picker-electron] already patched, no changes')
+  console.log('[fix-dsh-directory-picker-electron] Electron worker launch is patched')
   process.exit(0)
+}
+
+if (checkOnly) {
+  throw new Error(
+    '[fix-dsh-directory-picker-electron] missing ELECTRON_RUN_AS_NODE in the Win32 dialog worker environment'
+  )
 }
 
 if (!source.includes(original)) {
