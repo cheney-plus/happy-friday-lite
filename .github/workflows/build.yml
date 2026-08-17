@@ -162,6 +162,7 @@ jobs:
       - name: Install Windows native bindings
         run: |
           node scripts/prebuild-install.mjs win32 x64
+          node scripts/fix-dsh-directory-picker-electron.mjs
 
       - name: Verify Windows node-pty prebuilds
         run: |
