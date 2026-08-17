@@ -202,11 +202,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
+          - os: macos-14
             arch: arm64
             arch-flag: --arm64
             artifact-name: HappyFriday-macOS-arm64
-          - os: macos-13
+          - os: macos-14
             arch: x64
             arch-flag: --x64
             artifact-name: HappyFriday-macOS-x64
