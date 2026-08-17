@@ -188,6 +188,27 @@ function syncConfiguration(model, mcpUrl) {
   const patch = [
     { id: 'llm-deepseek', disabled: true },
     { id: 'ui-settings-models', disabled: true },
+    // DSH's adaptive picker selects its native Win32 implementation in a
+    // loopback session. That implementation launches a second Electron
+    // process as a Node worker, which exits before it can reply in packaged
+    // builds. The browse backend is DSH's supported alternative: it runs in
+    // the already-connected Harness page and uses regular filesystem APIs.
+    ...(process.platform === 'win32'
+      ? [
+          {
+            id: 'directory-picker',
+            name: '@deepseek-ai/dsh-host-directory-picker-browse'
+          },
+          {
+            insert: [
+              {
+                id: 'ui-directory-picker',
+                name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+              }
+            ]
+          }
+        ]
+      : []),
     {
       insert: [
         {
