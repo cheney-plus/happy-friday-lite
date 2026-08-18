@@ -30,7 +30,7 @@
 
       <div class="sidebar-bottom">
         <router-link
-          v-for="item in sidebarBottomMenuConfig"
+          v-for="item in visibleSidebarBottomMenuConfig"
           :key="item.key"
           :to="item.path"
           class="menu-item"
@@ -65,10 +65,9 @@ const appStore = useAppStore();
 const router = useRouter();
 const { t } = useI18n();
 
-const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter((item) => {
-  if (item.key !== 'schedule' && item.key !== 'automation') return true;
-  return appStore.sidebarModules[item.key] !== false;
-}));
+const isModuleVisible = (item) => item.key === 'settings' || appStore.sidebarModules[item.key] !== false;
+const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter(isModuleVisible));
+const visibleSidebarBottomMenuConfig = computed(() => sidebarBottomMenuConfig.filter(isModuleVisible));
 
 // 系统头像固定使用 public/images/icon.png，不支持更换。
 const avatarSrc = '/images/icon.png';

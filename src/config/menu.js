@@ -22,6 +22,12 @@ export const sidebarBottomMenuConfig = [
   { key: 'settings', path: '/settings', icon: 'Settings', iconComponent: Settings, i18nKey: 'settings.title' }
 ]
 
+// Settings stays available so a hidden module can always be restored.
+export const sidebarModuleConfig = [
+  ...sidebarMenuConfig,
+  ...sidebarBottomMenuConfig.filter((item) => item.key !== 'settings')
+]
+
 export const fridayMenuConfig = {
   key: 'friday',
   path: '/friday',

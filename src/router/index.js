@@ -67,6 +67,11 @@ export const routes = [
     component: () => import('@/views/settings/SettingsModel.vue')
   },
   {
+    path: '/settings/modules',
+    name: 'settings-modules',
+    component: () => import('@/views/settings/SettingsModules.vue')
+  },
+  {
     path: '/friday',
     name: 'friday',
     component: () => import('@/views/friday/FridayChat.vue')

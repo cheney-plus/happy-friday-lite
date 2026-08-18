@@ -95,19 +95,12 @@
       <div class="settings-group">
         <div class="group-title">{{ t('settings.modules') }}</div>
         <div class="group-content">
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.scheduleModule') }}</span>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="moduleVisibility.schedule" @change="saveModuleVisibility" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.automationModule') }}</span>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="moduleVisibility.automation" @change="saveModuleVisibility" />
-              <span class="toggle-slider"></span>
-            </label>
+          <div class="setting-item clickable" @click="goToModuleSettings">
+            <div class="item-label-group">
+              <span class="item-label">{{ t('settings.sidebarModules') }}</span>
+              <span class="item-hint">{{ t('settings.sidebarModulesHint', { count: enabledModuleCount, total: sidebarModuleCount }) }}</span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
         </div>
       </div>
@@ -593,6 +586,7 @@ import { useAppStore } from '@/store';
 import { useTheme } from '@/utils/theme';
 import { electronService } from '@/services/electron';
 import { setI18nLanguage } from '@/i18n';
+import { sidebarModuleConfig } from '@/config/menu';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -642,10 +636,8 @@ const settings = reactive({
   scheduleDefaultView: appStore.scheduleDefaultView || 'month'
 });
 
-const moduleVisibility = reactive({
-  schedule: appStore.sidebarModules.schedule !== false,
-  automation: appStore.sidebarModules.automation !== false
-});
+const enabledModuleCount = computed(() => Object.values(appStore.sidebarModules).filter(Boolean).length);
+const sidebarModuleCount = sidebarModuleConfig.length;
 
 const runtimeLogsEnabled = ref(true);
 const noteExporting = ref(false);
@@ -1250,24 +1242,6 @@ const saveNoteFimCompletion = async () => {
   } catch (_e) {}
 };
 
-const saveModuleVisibility = async () => {
-  const previous = { ...appStore.sidebarModules };
-  const next = {
-    schedule: moduleVisibility.schedule,
-    automation: moduleVisibility.automation
-  };
-  appStore.setSidebarModules(next);
-  try {
-    const config = await electronService.invoke('get-config');
-    if (!config) throw new Error('Failed to load config');
-    config.sidebarModules = next;
-    await electronService.invoke('save-config', config);
-  } catch (_e) {
-    Object.assign(moduleVisibility, previous);
-    appStore.setSidebarModules(previous);
-  }
-};
-
 const saveRuntimeLogsConfig = async () => {
   const nextValue = runtimeLogsEnabled.value;
   try {
@@ -1325,11 +1299,7 @@ onMounted(() => {
   electronService.invoke('get-config').then((config) => {
     if (config) {
       runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
-      Object.assign(moduleVisibility, {
-        schedule: config.sidebarModules?.schedule !== false,
-        automation: config.sidebarModules?.automation !== false
-      });
-      appStore.setSidebarModules(moduleVisibility);
+      appStore.setSidebarModules(config.sidebarModules);
     }
   });
   loadBackupConfig();
@@ -1355,6 +1325,10 @@ onDeactivated(() => {
 
 const goToModelSettings = () => {
   router.push('/settings/model');
+};
+
+const goToModuleSettings = () => {
+  router.push('/settings/modules');
 };
 
 // ========== 关于 / 功能介绍 / 帮助与反馈 ==========

@@ -9,8 +9,12 @@ export const useAppStore = defineStore('app', {
     noteFimCompletion: true,
     scheduleDefaultView: 'month',
     sidebarModules: {
+      note: true,
+      knowledge: true,
       schedule: true,
-      automation: true
+      automation: true,
+      harness: true,
+      history: true
     },
   }),
   actions: {
@@ -31,8 +35,12 @@ export const useAppStore = defineStore('app', {
     },
     setSidebarModules(modules = {}) {
       this.sidebarModules = {
+        note: modules.note !== false,
+        knowledge: modules.knowledge !== false,
         schedule: modules.schedule !== false,
-        automation: modules.automation !== false
+        automation: modules.automation !== false,
+        harness: modules.harness !== false,
+        history: modules.history !== false
       }
     },
   }
