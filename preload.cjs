@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'delete_notebook',
       'export_html_to_pdf',
       'export_markdown',
+      'export_all_notes',
       'open-external',
       'python-check',
       'python-run',

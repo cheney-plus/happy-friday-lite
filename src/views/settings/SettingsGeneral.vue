@@ -175,6 +175,19 @@
         </div>
       </div>
 
+      <!-- 笔记导出 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.noteExport') }}</div>
+        <div class="group-content">
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.exportAllNotes') }}</span>
+            <button class="action-btn" :disabled="noteExporting" @click="handleExportAllNotes">
+              {{ noteExporting ? t('settings.exportingNotes') : t('settings.exportNotes') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 数据备份 -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.backup') }}</div>
@@ -642,6 +655,7 @@ const moduleVisibility = reactive({
 });
 
 const runtimeLogsEnabled = ref(true);
+const noteExporting = ref(false);
 
 // ========== 通用提示弹窗（替代原生 alert/confirm） ==========
 const dialog = reactive({
@@ -700,6 +714,25 @@ const confirmDialog = (message, options = {}) => showDialog({
   confirmText: options.confirmText || t('settings.dialogConfirm'),
   cancelText: options.cancelText || t('settings.dialogCancel')
 });
+
+const handleExportAllNotes = async () => {
+  if (noteExporting.value) return;
+  noteExporting.value = true;
+  try {
+    const result = await electronService.invoke('export_all_notes');
+    if (!result || result.canceled) return;
+    if (result.success) {
+      await notifySuccess(t('settings.exportNotesSuccess', { count: result.exported }), { details: result.exportDir });
+    } else {
+      const details = result.errors?.map(item => `${item.title}: ${item.error}`).join('\n');
+      await notifyError(t('settings.exportNotesFailed', { exported: result.exported, total: result.total }), { details });
+    }
+  } catch (e) {
+    await notifyError(t('settings.exportNotesFailed', { exported: 0, total: 0 }), { details: e.message || String(e) });
+  } finally {
+    noteExporting.value = false;
+  }
+};
 
 // 备份状态
 const backupState = reactive({
