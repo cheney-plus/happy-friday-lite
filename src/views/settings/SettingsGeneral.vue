@@ -175,19 +175,6 @@
         </div>
       </div>
 
-      <!-- 笔记导出 -->
-      <div class="settings-group">
-        <div class="group-title">{{ t('settings.noteExport') }}</div>
-        <div class="group-content">
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.exportAllNotes') }}</span>
-            <button class="action-btn" :disabled="noteExporting" @click="handleExportAllNotes">
-              {{ noteExporting ? t('settings.exportingNotes') : t('settings.exportNotes') }}
-            </button>
-          </div>
-        </div>
-      </div>
-
       <!-- 数据备份 -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.backup') }}</div>
@@ -200,6 +187,12 @@
               @click="handleBackup"
             >
               {{ backupState.backing ? t('settings.backing') : t('settings.createBackup') }}
+            </button>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.exportAllNotes') }}</span>
+            <button class="action-btn" :disabled="noteExporting" @click="handleExportAllNotes">
+              {{ noteExporting ? t('settings.exportingNotes') : t('settings.exportNotes') }}
             </button>
           </div>
           <div v-if="backupProgress.active" class="setting-item backup-progress-item">
