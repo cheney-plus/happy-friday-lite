@@ -60,7 +60,6 @@ import { useAppStore } from '@/store';
 import { useI18n } from 'vue-i18n';
 import { sidebarMenuConfig, sidebarBottomMenuConfig } from '@/config/menu';
 import AvatarDrawer from './AvatarDrawer.vue';
-import defaultAvatar from '@/assets/images/user.png';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -71,8 +70,8 @@ const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter((item) 
   return appStore.sidebarModules[item.key] !== false;
 }));
 
-// 用户头像：优先使用 set_avatar 工具写入的头像，否则回退到默认头像
-const avatarSrc = computed(() => appStore.avatar?.dataUrl || defaultAvatar);
+// 系统头像固定使用 public/images/icon.png，不支持更换。
+const avatarSrc = '/images/icon.png';
 
 const tooltip = reactive({
   visible: false,

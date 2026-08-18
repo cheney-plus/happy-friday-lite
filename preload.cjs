@@ -129,8 +129,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-list-memories',
       'agent-read-memory',
       'agent-write-memory',
-      'agent-get-avatar-history',
-      'agent-set-avatar',
       'harness-start',
       'harness-status',
       'harness-restart',

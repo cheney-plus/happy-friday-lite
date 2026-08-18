@@ -1210,7 +1210,7 @@ const selectTheme = async (value) => {
   appStore.setTheme(value);
   showThemeDropdown.value = false;
   // 持久化到 config.json，与 language 等设置保持一致。
-  // 否则 config.theme 会一直停留在默认 'light'，切换头像等广播 config-changed 时
+  // 否则 config.theme 会一直停留在默认 'light'，后续 config-changed 广播时
   // 会用过期的 theme 覆盖用户当前主题（深色被强制切回浅色）。
   try {
     const config = await electronService.invoke('get-config');

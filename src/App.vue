@@ -116,7 +116,7 @@ onMounted(async () => {
         }
         // 主题以本地 localStorage（useTheme）为权威源。
         // 旧版本未将 theme 持久化到 config，config.theme 可能停留在默认 'light'；
-        // 若直接采用，后续 config-changed 广播（如切换头像）会用过期值覆盖当前主题。
+        // 若直接采用，后续 config-changed 广播会用过期值覆盖当前主题。
         // 因此以本地主题为准同步 appStore，并在 config 不同步时回写纠正。
         if (config.theme !== currentMode.value) {
           config.theme = currentMode.value;
@@ -132,9 +132,6 @@ onMounted(async () => {
           appStore.setScheduleDefaultView(config.scheduleDefaultView);
         }
         appStore.setSidebarModules(config.sidebarModules);
-        if (config.avatar !== undefined) {
-          appStore.setAvatar(config.avatar);
-        }
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -158,9 +155,6 @@ onMounted(async () => {
       }
       if (data.sidebarModules !== undefined) {
         appStore.setSidebarModules(data.sidebarModules);
-      }
-      if (data.avatar !== undefined) {
-        appStore.setAvatar(data.avatar);
       }
     });
   } else {

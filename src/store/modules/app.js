@@ -12,8 +12,6 @@ export const useAppStore = defineStore('app', {
       schedule: true,
       automation: true
     },
-    // 用户头像：{ dataUrl, name, rarity, updatedAt } 或 null（回退到默认头像）
-    avatar: null
   }),
   actions: {
     toggleSidebar() {
@@ -37,8 +35,5 @@ export const useAppStore = defineStore('app', {
         automation: modules.automation !== false
       }
     },
-    setAvatar(avatar) {
-      this.avatar = avatar || null
-    }
   }
 })

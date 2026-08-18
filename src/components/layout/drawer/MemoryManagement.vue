@@ -16,25 +16,8 @@
         <div class="friday-card">
           <div
             class="friday-avatar-wrap"
-            :title="t('drawer.memory.avatarHistory')"
-            @click="avatarPanelVisible = true"
           >
-            <img
-              v-if="currentAvatar?.dataUrl"
-              :src="currentAvatar.dataUrl"
-              class="friday-avatar"
-              :alt="t('drawer.memory.fridayName')"
-            />
-            <div v-else class="friday-avatar fallback">
-              <Brain :size="32" :stroke-width="1.4" />
-            </div>
-            <span
-              v-if="currentAvatar?.rarity === 'rare'"
-              class="rarity-badge rare"
-              :title="t('drawer.memory.rare')"
-            >
-              <Crown :size="10" :stroke-width="2.2" />
-            </span>
+            <img src="/images/icon.png" class="friday-avatar" :alt="t('drawer.memory.fridayName')" />
           </div>
           <div class="friday-info">
             <div class="info-row">
@@ -162,80 +145,6 @@
       </Transition>
     </Teleport>
 
-    <!-- 已获头像面板 -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div
-          v-if="avatarPanelVisible"
-          class="mm-modal-overlay"
-          @click.self="avatarPanelVisible = false"
-        >
-          <div class="mm-modal avatar-panel">
-            <div class="modal-header">
-              <div class="modal-title-row">
-                <Images :size="15" :stroke-width="1.8" class="modal-title-icon" />
-                <h3 class="modal-title">
-                  {{ t('drawer.memory.avatarHistory') }}
-                  <span class="modal-title-file">{{ avatarHistory.length }}</span>
-                </h3>
-              </div>
-              <button class="modal-close" @click="avatarPanelVisible = false">
-                <X :size="16" :stroke-width="2" />
-              </button>
-            </div>
-
-            <div class="modal-body avatar-panel-body">
-              <!-- 当前选中头像大图展示 -->
-              <div v-if="currentAvatar" class="current-avatar-showcase">
-                <div class="showcase-avatar-wrap">
-                  <img
-                    :src="currentAvatar.dataUrl"
-                    :alt="currentAvatar.name"
-                    class="showcase-avatar"
-                  />
-                  <span
-                    v-if="currentAvatar.rarity === 'rare'"
-                    class="showcase-rare-badge"
-                    :title="t('drawer.memory.rare')"
-                  >
-                    <Crown :size="13" :stroke-width="2.2" />
-                  </span>
-                </div>
-              </div>
-
-              <div class="section-hint">{{ t('drawer.memory.avatarHistoryHint') }}</div>
-
-              <div v-if="avatarLoading" class="empty-hint">{{ t('drawer.memory.loading') }}</div>
-              <div v-else-if="avatarHistory.length" class="avatar-grid">
-                <button
-                  v-for="av in avatarHistory"
-                  :key="av.name"
-                  class="avatar-chip"
-                  :class="{
-                    active: av.name === currentAvatar?.name,
-                    rare: av.rarity === 'rare'
-                  }"
-                  :title="av.name"
-                  @click="handleSwitchAvatar(av.name)"
-                >
-                  <img :src="av.dataUrl" :alt="av.name" class="avatar-img" />
-                  <span v-if="av.rarity === 'rare'" class="chip-rare-mark">
-                    <Crown :size="9" :stroke-width="2.4" />
-                  </span>
-                  <span class="avatar-name">{{ av.name }}</span>
-                  <span
-                    v-if="av.name === currentAvatar?.name"
-                    class="chip-current"
-                  >{{ t('drawer.memory.currentAvatar') }}</span>
-                </button>
-              </div>
-              <div v-else class="empty-hint">{{ t('drawer.memory.noAvatarHistory') }}</div>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
   </div>
 </template>
 
@@ -244,19 +153,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import {
-  Brain, X, Pencil, Eye, Crown, Sparkles, User, BookOpen, Wrench,
-  Images
+  Brain, X, Pencil, Eye, Sparkles, User, BookOpen, Wrench
 } from 'lucide-vue-next';
 
 const { t } = useI18n();
 
 const emit = defineEmits(['close']);
-
-// ---- Friday 卡片 & 头像历史 ----
-const currentAvatar = ref(null);
-const avatarHistory = ref([]);
-const avatarLoading = ref(false);
-const avatarPanelVisible = ref(false);
 
 // ---- 记忆文件 ----
 const memoryFiles = ref([]);
@@ -275,9 +177,6 @@ const editModal = ref({
 // ---- 通知 ----
 const notice = ref(null);
 let noticeTimer = null;
-
-// ---- config-changed 监听（外部 set_avatar 更新头像时刷新）----
-let unlistenConfig = null;
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -320,21 +219,6 @@ const formatTime = (iso) => {
 
 // ============ 数据加载 ============
 
-const loadAvatarHistory = async () => {
-  avatarLoading.value = true;
-  try {
-    const res = await window.electronAPI?.invoke('agent-get-avatar-history');
-    if (res) {
-      currentAvatar.value = res.current || null;
-      avatarHistory.value = Array.isArray(res.history) ? res.history : [];
-    }
-  } catch (e) {
-    console.error('load avatar history failed', e);
-  } finally {
-    avatarLoading.value = false;
-  }
-};
-
 const loadMemoryFiles = async () => {
   memoryLoading.value = true;
   try {
@@ -345,22 +229,6 @@ const loadMemoryFiles = async () => {
     memoryFiles.value = [];
   } finally {
     memoryLoading.value = false;
-  }
-};
-
-// ============ 头像切换 ============
-
-const handleSwitchAvatar = async (name) => {
-  if (name === currentAvatar.value?.name) return;
-  try {
-    const res = await window.electronAPI?.invoke('agent-set-avatar', { name });
-    if (res?.success) {
-      await loadAvatarHistory();
-    } else {
-      showNotice(`${t('drawer.memory.switchAvatarFailed')}: ${res?.error || ''}`, 'error');
-    }
-  } catch (e) {
-    showNotice(`${t('drawer.memory.switchAvatarFailed')}: ${e?.message || e}`, 'error');
   }
 };
 
@@ -405,19 +273,11 @@ const saveEdit = async () => {
 };
 
 onMounted(() => {
-  loadAvatarHistory();
   loadMemoryFiles();
-  // 外部（如 set_avatar 工具）更新头像时刷新当前头像与历史
-  unlistenConfig = window.electronAPI?.on('config-changed', () => {
-    loadAvatarHistory();
-  });
 });
 
 onUnmounted(() => {
   clearTimeout(noticeTimer);
-  if (typeof unlistenConfig === 'function') {
-    unlistenConfig();
-  }
 });
 </script>
 
@@ -537,9 +397,7 @@ onUnmounted(() => {
 }
 
 .friday-avatar-wrap {
-  position: relative;
   flex-shrink: 0;
-  cursor: pointer;
   border-radius: 14px;
 }
 
@@ -550,54 +408,6 @@ onUnmounted(() => {
   object-fit: cover;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
-}
-
-.friday-avatar.fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-tertiary);
-}
-
-.avatar-id-hint {
-  position: absolute;
-  bottom: -5px;
-  right: -5px;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--accent-color, #6366f1);
-  color: #fff;
-  border: 2px solid var(--bg-secondary);
-  opacity: 0;
-  transform: scale(0.7);
-  transition: opacity 0.18s, transform 0.18s;
-}
-
-.friday-avatar-wrap:hover .avatar-id-hint {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.rarity-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-  color: #fff;
-}
-
-.rarity-badge.rare {
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
 }
 
 .friday-info {
@@ -629,116 +439,6 @@ onUnmounted(() => {
 .info-value.name {
   font-size: 14px;
   font-weight: 600;
-}
-
-/* ============ 头像历史网格 ============ */
-.avatar-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 8px;
-}
-
-.avatar-chip {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 4px 5px;
-  border: 1.5px solid transparent;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.15s, background-color 0.15s, transform 0.1s;
-}
-
-.avatar-chip:hover {
-  background: var(--bg-hover);
-  transform: translateY(-1px);
-}
-
-.avatar-chip.active {
-  border-color: var(--accent-color, #3b82f6);
-  background: var(--bg-hover);
-}
-
-.avatar-img {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  object-fit: cover;
-  background: var(--bg-primary);
-}
-
-.chip-rare-mark {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-  color: #fff;
-}
-
-.avatar-name {
-  font-size: 10.5px;
-  color: var(--text-secondary);
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.avatar-chip.active .avatar-name {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.chip-current {
-  font-size: 9.5px;
-  font-weight: 600;
-  color: var(--accent-color, #3b82f6);
-  line-height: 1;
-  margin-top: 1px;
-}
-
-/* ============ 已获头像面板：当前头像大图展示 ============ */
-.current-avatar-showcase {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 4px 4px;
-}
-
-.showcase-avatar-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.showcase-avatar {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-}
-
-.showcase-rare-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-  color: #fff;
-  border: 2px solid var(--bg-primary);
 }
 
 /* ============ 记忆文件网格 ============ */
@@ -896,28 +596,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-/* 已获头像面板：比编辑弹窗窄，内容区可滚动 */
-.avatar-panel {
-  width: 440px;
-  max-height: 72vh;
-}
-
-.avatar-panel-body {
-  overflow-y: auto;
-  padding: 12px 16px 16px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-color) transparent;
-}
-
-.avatar-panel-body::-webkit-scrollbar {
-  width: 6px;
-}
-
-.avatar-panel-body::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
 }
 
 .modal-header {
