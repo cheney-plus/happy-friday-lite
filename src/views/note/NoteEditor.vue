@@ -1,9 +1,10 @@
 <template>
   <div class="editor-page">
     <div class="editor-wrapper" :class="{ 'sidebar-collapsed': sidebarCollapsed }" :style="{ flex: '1 1 auto', minWidth: 0 }">
-      <div class="editor-toolbar" v-if="editor && !shareMode">
-      <div class="toolbar-left-group">
+      <div ref="toolbarRef" class="editor-toolbar" v-if="editor && !shareMode">
+      <div ref="toolbarLeftRef" class="toolbar-left-group">
       <!-- 第一组：撤销/重做、清除格式 -->
+      <div ref="historyToolbarSectionRef" v-show="isToolbarSectionVisible('history')" class="toolbar-section">
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" @click="editor.chain().focus().undo().run()" :disabled="!editor.can().undo()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -39,8 +40,10 @@
       </div>
 
       <div class="toolbar-divider"></div>
+      </div>
 
       <!-- 第二组：插入下拉菜单 -->
+      <div ref="insertToolbarSectionRef" v-show="isToolbarSectionVisible('insert')" class="toolbar-section">
       <div class="dropdown-wrapper">
         <button class="toolbar-btn dropdown-toggle" @click="toggleInsertMenu" :class="{ active: showInsertMenu }">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
@@ -85,8 +88,10 @@
       </div>
 
       <div class="toolbar-divider"></div>
+      </div>
 
       <!-- 第三组：文本格式 -->
+      <div ref="formatToolbarSectionRef" v-show="isToolbarSectionVisible('format')" class="toolbar-section">
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">
           <span style="font-weight: 700; font-size: 14px;">B</span>
@@ -147,8 +152,10 @@
       </div>
 
       <div class="toolbar-divider"></div>
+      </div>
 
       <!-- 第四组：标题下拉菜单 -->
+      <div ref="headingToolbarSectionRef" v-show="isToolbarSectionVisible('heading')" class="toolbar-section">
       <div class="dropdown-wrapper">
         <button class="toolbar-btn dropdown-toggle heading-toggle" @click="toggleHeadingMenu" :class="{ active: showHeadingMenu || isHeadingActive }">
           {{ currentHeadingLabel }}
@@ -175,8 +182,10 @@
       </div>
 
       <div class="toolbar-divider"></div>
+      </div>
 
       <!-- 第五组：列表 -->
+      <div ref="listToolbarSectionRef" v-show="isToolbarSectionVisible('list')" class="toolbar-section">
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
@@ -197,8 +206,10 @@
       </div>
 
       <div class="toolbar-divider"></div>
+      </div>
 
       <!-- 第六组：对齐方式 -->
+      <div ref="alignToolbarSectionRef" v-show="isToolbarSectionVisible('align')" class="toolbar-section">
       <div class="tooltip-wrapper">
         <button class="toolbar-btn" :class="{ active: editor.isActive({ textAlign: 'left' }) }" @click="editor.chain().focus().setTextAlign('left').run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="15" y1="12" x2="3" y2="12"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
@@ -219,8 +230,47 @@
       </div>
       </div>
 
+      <div v-if="hiddenToolbarSections.length" class="dropdown-wrapper toolbar-overflow-wrapper">
+        <button class="toolbar-btn" :class="{ active: showToolbarOverflow }" aria-label="更多工具" @click="toggleToolbarOverflow">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6h16M4 12h10M4 18h6"></path><path d="m17 15 3 3-3 3"></path><path d="M20 18h-6"></path>
+          </svg>
+        </button>
+        <span class="toolbar-overflow-tooltip">更多工具</span>
+        <div v-if="showToolbarOverflow" class="dropdown-menu toolbar-overflow-menu">
+          <button
+            v-for="tool in toolbarOverflowTools"
+            v-show="isToolbarSectionHidden(tool.section)"
+            :key="tool.key"
+            class="toolbar-overflow-card"
+            :disabled="tool.disabled?.()"
+            :title="tool.label"
+            @click="handleToolbarOverflowTool(tool)"
+          >
+            <component :is="tool.icon" :size="17" :stroke-width="2" />
+            <span>{{ tool.label }}</span>
+          </button>
+          <div v-if="toolbarOverflowColor" class="toolbar-overflow-color-panel">
+            <button class="toolbar-overflow-color-default" @click="applyToolbarOverflowColor(toolbarOverflowColor === 'highlight' ? 'transparent' : 'inherit')">
+              {{ toolbarOverflowColor === 'highlight' ? t('note.toolbar.noBackground') : t('note.toolbar.defaultColor') }}
+            </button>
+            <div class="toolbar-overflow-colors">
+              <button
+                v-for="color in (toolbarOverflowColor === 'highlight' ? highlightColorPalette : textColorPalette)"
+                :key="color"
+                class="toolbar-overflow-color"
+                :style="{ backgroundColor: color }"
+                :title="color"
+                @click="applyToolbarOverflowColor(color)"
+              ></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
       <!-- 右侧功能按钮组 -->
-      <div class="toolbar-right-group">
+      <div ref="toolbarRightRef" class="toolbar-right-group">
         <div class="tooltip-wrapper">
           <button class="toolbar-btn" @click="handleAddContent">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
@@ -493,7 +543,11 @@ import { useEditor, EditorContent } from '@tiptap/vue-3';
 import { Extension, Node } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { ChevronDown, ChevronUp, Search, X } from 'lucide-vue-next';
+import {
+  AlignCenter, AlignLeft, AlignRight, Bold, Code2, Eraser, Heading,
+  Highlighter, Image as ToolbarImage, Italic, Link2, List, ListChecks, ListOrdered,
+  Minus, Palette, Quote, Redo2, Strikethrough, Table2, Underline as ToolbarUnderline, Undo2,
+} from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
@@ -735,6 +789,125 @@ const showTextColorMenu = ref(false);
 const showHeadingMenu = ref(false);
 const showTableSubmenu = ref(false);
 const showMoreMenu = ref(false);
+const showToolbarOverflow = ref(false);
+const toolbarOverflowColor = ref(null);
+const toolbarRef = ref(null);
+const toolbarLeftRef = ref(null);
+const toolbarRightRef = ref(null);
+const historyToolbarSectionRef = ref(null);
+const insertToolbarSectionRef = ref(null);
+const formatToolbarSectionRef = ref(null);
+const headingToolbarSectionRef = ref(null);
+const listToolbarSectionRef = ref(null);
+const alignToolbarSectionRef = ref(null);
+const toolbarSectionOrder = ['history', 'insert', 'format', 'heading', 'list', 'align'];
+const visibleToolbarSections = ref(new Set(toolbarSectionOrder));
+const toolbarSectionWidths = new Map();
+let toolbarResizeObserver = null;
+let toolbarLayoutFrame = null;
+
+const toolbarSectionRefs = {
+  history: historyToolbarSectionRef,
+  insert: insertToolbarSectionRef,
+  format: formatToolbarSectionRef,
+  heading: headingToolbarSectionRef,
+  list: listToolbarSectionRef,
+  align: alignToolbarSectionRef,
+};
+
+const hiddenToolbarSections = computed(() => toolbarSectionOrder.filter(
+  section => !visibleToolbarSections.value.has(section),
+));
+
+const isToolbarSectionVisible = section => visibleToolbarSections.value.has(section);
+const isToolbarSectionHidden = section => !visibleToolbarSections.value.has(section);
+
+const closeToolbarOverflow = () => {
+  showToolbarOverflow.value = false;
+  toolbarOverflowColor.value = null;
+};
+
+const toggleToolbarOverflow = () => {
+  const nextVisible = !showToolbarOverflow.value;
+  showInsertMenu.value = false;
+  showHighlightMenu.value = false;
+  showTextColorMenu.value = false;
+  showHeadingMenu.value = false;
+  showTableSubmenu.value = false;
+  showToolbarOverflow.value = nextVisible;
+  toolbarOverflowColor.value = null;
+};
+
+const handleToolbarOverflowTool = (tool) => {
+  if (tool.key === 'highlight' || tool.key === 'text-color') {
+    toolbarOverflowColor.value = tool.key === 'highlight' ? 'highlight' : 'text';
+    return;
+  }
+  tool.run();
+  closeToolbarOverflow();
+};
+
+const applyToolbarOverflowColor = (color) => {
+  if (toolbarOverflowColor.value === 'highlight') setHighlight(color);
+  else setTextColor(color);
+  closeToolbarOverflow();
+};
+
+const updateToolbarLayout = () => {
+  toolbarLayoutFrame = null;
+  const toolbar = toolbarRef.value;
+  const rightGroup = toolbarRightRef.value;
+  if (!toolbar || !rightGroup) return;
+
+  toolbarSectionOrder.forEach((section) => {
+    const width = toolbarSectionRefs[section].value?.getBoundingClientRect().width;
+    if (width) toolbarSectionWidths.set(section, width);
+  });
+  if (toolbarSectionWidths.size !== toolbarSectionOrder.length) return;
+
+  const toolbarStyle = window.getComputedStyle(toolbar);
+  const rightStyle = window.getComputedStyle(rightGroup);
+  const gap = Number.parseFloat(toolbarStyle.gap) || 0;
+  const availableWidth = toolbar.getBoundingClientRect().width
+    - (Number.parseFloat(toolbarStyle.paddingLeft) || 0)
+    - (Number.parseFloat(toolbarStyle.paddingRight) || 0)
+    - rightGroup.getBoundingClientRect().width
+    - (Number.parseFloat(rightStyle.marginLeft) || 0)
+    - gap;
+  const sectionGap = 2;
+  const allSectionsWidth = toolbarSectionOrder.reduce(
+    (total, section) => total + toolbarSectionWidths.get(section),
+    0,
+  ) + sectionGap * (toolbarSectionOrder.length - 1);
+
+  let visibleSections;
+  if (allSectionsWidth <= availableWidth) {
+    visibleSections = toolbarSectionOrder;
+  } else {
+    // Reserve the overflow trigger before deciding which sections remain visible.
+    const widthForSections = availableWidth - 28 - sectionGap;
+    let usedWidth = 0;
+    visibleSections = toolbarSectionOrder.filter((section) => {
+      const nextWidth = toolbarSectionWidths.get(section) + (usedWidth ? sectionGap : 0);
+      if (usedWidth + nextWidth > widthForSections) return false;
+      usedWidth += nextWidth;
+      return true;
+    });
+  }
+
+  const sectionsChanged = visibleSections.some(
+    section => !visibleToolbarSections.value.has(section),
+  ) || visibleSections.length !== visibleToolbarSections.value.size;
+  visibleToolbarSections.value = new Set(visibleSections);
+  if (sectionsChanged) nextTick(scheduleToolbarLayout);
+  if (visibleSections.length === toolbarSectionOrder.length) closeToolbarOverflow();
+};
+
+const scheduleToolbarLayout = () => {
+  if (toolbarLayoutFrame !== null) cancelAnimationFrame(toolbarLayoutFrame);
+  toolbarLayoutFrame = requestAnimationFrame(updateToolbarLayout);
+};
+
 const tableRows = ref(0);
 const tableCols = ref(0);
 
@@ -1976,6 +2149,7 @@ const closeAllMenus = () => {
   showTextColorMenu.value = false;
   showHeadingMenu.value = false;
   showTableSubmenu.value = false;
+  closeToolbarOverflow();
 };
 
 const setHighlight = (color) => {
@@ -2033,6 +2207,36 @@ const insertTable = (rows, cols) => {
   showTableSubmenu.value = false;
 };
 
+const toolbarOverflowTools = computed(() => [
+  { key: 'undo', section: 'history', icon: Undo2, label: t('note.toolbar.undo'), disabled: () => !editor.value?.can().undo(), run: () => editor.value?.chain().focus().undo().run() },
+  { key: 'redo', section: 'history', icon: Redo2, label: t('note.toolbar.redo'), disabled: () => !editor.value?.can().redo(), run: () => editor.value?.chain().focus().redo().run() },
+  { key: 'clear', section: 'history', icon: Eraser, label: t('note.toolbar.clearFormat'), run: clearFormatting },
+  { key: 'link', section: 'history', icon: Link2, label: t('note.toolbar.link'), disabled: () => !hasSelection.value, run: addLink },
+  { key: 'table', section: 'insert', icon: Table2, label: t('note.toolbar.table'), run: () => insertTable(3, 3) },
+  { key: 'image', section: 'insert', icon: ToolbarImage, label: t('note.toolbar.image'), run: addImage },
+  { key: 'code', section: 'insert', icon: Code2, label: t('note.toolbar.codeBlock'), run: () => editor.value?.chain().focus().toggleCodeBlock().run() },
+  { key: 'divider', section: 'insert', icon: Minus, label: t('note.toolbar.divider'), run: () => editor.value?.chain().focus().setHorizontalRule().run() },
+  { key: 'quote', section: 'insert', icon: Quote, label: t('note.toolbar.quote'), run: () => editor.value?.chain().focus().toggleBlockquote().run() },
+  { key: 'bold', section: 'format', icon: Bold, label: t('note.toolbar.bold'), run: () => editor.value?.chain().focus().toggleBold().run() },
+  { key: 'italic', section: 'format', icon: Italic, label: t('note.toolbar.italic'), run: () => editor.value?.chain().focus().toggleItalic().run() },
+  { key: 'underline', section: 'format', icon: ToolbarUnderline, label: t('note.toolbar.underline'), run: () => editor.value?.chain().focus().toggleUnderline().run() },
+  { key: 'strike', section: 'format', icon: Strikethrough, label: t('note.toolbar.strike'), run: () => editor.value?.chain().focus().toggleStrike().run() },
+  { key: 'highlight', section: 'format', icon: Highlighter, label: t('note.toolbar.removeHighlight'), run: () => setHighlight('transparent') },
+  { key: 'text-color', section: 'format', icon: Palette, label: t('note.toolbar.defaultColor'), run: () => setTextColor('inherit') },
+  { key: 'heading', section: 'heading', icon: Heading, label: t('note.toolbar.title'), disabled: () => !canSetNoteTitle.value, run: setNoteTitle },
+  { key: 'heading-1', section: 'heading', icon: Heading, label: t('note.toolbar.heading1'), run: () => setHeading(1) },
+  { key: 'heading-2', section: 'heading', icon: Heading, label: t('note.toolbar.heading2'), run: () => setHeading(2) },
+  { key: 'heading-3', section: 'heading', icon: Heading, label: t('note.toolbar.heading3'), run: () => setHeading(3) },
+  { key: 'body', section: 'heading', icon: Heading, label: t('note.toolbar.body'), run: () => setHeading(0) },
+  { key: 'small-body', section: 'heading', icon: Heading, label: t('note.toolbar.smallBody'), run: setSmallBody },
+  { key: 'bullet', section: 'list', icon: List, label: t('note.toolbar.bulletList'), run: () => editor.value?.chain().focus().toggleBulletList().run() },
+  { key: 'ordered', section: 'list', icon: ListOrdered, label: t('note.toolbar.orderedList'), run: () => editor.value?.chain().focus().toggleOrderedList().run() },
+  { key: 'task', section: 'list', icon: ListChecks, label: t('note.toolbar.taskList'), run: () => editor.value?.chain().focus().toggleTaskList().run() },
+  { key: 'align-left', section: 'align', icon: AlignLeft, label: t('note.toolbar.alignLeft'), run: () => editor.value?.chain().focus().setTextAlign('left').run() },
+  { key: 'align-center', section: 'align', icon: AlignCenter, label: t('note.toolbar.alignCenter'), run: () => editor.value?.chain().focus().setTextAlign('center').run() },
+  { key: 'align-right', section: 'align', icon: AlignRight, label: t('note.toolbar.alignRight'), run: () => editor.value?.chain().focus().setTextAlign('right').run() },
+]);
+
 watch(() => props.modelValue, (newValue) => {
   const preparedContent = prepareEditorContent(newValue);
   if (editor.value && preparedContent !== editor.value.getHTML()) {
@@ -2049,12 +2253,19 @@ watch(() => appStore.noteFimCompletion, (enabled) => {
   }
 });
 
+watch(currentHeadingLabel, scheduleToolbarLayout);
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   setupChatListeners();
   setupFimListener();
   restoreChatSession();
   loadKbListFromDisk();
+  nextTick(() => {
+    scheduleToolbarLayout();
+    toolbarResizeObserver = new ResizeObserver(scheduleToolbarLayout);
+    toolbarResizeObserver.observe(toolbarRef.value);
+  });
 });
 
 onBeforeUnmount(() => {
@@ -2062,6 +2273,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside);
   cleanupChatListeners();
   cleanupFim();
+  toolbarResizeObserver?.disconnect();
+  if (toolbarLayoutFrame !== null) cancelAnimationFrame(toolbarLayoutFrame);
   if (editor.value) {
     editor.value.destroy();
   }
@@ -2304,10 +2517,10 @@ const fixEmptyTableCells = (html) => {
 
 .editor-toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-shrink: 0;
   gap: 2px;
-  padding: 6px 40px 6px 0;
+  padding: 4px 40px 4px 0;
   max-width: 9000px;
   margin: 0 auto;
   width: 100%;
@@ -2370,8 +2583,8 @@ const fixEmptyTableCells = (html) => {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 30px;
-  height: 30px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 7px;
   border: none;
   border-radius: 5px;
@@ -2402,7 +2615,7 @@ const fixEmptyTableCells = (html) => {
 
 .toolbar-divider {
   width: 1px;
-  height: 18px;
+  height: 16px;
   background-color: #ddd;
   margin: 0 5px;
 }
@@ -3111,10 +3324,136 @@ const fixEmptyTableCells = (html) => {
 
 .toolbar-left-group {
   flex: 1;
+  min-width: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 2px;
   align-items: center;
+}
+
+.toolbar-section {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolbar-overflow-wrapper {
+  flex: 0 0 auto;
+}
+
+.toolbar-overflow-tooltip {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.toolbar-overflow-wrapper:hover .toolbar-overflow-tooltip {
+  opacity: 1;
+}
+
+.toolbar-overflow-menu {
+  left: auto;
+  right: 0;
+  min-width: min(184px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 120px));
+  overflow-y: auto;
+  padding: 1px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(32px, 1fr));
+  gap: 0;
+}
+
+.toolbar-overflow-card {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 2px 0;
+  font-family: inherit;
+  color: var(--text-primary, #1f2937);
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.toolbar-overflow-card span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-overflow-card:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(59, 130, 246, 0.08));
+  color: var(--accent-color, #2563eb);
+}
+
+.toolbar-overflow-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.toolbar-overflow-color-panel {
+  grid-column: 1 / -1;
+  padding: 2px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.toolbar-overflow-color-default {
+  width: 100%;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  font-size: 10px;
+  padding: 1px;
+  cursor: pointer;
+}
+
+.toolbar-overflow-color-default:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.toolbar-overflow-colors {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 1px;
+  margin-top: 1px;
+}
+
+.toolbar-overflow-color {
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.toolbar-overflow-color:hover {
+  outline: 2px solid var(--accent-color, #2563eb);
+  outline-offset: 1px;
 }
 
 .toolbar-right-group {
