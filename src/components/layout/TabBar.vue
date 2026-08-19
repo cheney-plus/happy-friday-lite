@@ -17,6 +17,7 @@
             :style="{ width: tabWidth + 'px' }"
             role="tab"
             @click="switchTab(tab)"
+            @contextmenu.prevent.stop="showContextMenu($event, tab)"
             @mouseenter="hoveredTabId = tab.id"
             @mouseleave="hoveredTabId = ''"
           >
@@ -55,6 +56,40 @@
     </div>
 
     <div v-else class="tab-bar-right-spacer"></div>
+
+    <Teleport to="body">
+      <div
+        v-if="contextMenu.visible"
+        class="tab-context-menu-overlay"
+        @click="hideContextMenu"
+        @contextmenu.prevent="hideContextMenu"
+      >
+        <div
+          class="tab-context-menu"
+          :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+          role="menu"
+          @click.stop
+        >
+          <button class="tab-context-menu-item" role="menuitem" :disabled="!canCloseOthers" @click="closeOtherTabs">
+            <Layers :size="15" :stroke-width="1.8" />
+            <span>关闭其他</span>
+          </button>
+          <button class="tab-context-menu-item" role="menuitem" @click="closeAllTabs">
+            <X :size="15" :stroke-width="1.8" />
+            <span>全部关闭</span>
+          </button>
+          <div class="tab-context-menu-divider"></div>
+          <button class="tab-context-menu-item" role="menuitem" :disabled="!canMoveLeft" @click="moveContextTab(-1)">
+            <ArrowLeft :size="15" :stroke-width="1.8" />
+            <span>向左移动</span>
+          </button>
+          <button class="tab-context-menu-item" role="menuitem" :disabled="!canMoveRight" @click="moveContextTab(1)">
+            <ArrowRight :size="15" :stroke-width="1.8" />
+            <span>向右移动</span>
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -69,6 +104,9 @@ import {
   Square,
   PanelLeftClose,
   PanelLeftOpen,
+  ArrowLeft,
+  ArrowRight,
+  Layers,
   FolderKanban,
   FileText,
   CalendarDays,
@@ -107,6 +145,7 @@ const tabsAreaRef = ref(null);
 const tabsScrollRef = ref(null);
 const tabsAreaWidth = ref(0);
 const hoveredTabId = ref('');
+const contextMenu = ref({ visible: false, x: 0, y: 0, tabId: '' });
 
 const ADD_BTN_WIDTH = 28;
 const TAB_GAP = 3;
@@ -122,6 +161,11 @@ const tabWidth = computed(() => {
   const width = (availableForTabs - totalGaps) / count;
   return Math.min(Math.max(width, MIN_TAB_WIDTH), MAX_TAB_WIDTH);
 });
+
+const contextTabIndex = computed(() => tabStore.openedTabs.findIndex(tab => tab.id === contextMenu.value.tabId));
+const canCloseOthers = computed(() => tabStore.openedTabs.length > 1 && contextTabIndex.value !== -1);
+const canMoveLeft = computed(() => contextTabIndex.value > 0);
+const canMoveRight = computed(() => contextTabIndex.value !== -1 && contextTabIndex.value < tabStore.openedTabs.length - 1);
 
 const scrollToActiveTab = () => {
   nextTick(() => {
@@ -161,12 +205,14 @@ onMounted(() => {
     resizeObserver.observe(tabsAreaRef.value);
     tabsAreaWidth.value = tabsAreaRef.value.getBoundingClientRect().width;
   }
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   if (resizeObserver) {
     resizeObserver.disconnect();
   }
+  window.removeEventListener('keydown', handleKeydown);
 });
 
 const switchTab = (tab) => {
@@ -178,10 +224,50 @@ const switchTab = (tab) => {
 
 const closeTab = (id) => {
   tabStore.removeTab(id);
-  const activeTab = tabStore.openedTabs.find(t => t.id === tabStore.activeTabId);
-  if (activeTab) {
-    router.push(activeTab.fullPath);
+  navigateToActiveTab();
+};
+
+const navigateToActiveTab = () => {
+  const activeTab = tabStore.openedTabs.find(tab => tab.id === tabStore.activeTabId);
+  if (activeTab) router.push(activeTab.fullPath);
+};
+
+const showContextMenu = (event, tab) => {
+  const menuWidth = 118;
+  const menuHeight = 144;
+  contextMenu.value = {
+    visible: true,
+    x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+    y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+    tabId: tab.id
+  };
+};
+
+const hideContextMenu = () => {
+  contextMenu.value.visible = false;
+};
+
+const closeOtherTabs = () => {
+  if (!canCloseOthers.value) return;
+  tabStore.closeOtherTabs(contextMenu.value.tabId);
+  hideContextMenu();
+  navigateToActiveTab();
+};
+
+const closeAllTabs = () => {
+  tabStore.closeAllTabs();
+  hideContextMenu();
+  navigateToActiveTab();
+};
+
+const moveContextTab = (direction) => {
+  if (tabStore.moveTab(contextMenu.value.tabId, direction)) {
+    hideContextMenu();
   }
+};
+
+const handleKeydown = (event) => {
+  if (event.key === 'Escape') hideContextMenu();
 };
 
 const addFridayTab = () => {
@@ -403,6 +489,64 @@ const handleClose = () => {
   flex-shrink: 0;
   min-width: 50px;
   height: 100%;
+}
+
+.tab-context-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.tab-context-menu {
+  position: fixed;
+  z-index: 2001;
+  width: 118px;
+  min-width: 118px;
+  max-width: 118px;
+  box-sizing: border-box;
+  padding: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.tab-context-menu-item {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.tab-context-menu-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.tab-context-menu-item:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.tab-context-menu-divider {
+  height: 1px;
+  margin: 4px;
+  background: var(--border-color);
 }
 
 .linux-window-controls {

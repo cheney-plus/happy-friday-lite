@@ -59,6 +59,29 @@ export const useTabStore = defineStore('tabs', {
         }
       }
     },
+    closeOtherTabs(id) {
+      const tab = this.openedTabs.find(t => t.id === id)
+      if (!tab) return
+
+      this.openedTabs = [tab]
+      this.activeTabId = id
+    },
+    closeAllTabs() {
+      this.openedTabs = []
+      this.activeTabId = ''
+      return this.addFridayTab()
+    },
+    moveTab(id, direction) {
+      const index = this.openedTabs.findIndex(t => t.id === id)
+      const targetIndex = index + direction
+      if (index === -1 || targetIndex < 0 || targetIndex >= this.openedTabs.length) {
+        return false
+      }
+
+      const [tab] = this.openedTabs.splice(index, 1)
+      this.openedTabs.splice(targetIndex, 0, tab)
+      return true
+    },
     setActiveTab(id) {
       this.activeTabId = id
     },
