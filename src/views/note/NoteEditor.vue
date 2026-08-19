@@ -2520,7 +2520,7 @@ const fixEmptyTableCells = (html) => {
   align-items: center;
   flex-shrink: 0;
   gap: 2px;
-  padding: 4px 40px 4px 0;
+  padding: 4px 40px 0px 0;
   max-width: 9000px;
   margin: 0 auto;
   width: 100%;
@@ -2915,14 +2915,14 @@ const fixEmptyTableCells = (html) => {
   position: relative;
 }
 
-/* Keep a visible separation between the toolbar and scrolled editor content. */
+/* Keep a compact separation between the toolbar and scrolled editor content. */
 .editor-content::before {
   content: '';
   display: block;
   position: sticky;
   top: 0;
   z-index: 1;
-  height: 16px;
+  height: 6px;
   pointer-events: none;
   background-color: var(--bg-primary);
 }
@@ -2952,7 +2952,7 @@ const fixEmptyTableCells = (html) => {
   font-size: 16px;
   line-height: 1.6;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  padding-top: 4px;
+  padding-top: 0;
   padding-bottom: 40px;
   max-width: 900px;
   margin: 0 auto;
