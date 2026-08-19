@@ -39,27 +39,33 @@
 
 ### Friday 智能助手
 
-![Friday 智能助手首页](docs/resource/PixPin_2026-08-15_16-51-10.png)
+![Friday 智能助手首页](docs/resource/1.png)
 
-![Friday 对话与代码执行](docs/resource/PixPin_2026-07-11_03-31-58.png)
+![Friday 对话与代码执行](docs/resource/1.1.png)
 
 ### 知识库
 
-![知识库文件卡片](docs/resource/PixPin_2026-07-11_03-35-42.png)
-
-![知识库分类与检索](docs/resource/PixPin_2026-07-11_03-36-03.png)
+![知识库文件卡片](docs/resource/4.png)
 
 ### 笔记
 
-![笔记富文本编辑](docs/resource/PixPin_2026-07-11_03-35-27.png)
+![笔记富文本编辑](docs/resource/3.png)
 
 ### 日程
 
-![日程日历](docs/resource/PixPin_2026-07-11_03-37-05.png)
+![日程日历](docs/resource/5.png)
+
+### 自动化任务
+
+![自动化任务](docs/resource/6.png)
+
+### DeepSeek Harness
+
+![DeepSeek Harness](docs/resource/7.png)
 
 ### 设置
 
-![设置与功能介绍](docs/resource/PixPin_2026-07-11_03-37-31.png)
+![设置与功能介绍](docs/resource/8.png)
 
 ## 🚀 快速开始
 
