@@ -92,11 +92,27 @@ jobs:
           node scripts/prebuild-install.mjs ${{ matrix.arch }}
           node scripts/prebuild-clean.mjs ${{ matrix.arch }}
 
+      - name: Build portable node-pty for Linux ARM64
+        if: matrix.arch == 'arm64'
+        # node-pty is a Node-API module, so a binary built with Node 22 works
+        # in Electron. Building in Debian bullseye caps its glibc requirement
+        # at 2.31 instead of inheriting the Ubuntu 24 ARM runner's glibc 2.34.
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            node:22-bullseye \
+            bash -lc 'npm rebuild node-pty --build-from-source'
+          sudo chown -R "$(id -u):$(id -g)" node_modules/node-pty
+
       - name: Build Electron app (Linux ${{ matrix.arch }})
-        run: npx electron-builder ${{ matrix.build-target }} ${{ matrix.arch-flag }}
+        run: npx electron-builder ${{ matrix.build-target }} ${{ matrix.arch-flag }} --config.npmRebuild=false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           npm_config_python: ${{ steps.setup-python.outputs.python-path }}
+
+      - name: Verify packaged Linux native modules (${{ matrix.arch }})
+        run: node scripts/verify-packaged-native-modules.mjs ${{ matrix.arch }}
 
       - name: List build artifacts
         run: ls -lh release/ || true
@@ -146,6 +162,8 @@ jobs:
       - name: Install Windows native bindings
         run: |
           node scripts/prebuild-install.mjs win32 x64
+          node scripts/fix-dsh-directory-picker-electron.mjs
+          node scripts/fix-dsh-directory-picker-electron.mjs --check
 
       - name: Verify Windows node-pty prebuilds
         run: |
@@ -185,11 +203,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
+          - os: macos-14
             arch: arm64
             arch-flag: --arm64
             artifact-name: HappyFriday-macOS-arm64
-          - os: macos-13
+          - os: macos-14
             arch: x64
             arch-flag: --x64
             artifact-name: HappyFriday-macOS-x64

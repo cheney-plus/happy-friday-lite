@@ -30,7 +30,7 @@
 
       <div class="sidebar-bottom">
         <router-link
-          v-for="item in sidebarBottomMenuConfig"
+          v-for="item in visibleSidebarBottomMenuConfig"
           :key="item.key"
           :to="item.path"
           class="menu-item"
@@ -60,19 +60,17 @@ import { useAppStore } from '@/store';
 import { useI18n } from 'vue-i18n';
 import { sidebarMenuConfig, sidebarBottomMenuConfig } from '@/config/menu';
 import AvatarDrawer from './AvatarDrawer.vue';
-import defaultAvatar from '@/assets/images/user.png';
 
 const appStore = useAppStore();
 const router = useRouter();
 const { t } = useI18n();
 
-const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter((item) => {
-  if (item.key !== 'schedule' && item.key !== 'automation') return true;
-  return appStore.sidebarModules[item.key] !== false;
-}));
+const isModuleVisible = (item) => item.key === 'settings' || appStore.sidebarModules[item.key] !== false;
+const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter(isModuleVisible));
+const visibleSidebarBottomMenuConfig = computed(() => sidebarBottomMenuConfig.filter(isModuleVisible));
 
-// 用户头像：优先使用 set_avatar 工具写入的头像，否则回退到默认头像
-const avatarSrc = computed(() => appStore.avatar?.dataUrl || defaultAvatar);
+// Use Vite's base URL so the avatar also resolves from Electron's file:// build.
+const avatarSrc = `${import.meta.env.BASE_URL}images/icon.png`;
 
 const tooltip = reactive({
   visible: false,

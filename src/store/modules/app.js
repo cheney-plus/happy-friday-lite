@@ -9,11 +9,13 @@ export const useAppStore = defineStore('app', {
     noteFimCompletion: true,
     scheduleDefaultView: 'month',
     sidebarModules: {
+      note: true,
+      knowledge: true,
       schedule: true,
-      automation: true
+      automation: true,
+      harness: true,
+      history: true
     },
-    // 用户头像：{ dataUrl, name, rarity, updatedAt } 或 null（回退到默认头像）
-    avatar: null
   }),
   actions: {
     toggleSidebar() {
@@ -33,12 +35,13 @@ export const useAppStore = defineStore('app', {
     },
     setSidebarModules(modules = {}) {
       this.sidebarModules = {
+        note: modules.note !== false,
+        knowledge: modules.knowledge !== false,
         schedule: modules.schedule !== false,
-        automation: modules.automation !== false
+        automation: modules.automation !== false,
+        harness: modules.harness !== false,
+        history: modules.history !== false
       }
     },
-    setAvatar(avatar) {
-      this.avatar = avatar || null
-    }
   }
 })

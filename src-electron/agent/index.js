@@ -159,7 +159,6 @@ export async function createAgent(modelConfig, options = {}) {
       '- 调用 REST API（requests_get / requests_post / requests_put / requests_patch / requests_delete）\n' +
       '- 处理 JSON 数据（json_parse / json_extract / json_format）\n' +
       '- 抓取网页正文（fetch_webpage_text，自动去除导航/广告等非正文内容）\n' +
-      '- 替换应用头像（set_avatar，从内置头像库随机选取并应用；若用户在消息中提及口令，请将口令原样作为 keyword 参数传入以解锁稀有头像）\n\n' +
       (mcpTools.length > 0
         ? `## 外部 MCP 工具\n用户已连接 ${mcpTools.length} 个外部 MCP 工具（工具名以 \`mcp__\` 开头，格式为 \`mcp__服务器名__工具名\`）。这些工具来自用户添加的 MCP 服务器，可直接调用。调用前请阅读工具描述确认参数与用途。\n\n`
         : '') +

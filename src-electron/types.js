@@ -13,13 +13,6 @@ export function defaultConfig() {
       schedule: true,
       automation: true
     },
-    // 用户头像：由 set_avatar 工具写入，结构为 { dataUrl, name, rarity, updatedAt }
-    // 为 null 时前端回退到默认头像 src/assets/images/user.png
-    avatar: null,
-    // 历史已获得的头像列表：每次 set_avatar 应用新头像时追加（按 name 去重）。
-    // 反作弊：仅记录用户实际获得过的头像，绝不导出整库。
-    // 结构同 avatar：[{ name, dataUrl, rarity, obtainedAt }]
-    avatarHistory: [],
     backup: {
       enabled: false,
       interval: 'daily',

@@ -2305,6 +2305,7 @@ const fixEmptyTableCells = (html) => {
 .editor-toolbar {
   display: flex;
   align-items: flex-start;
+  flex-shrink: 0;
   gap: 2px;
   padding: 6px 40px 6px 0;
   max-width: 9000px;
@@ -2696,9 +2697,21 @@ const fixEmptyTableCells = (html) => {
 .editor-content {
   flex: 1;
   overflow-y: auto;
-  margin-top: 16px;
   padding-bottom: 40px;
   padding-right: 40px;
+  position: relative;
+}
+
+/* Keep a visible separation between the toolbar and scrolled editor content. */
+.editor-content::before {
+  content: '';
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 16px;
+  pointer-events: none;
+  background-color: var(--bg-primary);
 }
 
 .editor-content::-webkit-scrollbar {

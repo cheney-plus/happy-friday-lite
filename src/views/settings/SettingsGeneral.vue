@@ -95,19 +95,12 @@
       <div class="settings-group">
         <div class="group-title">{{ t('settings.modules') }}</div>
         <div class="group-content">
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.scheduleModule') }}</span>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="moduleVisibility.schedule" @change="saveModuleVisibility" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="setting-item">
-            <span class="item-label">{{ t('settings.automationModule') }}</span>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="moduleVisibility.automation" @change="saveModuleVisibility" />
-              <span class="toggle-slider"></span>
-            </label>
+          <div class="setting-item clickable" @click="goToModuleSettings">
+            <div class="item-label-group">
+              <span class="item-label">{{ t('settings.sidebarModules') }}</span>
+              <span class="item-hint">{{ t('settings.sidebarModulesHint', { count: enabledModuleCount, total: sidebarModuleCount }) }}</span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>
         </div>
       </div>
@@ -187,6 +180,12 @@
               @click="handleBackup"
             >
               {{ backupState.backing ? t('settings.backing') : t('settings.createBackup') }}
+            </button>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.exportAllNotes') }}</span>
+            <button class="action-btn" :disabled="noteExporting" @click="handleExportAllNotes">
+              {{ noteExporting ? t('settings.exportingNotes') : t('settings.exportNotes') }}
             </button>
           </div>
           <div v-if="backupProgress.active" class="setting-item backup-progress-item">
@@ -587,6 +586,7 @@ import { useAppStore } from '@/store';
 import { useTheme } from '@/utils/theme';
 import { electronService } from '@/services/electron';
 import { setI18nLanguage } from '@/i18n';
+import { sidebarModuleConfig } from '@/config/menu';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -636,12 +636,11 @@ const settings = reactive({
   scheduleDefaultView: appStore.scheduleDefaultView || 'month'
 });
 
-const moduleVisibility = reactive({
-  schedule: appStore.sidebarModules.schedule !== false,
-  automation: appStore.sidebarModules.automation !== false
-});
+const enabledModuleCount = computed(() => Object.values(appStore.sidebarModules).filter(Boolean).length);
+const sidebarModuleCount = sidebarModuleConfig.length;
 
 const runtimeLogsEnabled = ref(true);
+const noteExporting = ref(false);
 
 // ========== 通用提示弹窗（替代原生 alert/confirm） ==========
 const dialog = reactive({
@@ -700,6 +699,25 @@ const confirmDialog = (message, options = {}) => showDialog({
   confirmText: options.confirmText || t('settings.dialogConfirm'),
   cancelText: options.cancelText || t('settings.dialogCancel')
 });
+
+const handleExportAllNotes = async () => {
+  if (noteExporting.value) return;
+  noteExporting.value = true;
+  try {
+    const result = await electronService.invoke('export_all_notes');
+    if (!result || result.canceled) return;
+    if (result.success) {
+      await notifySuccess(t('settings.exportNotesSuccess', { count: result.exported }), { details: result.exportDir });
+    } else {
+      const details = result.errors?.map(item => `${item.title}: ${item.error}`).join('\n');
+      await notifyError(t('settings.exportNotesFailed', { exported: result.exported, total: result.total }), { details });
+    }
+  } catch (e) {
+    await notifyError(t('settings.exportNotesFailed', { exported: 0, total: 0 }), { details: e.message || String(e) });
+  } finally {
+    noteExporting.value = false;
+  }
+};
 
 // 备份状态
 const backupState = reactive({
@@ -1184,7 +1202,7 @@ const selectTheme = async (value) => {
   appStore.setTheme(value);
   showThemeDropdown.value = false;
   // 持久化到 config.json，与 language 等设置保持一致。
-  // 否则 config.theme 会一直停留在默认 'light'，切换头像等广播 config-changed 时
+  // 否则 config.theme 会一直停留在默认 'light'，后续 config-changed 广播时
   // 会用过期的 theme 覆盖用户当前主题（深色被强制切回浅色）。
   try {
     const config = await electronService.invoke('get-config');
@@ -1222,24 +1240,6 @@ const saveNoteFimCompletion = async () => {
       await electronService.invoke('save-config', config);
     }
   } catch (_e) {}
-};
-
-const saveModuleVisibility = async () => {
-  const previous = { ...appStore.sidebarModules };
-  const next = {
-    schedule: moduleVisibility.schedule,
-    automation: moduleVisibility.automation
-  };
-  appStore.setSidebarModules(next);
-  try {
-    const config = await electronService.invoke('get-config');
-    if (!config) throw new Error('Failed to load config');
-    config.sidebarModules = next;
-    await electronService.invoke('save-config', config);
-  } catch (_e) {
-    Object.assign(moduleVisibility, previous);
-    appStore.setSidebarModules(previous);
-  }
 };
 
 const saveRuntimeLogsConfig = async () => {
@@ -1299,11 +1299,7 @@ onMounted(() => {
   electronService.invoke('get-config').then((config) => {
     if (config) {
       runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
-      Object.assign(moduleVisibility, {
-        schedule: config.sidebarModules?.schedule !== false,
-        automation: config.sidebarModules?.automation !== false
-      });
-      appStore.setSidebarModules(moduleVisibility);
+      appStore.setSidebarModules(config.sidebarModules);
     }
   });
   loadBackupConfig();
@@ -1331,6 +1327,10 @@ const goToModelSettings = () => {
   router.push('/settings/model');
 };
 
+const goToModuleSettings = () => {
+  router.push('/settings/modules');
+};
+
 // ========== 关于 / 功能介绍 / 帮助与反馈 ==========
 const HELP_URL = 'https://github.com/cheney-plus/happy-friday-electron';
 
@@ -1338,7 +1338,7 @@ const showAboutModal = ref(false);
 const showFeaturesModal = ref(false);
 const showAuthorModal = ref(false);
 
-const appVersion = ref('1.8.0');
+const appVersion = ref('2.0.3');
 
 const aboutLogo = computed(() => {
   return appliedTheme.value === 'dark'

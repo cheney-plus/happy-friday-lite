@@ -5,7 +5,6 @@ import fs from 'fs'
 import { setDataDir as setConfigDataDir } from './src-electron/config.js'
 import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
-import { ensureDefaultAvatar } from './src-electron/avatar.js'
 import { checkAutoBackup } from './src-electron/backup.js'
 import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
@@ -123,10 +122,6 @@ app.whenReady().then(async () => {
   } catch (e) {
     console.warn('[Main] Failed to apply runtime log setting:', e.message)
   }
-
-  // 首次启动时为未设置头像的用户随机分配 5 个普通头像（稀有头像不参与默认分配）
-  // 需在数据目录初始化后、IPC 注册前完成，确保前端首次 get-config 即可拿到头像
-  ensureDefaultAvatar()
 
   console.log('[Main] Registering IPC commands...')
   try {

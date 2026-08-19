@@ -51,7 +51,6 @@ import {
 } from './humanInTheLoop.js'
 import { createThread, touchThread } from './memory.js'
 import { listMemoryFiles, readMemoryFile, writeMemoryFile } from './memoryFiles.js'
-import { getAvatarHistory, setAvatarFromHistory } from '../avatar.js'
 
 const log = createLogger('IPC')
 
@@ -389,32 +388,6 @@ export function registerAgentCommands(mainWindow) {
       // 广播 config-changed 并无必要（记忆文件不在 config 中），
       // 但 Agent 下次 invoke 会自动读取最新记忆文件，无需额外通知。
       log.info(`记忆文件已更新: ${fileName}`)
-    }
-    return res
-  })
-
-  // ========== 头像历史管理 ==========
-  // 通道：
-  //   - agent-get-avatar-history: 获取当前头像 + 历史已获得头像列表
-  //   - agent-set-avatar:         从历史已获得头像中切换（按 name 匹配）
-  // 反作弊：仅能在已获得的头像间切换，切换后广播 config-changed 实时刷新前端。
-
-  ipcMain.handle('agent-get-avatar-history', async () => {
-    return getAvatarHistory()
-  })
-
-  ipcMain.handle('agent-set-avatar', async (_event, args) => {
-    const name = args?.name
-    if (!name) return { success: false, error: '缺少 name' }
-    const res = setAvatarFromHistory(name)
-    if (res.success) {
-      // 广播 config-changed，前端（侧边栏等）实时刷新头像
-      try {
-        const config = loadConfig()
-        mainWindow.webContents.send(CONFIG_CHANGED, config)
-      } catch (e) {
-        log.warn(`广播 config-changed 失败: ${e.message}`)
-      }
     }
     return res
   })

@@ -1,6 +1,7 @@
 import { ipcMain, shell, dialog } from 'electron'
 import fs from 'fs'
 import path from 'path'
+import TurndownService from 'turndown'
 import { CancellationTokens } from './cancellation.js'
 import { loadConfig, saveConfig, getDataDir } from './config.js'
 import * as db from './db.js'
@@ -39,6 +40,39 @@ import {
 } from './automation.js'
 
 const cancelTokens = new CancellationTokens()
+
+function noteFileName(title, usedNames, exportDir) {
+  const baseName = String(title || '未命名笔记')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/[. ]+$/g, '')
+    .trim()
+    .slice(0, 120) || '未命名笔记'
+
+  let index = 1
+  let fileName = `${baseName}.md`
+  while (usedNames.has(fileName.toLowerCase()) || fs.existsSync(path.join(exportDir, fileName))) {
+    index += 1
+    fileName = `${baseName} (${index}).md`
+  }
+  usedNames.add(fileName.toLowerCase())
+  return fileName
+}
+
+function noteHtmlToMarkdown(html) {
+  const turndown = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-'
+  })
+  turndown.addRule('taskListItems', {
+    filter: node => node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem',
+    replacement: (content, node) => {
+      const checkbox = node.querySelector('input[type="checkbox"]')
+      return `- [${checkbox?.hasAttribute('checked') ? 'x' : ' '}] ${content.trim()}\n`
+    }
+  })
+  return turndown.turndown(html || '')
+}
 
 /**
  * 校验模型配置：确保用户已配置自己的大模型
@@ -502,6 +536,32 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('export_markdown', async (_event, args) => {
     await exportMarkdown(args.markdown, args.savePath)
     return true
+  })
+
+  ipcMain.handle('export_all_notes', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择笔记导出目录',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (result.canceled || !result.filePaths[0]) return { success: false, canceled: true }
+
+    const exportDir = result.filePaths[0]
+    const notes = db.getNotes()
+    const usedNames = new Set()
+    const errors = []
+    let exported = 0
+
+    for (const note of notes) {
+      try {
+        const fileName = noteFileName(note.title, usedNames, exportDir)
+        fs.writeFileSync(path.join(exportDir, fileName), noteHtmlToMarkdown(note.content), 'utf-8')
+        exported += 1
+      } catch (error) {
+        errors.push({ title: note.title || '未命名笔记', error: error.message })
+      }
+    }
+
+    return { success: errors.length === 0, exported, total: notes.length, errors, exportDir }
   })
 
   ipcMain.handle('open-external', (_event, url) => {
