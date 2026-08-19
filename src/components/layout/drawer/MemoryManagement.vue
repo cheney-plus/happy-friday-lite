@@ -17,7 +17,7 @@
           <div
             class="friday-avatar-wrap"
           >
-            <img src="/images/icon.png" class="friday-avatar" :alt="t('drawer.memory.fridayName')" />
+            <img :src="avatarSrc" class="friday-avatar" :alt="t('drawer.memory.fridayName')" />
           </div>
           <div class="friday-info">
             <div class="info-row">
@@ -159,6 +159,8 @@ import {
 const { t } = useI18n();
 
 const emit = defineEmits(['close']);
+
+const avatarSrc = `${import.meta.env.BASE_URL}images/icon.png`;
 
 // ---- 记忆文件 ----
 const memoryFiles = ref([]);

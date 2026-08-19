@@ -69,8 +69,8 @@ const isModuleVisible = (item) => item.key === 'settings' || appStore.sidebarMod
 const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter(isModuleVisible));
 const visibleSidebarBottomMenuConfig = computed(() => sidebarBottomMenuConfig.filter(isModuleVisible));
 
-// 系统头像固定使用 public/images/icon.png，不支持更换。
-const avatarSrc = '/images/icon.png';
+// Use Vite's base URL so the avatar also resolves from Electron's file:// build.
+const avatarSrc = `${import.meta.env.BASE_URL}images/icon.png`;
 
 const tooltip = reactive({
   visible: false,
