@@ -52,6 +52,9 @@
     "securityHint": "Binds to 127.0.0.1 only. Exposes application tools (notes / schedule / knowledge base) only, not shell / python system tools.",
     "statusOff": "Stopped",
     "statusOn": "Running",
+    "harnessUsing": "DeepSeek Harness is using the local MCP service. Stop Harness before stopping this service.",
+    "internalUsing": "The local MCP service is currently used by an internal app feature and cannot be stopped yet.",
+    "toggleFailed": "The local MCP service operation did not complete. Please try again.",
     "deleteConfirmTitle": "Delete MCP Server",
     "deleteConfirm": "Are you sure you want to delete this MCP server?"
   },

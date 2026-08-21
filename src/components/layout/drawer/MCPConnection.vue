@@ -385,6 +385,17 @@ const toggleLocal = async () => {
       };
       // 刷新可复制 JSON（启停后端口可能变化）
       await loadLocal();
+      if (res.keptAlive) {
+        const consumers = Array.isArray(res.consumers) ? res.consumers : [];
+        const messageKey = consumers.includes('deepseek-harness')
+          ? 'drawer.mcp.harnessUsing'
+          : 'drawer.mcp.internalUsing';
+        // 服务被 DeepSeek Harness 等内部消费者持有时，不能静默保活。
+        // 使用原生对话框确保用户明确知道停止操作未生效的原因。
+        window.alert(t(messageKey));
+      }
+    } else {
+      showNotice(t('drawer.mcp.toggleFailed'), 'error');
     }
   } catch (e) {
     showNotice(`${e?.message || e}`, 'error');
