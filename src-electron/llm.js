@@ -79,6 +79,10 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
     }
   }
 
+  // req 的 error 事件可能在 response error 之外触发，单独保留已收到的内容，
+  // 确保用户中断时仍能把部分回答通过 CHAT_DONE 落库。
+  let partialContent = ''
+  let partialReasoning = ''
   return new Promise((resolve, reject) => {
     const req = client.request(options, (res) => {
       if (res.statusCode !== 200) {
@@ -150,6 +154,7 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
               const reasoning = parsed.choices?.[0]?.delta?.reasoning_content
               if (reasoning) {
                 fullReasoning += reasoning
+                partialReasoning = fullReasoning
                 mainWindow.webContents.send(CHAT_REASONING_CHUNK, {
                   requestId,
                   sessionId: sessionId || null,
@@ -160,6 +165,7 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
               const content = parsed.choices?.[0]?.delta?.content
               if (content) {
                 fullContent += content
+                partialContent = fullContent
                 mainWindow.webContents.send(CHAT_CHUNK, {
                   requestId,
                   sessionId: sessionId || null,
@@ -200,7 +206,7 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
     req.on('error', (err) => {
       // cancel() 调用 req.destroy() 会触发此处：视为正常取消，返回部分内容
       if (cancelToken && cancelToken.cancelled) {
-        resolve({ fullContent: '', fullReasoning: '' })
+        resolve({ fullContent: partialContent, fullReasoning: partialReasoning })
         return
       }
       reject(AppError.llm(`Request error: ${err.message}`))

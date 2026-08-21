@@ -364,6 +364,12 @@ export function registerCommands(mainWindow) {
 
       return { sessionId: currentSessionId }
     } catch (e) {
+      // 将异常也作为助手消息保存，历史记录再次打开时不会出现用户消息后空白。
+      if (currentSessionId && userMessageId) {
+        const errorContent = `请求失败：${e?.message || String(e)}`
+        db.saveMessage(currentSessionId, 'assistant', errorContent, { error: true })
+        db.updateSessionTimestamp(currentSessionId)
+      }
       // 任何阶段出错都通知前端，避免前端一直处于 streaming 状态
       mainWindow.webContents.send(CHAT_ERROR, {
         requestId,
@@ -427,6 +433,7 @@ export function registerCommands(mainWindow) {
 
       return {}
     } catch (e) {
+      // 无记忆模式没有 session，错误由前端展示即可。
       // 任何阶段出错都通知前端，避免前端一直处于 streaming 状态
       mainWindow.webContents.send(CHAT_ERROR, {
         requestId,

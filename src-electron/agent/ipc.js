@@ -223,6 +223,11 @@ export function registerAgentCommands(mainWindow) {
       }
       log.error(`agent-invoke 失败: ${e.message}`)
       log.error(e.stack)
+      if (currentSessionId && userMessageId) {
+        const errorContent = `请求失败：${e?.message || String(e)}`
+        db.saveMessage(currentSessionId, 'assistant', errorContent, { error: true })
+        db.updateSessionTimestamp(currentSessionId)
+      }
       mainWindow.webContents.send(CHAT_ERROR, {
         requestId,
         sessionId: currentSessionId || null,

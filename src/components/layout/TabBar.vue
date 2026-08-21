@@ -222,7 +222,20 @@ const switchTab = (tab) => {
   }
 };
 
-const closeTab = (id) => {
+const requestFridayClose = async (id) => {
+  const event = new CustomEvent('friday-before-tab-close', {
+    cancelable: true,
+    detail: { tabId: id, promise: null }
+  });
+  const allowed = window.dispatchEvent(event);
+  if (!allowed) {
+    await event.detail.promise;
+  }
+  return allowed;
+};
+
+const closeTab = async (id) => {
+  if (!(await requestFridayClose(id))) return;
   tabStore.removeTab(id);
   navigateToActiveTab();
 };
