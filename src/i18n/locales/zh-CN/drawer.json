@@ -52,6 +52,9 @@
     "securityHint": "仅绑定 127.0.0.1。仅暴露应用功能工具（笔记 / 日程 / 知识库），不暴露 shell / python 等系统工具。",
     "statusOff": "已停止",
     "statusOn": "运行中",
+    "harnessUsing": "DeepSeek Harness 正在使用本机 MCP 服务，请先停止 Harness 后再关闭服务。",
+    "internalUsing": "本机 MCP 服务正被应用内部功能使用，暂时无法停止。",
+    "toggleFailed": "本机 MCP 服务操作未完成，请重试。",
     "deleteConfirmTitle": "删除 MCP 服务器",
     "deleteConfirm": "确定要删除该 MCP 服务器吗？"
   },

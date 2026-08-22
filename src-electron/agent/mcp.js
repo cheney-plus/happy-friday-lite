@@ -476,6 +476,7 @@ function buildLocalServer() {
 let localHttpServer = null
 let localPort = null
 const internalConsumers = new Set()
+const localHttpSockets = new Set()
 
 function getConfiguredPort() {
   try {
@@ -586,6 +587,12 @@ export async function startLocalMcpServer({ persist = true } = {}) {
       }
     })
   })
+  // server.close() 会等待 keep-alive 连接结束。MCP 客户端可长期保持连接，
+  // 因此记录连接以便用户停止服务时主动关闭，避免 IPC 一直等待。
+  localHttpServer.on('connection', (socket) => {
+    localHttpSockets.add(socket)
+    socket.on('close', () => localHttpSockets.delete(socket))
+  })
   let port
   try {
     port = await startListening(localHttpServer, getConfiguredPort() || LOCAL_PORT_PREFERRED)
@@ -605,13 +612,20 @@ export async function startLocalMcpServer({ persist = true } = {}) {
 export async function stopLocalMcpServer() {
   persistLocalConfig({ port: localPort, enabled: false })
   if (internalConsumers.size > 0) {
-    return { success: true, keptAlive: true }
+    return { success: true, keptAlive: true, consumers: [...internalConsumers] }
   }
   if (!localHttpServer) {
     return { success: true }
   }
-  await new Promise((resolve) => localHttpServer.close(() => resolve()))
+  const server = localHttpServer
+  // 先停止接受新连接，再关闭现有 keep-alive/流式连接，让 close 回调能够完成。
+  const closePromise = new Promise((resolve) => server.close(() => resolve()))
+  for (const socket of localHttpSockets) {
+    socket.destroy()
+  }
+  await closePromise
   localHttpServer = null
+  localHttpSockets.clear()
   log.info('本机 MCP 服务已停止')
   return { success: true }
 }
@@ -659,7 +673,7 @@ export async function autoStartLocalIfEnabled() {
 export function getLocalMcpStatus() {
   return {
     running: !!localHttpServer,
-    port: localPort,
+    port: localHttpServer ? localPort : null,
     url: localPort ? `http://127.0.0.1:${localPort}/mcp` : null,
     toolCount: getToolSpecs().length
   }

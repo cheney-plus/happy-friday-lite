@@ -181,7 +181,7 @@
 
 <script setup>
 import { ref, computed, nextTick, watch, onMounted, onUnmounted, onDeactivated } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
 import { marked } from 'marked';
@@ -296,6 +296,39 @@ function goBack() {
     return;
   }
   router.push('/friday');
+}
+
+// keep-alive 组件在切换 Tab 时只会触发路由离开，不一定卸载组件。
+// 由守卫统一确认并停止流式请求，后端收到 stop 后会把已收到的内容落库。
+let leavingAfterStop = false;
+onBeforeRouteLeave(async () => {
+  if (!isStreaming.value || leavingAfterStop || isShareMode.value) return true;
+  const shouldLeave = window.confirm('AI 正在回答，离开将中断对话。已生成的内容会被保存，确认离开吗？');
+  if (!shouldLeave) return false;
+  leavingAfterStop = true;
+  try {
+    await handleStop();
+    // 给主进程一小段时间完成 CHAT_DONE 和数据库写入，再切换视图。
+    await new Promise(resolve => setTimeout(resolve, 120));
+  } finally {
+    leavingAfterStop = false;
+  }
+  return true;
+});
+
+function handleTabCloseRequest(event) {
+  const tabId = event.detail?.tabId;
+  const currentTabId = route.query.__tab;
+  if (!isStreaming.value || !currentTabId || tabId !== currentTabId) return;
+  if (!window.confirm('AI 正在回答，关闭将中断对话。已生成的内容会被保存，确认关闭吗？')) {
+    event.preventDefault();
+    return;
+  }
+  event.preventDefault();
+  leavingAfterStop = true;
+  event.detail.promise = handleStop().finally(() => {
+    leavingAfterStop = false;
+  });
 }
 
 function handleAddToKnowledge() {
@@ -763,7 +796,12 @@ async function sendChatMessage(text) {
   } catch (err) {
     console.error('Chat invoke error:', err);
     isStreaming.value = false;
-    streamingContent.value = '';
+    const errorContent = `请求失败：${err?.message || '无法连接大模型，请稍后重试。'}`;
+    if (streamingContent.value || streamingReasoning.value) {
+      streamingContent.value = `${streamingContent.value}\n\n${errorContent}`.trim();
+    } else {
+      messages.value.push({ role: 'assistant', content: errorContent });
+    }
   }
 }
 
@@ -871,7 +909,7 @@ async function triggerAiResponse() {
   } catch (err) {
     console.error('Chat invoke error:', err);
     isStreaming.value = false;
-    streamingContent.value = '';
+    messages.value.push({ role: 'assistant', content: `请求失败：${err?.message || '无法连接大模型，请稍后重试。'}` });
   }
 }
 
@@ -952,6 +990,7 @@ async function initConversation() {
 
 onMounted(async () => {
   document.addEventListener('click', handleCodeBlockCopy);
+  window.addEventListener('friday-before-tab-close', handleTabCloseRequest);
 
   unlistenChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
@@ -1037,9 +1076,23 @@ onMounted(async () => {
   unlistenError = electronService.listen('chat-error', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
+    if (isDoneReceived) return;
+    isDoneReceived = true;
     isStreaming.value = false;
+    const errorContent = `请求失败：${data.error || '大模型暂时不可用，请稍后重试。'}`;
+    // 错误也作为助手消息展示，避免 404、超时、限速等异常表现为空白。
+    if (streamingContent.value || streamingReasoning.value) {
+      messages.value.push({
+        role: 'assistant',
+        content: `${streamingContent.value}\n\n${errorContent}`.trim(),
+        reasoning: streamingReasoning.value || undefined
+      });
+    } else {
+      messages.value.push({ role: 'assistant', content: errorContent });
+    }
     streamingContent.value = '';
     streamingReasoning.value = '';
+    agentSegments.value = [];
     showScrollDownBtn.value = false;
     console.error('Stream error:', data.error);
   });
@@ -1179,6 +1232,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleCodeBlockCopy);
+  window.removeEventListener('friday-before-tab-close', handleTabCloseRequest);
 
   // 清理总结功能临时事件监听器
   if (unlistenSummaryChunk) { unlistenSummaryChunk(); unlistenSummaryChunk = null; }

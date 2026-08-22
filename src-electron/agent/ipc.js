@@ -223,6 +223,11 @@ export function registerAgentCommands(mainWindow) {
       }
       log.error(`agent-invoke 失败: ${e.message}`)
       log.error(e.stack)
+      if (currentSessionId && userMessageId) {
+        const errorContent = `请求失败：${e?.message || String(e)}`
+        db.saveMessage(currentSessionId, 'assistant', errorContent, { error: true })
+        db.updateSessionTimestamp(currentSessionId)
+      }
       mainWindow.webContents.send(CHAT_ERROR, {
         requestId,
         sessionId: currentSessionId || null,
@@ -349,12 +354,15 @@ export function registerAgentCommands(mainWindow) {
   ipcMain.handle('mcp-local-toggle', async (_event, args) => {
     const enabled = !!args?.enabled
     try {
+      let result
       if (enabled) {
-        await startLocalMcpServer()
+        result = await startLocalMcpServer()
       } else {
-        await stopLocalMcpServer()
+        result = await stopLocalMcpServer()
       }
-      return { success: true, ...getLocalMcpStatus() }
+      // 保留 stopLocalMcpServer 返回的 keptAlive / consumers，
+      // 渲染进程据此提示 DeepSeek Harness 正在占用本机 MCP 服务。
+      return { ...result, ...getLocalMcpStatus() }
     } catch (e) {
       log.error(`mcp-local-toggle 失败: ${e.message}`)
       return { success: false, error: e.message, ...getLocalMcpStatus() }
