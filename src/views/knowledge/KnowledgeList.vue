@@ -225,6 +225,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { SidebarIcon } from './components/icons';
 import KbSidebar from './components/KbSidebar.vue';
 import KbMainContent from './components/KbMainContent.vue';
@@ -239,6 +240,7 @@ import { useKnowledgeBase } from './composables/useKnowledgeBase';
 import { useContextMenu } from './composables/useContextMenu';
 
 const showDeleteConfirm = ref(false);
+const { t } = useI18n();
 const deleteConfirmMessage = ref('');
 const pendingDeleteItem = ref(null);
 const pendingDeleteCategoryId = ref('');
@@ -338,7 +340,7 @@ const {
   confirmCreateKB,
   editKnowledgeBase,
   deleteKnowledgeBase
-} = useKnowledgeBase(fileSystem, sidebar);
+} = useKnowledgeBase(fileSystem, sidebar, t);
 
 const {
   contextMenu,
