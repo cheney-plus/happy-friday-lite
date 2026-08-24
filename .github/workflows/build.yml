@@ -190,7 +190,7 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────────────────────────────
-  # macOS 构建（arm64 + x64）
+  # macOS 构建（arm64）
   # 在 Intel runner 交叉构建 ARM64：electron-builder 会为目标架构重建
   # 原生依赖，且可避免 ARM runner 上 APFS DMG 创建的 hdiutil 兼容性问题。
   # ──────────────────────────────────────────────────────────────────────
@@ -207,10 +207,6 @@ jobs:
             arch: arm64
             arch-flag: --arm64
             artifact-name: HappyFriday-macOS-arm64
-          - os: macos-14
-            arch: x64
-            arch-flag: --x64
-            artifact-name: HappyFriday-macOS-x64
 
     steps:
       - name: Checkout code
