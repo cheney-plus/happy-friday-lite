@@ -587,6 +587,7 @@ import { useTheme } from '@/utils/theme';
 import { electronService } from '@/services/electron';
 import { setI18nLanguage } from '@/i18n';
 import { sidebarModuleConfig } from '@/config/menu';
+import packageJson from '../../../package.json';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -1338,7 +1339,7 @@ const showAboutModal = ref(false);
 const showFeaturesModal = ref(false);
 const showAuthorModal = ref(false);
 
-const appVersion = ref('2.0.3');
+const appVersion = packageJson.version;
 
 const aboutLogo = computed(() => {
   return appliedTheme.value === 'dark'
