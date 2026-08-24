@@ -145,6 +145,19 @@ function modelSignature(model) {
   return JSON.stringify([model.provider, model.providerLabel, model.apiKey, model.modelName, model.baseUrl])
 }
 
+function themePreference() {
+  const theme = loadConfig().theme
+  return ['light', 'dark', 'system'].includes(theme) ? theme : 'system'
+}
+
+function localePreference() {
+  return loadConfig().language === 'en-US' ? 'en' : 'zh'
+}
+
+function harnessSignature(model, theme, locale) {
+  return JSON.stringify([modelSignature(model), theme, locale])
+}
+
 function mcpToolConfiguration() {
   const definitions = listRegisteredTools().filter(def => def.meta?.exposedViaMcp === true)
   return {
@@ -158,8 +171,12 @@ function mcpToolConfiguration() {
 function syncConfiguration(model, mcpUrl) {
   const paths = harnessPaths()
   ensureHarnessDirectories(paths)
+  const theme = themePreference()
+  const locale = localePreference()
 
   const settings = readYamlMapping(paths.settings)
+  settings['ui-theme'] = { preference: theme }
+  settings.locale = { preference: locale }
   settings['agent-default-model'] = {
     provider: HARNESS_PROVIDER,
     model: model.modelName
@@ -397,7 +414,7 @@ async function bootHarness() {
     })
 
     await waitUntilReady(url, child, expectedGeneration)
-    activeModelSignature = modelSignature(model)
+    activeModelSignature = harnessSignature(model, themePreference(), localePreference())
     return updateState({
       status: 'ready',
       url,
@@ -475,7 +492,7 @@ export async function syncHarnessConfigurationIfRunning() {
   if (!sidecar || state.status !== 'ready') return publicStatus()
   try {
     const model = selectedModel()
-    if (modelSignature(model) === activeModelSignature) return publicStatus()
+    if (harnessSignature(model, themePreference(), localePreference()) === activeModelSignature) return publicStatus()
     return restartHarnessSidecar()
   } catch (error) {
     await stopHarnessSidecar()
