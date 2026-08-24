@@ -1330,7 +1330,7 @@ onActivated(() => {
   padding: 0 14px;
   height: 32px;
   border: none;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #1a1a1a;
   border-radius: 8px;
   color: white;
   font-size: 13px;
@@ -1340,7 +1340,7 @@ onActivated(() => {
 }
 
 .ai-assistant-btn:hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  background: #000000;
 }
 
 .calendar-body {

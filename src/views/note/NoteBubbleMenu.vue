@@ -907,7 +907,7 @@ onBeforeUnmount(() => {
 }
 
 .ai-write-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #1a1a1a;
   color: #ffffff !important;
   font-weight: 600;
   padding: 4px 12px;
@@ -919,10 +919,10 @@ onBeforeUnmount(() => {
 }
 
 .ai-write-btn:hover {
-  background: linear-gradient(135deg, #5568d3 0%, #653d91 100%);
+  background: #000000;
   color: #ffffff !important;
   transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
 }
 
 .ai-write-btn:active {
