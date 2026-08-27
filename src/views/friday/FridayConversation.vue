@@ -1,12 +1,22 @@
 <template>
   <div class="conversation-page">
-    <aside v-if="!isShareMode" class="conversation-history" aria-label="会话历史">
+    <aside
+      v-if="!isShareMode && !historyCollapsed"
+      class="conversation-history"
+      :style="{ '--history-width': `${historySidebarWidth}px` }"
+      aria-label="会话历史"
+    >
       <div class="history-heading">
         <span>会话历史</span>
-        <button class="history-search-btn" type="button" title="搜索会话" @click="focusHistorySearch">
+        <button class="history-collapse-btn" type="button" title="收起会话历史" @click="toggleHistorySidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="6.5"></circle>
-            <path d="m16 16 4 4"></path>
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <button class="history-search-btn" type="button" title="新建会话" @click="createNewConversation">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
           </svg>
         </button>
       </div>
@@ -20,7 +30,7 @@
       </label>
 
       <div class="history-list">
-        <div v-if="historyLoading" class="history-state">正在加载...</div>
+        <div v-if="historyLoading && !historySessions.length" class="history-state">正在加载...</div>
         <template v-else-if="filteredSessions.length">
           <button
             v-for="session in filteredSessions"
@@ -32,11 +42,14 @@
             @click="openHistorySession(session)"
           >
             <svg class="history-session-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              <rect x="3" y="4" width="18" height="15" rx="3"></rect>
+              <path d="m8 19-2 2"></path>
+              <path d="M8 10h.01"></path>
+              <path d="M12 10h.01"></path>
+              <path d="M16 10h.01"></path>
             </svg>
             <span class="history-session-content">
               <span class="history-session-title">{{ session.title || '新对话' }}</span>
-              <span class="history-session-time">{{ formatHistoryTime(session.updatedAt || session.createdAt) }}</span>
             </span>
           </button>
         </template>
@@ -44,17 +57,13 @@
       </div>
 
       <div class="history-footer">为你保留最近的对话记录</div>
+      <div class="history-resizer" @mousedown.prevent="startHistoryResize"></div>
     </aside>
 
     <div class="conversation-container">
+    <FridayChat v-if="showNewConversation" minimal class="embedded-friday-chat" />
+    <template v-else>
     <header class="conversation-header">
-      <button v-if="!isShareMode && showBackBtn" class="header-btn back-btn" @click="goBack">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 12H5"></path>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-      </button>
-
       <div class="header-center">
         <span class="header-title">{{ chatTitle }}</span>
         <span class="header-time">{{ chatTime }}</span>
@@ -223,12 +232,18 @@
         {{ saveToastMessage }}
       </div>
     </Transition>
+    </template>
+    <button v-if="!isShareMode && historyCollapsed" class="history-expand-btn" type="button" title="展开会话历史" @mousedown.stop @click.stop="expandHistorySidebar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch, onMounted, onUnmounted, onDeactivated } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted, onDeactivated, onActivated } from 'vue';
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
@@ -240,6 +255,7 @@ import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import RollbackConfirmDialog from '@/components/chat/RollbackConfirmDialog.vue';
 import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import ToolCallSection from '@/components/chat/ToolCallSection.vue';
+import FridayChat from '@/views/friday/FridayChat.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -258,11 +274,16 @@ const chatTitle = ref('与 Friday 的对话');
 const chatTime = ref(formatTime(new Date()));
 
 const messages = ref([]);
-const historySessions = ref([]);
+const showNewConversation = ref(false);
+const historySessions = ref(loadCachedHistorySessions());
 const historySearch = ref('');
 const historySearchFocused = ref(false);
 const historyLoading = ref(false);
 const historySearchInput = ref(null);
+const historySidebarWidth = ref(loadHistorySidebarWidth());
+const historyCollapsed = ref(false);
+let historyResizeStartX = 0;
+let historyResizeStartWidth = 0;
 
 const filteredSessions = computed(() => {
   const keyword = historySearch.value.trim().toLowerCase();
@@ -317,19 +338,14 @@ function formatTime(date) {
   return `${h}:${m}`;
 }
 
-function formatHistoryTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  if (isToday) return formatTime(date);
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return '昨天';
-  return `${date.getMonth() + 1}/${date.getDate()}`;
+function loadHistorySidebarWidth() {
+  const fallbackWidth = 200;
+  try {
+    const savedWidth = Number(localStorage.getItem('happy-friday-history-sidebar-width'));
+    return savedWidth >= 200 && savedWidth <= 400 ? savedWidth : fallbackWidth;
+  } catch {
+    return fallbackWidth;
+  }
 }
 
 async function loadHistorySessions() {
@@ -338,6 +354,9 @@ async function loadHistorySessions() {
   try {
     const sessions = await electronService.invoke('get_sessions');
     historySessions.value = (sessions || []).slice(0, 50);
+    try {
+      sessionStorage.setItem('happy-friday-history-sessions', JSON.stringify(historySessions.value));
+    } catch {}
   } catch (err) {
     console.error('Failed to load conversation history:', err);
   } finally {
@@ -345,8 +364,18 @@ async function loadHistorySessions() {
   }
 }
 
+function loadCachedHistorySessions() {
+  try {
+    const cachedSessions = JSON.parse(sessionStorage.getItem('happy-friday-history-sessions') || '[]');
+    return Array.isArray(cachedSessions) ? cachedSessions : [];
+  } catch {
+    return [];
+  }
+}
+
 function openHistorySession(session) {
   if (!session?.id || session.id === currentSessionId.value) return;
+  showNewConversation.value = false;
   router.push({
     name: 'friday-chat',
     params: { sessionId: session.id },
@@ -356,6 +385,39 @@ function openHistorySession(session) {
 
 function focusHistorySearch() {
   historySearchInput.value?.focus();
+}
+
+function createNewConversation() {
+  if (isStreaming.value) return;
+  showNewConversation.value = true;
+}
+
+function toggleHistorySidebar() {
+  historyCollapsed.value = !historyCollapsed.value;
+}
+
+function expandHistorySidebar() {
+  historyCollapsed.value = false;
+}
+
+function startHistoryResize(event) {
+  historyResizeStartX = event.clientX;
+  historyResizeStartWidth = historySidebarWidth.value;
+  window.addEventListener('mousemove', resizeHistorySidebar);
+  window.addEventListener('mouseup', stopHistoryResize);
+}
+
+function resizeHistorySidebar(event) {
+  const nextWidth = historyResizeStartWidth + event.clientX - historyResizeStartX;
+  historySidebarWidth.value = Math.min(400, Math.max(200, nextWidth));
+}
+
+function stopHistoryResize() {
+  window.removeEventListener('mousemove', resizeHistorySidebar);
+  window.removeEventListener('mouseup', stopHistoryResize);
+  try {
+    localStorage.setItem('happy-friday-history-sidebar-width', String(historySidebarWidth.value));
+  } catch {}
 }
 
 // Agent 模式文本段 Markdown 渲染（含代码块语言标签 + 复制按钮）
@@ -373,8 +435,6 @@ function renderMarkdown(content) {
   return marked.parse(content);
 }
 
-const showBackBtn = computed(() => route.query.hideBack !== 'true');
-
 // 分享模式：通过分享链接在浏览器中打开（复用对话界面，隐藏输入框与操作按钮）
 // 触发条件：路由 meta.share 标记 或 运行在非 Electron 环境（浏览器）
 const isShareMode = computed(() => route.meta?.share === true || !electronService.isElectron);
@@ -390,14 +450,6 @@ const isThinking = computed(() => {
   // 最后一段是工具（running/pending_approval/success/rejected）→ LLM 正在思考下一步
   return true;
 });
-
-function goBack() {
-  if (route.query.from === 'automation') {
-    router.back();
-    return;
-  }
-  router.push('/friday');
-}
 
 // keep-alive 组件在切换 Tab 时只会触发路由离开，不一定卸载组件。
 // 由守卫统一确认并停止流式请求，后端收到 stop 后会把已收到的内容落库。
@@ -1004,6 +1056,7 @@ async function triggerAiResponse() {
 }
 
 async function initConversation() {
+  showNewConversation.value = false;
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -1335,6 +1388,7 @@ watch(() => route.params.sessionId, (sessionId, previousSessionId) => {
 onUnmounted(() => {
   document.removeEventListener('click', handleCodeBlockCopy);
   window.removeEventListener('friday-before-tab-close', handleTabCloseRequest);
+  stopHistoryResize();
 
   // 清理总结功能临时事件监听器
   if (unlistenSummaryChunk) { unlistenSummaryChunk(); unlistenSummaryChunk = null; }
@@ -1357,6 +1411,10 @@ onUnmounted(() => {
 onDeactivated(() => {
   rollbackDialogVisible.value = false;
   pendingApproval.value = null;
+});
+
+onActivated(() => {
+  historySidebarWidth.value = loadHistorySidebarWidth();
 });
 
 // ========== Agent 审批处理 ==========
@@ -1424,25 +1482,100 @@ async function handleRejectTool(decision) {
 }
 
 .conversation-history {
-  width: 264px;
-  flex: 0 0 264px;
+  width: var(--history-width, 264px);
+  flex: 0 0 var(--history-width, 264px);
   display: flex;
   flex-direction: column;
   min-width: 0;
   padding: 20px 12px 16px;
-  background: var(--bg-secondary);
+  background: #fbfcfb;
   border-right: 1px solid var(--border-color);
+  position: relative;
+}
+
+.history-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 3;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.history-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.history-resizer:hover::after { background: var(--text-tertiary); }
+
+.history-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-collapse-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-expand-btn {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  z-index: 20;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-expand-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .history-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 2px;
   padding: 0 8px;
   color: var(--text-primary);
   font-size: 16px;
   font-weight: 650;
 }
+
+.history-heading > span { margin-right: auto; }
 
 .history-search-btn {
   display: flex;
@@ -1496,15 +1629,18 @@ async function handleRejectTool(decision) {
   font-size: 13px;
 }
 
-.history-search input::placeholder { color: var(--text-tertiary); }
+.history-search input::placeholder { color: var(--text-primary); opacity: 0.72; }
 .history-search input::-webkit-search-cancel-button { display: none; }
 
 .history-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 2px 0;
+  margin-right: -8px;
+  padding: 2px 8px 2px 0;
 }
+
+[data-theme='dark'] .conversation-history { background: var(--bg-secondary); }
 
 .history-list::-webkit-scrollbar { width: 4px; }
 .history-list::-webkit-scrollbar-track { background: transparent; }
@@ -1515,8 +1651,9 @@ async function handleRejectTool(decision) {
   align-items: center;
   gap: 9px;
   width: 100%;
-  min-height: 48px;
-  padding: 8px;
+  min-height: 36px;
+  margin: 6px 0;
+  padding: 4px 8px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -1549,11 +1686,10 @@ async function handleRejectTool(decision) {
   white-space: nowrap;
 }
 
-.history-session-time { color: var(--text-tertiary); font-size: 11px; line-height: 1.2; }
 
 .history-state {
   padding: 30px 10px;
-  color: var(--text-tertiary);
+  color: var(--text-primary);
   font-size: 12px;
   text-align: center;
 }
@@ -1562,7 +1698,7 @@ async function handleRejectTool(decision) {
   margin: 12px 4px 0;
   padding-top: 13px;
   border-top: 1px solid var(--border-color);
-  color: var(--text-tertiary);
+  color: var(--text-primary);
   font-size: 11px;
   line-height: 1.4;
   text-align: center;
@@ -1577,15 +1713,21 @@ async function handleRejectTool(decision) {
   background-color: var(--bg-primary);
   overflow: hidden;
   position: relative;
+  isolation: isolate;
+}
+
+.embedded-friday-chat {
+  background-color: var(--bg-primary) !important;
 }
 
 .conversation-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 12px 16px;
   flex-shrink: 0;
   overflow: visible;
+  position: relative;
   -webkit-app-region: drag;
   app-region: drag;
 }
@@ -1605,6 +1747,11 @@ async function handleRejectTool(decision) {
   -webkit-app-region: no-drag;
   app-region: no-drag;
   position: relative;
+}
+
+.header-btn.knowledge-btn {
+  position: absolute;
+  right: 16px;
 }
 
 .header-btn:hover {
