@@ -1,5 +1,52 @@
 <template>
-  <div class="conversation-container">
+  <div class="conversation-page">
+    <aside v-if="!isShareMode" class="conversation-history" aria-label="会话历史">
+      <div class="history-heading">
+        <span>会话历史</span>
+        <button class="history-search-btn" type="button" title="搜索会话" @click="focusHistorySearch">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="6.5"></circle>
+            <path d="m16 16 4 4"></path>
+          </svg>
+        </button>
+      </div>
+
+      <label class="history-search" :class="{ focused: historySearchFocused || historySearch }">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="6.5"></circle>
+          <path d="m16 16 4 4"></path>
+        </svg>
+        <input ref="historySearchInput" v-model="historySearch" type="search" placeholder="搜索会话" @focus="historySearchFocused = true" @blur="historySearchFocused = false" />
+      </label>
+
+      <div class="history-list">
+        <div v-if="historyLoading" class="history-state">正在加载...</div>
+        <template v-else-if="filteredSessions.length">
+          <button
+            v-for="session in filteredSessions"
+            :key="session.id"
+            type="button"
+            class="history-session"
+            :class="{ active: session.id === currentSessionId }"
+            :title="session.title || '新对话'"
+            @click="openHistorySession(session)"
+          >
+            <svg class="history-session-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span class="history-session-content">
+              <span class="history-session-title">{{ session.title || '新对话' }}</span>
+              <span class="history-session-time">{{ formatHistoryTime(session.updatedAt || session.createdAt) }}</span>
+            </span>
+          </button>
+        </template>
+        <div v-else class="history-state">{{ historySearch ? '未找到匹配会话' : '暂无会话记录' }}</div>
+      </div>
+
+      <div class="history-footer">为你保留最近的对话记录</div>
+    </aside>
+
+    <div class="conversation-container">
     <header class="conversation-header">
       <button v-if="!isShareMode && showBackBtn" class="header-btn back-btn" @click="goBack">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -176,6 +223,7 @@
         {{ saveToastMessage }}
       </div>
     </Transition>
+    </div>
   </div>
 </template>
 
@@ -210,6 +258,17 @@ const chatTitle = ref('与 Friday 的对话');
 const chatTime = ref(formatTime(new Date()));
 
 const messages = ref([]);
+const historySessions = ref([]);
+const historySearch = ref('');
+const historySearchFocused = ref(false);
+const historyLoading = ref(false);
+const historySearchInput = ref(null);
+
+const filteredSessions = computed(() => {
+  const keyword = historySearch.value.trim().toLowerCase();
+  if (!keyword) return historySessions.value;
+  return historySessions.value.filter((session) => (session.title || '新对话').toLowerCase().includes(keyword));
+});
 
 const currentMode = ref('');
 const currentSessionId = ref('');
@@ -256,6 +315,47 @@ function formatTime(date) {
   const h = date.getHours().toString().padStart(2, '0');
   const m = date.getMinutes().toString().padStart(2, '0');
   return `${h}:${m}`;
+}
+
+function formatHistoryTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) return formatTime(date);
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return '昨天';
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+async function loadHistorySessions() {
+  if (isShareMode.value) return;
+  historyLoading.value = true;
+  try {
+    const sessions = await electronService.invoke('get_sessions');
+    historySessions.value = (sessions || []).slice(0, 50);
+  } catch (err) {
+    console.error('Failed to load conversation history:', err);
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+function openHistorySession(session) {
+  if (!session?.id || session.id === currentSessionId.value) return;
+  router.push({
+    name: 'friday-chat',
+    params: { sessionId: session.id },
+    query: { mode: session.mode || 'chat', title: session.title || '新对话' }
+  });
+}
+
+function focusHistorySearch() {
+  historySearchInput.value?.focus();
 }
 
 // Agent 模式文本段 Markdown 渲染（含代码块语言标签 + 复制按钮）
@@ -928,6 +1028,8 @@ async function initConversation() {
     return;
   }
 
+  loadHistorySessions();
+
   if (currentSessionId.value) {
     const queryTitle = route.query.title;
     if (queryTitle) {
@@ -1055,6 +1157,8 @@ onMounted(async () => {
       currentSessionId.value = data.sessionId;
     }
 
+    loadHistorySessions();
+
     streamingContent.value = '';
     streamingReasoning.value = '';
     // Agent 模式：清空时间线段（已保存到消息对象中）
@@ -1092,6 +1196,8 @@ onMounted(async () => {
     if (data.sessionId === currentSessionId.value) {
       chatTitle.value = data.title;
     }
+    const session = historySessions.value.find((item) => item.id === data.sessionId);
+    if (session) session.title = data.title;
   });
 
   // ========== Agent 模式专有事件 ==========
@@ -1220,6 +1326,12 @@ onMounted(async () => {
   }
 });
 
+watch(() => route.params.sessionId, (sessionId, previousSessionId) => {
+  if (sessionId && sessionId !== previousSessionId) {
+    initConversation();
+  }
+});
+
 onUnmounted(() => {
   document.removeEventListener('click', handleCodeBlockCopy);
   window.removeEventListener('friday-before-tab-close', handleTabCloseRequest);
@@ -1302,11 +1414,166 @@ async function handleRejectTool(decision) {
 </script>
 
 <style scoped>
+.conversation-page {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.conversation-history {
+  width: 264px;
+  flex: 0 0 264px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px 12px 16px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+}
+
+.history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.history-search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-search-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  margin: 14px 4px 10px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-tertiary);
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.history-search.focused {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.history-search input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.history-search input::placeholder { color: var(--text-tertiary); }
+.history-search input::-webkit-search-cancel-button { display: none; }
+
+.history-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.history-list::-webkit-scrollbar { width: 4px; }
+.history-list::-webkit-scrollbar-track { background: transparent; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+.history-session {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-session:hover { background: var(--bg-hover); color: var(--text-primary); }
+.history-session.active { background: color-mix(in srgb, var(--text-primary) 7%, transparent); color: var(--text-primary); }
+
+.history-session-icon { flex: 0 0 auto; opacity: 0.82; }
+
+.history-session-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-session-title {
+  overflow: hidden;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 520;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-session-time { color: var(--text-tertiary); font-size: 11px; line-height: 1.2; }
+
+.history-state {
+  padding: 30px 10px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.history-footer {
+  margin: 12px 4px 0;
+  padding-top: 13px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .conversation-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background-color: var(--bg-primary);
   overflow: hidden;
   position: relative;
@@ -1405,6 +1672,10 @@ async function handleRejectTool(decision) {
   overflow-y: auto;
   padding: 20px 0;
   scroll-behavior: smooth;
+}
+
+@media (max-width: 860px) {
+  .conversation-history { display: none; }
 }
 
 .conversation-messages::-webkit-scrollbar {
