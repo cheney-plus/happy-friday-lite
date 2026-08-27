@@ -51,6 +51,20 @@
             <span class="history-session-content">
               <span class="history-session-title">{{ session.title || '新对话' }}</span>
             </span>
+            <span
+              class="history-session-menu-btn"
+              role="button"
+              tabindex="0"
+              title="更多操作"
+              @click.stop="toggleHistorySessionMenu(session.id, $event)"
+              @keydown.enter.stop="toggleHistorySessionMenu(session.id, $event)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="12" cy="5" r="1.5"></circle>
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+              </svg>
+            </span>
           </button>
         </template>
         <div v-else class="history-state">{{ historySearch ? '未找到匹配会话' : '暂无会话记录' }}</div>
@@ -59,6 +73,32 @@
       <div class="history-footer">为你保留最近的对话记录</div>
       <div class="history-resizer" @mousedown.prevent="startHistoryResize"></div>
     </aside>
+
+    <Teleport to="body">
+      <div v-if="activeHistorySessionMenuId" class="history-session-menu-overlay" :style="historySessionMenuStyle" @click.stop>
+        <div class="history-session-menu" @click.stop>
+          <button type="button" class="history-menu-item" @click="renameHistorySession">
+            <span>重命名</span>
+          </button>
+          <button type="button" class="history-menu-item delete" @click="deleteHistorySession">
+            <span>删除</span>
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showHistoryRenameDialog" class="history-rename-overlay" @click.self="showHistoryRenameDialog = false">
+        <div class="history-rename-dialog">
+          <div class="history-rename-title">重命名会话</div>
+          <input ref="historyRenameInput" v-model="historyRenameValue" class="history-rename-input" placeholder="请输入会话名称" @keydown.enter="confirmHistoryRename" />
+          <div class="history-rename-actions">
+            <button type="button" @click="showHistoryRenameDialog = false">取消</button>
+            <button type="button" class="confirm" @click="confirmHistoryRename">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <div class="conversation-container">
     <FridayChat v-if="showNewConversation" minimal class="embedded-friday-chat" />
@@ -257,6 +297,10 @@ import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import ToolCallSection from '@/components/chat/ToolCallSection.vue';
 import FridayChat from '@/views/friday/FridayChat.vue';
 
+// keep-alive keeps previous route instances alive. Their route watchers can
+// observe a later `q` query, so dedupe initial sends across all instances.
+const handledInitialQueryKeys = new Set();
+
 const router = useRouter();
 const route = useRoute();
 const noteStore = useNoteStore();
@@ -282,6 +326,13 @@ const historyLoading = ref(false);
 const historySearchInput = ref(null);
 const historySidebarWidth = ref(loadHistorySidebarWidth());
 const historyCollapsed = ref(false);
+const activeHistorySessionMenuId = ref(null);
+const historyRenameSessionId = ref(null);
+const historySessionMenuStyle = ref({});
+const showHistoryRenameDialog = ref(false);
+const historyRenameValue = ref('');
+const historyRenameInput = ref(null);
+let isOpeningNewConversation = false;
 let historyResizeStartX = 0;
 let historyResizeStartWidth = 0;
 
@@ -304,6 +355,7 @@ let unlistenAgentToolResult = null;
 let unlistenAgentApproval = null;
 let activeRequestId = '';
 let isDoneReceived = false;
+let activeInitRouteKey = '';
 
 // ========== Agent 模式状态 ==========
 // 当前流式响应的 Agent 时间线段（仅 Agent 模式使用）
@@ -383,12 +435,74 @@ function openHistorySession(session) {
   });
 }
 
+function toggleHistorySessionMenu(sessionId, event) {
+  if (activeHistorySessionMenuId.value === sessionId) {
+    activeHistorySessionMenuId.value = null;
+    return;
+  }
+  const rect = event.currentTarget.getBoundingClientRect();
+  activeHistorySessionMenuId.value = sessionId;
+  historySessionMenuStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 4}px`,
+    right: `${window.innerWidth - rect.right}px`,
+    zIndex: '10000'
+  };
+}
+
+function closeHistorySessionMenu() {
+  activeHistorySessionMenuId.value = null;
+}
+
+async function deleteHistorySession() {
+  const sessionId = activeHistorySessionMenuId.value;
+  if (!sessionId) return;
+  try {
+    await electronService.invoke('delete_session', { sessionId });
+    historySessions.value = historySessions.value.filter(session => session.id !== sessionId);
+    sessionStorage.setItem('happy-friday-history-sessions', JSON.stringify(historySessions.value));
+  } catch (err) {
+    console.error('Failed to delete session:', err);
+  }
+  closeHistorySessionMenu();
+}
+
+async function renameHistorySession() {
+  const sessionId = activeHistorySessionMenuId.value;
+  const session = historySessions.value.find(item => item.id === sessionId);
+  if (!session) return;
+  historyRenameSessionId.value = sessionId;
+  closeHistorySessionMenu();
+  historyRenameValue.value = session.title || '';
+  showHistoryRenameDialog.value = true;
+  nextTick(() => { historyRenameInput.value?.focus(); historyRenameInput.value?.select(); });
+}
+
+async function confirmHistoryRename() {
+  const sessionId = historyRenameSessionId.value;
+  const session = historySessions.value.find(item => item.id === sessionId);
+  const title = historyRenameValue.value.trim();
+  if (!sessionId || !session || !title || title === session.title) {
+    showHistoryRenameDialog.value = false;
+    return;
+  }
+  try {
+    await electronService.invoke('update_session_title', { sessionId, title });
+    session.title = title;
+    sessionStorage.setItem('happy-friday-history-sessions', JSON.stringify(historySessions.value));
+  } catch (err) {
+    console.error('Failed to rename session:', err);
+  }
+  showHistoryRenameDialog.value = false;
+}
+
 function focusHistorySearch() {
   historySearchInput.value?.focus();
 }
 
 function createNewConversation() {
-  if (isStreaming.value) return;
+  if (isStreaming.value || isOpeningNewConversation) return;
+  isOpeningNewConversation = true;
   showNewConversation.value = true;
 }
 
@@ -1056,7 +1170,12 @@ async function triggerAiResponse() {
 }
 
 async function initConversation() {
+  const initRouteKey = `${route.fullPath}`;
+  if (activeInitRouteKey === initRouteKey) return;
+  activeInitRouteKey = initRouteKey;
+
   showNewConversation.value = false;
+  isOpeningNewConversation = false;
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -1121,6 +1240,10 @@ async function initConversation() {
 
   const query = route.query.q;
   if (query) {
+    const queryKey = `${route.params.sessionId || ''}::${route.query.q}::${route.query.mode || ''}`;
+    if (handledInitialQueryKeys.has(queryKey)) return;
+    handledInitialQueryKeys.add(queryKey);
+
     const alreadyHasMessage = messages.value.length > 0
       && messages.value[messages.value.length - 1].role === 'user'
       && messages.value[messages.value.length - 1].content === query;
@@ -1134,6 +1257,7 @@ async function initConversation() {
 }
 
 onMounted(async () => {
+  document.addEventListener('click', closeHistorySessionMenu);
   document.addEventListener('click', handleCodeBlockCopy);
   window.addEventListener('friday-before-tab-close', handleTabCloseRequest);
 
@@ -1386,6 +1510,7 @@ watch(() => route.params.sessionId, (sessionId, previousSessionId) => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener('click', closeHistorySessionMenu);
   document.removeEventListener('click', handleCodeBlockCopy);
   window.removeEventListener('friday-before-tab-close', handleTabCloseRequest);
   stopHistoryResize();
@@ -1686,6 +1811,106 @@ async function handleRejectTool(decision) {
   white-space: nowrap;
 }
 
+.history-session-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+}
+
+.history-session:hover .history-session-menu-btn,
+.history-session-menu-btn:focus-visible {
+  opacity: 1;
+}
+
+.history-session-menu-btn:hover,
+.history-session-menu-btn:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.history-session-menu-overlay {
+  animation: historyMenuIn 0.12s ease-out;
+}
+
+@keyframes historyMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.history-session-menu {
+  min-width: 120px;
+  padding: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.history-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-menu-item:hover { background: var(--bg-hover); }
+.history-menu-item.delete { color: #ef4444; }
+
+.history-rename-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  animation: historyRenameFadeIn 0.15s ease;
+}
+
+@keyframes historyRenameFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.history-rename-dialog {
+  width: min(360px, calc(100vw - 32px));
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg-primary);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  animation: historyRenameModalIn 0.2s ease-out;
+}
+
+@keyframes historyRenameModalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.history-rename-title { margin-bottom: 16px; color: var(--text-primary); font-size: 16px; font-weight: 600; }
+.history-rename-input { width: 100%; box-sizing: border-box; padding: 10px 14px; border: 1.5px solid var(--border-color); border-radius: 10px; font-size: 14px; color: var(--text-primary); background: var(--bg-primary); outline: none; transition: border-color 0.2s ease; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+.history-rename-input:focus { border-color: var(--text-tertiary); }
+.history-rename-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.history-rename-actions button { padding: 8px 18px; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+.history-rename-actions button:first-child { background: var(--bg-secondary); color: var(--text-primary); }
+.history-rename-actions button:first-child:hover { background: var(--border-color); }
+.history-rename-actions button.confirm { background: var(--text-primary); color: #ffffff; }
+.history-rename-actions button.confirm:hover { background: var(--text-secondary); }
+
 
 .history-state {
   padding: 30px 10px;
@@ -1718,6 +1943,11 @@ async function handleRejectTool(decision) {
 
 .embedded-friday-chat {
   background-color: var(--bg-primary) !important;
+}
+
+/* 新建会话页仅保留输入区域，不展示功能快捷入口。 */
+.embedded-friday-chat :deep(.features-section) {
+  display: none;
 }
 
 .conversation-header {

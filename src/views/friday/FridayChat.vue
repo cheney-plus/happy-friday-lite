@@ -322,13 +322,19 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, onDeactivated, onActivated, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAppStore } from '@/store';
 import ChatHistoryDrawer from '@/components/chat/ChatHistoryDrawer.vue';
 import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue';
 import { coverOptions, DEFAULT_CATEGORIES } from '@/views/knowledge/constants';
 
+// FridayChat is used both as a route view and as the embedded "new
+// conversation" view. A module-level guard prevents two mounted instances
+// from submitting the same message during keep-alive/route transitions.
+let isConversationNavigationPending = false;
+
 const router = useRouter();
+const route = useRoute();
 const { t } = useI18n();
 const appStore = useAppStore();
 const inputText = ref('');
@@ -647,6 +653,10 @@ const loadKbListFromDisk = async () => {
 };
 
 const handleSend = async () => {
+  // router.push is asynchronous; guard the synchronous gap so a double click
+  // or duplicate input event cannot create multiple new conversation routes.
+  if (isConversationNavigationPending) return;
+
   const text = inputText.value.trim();
   if (!text) return;
 
@@ -658,6 +668,8 @@ const handleSend = async () => {
     router.push('/settings/model');
     return;
   }
+
+  isConversationNavigationPending = true;
 
   // 所有模式统一支持 @ 引用笔记/知识库文件
   // - note / kb-file：直接将内容注入到首条用户消息中（LLM 上下文 10k 字符）
@@ -680,19 +692,28 @@ const handleSend = async () => {
   const kbName = kbAttachment ? kbAttachment.name : '';
   const kbCategoryId = kbAttachment && kbAttachment.categoryId ? kbAttachment.categoryId : '';
 
-  router.push({
-    name: 'friday-chat',
-    params: { sessionId: `new-${Date.now()}` },
-    query: {
-      q: text,
-      mode: currentMode.value,
-      modelId: selectedModel.id,
-      thinkMode: modelSettings.value.thinkMode,
-      kbName,
-      kbCategoryId,
-      ...(hasAtt ? { hasAtt: 'true' } : {})
+  try {
+    const navigationFailure = await router.push({
+      name: 'friday-chat',
+      params: { sessionId: `new-${Date.now()}` },
+      query: {
+        q: text,
+        mode: currentMode.value,
+        modelId: selectedModel.id,
+        thinkMode: modelSettings.value.thinkMode,
+        kbName,
+        kbCategoryId,
+        ...(hasAtt ? { hasAtt: 'true' } : {})
+      }
+    });
+    if (navigationFailure) {
+      isConversationNavigationPending = false;
     }
-  });
+  } catch (err) {
+    // Allow retrying when navigation is aborted or otherwise fails.
+    isConversationNavigationPending = false;
+    console.error('Conversation navigation error:', err);
+  }
 };
 
 // 构造 @ 引用相关数据
@@ -728,7 +749,8 @@ const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
 
 onMounted(() => {
   document.addEventListener('scroll', handleDocumentScroll, true);
-  // loadCustomModels() 由 onActivated 统一触发（keep-alive 首次挂载时 onActivated 也会执行）
+  // 新建会话以嵌入方式挂载时不会经过 keep-alive 的 activated 钩子，需在首次挂载时初始化模型。
+  loadCustomModels();
   loadKbListFromDisk();
 });
 
@@ -744,6 +766,12 @@ onDeactivated(() => {
 });
 
 onActivated(() => {
+  // Only reset when this is the standalone landing page. The same component
+  // is embedded by FridayConversation; resetting there can reopen the submit
+  // window while its navigation is still in flight.
+  if (route.name === 'friday') {
+    isConversationNavigationPending = false;
+  }
   // 保留输入框文字，仅重新计算高度以适配恢复后的内容
   nextTick(() => {
     autoResize();
