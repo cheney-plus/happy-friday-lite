@@ -10,6 +10,7 @@
  */
 
 import { createLogger } from './logger.js'
+import { SUBAGENT_RESEARCHER_PROMPT } from '../../src/config/prompts.js'
 
 const log = createLogger('Subagents')
 
@@ -25,12 +26,7 @@ export function buildSubagents() {
       name: 'researcher',
       description:
         '通用调研子 Agent。当主 Agent 需要进行多步搜索、跨知识库检索、信息汇总时，可派发任务给此子 Agent。',
-      prompt:
-        '你是一个专注于信息调研的子 Agent。你的职责是：\n' +
-        '1. 根据主 Agent 的任务描述，使用 retrieve_knowledge、search_notes 等工具进行多步检索\n' +
-        '2. 汇总检索到的信息，提取关键要点\n' +
-        '3. 返回结构化的调研结果（含来源）\n\n' +
-        '注意：你只负责调研，不负责创建笔记/日程等写操作。'
+      prompt: SUBAGENT_RESEARCHER_PROMPT
     }
   ]
 

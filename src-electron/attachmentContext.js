@@ -11,6 +11,7 @@
 
 import fs from 'fs'
 import * as db from './db.js'
+import { buildAttachmentContextPrompt } from '../src/config/prompts.js'
 
 const MAX_LLM_CONTENT_LENGTH = 2500
 
@@ -57,9 +58,7 @@ export const buildLlmMessage = (userMessage, attachments, mode) => {
   const textPart = sepIdx >= 0 ? userMessage.slice(0, sepIdx) : userMessage
 
   const isAgent = mode === 'agent'
-  const prompt = isAgent
-    ? '💡 用户在本条消息中 @ 引用了以下内容，请使用工具读取这些内容后进行回答：'
-    : '💡 用户在本条消息中 @ 引用了以下内容，请优先参考这些内容进行回答：'
+  const prompt = buildAttachmentContextPrompt(isAgent)
 
   const parts = []
   for (const att of attachments) {

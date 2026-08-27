@@ -334,6 +334,7 @@ import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
 import { marked } from 'marked';
+import { buildConversationSummaryPrompt } from '@/config/prompts';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -618,18 +619,7 @@ const handleRowMenuSaveAsNote = async (session) => {
       .filter(Boolean)
       .join('\n\n');
 
-    const prompt = `请将以下对话内容总结为一份结构化笔记，要求：
-1. 第一行使用 # 标题格式，为这份笔记取一个简洁且有意义的标题，标签最后不要带笔记二字（不超过20字）
-2. 主题概述（一句话概括）
-3. 关键要点（3-5个要点）
-4. 详细内容（按主题分类整理）
-5. 结论与建议
-
-对话内容：
-
-${transcript}
-
-请使用 Markdown 格式输出。`;
+    const prompt = buildConversationSummaryPrompt(transcript);
 
     const summaryRequestId = `summary_${Date.now()}`;
     let summaryContent = '';

@@ -185,6 +185,7 @@ import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
 import { marked } from 'marked';
+import { buildConversationSummaryPrompt } from '@/config/prompts';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
@@ -380,18 +381,7 @@ async function doSummarize(model) {
     .filter(Boolean)
     .join('\n\n');
 
-  const prompt = `请将以下对话内容总结为一份结构化笔记，要求：
-1. 第一行使用 # 标题格式，为这份笔记取一个简洁且有意义的标题，标签最后不要带笔记二字（不超过20字）
-2. 主题概述（一句话概括）
-3. 关键要点（3-5个要点）
-4. 详细内容（按主题分类整理）
-5. 结论与建议
-
-对话内容：
-
-${transcript}
-
-请使用 Markdown 格式输出。`;
+  const prompt = buildConversationSummaryPrompt(transcript);
 
   unlistenSummaryChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;

@@ -1,4 +1,5 @@
-export const DEFAULT_SYSTEM_PROMPT = '你是 Friday，一个定制化个人知识智能服务助手。你友好、专业，善于帮助用户解答问题和完成任务。'
+export { DEFAULT_SYSTEM_PROMPT } from '../src/config/prompts.js'
+import { DEFAULT_SYSTEM_PROMPT } from '../src/config/prompts.js'
 
 export function defaultConfig() {
   return {
