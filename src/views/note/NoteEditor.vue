@@ -76,15 +76,15 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 0 8H6"></path><path d="M6 12h10a4 4 0 0 1 0 8H6"></path><path d="M6 4v16"></path></svg>
             {{ t('note.toolbar.formula') }}
           </div>
-          <div class="menu-item" @click="editor.chain().focus().toggleCodeBlock().run()">
+          <div class="menu-item" @click="insertCodeBlock">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
             {{ t('note.toolbar.codeBlock') }}
           </div>
-          <div class="menu-item" @click="editor.chain().focus().setHorizontalRule().run()">
+          <div class="menu-item" @click="insertDivider">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line></svg>
             {{ t('note.toolbar.divider') }}
           </div>
-          <div class="menu-item" @click="editor.chain().focus().toggleBlockquote().run()">
+          <div class="menu-item" @click="insertQuote">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 1 1 1 1z"></path></svg>
             {{ t('note.toolbar.quote') }}
           </div>
@@ -905,13 +905,31 @@ const closeToolbarOverflow = () => {
   toolbarOverflowColor.value = null;
 };
 
-const toggleToolbarOverflow = () => {
-  const nextVisible = !showToolbarOverflow.value;
+const closeDropdownMenus = () => {
   showInsertMenu.value = false;
   showHighlightMenu.value = false;
   showTextColorMenu.value = false;
   showHeadingMenu.value = false;
   showTableSubmenu.value = false;
+};
+
+const exclusiveToggleMenu = (menu) => {
+  const nextVisible = !menu.value;
+  closeDropdownMenus();
+  closeToolbarOverflow();
+  menu.value = nextVisible;
+};
+
+const runInsertAction = (action) => {
+  const result = action?.();
+  showInsertMenu.value = false;
+  showTableSubmenu.value = false;
+  return result;
+};
+
+const toggleToolbarOverflow = () => {
+  const nextVisible = !showToolbarOverflow.value;
+  closeDropdownMenus();
   showToolbarOverflow.value = nextVisible;
   toolbarOverflowColor.value = null;
 };
@@ -1078,15 +1096,12 @@ const imageAlt = ref('');
 const imageUrlInput = ref(null);
 
 const addImage = () => {
-  showInsertMenu.value = false;
-  imageUrl.value = '';
-  imageAlt.value = '';
-  showImageDialog.value = true;
-  setTimeout(() => {
-    if (imageUrlInput.value) {
-      imageUrlInput.value.focus();
-    }
-  }, 100);
+  runInsertAction(() => {
+    imageUrl.value = '';
+    imageAlt.value = '';
+    showImageDialog.value = true;
+    nextTick(() => imageUrlInput.value?.focus());
+  });
 };
 
 const closeImageDialog = () => {
@@ -1129,14 +1144,13 @@ const formulaPreviewHtml = computed(() => {
 });
 
 const openFormulaEditor = ({ mode = 'inline', latex = '', pos = null, editing = false } = {}) => {
-  showInsertMenu.value = false;
-  formulaMode.value = mode;
-  formulaLatex.value = latex;
-  formulaEditPos.value = pos;
-  isEditingFormula.value = editing;
-  showFormulaDialog.value = true;
-  nextTick(() => {
-    formulaLatexInput.value?.focus();
+  runInsertAction(() => {
+    formulaMode.value = mode;
+    formulaLatex.value = latex;
+    formulaEditPos.value = pos;
+    isEditingFormula.value = editing;
+    showFormulaDialog.value = true;
+    nextTick(() => formulaLatexInput.value?.focus());
   });
 };
 
@@ -2309,40 +2323,13 @@ const canSetNoteTitle = computed(() => {
   return $from.depth === 1 && $from.index(0) === 0;
 });
 
-const toggleInsertMenu = () => {
-  showInsertMenu.value = !showInsertMenu.value;
-  showHighlightMenu.value = false;
-  showTextColorMenu.value = false;
-  showHeadingMenu.value = false;
-};
-
-const toggleHighlightMenu = () => {
-  showHighlightMenu.value = !showHighlightMenu.value;
-  showInsertMenu.value = false;
-  showTextColorMenu.value = false;
-  showHeadingMenu.value = false;
-};
-
-const toggleTextColorMenu = () => {
-  showTextColorMenu.value = !showTextColorMenu.value;
-  showInsertMenu.value = false;
-  showHighlightMenu.value = false;
-  showHeadingMenu.value = false;
-};
-
-const toggleHeadingMenu = () => {
-  showHeadingMenu.value = !showHeadingMenu.value;
-  showInsertMenu.value = false;
-  showHighlightMenu.value = false;
-  showTextColorMenu.value = false;
-};
+const toggleInsertMenu = () => exclusiveToggleMenu(showInsertMenu);
+const toggleHighlightMenu = () => exclusiveToggleMenu(showHighlightMenu);
+const toggleTextColorMenu = () => exclusiveToggleMenu(showTextColorMenu);
+const toggleHeadingMenu = () => exclusiveToggleMenu(showHeadingMenu);
 
 const closeAllMenus = () => {
-  showInsertMenu.value = false;
-  showHighlightMenu.value = false;
-  showTextColorMenu.value = false;
-  showHeadingMenu.value = false;
-  showTableSubmenu.value = false;
+  closeDropdownMenus();
   closeToolbarOverflow();
 };
 
@@ -2350,14 +2337,30 @@ const setHighlight = (color) => {
   if (color === 'transparent') {
     editor.value?.chain().focus().unsetHighlight().run();
   } else {
-    editor.value?.chain().focus().toggleHighlight({ color }).run();
+    editor.value?.chain().focus().setHighlight({ color }).run();
   }
   showHighlightMenu.value = false;
 };
 
 const setTextColor = (color) => {
-  editor.value?.chain().focus().setColor(color).run();
+  if (!color || color === 'inherit' || color === 'transparent') {
+    editor.value?.chain().focus().unsetColor().run();
+  } else {
+    editor.value?.chain().focus().setColor(color).run();
+  }
   showTextColorMenu.value = false;
+};
+
+const insertCodeBlock = () => {
+  runInsertAction(() => editor.value?.chain().focus().toggleCodeBlock().run());
+};
+
+const insertDivider = () => {
+  runInsertAction(() => editor.value?.chain().focus().setHorizontalRule().run());
+};
+
+const insertQuote = () => {
+  runInsertAction(() => editor.value?.chain().focus().toggleBlockquote().run());
 };
 
 const setHeading = (level) => {
@@ -2392,13 +2395,13 @@ const setSmallBody = () => {
 };
 
 const insertTable = (rows, cols) => {
-  editor.value
-    ?.chain()
-    .focus()
-    .insertTable({ rows, cols, withHeaderRow: true })
-    .run();
-  showInsertMenu.value = false;
-  showTableSubmenu.value = false;
+  runInsertAction(() => {
+    editor.value
+      ?.chain()
+      .focus()
+      .insertTable({ rows, cols, withHeaderRow: true })
+      .run();
+  });
 };
 
 const toolbarOverflowTools = computed(() => [
@@ -2409,15 +2412,15 @@ const toolbarOverflowTools = computed(() => [
   { key: 'table', section: 'insert', icon: Table2, label: t('note.toolbar.table'), run: () => insertTable(3, 3) },
   { key: 'image', section: 'insert', icon: ToolbarImage, label: t('note.toolbar.image'), run: addImage },
   { key: 'formula', section: 'insert', icon: Sigma, label: t('note.toolbar.formula'), run: addFormula },
-  { key: 'code', section: 'insert', icon: Code2, label: t('note.toolbar.codeBlock'), run: () => editor.value?.chain().focus().toggleCodeBlock().run() },
-  { key: 'divider', section: 'insert', icon: Minus, label: t('note.toolbar.divider'), run: () => editor.value?.chain().focus().setHorizontalRule().run() },
-  { key: 'quote', section: 'insert', icon: Quote, label: t('note.toolbar.quote'), run: () => editor.value?.chain().focus().toggleBlockquote().run() },
+  { key: 'code', section: 'insert', icon: Code2, label: t('note.toolbar.codeBlock'), run: insertCodeBlock },
+  { key: 'divider', section: 'insert', icon: Minus, label: t('note.toolbar.divider'), run: insertDivider },
+  { key: 'quote', section: 'insert', icon: Quote, label: t('note.toolbar.quote'), run: insertQuote },
   { key: 'bold', section: 'format', icon: Bold, label: t('note.toolbar.bold'), run: () => editor.value?.chain().focus().toggleBold().run() },
   { key: 'italic', section: 'format', icon: Italic, label: t('note.toolbar.italic'), run: () => editor.value?.chain().focus().toggleItalic().run() },
   { key: 'underline', section: 'format', icon: ToolbarUnderline, label: t('note.toolbar.underline'), run: () => editor.value?.chain().focus().toggleUnderline().run() },
   { key: 'strike', section: 'format', icon: Strikethrough, label: t('note.toolbar.strike'), run: () => editor.value?.chain().focus().toggleStrike().run() },
-  { key: 'highlight', section: 'format', icon: Highlighter, label: t('note.toolbar.removeHighlight'), run: () => setHighlight('transparent') },
-  { key: 'text-color', section: 'format', icon: Palette, label: t('note.toolbar.defaultColor'), run: () => setTextColor('inherit') },
+  { key: 'highlight', section: 'format', icon: Highlighter, label: t('note.toolbar.backgroundColor'), run: () => setHighlight('transparent') },
+  { key: 'text-color', section: 'format', icon: Palette, label: t('note.toolbar.textColor'), run: () => setTextColor('inherit') },
   { key: 'heading', section: 'heading', icon: Heading, label: t('note.toolbar.title'), disabled: () => !canSetNoteTitle.value, run: setNoteTitle },
   { key: 'heading-1', section: 'heading', icon: Heading, label: t('note.toolbar.heading1'), run: () => setHeading(1) },
   { key: 'heading-2', section: 'heading', icon: Heading, label: t('note.toolbar.heading2'), run: () => setHeading(2) },
@@ -2494,19 +2497,13 @@ const isRichHtml = (html) => {
     /<blockquote\b/i,
     /<pre\b|<code\b/i,
     /<ol\b|<ul\b/i,
+    /data-type\s*=\s*["'](?:inline-math|block-math|taskItem|taskList)["']/i,
+    /data-latex\s*=/i,
     /style\s*=\s*["'][^"']*(?:color|font-weight|font-style|text-decoration|background)/i,
     /class\s*=\s*["'][^"']*(?:bold|italic|underline|highlight)/i,
   ];
 
-  const hasRichContent = richHtmlPatterns.some(pattern => pattern.test(html));
-  
-  if (hasRichContent) return true;
-
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
-  const textContent = tempDiv.textContent || '';
-  
-  return false;
+  return richHtmlPatterns.some(pattern => pattern.test(html));
 };
 
 const preprocessMarkdownTables = (text) => {
@@ -3312,20 +3309,6 @@ const fixEmptyTableCells = (html) => {
   padding: 0;
 }
 
-:deep(.pre-editor pre) {
-  background-color: var(--bg-hover);
-  padding: 1em;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 0.8em 0;
-}
-
-:deep(.pre-editor pre code) {
-  background: none;
-  padding: 0;
-  font-size: 0.9em;
-}
-
 :deep(.prose-editor a.text-link) {
   color: #3b82f6;
   text-decoration: underline;
@@ -3387,19 +3370,31 @@ const fixEmptyTableCells = (html) => {
   padding-left: 0.25em;
 }
 
-/* 复选框区域不可编辑，固定宽度，避免挤占后面的编辑区 */
+/* 复选框与首行文字垂直居中对齐：label 高度对齐行高 */
 :deep(.prose-editor ul[data-type="taskList"] li > label) {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  margin: 0.2em 0 0;
+  box-sizing: border-box;
+  height: 1.4em;
+  margin: 0;
+  padding: 0;
   user-select: none;
+  line-height: 1;
 }
 
 :deep(.prose-editor ul[data-type="taskList"] li > label input[type="checkbox"]) {
   margin: 0;
   cursor: pointer;
   flex-shrink: 0;
+  width: 0.95em;
+  height: 0.95em;
+}
+
+/* TipTap 自带空 span，不占位 */
+:deep(.prose-editor ul[data-type="taskList"] li > label > span) {
+  display: none;
 }
 
 /* TipTap contentDOM：必须占满剩余宽度，空段落时才有光标落点 */
@@ -3410,6 +3405,7 @@ const fixEmptyTableCells = (html) => {
 
 :deep(.prose-editor ul[data-type="taskList"] li > div > p) {
   margin: 0;
+  line-height: 1.4;
   min-height: 1.4em;
 }
 
