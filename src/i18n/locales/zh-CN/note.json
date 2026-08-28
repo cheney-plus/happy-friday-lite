@@ -79,6 +79,7 @@
     "insert": "插入",
     "table": "表格",
     "image": "图片",
+    "formula": "公式",
     "codeBlock": "代码块",
     "horizontalRule": "分割线",
     "divider": "分割线",
@@ -139,6 +140,21 @@
     "descriptionPlaceholder": "图片描述",
     "insertBtn": "插入",
     "insert": "插入",
+    "cancel": "取消"
+  },
+  "formulaDialog": {
+    "insertTitle": "插入公式",
+    "editTitle": "编辑公式",
+    "mode": "类型",
+    "inline": "行内公式",
+    "block": "块级公式",
+    "latex": "LaTeX 公式",
+    "placeholder": "例如：E = mc^2",
+    "preview": "预览",
+    "previewEmpty": "输入公式后可在此预览",
+    "hint": "行内对应 $...$，块级对应 $$...$$",
+    "insert": "插入",
+    "update": "更新",
     "cancel": "取消"
   },
   "aiSidebar": {

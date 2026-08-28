@@ -72,6 +72,10 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             {{ t('note.toolbar.image') }}
           </div>
+          <div class="menu-item" @click="addFormula">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 0 8H6"></path><path d="M6 12h10a4 4 0 0 1 0 8H6"></path><path d="M6 4v16"></path></svg>
+            {{ t('note.toolbar.formula') }}
+          </div>
           <div class="menu-item" @click="editor.chain().focus().toggleCodeBlock().run()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
             {{ t('note.toolbar.codeBlock') }}
@@ -414,6 +418,68 @@
         </div>
       </div>
     </div>
+
+    <!-- 公式对话框 -->
+    <div v-if="showFormulaDialog" class="dialog-overlay" @click.self="closeFormulaDialog">
+      <div class="dialog formula-dialog">
+        <div class="dialog-header">
+          <h3>{{ isEditingFormula ? t('note.formulaDialog.editTitle') : t('note.formulaDialog.insertTitle') }}</h3>
+          <button class="dialog-close" @click="closeFormulaDialog">×</button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>{{ t('note.formulaDialog.mode') }}</label>
+            <div class="formula-mode-tabs">
+              <button
+                type="button"
+                class="formula-mode-tab"
+                :class="{ active: formulaMode === 'inline' }"
+                :disabled="isEditingFormula"
+                @click="formulaMode = 'inline'"
+              >
+                {{ t('note.formulaDialog.inline') }}
+              </button>
+              <button
+                type="button"
+                class="formula-mode-tab"
+                :class="{ active: formulaMode === 'block' }"
+                :disabled="isEditingFormula"
+                @click="formulaMode = 'block'"
+              >
+                {{ t('note.formulaDialog.block') }}
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>{{ t('note.formulaDialog.latex') }}</label>
+            <textarea
+              ref="formulaLatexInput"
+              v-model="formulaLatex"
+              class="form-input formula-latex-input"
+              rows="3"
+              :placeholder="t('note.formulaDialog.placeholder')"
+              @keydown.meta.enter.prevent="confirmFormula"
+              @keydown.ctrl.enter.prevent="confirmFormula"
+            />
+            <div class="formula-hint">{{ t('note.formulaDialog.hint') }}</div>
+          </div>
+          <div class="form-group">
+            <label>{{ t('note.formulaDialog.preview') }}</label>
+            <div
+              class="formula-preview"
+              :class="{ empty: !formulaPreviewHtml, block: formulaMode === 'block' }"
+              v-html="formulaPreviewHtml || t('note.formulaDialog.previewEmpty')"
+            />
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-secondary" @click="closeFormulaDialog">{{ t('note.formulaDialog.cancel') }}</button>
+          <button class="btn btn-primary" @click="confirmFormula" :disabled="!formulaLatex.trim()">
+            {{ isEditingFormula ? t('note.formulaDialog.update') : t('note.formulaDialog.insert') }}
+          </button>
+        </div>
+      </div>
+    </div>
     </div>
 
     <Transition name="sidebar-slide">
@@ -546,7 +612,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Code2, Eraser, Heading,
   Highlighter, Image as ToolbarImage, Italic, Link2, List, ListChecks, ListOrdered,
-  Minus, Palette, Quote, Redo2, Strikethrough, Table2, Underline as ToolbarUnderline, Undo2,
+  Minus, Palette, Quote, Redo2, Sigma, Strikethrough, Table2, Underline as ToolbarUnderline, Undo2,
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
@@ -573,6 +639,9 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
+import { Mathematics } from '@tiptap/extension-mathematics';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -1038,6 +1107,70 @@ const confirmImage = () => {
   closeImageDialog();
 };
 
+// 公式对话框相关
+const showFormulaDialog = ref(false);
+const formulaLatex = ref('');
+const formulaMode = ref('inline');
+const formulaEditPos = ref(null);
+const isEditingFormula = ref(false);
+const formulaLatexInput = ref(null);
+
+const formulaPreviewHtml = computed(() => {
+  const latex = formulaLatex.value.trim();
+  if (!latex) return '';
+  try {
+    return katex.renderToString(latex, {
+      throwOnError: false,
+      displayMode: formulaMode.value === 'block',
+    });
+  } catch (error) {
+    return `<span class="formula-preview-error">${error?.message || 'Invalid LaTeX'}</span>`;
+  }
+});
+
+const openFormulaEditor = ({ mode = 'inline', latex = '', pos = null, editing = false } = {}) => {
+  showInsertMenu.value = false;
+  formulaMode.value = mode;
+  formulaLatex.value = latex;
+  formulaEditPos.value = pos;
+  isEditingFormula.value = editing;
+  showFormulaDialog.value = true;
+  nextTick(() => {
+    formulaLatexInput.value?.focus();
+  });
+};
+
+const addFormula = () => {
+  openFormulaEditor({ mode: 'inline', latex: '', editing: false });
+};
+
+const closeFormulaDialog = () => {
+  showFormulaDialog.value = false;
+  formulaLatex.value = '';
+  formulaMode.value = 'inline';
+  formulaEditPos.value = null;
+  isEditingFormula.value = false;
+};
+
+const confirmFormula = () => {
+  const latex = formulaLatex.value.trim();
+  if (!latex || !editor.value) return;
+
+  if (isEditingFormula.value && typeof formulaEditPos.value === 'number') {
+    if (formulaMode.value === 'block') {
+      editor.value.chain().focus().updateBlockMath({ latex, pos: formulaEditPos.value }).run();
+    } else {
+      editor.value.chain().focus().updateInlineMath({ latex, pos: formulaEditPos.value }).run();
+    }
+  } else if (formulaMode.value === 'block') {
+    editor.value.chain().focus().insertBlockMath({ latex }).run();
+  } else {
+    editor.value.chain().focus().insertInlineMath({ latex }).run();
+  }
+
+  closeFormulaDialog();
+};
+
 // 更多菜单相关
 const toggleMoreMenu = (event) => {
   showMoreMenu.value = !showMoreMenu.value;
@@ -1202,6 +1335,20 @@ const exportMarkdown = async () => {
         const checked = checkbox?.hasAttribute('checked') ? 'x' : ' ';
         return `- [${checked}] ${content.trim()}\n`;
       }
+    });
+    turndown.addRule('inlineMath', {
+      filter: (node) => node.nodeName === 'SPAN' && node.getAttribute('data-type') === 'inline-math',
+      replacement: (_content, node) => {
+        const latex = node.getAttribute('data-latex') || '';
+        return `$${latex}$`;
+      },
+    });
+    turndown.addRule('blockMath', {
+      filter: (node) => node.nodeName === 'DIV' && node.getAttribute('data-type') === 'block-math',
+      replacement: (_content, node) => {
+        const latex = node.getAttribute('data-latex') || '';
+        return `\n\n$$\n${latex}\n$$\n\n`;
+      },
     });
     const markdown = turndown.turndown(html);
     await electronService.invoke('export_markdown', { markdown, savePath: filePath });
@@ -1912,6 +2059,31 @@ const editor = useEditor({
     }),
     TextStyle,
     Color,
+    Mathematics.configure({
+      katexOptions: {
+        throwOnError: false,
+      },
+      inlineOptions: {
+        onClick: (node, pos) => {
+          openFormulaEditor({
+            mode: 'inline',
+            latex: node.attrs.latex || '',
+            pos,
+            editing: true,
+          });
+        },
+      },
+      blockOptions: {
+        onClick: (node, pos) => {
+          openFormulaEditor({
+            mode: 'block',
+            latex: node.attrs.latex || '',
+            pos,
+            editing: true,
+          });
+        },
+      },
+    }),
     CodeBlockLowlight.extend({
       addNodeView() {
         return VueNodeViewRenderer(CodeBlockComponent);
@@ -2236,6 +2408,7 @@ const toolbarOverflowTools = computed(() => [
   { key: 'link', section: 'history', icon: Link2, label: t('note.toolbar.link'), disabled: () => !hasSelection.value, run: addLink },
   { key: 'table', section: 'insert', icon: Table2, label: t('note.toolbar.table'), run: () => insertTable(3, 3) },
   { key: 'image', section: 'insert', icon: ToolbarImage, label: t('note.toolbar.image'), run: addImage },
+  { key: 'formula', section: 'insert', icon: Sigma, label: t('note.toolbar.formula'), run: addFormula },
   { key: 'code', section: 'insert', icon: Code2, label: t('note.toolbar.codeBlock'), run: () => editor.value?.chain().focus().toggleCodeBlock().run() },
   { key: 'divider', section: 'insert', icon: Minus, label: t('note.toolbar.divider'), run: () => editor.value?.chain().focus().setHorizontalRule().run() },
   { key: 'quote', section: 'insert', icon: Quote, label: t('note.toolbar.quote'), run: () => editor.value?.chain().focus().toggleBlockquote().run() },
@@ -3244,6 +3417,33 @@ const fixEmptyTableCells = (html) => {
   color: attr(data-color);
 }
 
+:deep(.prose-editor span[data-type='inline-math']) {
+  display: inline-block;
+  padding: 0 0.15em;
+  border-radius: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+:deep(.prose-editor span[data-type='inline-math']:hover) {
+  background-color: var(--bg-hover);
+}
+
+:deep(.prose-editor div[data-type='block-math']) {
+  display: block;
+  margin: 0.8em 0;
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  text-align: center;
+  overflow-x: auto;
+  cursor: pointer;
+  background-color: var(--bg-hover);
+}
+
+:deep(.prose-editor div[data-type='block-math']:hover) {
+  outline: 1px solid var(--border-color);
+}
+
 .dialog-overlay {
   position: fixed;
   top: 0;
@@ -3264,6 +3464,75 @@ const fixEmptyTableCells = (html) => {
   width: 90%;
   max-width: 480px;
   overflow: hidden;
+}
+
+.formula-dialog {
+  max-width: 560px;
+}
+
+.formula-mode-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.formula-mode-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.formula-mode-tab.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.formula-mode-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.formula-latex-input {
+  min-height: 84px;
+  resize: vertical;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  line-height: 1.5;
+}
+
+.formula-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.formula-preview {
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #111827;
+  overflow-x: auto;
+}
+
+.formula-preview.empty {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.formula-preview.block {
+  text-align: center;
+}
+
+.formula-preview-error {
+  color: #dc2626;
+  font-size: 13px;
 }
 
 .dialog-header {
@@ -3739,6 +4008,32 @@ const fixEmptyTableCells = (html) => {
 }
 
 [data-theme='dark'] .form-input::placeholder {
+  color: #6b7280;
+}
+
+[data-theme='dark'] .formula-mode-tab {
+  background: #374151;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+
+[data-theme='dark'] .formula-mode-tab.active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+[data-theme='dark'] .formula-hint {
+  color: #6b7280;
+}
+
+[data-theme='dark'] .formula-preview {
+  background: #111827;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+[data-theme='dark'] .formula-preview.empty {
   color: #6b7280;
 }
 
