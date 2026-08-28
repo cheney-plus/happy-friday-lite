@@ -162,8 +162,8 @@
       <div ref="headingToolbarSectionRef" v-show="isToolbarSectionVisible('heading')" class="toolbar-section">
       <div class="dropdown-wrapper">
         <button class="toolbar-btn dropdown-toggle heading-toggle" @click="toggleHeadingMenu" :class="{ active: showHeadingMenu || isHeadingActive }">
-          {{ currentHeadingLabel }}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <span class="heading-toggle-label">{{ currentHeadingLabel }}</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHeadingMenu" class="dropdown-menu heading-menu">
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('noteTitle'), disabled: !canSetNoteTitle }" @click="setNoteTitle">
@@ -2303,9 +2303,10 @@ const isBodyActive = computed(() => {
 const currentHeadingLabel = computed(() => {
   if (!editor.value) return t('note.toolbar.body');
   if (editor.value.isActive('noteTitle')) return t('note.toolbar.title');
-  if (editor.value.isActive('heading', { level: 1 })) return t('note.toolbar.heading1');
-  if (editor.value.isActive('heading', { level: 2 })) return t('note.toolbar.heading2');
-  if (editor.value.isActive('heading', { level: 3 })) return t('note.toolbar.heading3');
+  // 工具栏按钮用短标签，避免长文案把按钮撑宽
+  if (editor.value.isActive('heading', { level: 1 })) return 'H1';
+  if (editor.value.isActive('heading', { level: 2 })) return 'H2';
+  if (editor.value.isActive('heading', { level: 3 })) return 'H3';
   if (isSmallBodyActive.value) return t('note.toolbar.smallBody');
   return t('note.toolbar.body');
 });
@@ -3027,12 +3028,36 @@ const fixEmptyTableCells = (html) => {
 }
 
 .heading-toggle {
-  min-width: 68px;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  padding: 0 4px;
+  gap: 2px;
   font-weight: 500;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.heading-toggle-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.heading-menu {
+  min-width: 112px;
+}
+
+.heading-menu .menu-item {
+  gap: 8px;
+  padding: 8px 12px;
 }
 
 .heading-preview {
-  padding: 7px 14px;
+  padding: 7px 12px;
 }
 
 .note-title-menu-label {
@@ -3810,7 +3835,7 @@ const fixEmptyTableCells = (html) => {
 .more-menu {
   right: 0;
   left: auto;
-  min-width: 130px;
+  min-width: 138px;
   padding: 4px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -3832,6 +3857,7 @@ const fixEmptyTableCells = (html) => {
   font-family: inherit;
   border-radius: 5px;
   letter-spacing: normal;
+  white-space: nowrap;
   transition: background 0.12s;
 }
 
