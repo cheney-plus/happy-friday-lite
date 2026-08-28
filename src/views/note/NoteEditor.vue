@@ -174,8 +174,8 @@
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(3)">
             <span class="heading-level-3-label">{{ t('note.toolbar.heading3') }}</span>
           </div>
-          <div class="menu-item" :class="{ active: editor.isActive('paragraph'), disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
-          <div class="menu-item" :class="{ active: editor.isActive('smallParagraph'), disabled: editor.isActive('noteTitle') }" @click="setSmallBody">
+          <div class="menu-item" :class="{ active: isBodyActive, disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
+          <div class="menu-item" :class="{ active: isSmallBodyActive, disabled: editor.isActive('noteTitle') }" @click="setSmallBody">
             <span class="small-body-label">{{ t('note.toolbar.smallBody') }}</span>
           </div>
         </div>
@@ -554,6 +554,8 @@ import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import { electronService } from '@/services/electron';
 import { getChatSession, setChatSession } from '@/utils/chatSessionCache';
 import StarterKit from '@tiptap/starter-kit';
+import Paragraph from '@tiptap/extension-paragraph';
+import Code from '@tiptap/extension-code';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
@@ -740,19 +742,26 @@ const NoteTitle = Node.create({
   },
 });
 
-const SmallParagraph = Node.create({
-  name: 'smallParagraph',
-  priority: 1100,
-  group: 'block',
-  content: 'inline*',
-
-  parseHTML() {
-    return [{ tag: 'p[data-small-text]' }];
+// 小正：paragraph.small 属性。独立 block + 高 priority 会使回车默认落到小正。
+const CustomParagraph = Paragraph.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      small: {
+        default: false,
+        parseHTML: (element) => element.hasAttribute('data-small-text'),
+        renderHTML: (attributes) => {
+          if (!attributes.small) return {};
+          return { 'data-small-text': 'true' };
+        },
+      },
+    };
   },
+});
 
-  renderHTML({ HTMLAttributes }) {
-    return ['p', { ...HTMLAttributes, 'data-small-text': 'true' }, 0];
-  },
+// 默认 code mark 的 excludes: '_' 会排斥 bold 等所有 mark
+const InlineCode = Code.extend({
+  excludes: '',
 });
 
 const prepareEditorContent = (content) => {
@@ -1855,16 +1864,19 @@ const editor = useEditor({
   extensions: [
     NoteSearch,
     NoteTitle,
-    SmallParagraph,
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3],
       },
+      code: false,
       codeBlock: false,
+      paragraph: false,
     }),
+    CustomParagraph,
+    InlineCode,
     Underline,
     TextAlign.configure({
-      types: ['noteTitle', 'smallParagraph', 'heading', 'paragraph'],
+      types: ['noteTitle', 'heading', 'paragraph'],
     }),
     Highlight.configure({
       multicolor: true,
@@ -2092,13 +2104,23 @@ const handleSearchInputKeydown = (event) => {
   }
 };
 
+const isSmallBodyActive = computed(() => {
+  if (!editor.value) return false;
+  return editor.value.isActive('paragraph', { small: true });
+});
+
+const isBodyActive = computed(() => {
+  if (!editor.value) return false;
+  return editor.value.isActive('paragraph') && !editor.value.isActive('paragraph', { small: true });
+});
+
 const currentHeadingLabel = computed(() => {
   if (!editor.value) return t('note.toolbar.body');
   if (editor.value.isActive('noteTitle')) return t('note.toolbar.title');
   if (editor.value.isActive('heading', { level: 1 })) return t('note.toolbar.heading1');
   if (editor.value.isActive('heading', { level: 2 })) return t('note.toolbar.heading2');
   if (editor.value.isActive('heading', { level: 3 })) return t('note.toolbar.heading3');
-  if (editor.value.isActive('smallParagraph')) return t('note.toolbar.smallBody');
+  if (isSmallBodyActive.value) return t('note.toolbar.smallBody');
   return t('note.toolbar.body');
 });
 
@@ -2106,7 +2128,7 @@ const isHeadingActive = computed(() => {
   if (!editor.value) return false;
   return editor.value.isActive('noteTitle')
     || editor.value.isActive('heading')
-    || editor.value.isActive('smallParagraph');
+    || isSmallBodyActive.value;
 });
 
 const canSetNoteTitle = computed(() => {
@@ -2169,7 +2191,7 @@ const setTextColor = (color) => {
 const setHeading = (level) => {
   if (editor.value?.isActive('noteTitle')) return;
   if (level === 0) {
-    editor.value?.chain().focus().setParagraph().run();
+    editor.value?.chain().focus().setNode('paragraph', { small: false }).run();
   } else {
     editor.value?.chain().focus().toggleHeading({ level }).run();
   }
@@ -2193,7 +2215,7 @@ const setNoteTitle = () => {
 
 const setSmallBody = () => {
   if (editor.value?.isActive('noteTitle')) return;
-  editor.value?.chain().focus().setNode('smallParagraph').run();
+  editor.value?.chain().focus().setNode('paragraph', { small: true }).run();
   showHeadingMenu.value = false;
 };
 
@@ -2950,7 +2972,8 @@ const fixEmptyTableCells = (html) => {
   min-height: 100%;
   color: var(--text-primary);
   font-size: 16px;
-  line-height: 1.6;
+  /* 控制段内自动换行疏密；回车段距靠 p/heading margin 拉开 */
+  line-height: 1.4;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   padding-top: 0;
   padding-bottom: 40px;
@@ -2978,7 +3001,7 @@ const fixEmptyTableCells = (html) => {
 :deep(.prose-editor h2),
 :deep(.prose-editor h3) {
   font-weight: 600;
-  margin: 0.8em 0 0.4em;
+  margin: 1.05em 0 0.55em;
   line-height: 1.3;
 }
 
@@ -2997,12 +3020,12 @@ const fixEmptyTableCells = (html) => {
 :deep(.prose-editor h1[data-note-title]) {
   font-size: 22px;
   font-weight: 500;
-  margin: 0.2em 0 0.6em;
+  margin: 0.2em 0 0.75em;
   line-height: 1.25;
 }
 
 :deep(.prose-editor p) {
-  margin: 0.4em 0;
+  margin: 0.65em 0;
 }
 
 :deep(.prose-editor p[data-small-text]) {
@@ -3011,12 +3034,21 @@ const fixEmptyTableCells = (html) => {
 
 :deep(.prose-editor ul),
 :deep(.prose-editor ol) {
-  padding-left: 1.5em;
-  margin: 0.4em 0;
+  padding-left: 0;
+  margin: 0.45em 0;
+  list-style-position: inside;
 }
 
 :deep(.prose-editor ul) {
   list-style-type: disc;
+}
+
+:deep(.prose-editor ul ul) {
+  list-style-type: circle;
+}
+
+:deep(.prose-editor ul ul ul) {
+  list-style-type: square;
 }
 
 :deep(.prose-editor ol) {
@@ -3031,8 +3063,31 @@ const fixEmptyTableCells = (html) => {
   list-style-type: lower-roman;
 }
 
+/* 仅嵌套列表保留层级缩进 */
+:deep(.prose-editor ul ul),
+:deep(.prose-editor ul ol),
+:deep(.prose-editor ol ul),
+:deep(.prose-editor ol ol) {
+  padding-left: 1.25em;
+}
+
 :deep(.prose-editor li) {
-  margin: 0.2em 0;
+  margin: 0.22em 0;
+}
+
+/* TipTap 列表项内嵌 paragraph：inline 避免 inside 标记单独占一行；
+   margin-left 拉开符号与文字，且不增加整行缩进 */
+:deep(.prose-editor li > p) {
+  margin: 0;
+  display: inline;
+}
+
+:deep(.prose-editor ul:not([data-type='taskList']) > li > p) {
+  margin-left: 0.2em;
+}
+
+:deep(.prose-editor ol > li > p) {
+  margin-left: 0.4em;
 }
 
 :deep(.prose-editor blockquote) {
@@ -3051,6 +3106,13 @@ const fixEmptyTableCells = (html) => {
   font-size: 0.9em;
   text-shadow: none;
   box-shadow: none;
+}
+
+:deep(.prose-editor code strong),
+:deep(.prose-editor code b),
+:deep(.prose-editor strong code),
+:deep(.prose-editor b code) {
+  font-weight: 700;
 }
 
 :deep(.prose-editor pre code) {
@@ -3142,24 +3204,40 @@ const fixEmptyTableCells = (html) => {
 :deep(.prose-editor ul[data-type="taskList"]) {
   list-style: none;
   padding-left: 0;
+  margin-left: 0;
 }
 
 :deep(.prose-editor ul[data-type="taskList"] li) {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: 0.5em;
+  padding-left: 0.25em;
 }
 
+/* 复选框区域不可编辑，固定宽度，避免挤占后面的编辑区 */
 :deep(.prose-editor ul[data-type="taskList"] li > label) {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 1.5em;
+  flex: 0 0 auto;
+  margin: 0.2em 0 0;
+  user-select: none;
 }
 
 :deep(.prose-editor ul[data-type="taskList"] li > label input[type="checkbox"]) {
-  margin-top: 0;
+  margin: 0;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+/* TipTap contentDOM：必须占满剩余宽度，空段落时才有光标落点 */
+:deep(.prose-editor ul[data-type="taskList"] li > div) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+:deep(.prose-editor ul[data-type="taskList"] li > div > p) {
+  margin: 0;
+  min-height: 1.4em;
 }
 
 :deep(.prose-editor span[data-color]) {
