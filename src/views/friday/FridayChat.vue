@@ -728,7 +728,8 @@ const buildAttachmentData = (text, noteAttachments, kbFileAttachments) => {
 
 onMounted(() => {
   document.addEventListener('scroll', handleDocumentScroll, true);
-  // loadCustomModels() 由 onActivated 统一触发（keep-alive 首次挂载时 onActivated 也会执行）
+  // 新建会话以嵌入方式挂载时不会经过 keep-alive 的 activated 钩子，需在首次挂载时初始化模型。
+  loadCustomModels();
   loadKbListFromDisk();
 });
 

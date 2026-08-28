@@ -1,4 +1,5 @@
 {
   "title": "Knowledge Base",
-  "placeholder": "This is placeholder for knowledge base"
+  "placeholder": "This is placeholder for knowledge base",
+  "categories": { "personal": "Personal Knowledge Base", "local": "Local Knowledge Base", "agent": "Agent" }
 }

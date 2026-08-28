@@ -1,14 +1,24 @@
-import { ref, reactive, computed, nextTick } from 'vue';
+import { ref, reactive, computed, nextTick, watch } from 'vue';
 import { coverOptions, DEFAULT_CATEGORIES } from '../constants';
 
 // Agent 智能体目录下需要隐藏的系统目录（SKILL 由后端维护不在侧边栏展示，仅显示 SANDBOX 及用户创建的目录）
 const AGENT_HIDDEN_DIRS = ['memories', 'large_tool_results', 'SKILL'];
 
-export function useKnowledgeBase(fileSystem, sidebar) {
+export function useKnowledgeBase(fileSystem, sidebar, t = key => key) {
   const api = window.electronAPI;
   const selectedKB = ref('');
   const currentTitle = ref('知识库');
-  const categories = reactive(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)));
+  const categories = reactive(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)).map(category => ({
+    ...category,
+    name: t(`knowledge.categories.${category.id}`)
+  })));
+  watch(
+    () => [t('knowledge.categories.personal'), t('knowledge.categories.local'), t('knowledge.categories.agent')],
+    ([personal, local, agent]) => {
+      const labels = { personal, local, agent };
+      categories.forEach(category => { category.name = labels[category.id] || category.name; });
+    }
+  );
 
   const showCreateDialog = ref(false);
   const currentCategoryId = ref('');

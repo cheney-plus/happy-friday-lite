@@ -109,9 +109,31 @@ function writeAtomic(filename, content, mode = 0o600) {
   if (process.platform !== 'win32') fs.chmodSync(filename, mode)
 }
 
+function quarantineCorruptYaml(filename, reason) {
+  const backup = `${filename}.corrupt-${Date.now()}`
+  try {
+    fs.renameSync(filename, backup)
+    console.warn(`[Harness] Ignoring corrupt ${path.basename(filename)} (${reason}); preserved as ${backup}`)
+  } catch (error) {
+    // If the file cannot be moved, keep the original error useful to the caller.
+    throw new Error(`Unable to quarantine corrupt ${path.basename(filename)}: ${error.message}`)
+  }
+}
+
 function readYamlMapping(filename) {
   if (!fs.existsSync(filename)) return {}
-  const parsed = yaml.load(fs.readFileSync(filename, 'utf-8'))
+  const content = fs.readFileSync(filename, 'utf-8')
+  let parsed
+  try {
+    // js-yaml rejects NUL characters before parsing. A stale/corrupt Harness
+    // state file should not prevent the sidecar from recreating its config.
+    if (content.includes('\u0000')) throw new Error('null byte is not allowed in input')
+    parsed = yaml.load(content)
+  } catch (error) {
+    if (!/null byte is not allowed|YAMLException/i.test(error.message || '')) throw error
+    quarantineCorruptYaml(filename, error.message)
+    return {}
+  }
   if (parsed === null || parsed === undefined) return {}
   if (typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`${path.basename(filename)} must contain a mapping`)

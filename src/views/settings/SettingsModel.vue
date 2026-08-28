@@ -36,7 +36,7 @@
 
       <div class="group-title">自定义模型</div>
       <div class="custom-models-container">
-        <div class="add-model-btn" @click="showAddModal = true">
+        <div class="add-model-btn" @click="openAddModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -182,6 +182,7 @@
                 <input
                   :type="showApiKey ? 'text' : 'password'"
                   v-model="formData.apiKey"
+                  @change="loadAvailableModels"
                   placeholder="输入你的API Key"
                   class="form-input"
                 />
@@ -199,23 +200,81 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label">对话模型名称</label>
-              <input
-                type="text"
-                v-model="formData.modelName"
-                placeholder="输入对话模型名称"
-                class="form-input"
-              />
+              <div class="model-name-label-row">
+                <label class="form-label">对话模型名称</label>
+                <button
+                  v-if="formData.provider && formData.provider !== 'other'"
+                  type="button"
+                  class="model-refresh-btn"
+                  :disabled="modelsLoading || !formData.apiKey"
+                  @click="loadAvailableModels"
+                >
+                  <svg :class="{ 'spin-icon': modelsLoading }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    <polyline points="21 3 21 9 15 9"></polyline>
+                  </svg>
+                  <span>{{ modelsLoading ? '获取中' : '刷新' }}</span>
+                </button>
+              </div>
+              <div v-if="availableChatModels.length || modelsLoading" class="custom-select model-name-select" ref="modelNameSelectRef">
+                <div
+                  class="select-trigger"
+                  :class="{ disabled: modelsLoading }"
+                  @click="toggleAvailableModelsDropdown"
+                >
+                  <span :class="{ placeholder: !formData.modelName }">
+                    {{ formData.modelName || (modelsLoading ? '正在获取模型列表...' : '选择对话模型') }}
+                  </span>
+                  <svg class="select-arrow" :class="{ expanded: showAvailableModelsDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+                <div v-if="showAvailableModelsDropdown && !modelsLoading" class="dropdown-menu model-options-menu">
+                  <div
+                    v-for="model in availableChatModels"
+                    :key="model"
+                    class="dropdown-item"
+                    :class="{ selected: formData.modelName === model }"
+                    @click="selectAvailableModel(model)"
+                  >
+                    <span>{{ model }}</span>
+                    <svg v-if="formData.modelName === model" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <input v-else type="text" v-model="formData.modelName" :placeholder="modelInputPlaceholder" class="form-input" />
+              <p v-if="modelsError" class="model-fetch-error">{{ modelsError }}，可手动输入模型名称。</p>
             </div>
 
             <div class="form-group">
               <label class="form-label">Embedding 模型<span class="optional-tag">可选</span></label>
-              <input
-                type="text"
-                v-model="formData.embeddingModelName"
-                placeholder="输入 Embedding 模型名称，如 text-embedding-v4"
-                class="form-input"
-              />
+              <div v-if="availableEmbeddingModels.length" class="custom-select model-name-select" ref="embeddingModelSelectRef">
+                <div class="select-trigger" @click="toggleEmbeddingModelsDropdown">
+                  <span :class="{ placeholder: !formData.embeddingModelName }">
+                    {{ formData.embeddingModelName || '选择 Embedding 模型' }}
+                  </span>
+                  <svg class="select-arrow" :class="{ expanded: showEmbeddingModelsDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+                <div v-if="showEmbeddingModelsDropdown" class="dropdown-menu model-options-menu">
+                  <div
+                    v-for="model in availableEmbeddingModels"
+                    :key="model"
+                    class="dropdown-item"
+                    :class="{ selected: formData.embeddingModelName === model }"
+                    @click="selectEmbeddingModel(model)"
+                  >
+                    <span>{{ model }}</span>
+                    <svg v-if="formData.embeddingModelName === model" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <input v-else type="text" v-model="formData.embeddingModelName" placeholder="输入 Embedding 模型名称，如 text-embedding-v4" class="form-input" />
             </div>
 
             <div v-if="formData.provider === 'other'" class="form-group">
@@ -360,6 +419,13 @@ const showModelDropdown = ref(false);
 const providerSelectRef = ref(null);
 const modelSelectRef = ref(null);
 const modelDropdownRef = ref(null);
+const modelNameSelectRef = ref(null);
+const embeddingModelSelectRef = ref(null);
+const availableModels = ref([]);
+const modelsLoading = ref(false);
+const modelsError = ref('');
+const showAvailableModelsDropdown = ref(false);
+const showEmbeddingModelsDropdown = ref(false);
 
 const providerList = [
   { value: 'doubao', label: '豆包', icon: new URL('@/assets/images/豆包.png', import.meta.url).href, baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
@@ -373,6 +439,23 @@ const providerList = [
 
 const selectedProvider = computed(() => {
   return providerList.find(p => p.value === formData.value.provider) || null;
+});
+
+const modelInputPlaceholder = computed(() => {
+  if (formData.value.provider === 'other') return '输入对话模型名称';
+  if (!formData.value.provider) return '请先选择模型厂商';
+  if (!formData.value.apiKey) return '填写 API Key 后自动获取模型列表';
+  return '未获取到模型时可手动输入';
+});
+
+const isEmbeddingModel = (model) => /embedding|embed|vector|(?:^|[-_])embo(?:[-_]|$)/i.test(model);
+
+const availableChatModels = computed(() => {
+  return availableModels.value.filter(model => !isEmbeddingModel(model));
+});
+
+const availableEmbeddingModels = computed(() => {
+  return availableModels.value.filter(isEmbeddingModel);
 });
 
 const formData = ref({
@@ -430,6 +513,11 @@ const deleteTarget = ref(null);
 
 const modalTitle = computed(() => editingModelId.value ? '编辑模型' : '添加模型');
 
+const openAddModal = () => {
+  resetForm();
+  showAddModal.value = true;
+};
+
 const editModel = (model) => {
   editingModelId.value = model.id;
   formData.value = {
@@ -444,6 +532,7 @@ const editModel = (model) => {
   };
   showModelDropdown.value = false;
   showAddModal.value = true;
+  loadAvailableModels();
 };
 
 const confirmDeleteModel = (model) => {
@@ -491,13 +580,79 @@ const toggleProviderDropdown = () => {
 };
 
 const selectProvider = (provider) => {
+  const providerChanged = formData.value.provider !== provider.value;
   formData.value.provider = provider.value;
   showProviderDropdown.value = false;
+  if (providerChanged) {
+    formData.value.modelName = '';
+    availableModels.value = [];
+    modelsLoading.value = false;
+    modelsError.value = '';
+    showAvailableModelsDropdown.value = false;
+    showEmbeddingModelsDropdown.value = false;
+  }
+  loadAvailableModels();
+};
+
+const toggleAvailableModelsDropdown = () => {
+  if (!modelsLoading.value && availableChatModels.value.length) {
+    showAvailableModelsDropdown.value = !showAvailableModelsDropdown.value;
+  }
+};
+
+const selectAvailableModel = (model) => {
+  formData.value.modelName = model;
+  showAvailableModelsDropdown.value = false;
+};
+
+const toggleEmbeddingModelsDropdown = () => {
+  showEmbeddingModelsDropdown.value = !showEmbeddingModelsDropdown.value;
+};
+
+const selectEmbeddingModel = (model) => {
+  formData.value.embeddingModelName = model;
+  showEmbeddingModelsDropdown.value = false;
+};
+
+const loadAvailableModels = async () => {
+  if (!formData.value.provider || formData.value.provider === 'other' || !formData.value.apiKey) return;
+
+  const provider = formData.value.provider;
+  const apiKey = formData.value.apiKey;
+  modelsLoading.value = true;
+  modelsError.value = '';
+  try {
+    const result = await electronService.invoke('model-list-available', {
+      provider,
+      apiKey
+    });
+    // 用户在请求完成前切换厂商或 API Key 时，丢弃过期响应。
+    if (formData.value.provider !== provider || formData.value.apiKey !== apiKey) return;
+    if (!result?.success) throw new Error(result?.error || '无法获取模型列表');
+    availableModels.value = result.models || [];
+    if (availableChatModels.value.length && !availableChatModels.value.includes(formData.value.modelName)) {
+      formData.value.modelName = '';
+    }
+  } catch (error) {
+    if (formData.value.provider !== provider || formData.value.apiKey !== apiKey) return;
+    availableModels.value = [];
+    modelsError.value = error?.message || '无法获取模型列表';
+  } finally {
+    if (formData.value.provider === provider && formData.value.apiKey === apiKey) {
+      modelsLoading.value = false;
+    }
+  }
 };
 
 const handleClickOutside = (event) => {
   if (providerSelectRef.value && !providerSelectRef.value.contains(event.target)) {
     showProviderDropdown.value = false;
+  }
+  if (modelNameSelectRef.value && !modelNameSelectRef.value.contains(event.target)) {
+    showAvailableModelsDropdown.value = false;
+  }
+  if (embeddingModelSelectRef.value && !embeddingModelSelectRef.value.contains(event.target)) {
+    showEmbeddingModelsDropdown.value = false;
   }
   if (showModelDropdown.value &&
       modelSelectRef.value && !modelSelectRef.value.contains(event.target) &&
@@ -518,6 +673,8 @@ onUnmounted(() => {
 onDeactivated(() => {
   showModelDropdown.value = false;
   showProviderDropdown.value = false;
+  showAvailableModelsDropdown.value = false;
+  showEmbeddingModelsDropdown.value = false;
   showAddModal.value = false;
   showDeleteConfirm.value = false;
 });
@@ -614,6 +771,10 @@ const resetForm = () => {
   };
   showApiKey.value = false;
   showEmbeddingApiKey.value = false;
+  availableModels.value = [];
+  modelsLoading.value = false;
+  modelsError.value = '';
+  showAvailableModelsDropdown.value = false;
   editingModelId.value = null;
 };
 
@@ -1209,6 +1370,70 @@ function formatTime(ts) {
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 8px;
+}
+
+.model-name-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.model-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.model-refresh-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.model-refresh-btn:disabled {
+  cursor: not-allowed;
+  color: var(--text-tertiary);
+}
+
+.model-name-select {
+  position: relative;
+}
+
+.model-name-select .select-trigger.disabled {
+  cursor: wait;
+  color: var(--text-tertiary);
+}
+
+.model-name-select .model-options-menu {
+  /* 四个选项的可视高度，更多模型在菜单内部滚动 */
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.model-options-menu .dropdown-item {
+  justify-content: space-between;
+  height: 30px;
+  min-height: 30px;
+  padding: 5px 12px;
+  line-height: 20px;
+  box-sizing: border-box;
+}
+
+.model-options-menu .dropdown-item.selected {
+  background-color: var(--accent-light);
+}
+
+.model-fetch-error {
+  margin: 6px 0 0;
+  color: #dc2626;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .optional-tag {

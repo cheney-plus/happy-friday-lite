@@ -79,6 +79,7 @@
     "insert": "Insert",
     "table": "Table",
     "image": "Image",
+    "formula": "Formula",
     "codeBlock": "Code block",
     "horizontalRule": "Horizontal rule",
     "divider": "Horizontal rule",
@@ -139,6 +140,21 @@
     "descriptionPlaceholder": "Image description",
     "insertBtn": "Insert",
     "insert": "Insert",
+    "cancel": "Cancel"
+  },
+  "formulaDialog": {
+    "insertTitle": "Insert formula",
+    "editTitle": "Edit formula",
+    "mode": "Type",
+    "inline": "Inline",
+    "block": "Block",
+    "latex": "LaTeX",
+    "placeholder": "e.g. E = mc^2",
+    "preview": "Preview",
+    "previewEmpty": "Preview appears as you type",
+    "hint": "Inline uses $...$, block uses $$...$$",
+    "insert": "Insert",
+    "update": "Update",
     "cancel": "Cancel"
   },
   "aiSidebar": {

@@ -72,15 +72,19 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             {{ t('note.toolbar.image') }}
           </div>
-          <div class="menu-item" @click="editor.chain().focus().toggleCodeBlock().run()">
+          <div class="menu-item" @click="addFormula">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 0 8H6"></path><path d="M6 12h10a4 4 0 0 1 0 8H6"></path><path d="M6 4v16"></path></svg>
+            {{ t('note.toolbar.formula') }}
+          </div>
+          <div class="menu-item" @click="insertCodeBlock">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
             {{ t('note.toolbar.codeBlock') }}
           </div>
-          <div class="menu-item" @click="editor.chain().focus().setHorizontalRule().run()">
+          <div class="menu-item" @click="insertDivider">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line></svg>
             {{ t('note.toolbar.divider') }}
           </div>
-          <div class="menu-item" @click="editor.chain().focus().toggleBlockquote().run()">
+          <div class="menu-item" @click="insertQuote">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 1 1 1 1z"></path></svg>
             {{ t('note.toolbar.quote') }}
           </div>
@@ -158,8 +162,8 @@
       <div ref="headingToolbarSectionRef" v-show="isToolbarSectionVisible('heading')" class="toolbar-section">
       <div class="dropdown-wrapper">
         <button class="toolbar-btn dropdown-toggle heading-toggle" @click="toggleHeadingMenu" :class="{ active: showHeadingMenu || isHeadingActive }">
-          {{ currentHeadingLabel }}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <span class="heading-toggle-label">{{ currentHeadingLabel }}</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHeadingMenu" class="dropdown-menu heading-menu">
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('noteTitle'), disabled: !canSetNoteTitle }" @click="setNoteTitle">
@@ -174,8 +178,8 @@
           <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(3)">
             <span class="heading-level-3-label">{{ t('note.toolbar.heading3') }}</span>
           </div>
-          <div class="menu-item" :class="{ active: editor.isActive('paragraph'), disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
-          <div class="menu-item" :class="{ active: editor.isActive('smallParagraph'), disabled: editor.isActive('noteTitle') }" @click="setSmallBody">
+          <div class="menu-item" :class="{ active: isBodyActive, disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
+          <div class="menu-item" :class="{ active: isSmallBodyActive, disabled: editor.isActive('noteTitle') }" @click="setSmallBody">
             <span class="small-body-label">{{ t('note.toolbar.smallBody') }}</span>
           </div>
         </div>
@@ -414,6 +418,68 @@
         </div>
       </div>
     </div>
+
+    <!-- 公式对话框 -->
+    <div v-if="showFormulaDialog" class="dialog-overlay" @click.self="closeFormulaDialog">
+      <div class="dialog formula-dialog">
+        <div class="dialog-header">
+          <h3>{{ isEditingFormula ? t('note.formulaDialog.editTitle') : t('note.formulaDialog.insertTitle') }}</h3>
+          <button class="dialog-close" @click="closeFormulaDialog">×</button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>{{ t('note.formulaDialog.mode') }}</label>
+            <div class="formula-mode-tabs">
+              <button
+                type="button"
+                class="formula-mode-tab"
+                :class="{ active: formulaMode === 'inline' }"
+                :disabled="isEditingFormula"
+                @click="formulaMode = 'inline'"
+              >
+                {{ t('note.formulaDialog.inline') }}
+              </button>
+              <button
+                type="button"
+                class="formula-mode-tab"
+                :class="{ active: formulaMode === 'block' }"
+                :disabled="isEditingFormula"
+                @click="formulaMode = 'block'"
+              >
+                {{ t('note.formulaDialog.block') }}
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>{{ t('note.formulaDialog.latex') }}</label>
+            <textarea
+              ref="formulaLatexInput"
+              v-model="formulaLatex"
+              class="form-input formula-latex-input"
+              rows="3"
+              :placeholder="t('note.formulaDialog.placeholder')"
+              @keydown.meta.enter.prevent="confirmFormula"
+              @keydown.ctrl.enter.prevent="confirmFormula"
+            />
+            <div class="formula-hint">{{ t('note.formulaDialog.hint') }}</div>
+          </div>
+          <div class="form-group">
+            <label>{{ t('note.formulaDialog.preview') }}</label>
+            <div
+              class="formula-preview"
+              :class="{ empty: !formulaPreviewHtml, block: formulaMode === 'block' }"
+              v-html="formulaPreviewHtml || t('note.formulaDialog.previewEmpty')"
+            />
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-secondary" @click="closeFormulaDialog">{{ t('note.formulaDialog.cancel') }}</button>
+          <button class="btn btn-primary" @click="confirmFormula" :disabled="!formulaLatex.trim()">
+            {{ isEditingFormula ? t('note.formulaDialog.update') : t('note.formulaDialog.insert') }}
+          </button>
+        </div>
+      </div>
+    </div>
     </div>
 
     <Transition name="sidebar-slide">
@@ -546,7 +612,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Code2, Eraser, Heading,
   Highlighter, Image as ToolbarImage, Italic, Link2, List, ListChecks, ListOrdered,
-  Minus, Palette, Quote, Redo2, Strikethrough, Table2, Underline as ToolbarUnderline, Undo2,
+  Minus, Palette, Quote, Redo2, Sigma, Strikethrough, Table2, Underline as ToolbarUnderline, Undo2,
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
@@ -554,6 +620,8 @@ import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import { electronService } from '@/services/electron';
 import { getChatSession, setChatSession } from '@/utils/chatSessionCache';
 import StarterKit from '@tiptap/starter-kit';
+import Paragraph from '@tiptap/extension-paragraph';
+import Code from '@tiptap/extension-code';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
@@ -571,6 +639,9 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
+import { Mathematics } from '@tiptap/extension-mathematics';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -740,19 +811,26 @@ const NoteTitle = Node.create({
   },
 });
 
-const SmallParagraph = Node.create({
-  name: 'smallParagraph',
-  priority: 1100,
-  group: 'block',
-  content: 'inline*',
-
-  parseHTML() {
-    return [{ tag: 'p[data-small-text]' }];
+// 小正：paragraph.small 属性。独立 block + 高 priority 会使回车默认落到小正。
+const CustomParagraph = Paragraph.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      small: {
+        default: false,
+        parseHTML: (element) => element.hasAttribute('data-small-text'),
+        renderHTML: (attributes) => {
+          if (!attributes.small) return {};
+          return { 'data-small-text': 'true' };
+        },
+      },
+    };
   },
+});
 
-  renderHTML({ HTMLAttributes }) {
-    return ['p', { ...HTMLAttributes, 'data-small-text': 'true' }, 0];
-  },
+// 默认 code mark 的 excludes: '_' 会排斥 bold 等所有 mark
+const InlineCode = Code.extend({
+  excludes: '',
 });
 
 const prepareEditorContent = (content) => {
@@ -827,13 +905,31 @@ const closeToolbarOverflow = () => {
   toolbarOverflowColor.value = null;
 };
 
-const toggleToolbarOverflow = () => {
-  const nextVisible = !showToolbarOverflow.value;
+const closeDropdownMenus = () => {
   showInsertMenu.value = false;
   showHighlightMenu.value = false;
   showTextColorMenu.value = false;
   showHeadingMenu.value = false;
   showTableSubmenu.value = false;
+};
+
+const exclusiveToggleMenu = (menu) => {
+  const nextVisible = !menu.value;
+  closeDropdownMenus();
+  closeToolbarOverflow();
+  menu.value = nextVisible;
+};
+
+const runInsertAction = (action) => {
+  const result = action?.();
+  showInsertMenu.value = false;
+  showTableSubmenu.value = false;
+  return result;
+};
+
+const toggleToolbarOverflow = () => {
+  const nextVisible = !showToolbarOverflow.value;
+  closeDropdownMenus();
   showToolbarOverflow.value = nextVisible;
   toolbarOverflowColor.value = null;
 };
@@ -1000,15 +1096,12 @@ const imageAlt = ref('');
 const imageUrlInput = ref(null);
 
 const addImage = () => {
-  showInsertMenu.value = false;
-  imageUrl.value = '';
-  imageAlt.value = '';
-  showImageDialog.value = true;
-  setTimeout(() => {
-    if (imageUrlInput.value) {
-      imageUrlInput.value.focus();
-    }
-  }, 100);
+  runInsertAction(() => {
+    imageUrl.value = '';
+    imageAlt.value = '';
+    showImageDialog.value = true;
+    nextTick(() => imageUrlInput.value?.focus());
+  });
 };
 
 const closeImageDialog = () => {
@@ -1027,6 +1120,69 @@ const confirmImage = () => {
     .run();
 
   closeImageDialog();
+};
+
+// 公式对话框相关
+const showFormulaDialog = ref(false);
+const formulaLatex = ref('');
+const formulaMode = ref('inline');
+const formulaEditPos = ref(null);
+const isEditingFormula = ref(false);
+const formulaLatexInput = ref(null);
+
+const formulaPreviewHtml = computed(() => {
+  const latex = formulaLatex.value.trim();
+  if (!latex) return '';
+  try {
+    return katex.renderToString(latex, {
+      throwOnError: false,
+      displayMode: formulaMode.value === 'block',
+    });
+  } catch (error) {
+    return `<span class="formula-preview-error">${error?.message || 'Invalid LaTeX'}</span>`;
+  }
+});
+
+const openFormulaEditor = ({ mode = 'inline', latex = '', pos = null, editing = false } = {}) => {
+  runInsertAction(() => {
+    formulaMode.value = mode;
+    formulaLatex.value = latex;
+    formulaEditPos.value = pos;
+    isEditingFormula.value = editing;
+    showFormulaDialog.value = true;
+    nextTick(() => formulaLatexInput.value?.focus());
+  });
+};
+
+const addFormula = () => {
+  openFormulaEditor({ mode: 'inline', latex: '', editing: false });
+};
+
+const closeFormulaDialog = () => {
+  showFormulaDialog.value = false;
+  formulaLatex.value = '';
+  formulaMode.value = 'inline';
+  formulaEditPos.value = null;
+  isEditingFormula.value = false;
+};
+
+const confirmFormula = () => {
+  const latex = formulaLatex.value.trim();
+  if (!latex || !editor.value) return;
+
+  if (isEditingFormula.value && typeof formulaEditPos.value === 'number') {
+    if (formulaMode.value === 'block') {
+      editor.value.chain().focus().updateBlockMath({ latex, pos: formulaEditPos.value }).run();
+    } else {
+      editor.value.chain().focus().updateInlineMath({ latex, pos: formulaEditPos.value }).run();
+    }
+  } else if (formulaMode.value === 'block') {
+    editor.value.chain().focus().insertBlockMath({ latex }).run();
+  } else {
+    editor.value.chain().focus().insertInlineMath({ latex }).run();
+  }
+
+  closeFormulaDialog();
 };
 
 // 更多菜单相关
@@ -1193,6 +1349,20 @@ const exportMarkdown = async () => {
         const checked = checkbox?.hasAttribute('checked') ? 'x' : ' ';
         return `- [${checked}] ${content.trim()}\n`;
       }
+    });
+    turndown.addRule('inlineMath', {
+      filter: (node) => node.nodeName === 'SPAN' && node.getAttribute('data-type') === 'inline-math',
+      replacement: (_content, node) => {
+        const latex = node.getAttribute('data-latex') || '';
+        return `$${latex}$`;
+      },
+    });
+    turndown.addRule('blockMath', {
+      filter: (node) => node.nodeName === 'DIV' && node.getAttribute('data-type') === 'block-math',
+      replacement: (_content, node) => {
+        const latex = node.getAttribute('data-latex') || '';
+        return `\n\n$$\n${latex}\n$$\n\n`;
+      },
     });
     const markdown = turndown.turndown(html);
     await electronService.invoke('export_markdown', { markdown, savePath: filePath });
@@ -1855,16 +2025,19 @@ const editor = useEditor({
   extensions: [
     NoteSearch,
     NoteTitle,
-    SmallParagraph,
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3],
       },
+      code: false,
       codeBlock: false,
+      paragraph: false,
     }),
+    CustomParagraph,
+    InlineCode,
     Underline,
     TextAlign.configure({
-      types: ['noteTitle', 'smallParagraph', 'heading', 'paragraph'],
+      types: ['noteTitle', 'heading', 'paragraph'],
     }),
     Highlight.configure({
       multicolor: true,
@@ -1900,6 +2073,31 @@ const editor = useEditor({
     }),
     TextStyle,
     Color,
+    Mathematics.configure({
+      katexOptions: {
+        throwOnError: false,
+      },
+      inlineOptions: {
+        onClick: (node, pos) => {
+          openFormulaEditor({
+            mode: 'inline',
+            latex: node.attrs.latex || '',
+            pos,
+            editing: true,
+          });
+        },
+      },
+      blockOptions: {
+        onClick: (node, pos) => {
+          openFormulaEditor({
+            mode: 'block',
+            latex: node.attrs.latex || '',
+            pos,
+            editing: true,
+          });
+        },
+      },
+    }),
     CodeBlockLowlight.extend({
       addNodeView() {
         return VueNodeViewRenderer(CodeBlockComponent);
@@ -2092,13 +2290,24 @@ const handleSearchInputKeydown = (event) => {
   }
 };
 
+const isSmallBodyActive = computed(() => {
+  if (!editor.value) return false;
+  return editor.value.isActive('paragraph', { small: true });
+});
+
+const isBodyActive = computed(() => {
+  if (!editor.value) return false;
+  return editor.value.isActive('paragraph') && !editor.value.isActive('paragraph', { small: true });
+});
+
 const currentHeadingLabel = computed(() => {
   if (!editor.value) return t('note.toolbar.body');
   if (editor.value.isActive('noteTitle')) return t('note.toolbar.title');
-  if (editor.value.isActive('heading', { level: 1 })) return t('note.toolbar.heading1');
-  if (editor.value.isActive('heading', { level: 2 })) return t('note.toolbar.heading2');
-  if (editor.value.isActive('heading', { level: 3 })) return t('note.toolbar.heading3');
-  if (editor.value.isActive('smallParagraph')) return t('note.toolbar.smallBody');
+  // 工具栏按钮用短标签，避免长文案把按钮撑宽
+  if (editor.value.isActive('heading', { level: 1 })) return 'H1';
+  if (editor.value.isActive('heading', { level: 2 })) return 'H2';
+  if (editor.value.isActive('heading', { level: 3 })) return 'H3';
+  if (isSmallBodyActive.value) return t('note.toolbar.smallBody');
   return t('note.toolbar.body');
 });
 
@@ -2106,7 +2315,7 @@ const isHeadingActive = computed(() => {
   if (!editor.value) return false;
   return editor.value.isActive('noteTitle')
     || editor.value.isActive('heading')
-    || editor.value.isActive('smallParagraph');
+    || isSmallBodyActive.value;
 });
 
 const canSetNoteTitle = computed(() => {
@@ -2115,40 +2324,13 @@ const canSetNoteTitle = computed(() => {
   return $from.depth === 1 && $from.index(0) === 0;
 });
 
-const toggleInsertMenu = () => {
-  showInsertMenu.value = !showInsertMenu.value;
-  showHighlightMenu.value = false;
-  showTextColorMenu.value = false;
-  showHeadingMenu.value = false;
-};
-
-const toggleHighlightMenu = () => {
-  showHighlightMenu.value = !showHighlightMenu.value;
-  showInsertMenu.value = false;
-  showTextColorMenu.value = false;
-  showHeadingMenu.value = false;
-};
-
-const toggleTextColorMenu = () => {
-  showTextColorMenu.value = !showTextColorMenu.value;
-  showInsertMenu.value = false;
-  showHighlightMenu.value = false;
-  showHeadingMenu.value = false;
-};
-
-const toggleHeadingMenu = () => {
-  showHeadingMenu.value = !showHeadingMenu.value;
-  showInsertMenu.value = false;
-  showHighlightMenu.value = false;
-  showTextColorMenu.value = false;
-};
+const toggleInsertMenu = () => exclusiveToggleMenu(showInsertMenu);
+const toggleHighlightMenu = () => exclusiveToggleMenu(showHighlightMenu);
+const toggleTextColorMenu = () => exclusiveToggleMenu(showTextColorMenu);
+const toggleHeadingMenu = () => exclusiveToggleMenu(showHeadingMenu);
 
 const closeAllMenus = () => {
-  showInsertMenu.value = false;
-  showHighlightMenu.value = false;
-  showTextColorMenu.value = false;
-  showHeadingMenu.value = false;
-  showTableSubmenu.value = false;
+  closeDropdownMenus();
   closeToolbarOverflow();
 };
 
@@ -2156,20 +2338,36 @@ const setHighlight = (color) => {
   if (color === 'transparent') {
     editor.value?.chain().focus().unsetHighlight().run();
   } else {
-    editor.value?.chain().focus().toggleHighlight({ color }).run();
+    editor.value?.chain().focus().setHighlight({ color }).run();
   }
   showHighlightMenu.value = false;
 };
 
 const setTextColor = (color) => {
-  editor.value?.chain().focus().setColor(color).run();
+  if (!color || color === 'inherit' || color === 'transparent') {
+    editor.value?.chain().focus().unsetColor().run();
+  } else {
+    editor.value?.chain().focus().setColor(color).run();
+  }
   showTextColorMenu.value = false;
+};
+
+const insertCodeBlock = () => {
+  runInsertAction(() => editor.value?.chain().focus().toggleCodeBlock().run());
+};
+
+const insertDivider = () => {
+  runInsertAction(() => editor.value?.chain().focus().setHorizontalRule().run());
+};
+
+const insertQuote = () => {
+  runInsertAction(() => editor.value?.chain().focus().toggleBlockquote().run());
 };
 
 const setHeading = (level) => {
   if (editor.value?.isActive('noteTitle')) return;
   if (level === 0) {
-    editor.value?.chain().focus().setParagraph().run();
+    editor.value?.chain().focus().setNode('paragraph', { small: false }).run();
   } else {
     editor.value?.chain().focus().toggleHeading({ level }).run();
   }
@@ -2193,18 +2391,18 @@ const setNoteTitle = () => {
 
 const setSmallBody = () => {
   if (editor.value?.isActive('noteTitle')) return;
-  editor.value?.chain().focus().setNode('smallParagraph').run();
+  editor.value?.chain().focus().setNode('paragraph', { small: true }).run();
   showHeadingMenu.value = false;
 };
 
 const insertTable = (rows, cols) => {
-  editor.value
-    ?.chain()
-    .focus()
-    .insertTable({ rows, cols, withHeaderRow: true })
-    .run();
-  showInsertMenu.value = false;
-  showTableSubmenu.value = false;
+  runInsertAction(() => {
+    editor.value
+      ?.chain()
+      .focus()
+      .insertTable({ rows, cols, withHeaderRow: true })
+      .run();
+  });
 };
 
 const toolbarOverflowTools = computed(() => [
@@ -2214,15 +2412,16 @@ const toolbarOverflowTools = computed(() => [
   { key: 'link', section: 'history', icon: Link2, label: t('note.toolbar.link'), disabled: () => !hasSelection.value, run: addLink },
   { key: 'table', section: 'insert', icon: Table2, label: t('note.toolbar.table'), run: () => insertTable(3, 3) },
   { key: 'image', section: 'insert', icon: ToolbarImage, label: t('note.toolbar.image'), run: addImage },
-  { key: 'code', section: 'insert', icon: Code2, label: t('note.toolbar.codeBlock'), run: () => editor.value?.chain().focus().toggleCodeBlock().run() },
-  { key: 'divider', section: 'insert', icon: Minus, label: t('note.toolbar.divider'), run: () => editor.value?.chain().focus().setHorizontalRule().run() },
-  { key: 'quote', section: 'insert', icon: Quote, label: t('note.toolbar.quote'), run: () => editor.value?.chain().focus().toggleBlockquote().run() },
+  { key: 'formula', section: 'insert', icon: Sigma, label: t('note.toolbar.formula'), run: addFormula },
+  { key: 'code', section: 'insert', icon: Code2, label: t('note.toolbar.codeBlock'), run: insertCodeBlock },
+  { key: 'divider', section: 'insert', icon: Minus, label: t('note.toolbar.divider'), run: insertDivider },
+  { key: 'quote', section: 'insert', icon: Quote, label: t('note.toolbar.quote'), run: insertQuote },
   { key: 'bold', section: 'format', icon: Bold, label: t('note.toolbar.bold'), run: () => editor.value?.chain().focus().toggleBold().run() },
   { key: 'italic', section: 'format', icon: Italic, label: t('note.toolbar.italic'), run: () => editor.value?.chain().focus().toggleItalic().run() },
   { key: 'underline', section: 'format', icon: ToolbarUnderline, label: t('note.toolbar.underline'), run: () => editor.value?.chain().focus().toggleUnderline().run() },
   { key: 'strike', section: 'format', icon: Strikethrough, label: t('note.toolbar.strike'), run: () => editor.value?.chain().focus().toggleStrike().run() },
-  { key: 'highlight', section: 'format', icon: Highlighter, label: t('note.toolbar.removeHighlight'), run: () => setHighlight('transparent') },
-  { key: 'text-color', section: 'format', icon: Palette, label: t('note.toolbar.defaultColor'), run: () => setTextColor('inherit') },
+  { key: 'highlight', section: 'format', icon: Highlighter, label: t('note.toolbar.backgroundColor'), run: () => setHighlight('transparent') },
+  { key: 'text-color', section: 'format', icon: Palette, label: t('note.toolbar.textColor'), run: () => setTextColor('inherit') },
   { key: 'heading', section: 'heading', icon: Heading, label: t('note.toolbar.title'), disabled: () => !canSetNoteTitle.value, run: setNoteTitle },
   { key: 'heading-1', section: 'heading', icon: Heading, label: t('note.toolbar.heading1'), run: () => setHeading(1) },
   { key: 'heading-2', section: 'heading', icon: Heading, label: t('note.toolbar.heading2'), run: () => setHeading(2) },
@@ -2299,19 +2498,13 @@ const isRichHtml = (html) => {
     /<blockquote\b/i,
     /<pre\b|<code\b/i,
     /<ol\b|<ul\b/i,
+    /data-type\s*=\s*["'](?:inline-math|block-math|taskItem|taskList)["']/i,
+    /data-latex\s*=/i,
     /style\s*=\s*["'][^"']*(?:color|font-weight|font-style|text-decoration|background)/i,
     /class\s*=\s*["'][^"']*(?:bold|italic|underline|highlight)/i,
   ];
 
-  const hasRichContent = richHtmlPatterns.some(pattern => pattern.test(html));
-  
-  if (hasRichContent) return true;
-
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
-  const textContent = tempDiv.textContent || '';
-  
-  return false;
+  return richHtmlPatterns.some(pattern => pattern.test(html));
 };
 
 const preprocessMarkdownTables = (text) => {
@@ -2835,12 +3028,36 @@ const fixEmptyTableCells = (html) => {
 }
 
 .heading-toggle {
-  min-width: 68px;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  padding: 0 4px;
+  gap: 2px;
   font-weight: 500;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.heading-toggle-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.heading-menu {
+  min-width: 112px;
+}
+
+.heading-menu .menu-item {
+  gap: 8px;
+  padding: 8px 12px;
 }
 
 .heading-preview {
-  padding: 7px 14px;
+  padding: 7px 12px;
 }
 
 .note-title-menu-label {
@@ -2950,7 +3167,8 @@ const fixEmptyTableCells = (html) => {
   min-height: 100%;
   color: var(--text-primary);
   font-size: 16px;
-  line-height: 1.6;
+  /* 控制段内自动换行疏密；回车段距靠 p/heading margin 拉开 */
+  line-height: 1.4;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   padding-top: 0;
   padding-bottom: 40px;
@@ -2978,7 +3196,7 @@ const fixEmptyTableCells = (html) => {
 :deep(.prose-editor h2),
 :deep(.prose-editor h3) {
   font-weight: 600;
-  margin: 0.8em 0 0.4em;
+  margin: 1.05em 0 0.55em;
   line-height: 1.3;
 }
 
@@ -2997,12 +3215,12 @@ const fixEmptyTableCells = (html) => {
 :deep(.prose-editor h1[data-note-title]) {
   font-size: 22px;
   font-weight: 500;
-  margin: 0.2em 0 0.6em;
+  margin: 0.2em 0 0.75em;
   line-height: 1.25;
 }
 
 :deep(.prose-editor p) {
-  margin: 0.4em 0;
+  margin: 0.65em 0;
 }
 
 :deep(.prose-editor p[data-small-text]) {
@@ -3011,12 +3229,21 @@ const fixEmptyTableCells = (html) => {
 
 :deep(.prose-editor ul),
 :deep(.prose-editor ol) {
-  padding-left: 1.5em;
-  margin: 0.4em 0;
+  padding-left: 0;
+  margin: 0.45em 0;
+  list-style-position: inside;
 }
 
 :deep(.prose-editor ul) {
   list-style-type: disc;
+}
+
+:deep(.prose-editor ul ul) {
+  list-style-type: circle;
+}
+
+:deep(.prose-editor ul ul ul) {
+  list-style-type: square;
 }
 
 :deep(.prose-editor ol) {
@@ -3031,8 +3258,31 @@ const fixEmptyTableCells = (html) => {
   list-style-type: lower-roman;
 }
 
+/* 仅嵌套列表保留层级缩进 */
+:deep(.prose-editor ul ul),
+:deep(.prose-editor ul ol),
+:deep(.prose-editor ol ul),
+:deep(.prose-editor ol ol) {
+  padding-left: 1.25em;
+}
+
 :deep(.prose-editor li) {
-  margin: 0.2em 0;
+  margin: 0.22em 0;
+}
+
+/* TipTap 列表项内嵌 paragraph：inline 避免 inside 标记单独占一行；
+   margin-left 拉开符号与文字，且不增加整行缩进 */
+:deep(.prose-editor li > p) {
+  margin: 0;
+  display: inline;
+}
+
+:deep(.prose-editor ul:not([data-type='taskList']) > li > p) {
+  margin-left: 0.2em;
+}
+
+:deep(.prose-editor ol > li > p) {
+  margin-left: 0.4em;
 }
 
 :deep(.prose-editor blockquote) {
@@ -3051,6 +3301,13 @@ const fixEmptyTableCells = (html) => {
   font-size: 0.9em;
   text-shadow: none;
   box-shadow: none;
+}
+
+:deep(.prose-editor code strong),
+:deep(.prose-editor code b),
+:deep(.prose-editor strong code),
+:deep(.prose-editor b code) {
+  font-weight: 700;
 }
 
 :deep(.prose-editor pre code) {
@@ -3075,20 +3332,6 @@ const fixEmptyTableCells = (html) => {
   overflow-wrap: normal !important;
   margin: 0;
   padding: 0;
-}
-
-:deep(.pre-editor pre) {
-  background-color: var(--bg-hover);
-  padding: 1em;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 0.8em 0;
-}
-
-:deep(.pre-editor pre code) {
-  background: none;
-  padding: 0;
-  font-size: 0.9em;
 }
 
 :deep(.prose-editor a.text-link) {
@@ -3142,28 +3385,84 @@ const fixEmptyTableCells = (html) => {
 :deep(.prose-editor ul[data-type="taskList"]) {
   list-style: none;
   padding-left: 0;
+  margin-left: 0;
 }
 
 :deep(.prose-editor ul[data-type="taskList"] li) {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: 0.5em;
+  padding-left: 0.25em;
 }
 
+/* 复选框与首行文字垂直居中对齐：label 高度对齐行高 */
 :deep(.prose-editor ul[data-type="taskList"] li > label) {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 1.5em;
+  justify-content: center;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  height: 1.4em;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  line-height: 1;
 }
 
 :deep(.prose-editor ul[data-type="taskList"] li > label input[type="checkbox"]) {
-  margin-top: 0;
+  margin: 0;
   cursor: pointer;
   flex-shrink: 0;
+  width: 0.95em;
+  height: 0.95em;
+}
+
+/* TipTap 自带空 span，不占位 */
+:deep(.prose-editor ul[data-type="taskList"] li > label > span) {
+  display: none;
+}
+
+/* TipTap contentDOM：必须占满剩余宽度，空段落时才有光标落点 */
+:deep(.prose-editor ul[data-type="taskList"] li > div) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+:deep(.prose-editor ul[data-type="taskList"] li > div > p) {
+  margin: 0;
+  line-height: 1.4;
+  min-height: 1.4em;
 }
 
 :deep(.prose-editor span[data-color]) {
   color: attr(data-color);
+}
+
+:deep(.prose-editor span[data-type='inline-math']) {
+  display: inline-block;
+  padding: 0 0.15em;
+  border-radius: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+:deep(.prose-editor span[data-type='inline-math']:hover) {
+  background-color: var(--bg-hover);
+}
+
+:deep(.prose-editor div[data-type='block-math']) {
+  display: block;
+  margin: 0.8em 0;
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  text-align: center;
+  overflow-x: auto;
+  cursor: pointer;
+  background-color: var(--bg-hover);
+}
+
+:deep(.prose-editor div[data-type='block-math']:hover) {
+  outline: 1px solid var(--border-color);
 }
 
 .dialog-overlay {
@@ -3186,6 +3485,75 @@ const fixEmptyTableCells = (html) => {
   width: 90%;
   max-width: 480px;
   overflow: hidden;
+}
+
+.formula-dialog {
+  max-width: 560px;
+}
+
+.formula-mode-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.formula-mode-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.formula-mode-tab.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.formula-mode-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.formula-latex-input {
+  min-height: 84px;
+  resize: vertical;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  line-height: 1.5;
+}
+
+.formula-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.formula-preview {
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #111827;
+  overflow-x: auto;
+}
+
+.formula-preview.empty {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.formula-preview.block {
+  text-align: center;
+}
+
+.formula-preview-error {
+  color: #dc2626;
+  font-size: 13px;
 }
 
 .dialog-header {
@@ -3467,7 +3835,7 @@ const fixEmptyTableCells = (html) => {
 .more-menu {
   right: 0;
   left: auto;
-  min-width: 130px;
+  min-width: 138px;
   padding: 4px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -3489,6 +3857,7 @@ const fixEmptyTableCells = (html) => {
   font-family: inherit;
   border-radius: 5px;
   letter-spacing: normal;
+  white-space: nowrap;
   transition: background 0.12s;
 }
 
@@ -3661,6 +4030,32 @@ const fixEmptyTableCells = (html) => {
 }
 
 [data-theme='dark'] .form-input::placeholder {
+  color: #6b7280;
+}
+
+[data-theme='dark'] .formula-mode-tab {
+  background: #374151;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+
+[data-theme='dark'] .formula-mode-tab.active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+[data-theme='dark'] .formula-hint {
+  color: #6b7280;
+}
+
+[data-theme='dark'] .formula-preview {
+  background: #111827;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+[data-theme='dark'] .formula-preview.empty {
   color: #6b7280;
 }
 

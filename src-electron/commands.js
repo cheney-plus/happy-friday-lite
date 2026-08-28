@@ -23,6 +23,7 @@ import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
+import { listProviderModels } from './modelCatalog.js'
 import { registerAgentCommands } from './agent/ipc.js'
 import {
   registerHarnessCommands,
@@ -1452,6 +1453,16 @@ export function registerCommands(mainWindow) {
     } catch (e) {
       console.error('[IPC] model-query-balance 错误:', e)
       return { success: false, error: e.message, data: null }
+    }
+  })
+
+  ipcMain.handle('model-list-available', async (_event, args) => {
+    try {
+      const models = await listProviderModels(args?.provider, args?.apiKey)
+      return { success: true, models }
+    } catch (e) {
+      console.warn('[IPC] model-list-available error:', e.message)
+      return { success: false, error: e.message, models: [] }
     }
   })
 

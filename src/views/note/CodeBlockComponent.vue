@@ -111,7 +111,7 @@ const handleDelete = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 1px 12px;
   background-color: transparent;
 }
 
@@ -181,7 +181,7 @@ const handleDelete = () => {
 
 .line-numbers {
   flex-shrink: 0;
-  padding: 8px 0;
+  padding: 2px 0;
   text-align: right;
   user-select: none !important;
   -webkit-user-select: none !important;
@@ -202,7 +202,7 @@ const handleDelete = () => {
 
 pre {
   margin: 0;
-  padding: 8px 16px;
+  padding: 2px 16px;
   background-color: transparent;
   overflow-x: auto;
   flex: 1;

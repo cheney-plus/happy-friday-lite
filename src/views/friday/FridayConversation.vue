@@ -1,13 +1,109 @@
 <template>
-  <div class="conversation-container">
-    <header class="conversation-header">
-      <button v-if="!isShareMode && showBackBtn" class="header-btn back-btn" @click="goBack">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 12H5"></path>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-      </button>
+  <div class="conversation-page">
+    <aside
+      v-if="!isShareMode && !historyCollapsed"
+      class="conversation-history"
+      :style="{ '--history-width': `${historySidebarWidth}px` }"
+      aria-label="会话历史"
+    >
+      <div class="history-heading">
+        <span>会话历史</span>
+        <button class="history-collapse-btn" type="button" title="收起会话历史" @click="toggleHistorySidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <button class="history-search-btn" type="button" title="新建会话" @click="createNewConversation">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+        </button>
+      </div>
 
+      <label class="history-search" :class="{ focused: historySearchFocused || historySearch }">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="6.5"></circle>
+          <path d="m16 16 4 4"></path>
+        </svg>
+        <input ref="historySearchInput" v-model="historySearch" type="search" placeholder="搜索会话" @focus="historySearchFocused = true" @blur="historySearchFocused = false" />
+      </label>
+
+      <div class="history-list">
+        <div v-if="historyLoading && !historySessions.length" class="history-state">正在加载...</div>
+        <template v-else-if="filteredSessions.length">
+          <button
+            v-for="session in filteredSessions"
+            :key="session.id"
+            type="button"
+            class="history-session"
+            :class="{ active: session.id === currentSessionId }"
+            :title="session.title || '新对话'"
+            @click="openHistorySession(session)"
+          >
+            <svg class="history-session-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="15" rx="3"></rect>
+              <path d="m8 19-2 2"></path>
+              <path d="M8 10h.01"></path>
+              <path d="M12 10h.01"></path>
+              <path d="M16 10h.01"></path>
+            </svg>
+            <span class="history-session-content">
+              <span class="history-session-title">{{ session.title || '新对话' }}</span>
+            </span>
+            <span
+              class="history-session-menu-btn"
+              role="button"
+              tabindex="0"
+              title="更多操作"
+              @click.stop="toggleHistorySessionMenu(session.id, $event)"
+              @keydown.enter.stop="toggleHistorySessionMenu(session.id, $event)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="12" cy="5" r="1.5"></circle>
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+              </svg>
+            </span>
+          </button>
+        </template>
+        <div v-else class="history-state">{{ historySearch ? '未找到匹配会话' : '暂无会话记录' }}</div>
+      </div>
+
+      <div class="history-footer">为你保留最近的对话记录</div>
+      <div class="history-resizer" @mousedown.prevent="startHistoryResize"></div>
+    </aside>
+
+    <Teleport to="body">
+      <div v-if="activeHistorySessionMenuId" class="history-session-menu-overlay" :style="historySessionMenuStyle" @click.stop>
+        <div class="history-session-menu" @click.stop>
+          <button type="button" class="history-menu-item" @click="renameHistorySession">
+            <span>重命名</span>
+          </button>
+          <button type="button" class="history-menu-item delete" @click="deleteHistorySession">
+            <span>删除</span>
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showHistoryRenameDialog" class="history-rename-overlay" @click.self="showHistoryRenameDialog = false">
+        <div class="history-rename-dialog">
+          <div class="history-rename-title">重命名会话</div>
+          <input ref="historyRenameInput" v-model="historyRenameValue" class="history-rename-input" placeholder="请输入会话名称" @keydown.enter="confirmHistoryRename" />
+          <div class="history-rename-actions">
+            <button type="button" @click="showHistoryRenameDialog = false">取消</button>
+            <button type="button" class="confirm" @click="confirmHistoryRename">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <div class="conversation-container">
+    <FridayChat v-if="showNewConversation" minimal class="embedded-friday-chat" />
+    <template v-else>
+    <header class="conversation-header">
       <div class="header-center">
         <span class="header-title">{{ chatTitle }}</span>
         <span class="header-time">{{ chatTime }}</span>
@@ -176,24 +272,36 @@
         {{ saveToastMessage }}
       </div>
     </Transition>
+    </template>
+    <button v-if="!isShareMode && historyCollapsed" class="history-expand-btn" type="button" title="展开会话历史" @mousedown.stop @click.stop="expandHistorySidebar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch, onMounted, onUnmounted, onDeactivated } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted, onDeactivated, onActivated } from 'vue';
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
 import { marked } from 'marked';
+import { buildConversationSummaryPrompt } from '@/config/prompts';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import RollbackConfirmDialog from '@/components/chat/RollbackConfirmDialog.vue';
 import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import ToolCallSection from '@/components/chat/ToolCallSection.vue';
+import FridayChat from '@/views/friday/FridayChat.vue';
 
 const router = useRouter();
 const route = useRoute();
+// App.vue keys router views by fullPath. Keep this instance's route identity
+// so cached conversation views ignore updates intended for a newer instance.
+const instanceRouteFullPath = route.fullPath;
 const noteStore = useNoteStore();
 
 const inputText = ref('');
@@ -209,6 +317,28 @@ const chatTitle = ref('与 Friday 的对话');
 const chatTime = ref(formatTime(new Date()));
 
 const messages = ref([]);
+const showNewConversation = ref(false);
+const historySessions = ref(loadCachedHistorySessions());
+const historySearch = ref('');
+const historySearchFocused = ref(false);
+const historyLoading = ref(false);
+const historySearchInput = ref(null);
+const historySidebarWidth = ref(loadHistorySidebarWidth());
+const historyCollapsed = ref(false);
+const activeHistorySessionMenuId = ref(null);
+const historyRenameSessionId = ref(null);
+const historySessionMenuStyle = ref({});
+const showHistoryRenameDialog = ref(false);
+const historyRenameValue = ref('');
+const historyRenameInput = ref(null);
+let historyResizeStartX = 0;
+let historyResizeStartWidth = 0;
+
+const filteredSessions = computed(() => {
+  const keyword = historySearch.value.trim().toLowerCase();
+  if (!keyword) return historySessions.value;
+  return historySessions.value.filter((session) => (session.title || '新对话').toLowerCase().includes(keyword));
+});
 
 const currentMode = ref('');
 const currentSessionId = ref('');
@@ -223,6 +353,8 @@ let unlistenAgentToolResult = null;
 let unlistenAgentApproval = null;
 let activeRequestId = '';
 let isDoneReceived = false;
+let handledInitialQueryKey = '';
+let activeInitRouteKey = '';
 
 // ========== Agent 模式状态 ==========
 // 当前流式响应的 Agent 时间线段（仅 Agent 模式使用）
@@ -257,6 +389,149 @@ function formatTime(date) {
   return `${h}:${m}`;
 }
 
+function loadHistorySidebarWidth() {
+  const fallbackWidth = 200;
+  try {
+    const savedWidth = Number(localStorage.getItem('happy-friday-history-sidebar-width'));
+    return savedWidth >= 200 && savedWidth <= 400 ? savedWidth : fallbackWidth;
+  } catch {
+    return fallbackWidth;
+  }
+}
+
+async function loadHistorySessions() {
+  if (isShareMode.value) return;
+  historyLoading.value = true;
+  try {
+    const sessions = await electronService.invoke('get_sessions');
+    historySessions.value = (sessions || []).slice(0, 50);
+    try {
+      sessionStorage.setItem('happy-friday-history-sessions', JSON.stringify(historySessions.value));
+    } catch {}
+  } catch (err) {
+    console.error('Failed to load conversation history:', err);
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+function loadCachedHistorySessions() {
+  try {
+    const cachedSessions = JSON.parse(sessionStorage.getItem('happy-friday-history-sessions') || '[]');
+    return Array.isArray(cachedSessions) ? cachedSessions : [];
+  } catch {
+    return [];
+  }
+}
+
+function openHistorySession(session) {
+  if (!session?.id || session.id === currentSessionId.value) return;
+  showNewConversation.value = false;
+  router.push({
+    name: 'friday-chat',
+    params: { sessionId: session.id },
+    query: { mode: session.mode || 'chat', title: session.title || '新对话' }
+  });
+}
+
+function toggleHistorySessionMenu(sessionId, event) {
+  if (activeHistorySessionMenuId.value === sessionId) {
+    activeHistorySessionMenuId.value = null;
+    return;
+  }
+  const rect = event.currentTarget.getBoundingClientRect();
+  activeHistorySessionMenuId.value = sessionId;
+  historySessionMenuStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 4}px`,
+    right: `${window.innerWidth - rect.right}px`,
+    zIndex: '10000'
+  };
+}
+
+function closeHistorySessionMenu() {
+  activeHistorySessionMenuId.value = null;
+}
+
+async function deleteHistorySession() {
+  const sessionId = activeHistorySessionMenuId.value;
+  if (!sessionId) return;
+  try {
+    await electronService.invoke('delete_session', { sessionId });
+    historySessions.value = historySessions.value.filter(session => session.id !== sessionId);
+    sessionStorage.setItem('happy-friday-history-sessions', JSON.stringify(historySessions.value));
+  } catch (err) {
+    console.error('Failed to delete session:', err);
+  }
+  closeHistorySessionMenu();
+}
+
+async function renameHistorySession() {
+  const sessionId = activeHistorySessionMenuId.value;
+  const session = historySessions.value.find(item => item.id === sessionId);
+  if (!session) return;
+  historyRenameSessionId.value = sessionId;
+  closeHistorySessionMenu();
+  historyRenameValue.value = session.title || '';
+  showHistoryRenameDialog.value = true;
+  nextTick(() => { historyRenameInput.value?.focus(); historyRenameInput.value?.select(); });
+}
+
+async function confirmHistoryRename() {
+  const sessionId = historyRenameSessionId.value;
+  const session = historySessions.value.find(item => item.id === sessionId);
+  const title = historyRenameValue.value.trim();
+  if (!sessionId || !session || !title || title === session.title) {
+    showHistoryRenameDialog.value = false;
+    return;
+  }
+  try {
+    await electronService.invoke('update_session_title', { sessionId, title });
+    session.title = title;
+    sessionStorage.setItem('happy-friday-history-sessions', JSON.stringify(historySessions.value));
+  } catch (err) {
+    console.error('Failed to rename session:', err);
+  }
+  showHistoryRenameDialog.value = false;
+}
+
+function focusHistorySearch() {
+  historySearchInput.value?.focus();
+}
+
+function createNewConversation() {
+  if (isStreaming.value) return;
+  showNewConversation.value = true;
+}
+
+function toggleHistorySidebar() {
+  historyCollapsed.value = !historyCollapsed.value;
+}
+
+function expandHistorySidebar() {
+  historyCollapsed.value = false;
+}
+
+function startHistoryResize(event) {
+  historyResizeStartX = event.clientX;
+  historyResizeStartWidth = historySidebarWidth.value;
+  window.addEventListener('mousemove', resizeHistorySidebar);
+  window.addEventListener('mouseup', stopHistoryResize);
+}
+
+function resizeHistorySidebar(event) {
+  const nextWidth = historyResizeStartWidth + event.clientX - historyResizeStartX;
+  historySidebarWidth.value = Math.min(400, Math.max(200, nextWidth));
+}
+
+function stopHistoryResize() {
+  window.removeEventListener('mousemove', resizeHistorySidebar);
+  window.removeEventListener('mouseup', stopHistoryResize);
+  try {
+    localStorage.setItem('happy-friday-history-sidebar-width', String(historySidebarWidth.value));
+  } catch {}
+}
+
 // Agent 模式文本段 Markdown 渲染（含代码块语言标签 + 复制按钮）
 const agentMarkedRenderer = new marked.Renderer();
 agentMarkedRenderer.code = function ({ text, lang }) {
@@ -271,8 +546,6 @@ marked.setOptions({ breaks: true, gfm: true, renderer: agentMarkedRenderer });
 function renderMarkdown(content) {
   return marked.parse(content);
 }
-
-const showBackBtn = computed(() => route.query.hideBack !== 'true');
 
 // 分享模式：通过分享链接在浏览器中打开（复用对话界面，隐藏输入框与操作按钮）
 // 触发条件：路由 meta.share 标记 或 运行在非 Electron 环境（浏览器）
@@ -289,14 +562,6 @@ const isThinking = computed(() => {
   // 最后一段是工具（running/pending_approval/success/rejected）→ LLM 正在思考下一步
   return true;
 });
-
-function goBack() {
-  if (route.query.from === 'automation') {
-    router.back();
-    return;
-  }
-  router.push('/friday');
-}
 
 // keep-alive 组件在切换 Tab 时只会触发路由离开，不一定卸载组件。
 // 由守卫统一确认并停止流式请求，后端收到 stop 后会把已收到的内容落库。
@@ -380,18 +645,7 @@ async function doSummarize(model) {
     .filter(Boolean)
     .join('\n\n');
 
-  const prompt = `请将以下对话内容总结为一份结构化笔记，要求：
-1. 第一行使用 # 标题格式，为这份笔记取一个简洁且有意义的标题，标签最后不要带笔记二字（不超过20字）
-2. 主题概述（一句话概括）
-3. 关键要点（3-5个要点）
-4. 详细内容（按主题分类整理）
-5. 结论与建议
-
-对话内容：
-
-${transcript}
-
-请使用 Markdown 格式输出。`;
+  const prompt = buildConversationSummaryPrompt(transcript);
 
   unlistenSummaryChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
@@ -715,7 +969,6 @@ async function sendChatMessage(text) {
   const mode = route.query.mode || 'chat';
   const modelId = route.query.modelId || '';
   const model = loadModelConfig(modelId);
-
   if (!model) {
     alert('未配置大模型，请先在设置中添加自己的模型');
     router.push('/settings/model');
@@ -914,6 +1167,12 @@ async function triggerAiResponse() {
 }
 
 async function initConversation() {
+  if (route.fullPath !== instanceRouteFullPath) return;
+  const initRouteKey = `${route.fullPath}`;
+  if (activeInitRouteKey === initRouteKey) return;
+  activeInitRouteKey = initRouteKey;
+
+  showNewConversation.value = false;
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -937,6 +1196,8 @@ async function initConversation() {
     nextTick(() => scrollToBottom(true));
     return;
   }
+
+  loadHistorySessions();
 
   if (currentSessionId.value) {
     const queryTitle = route.query.title;
@@ -976,6 +1237,13 @@ async function initConversation() {
 
   const query = route.query.q;
   if (query) {
+    // Async history loading may have finished after this cached instance was
+    // replaced by another route. Never send that newer route's first message.
+    if (route.fullPath !== instanceRouteFullPath) return;
+    const queryKey = `${route.params.sessionId || ''}::${route.query.q}::${route.query.mode || ''}`;
+    if (handledInitialQueryKey === queryKey) return;
+    handledInitialQueryKey = queryKey;
+
     const alreadyHasMessage = messages.value.length > 0
       && messages.value[messages.value.length - 1].role === 'user'
       && messages.value[messages.value.length - 1].content === query;
@@ -989,6 +1257,7 @@ async function initConversation() {
 }
 
 onMounted(async () => {
+  document.addEventListener('click', closeHistorySessionMenu);
   document.addEventListener('click', handleCodeBlockCopy);
   window.addEventListener('friday-before-tab-close', handleTabCloseRequest);
 
@@ -1065,6 +1334,8 @@ onMounted(async () => {
       currentSessionId.value = data.sessionId;
     }
 
+    loadHistorySessions();
+
     streamingContent.value = '';
     streamingReasoning.value = '';
     // Agent 模式：清空时间线段（已保存到消息对象中）
@@ -1102,6 +1373,8 @@ onMounted(async () => {
     if (data.sessionId === currentSessionId.value) {
       chatTitle.value = data.title;
     }
+    const session = historySessions.value.find((item) => item.id === data.sessionId);
+    if (session) session.title = data.title;
   });
 
   // ========== Agent 模式专有事件 ==========
@@ -1230,9 +1503,17 @@ onMounted(async () => {
   }
 });
 
+watch(() => route.params.sessionId, (sessionId, previousSessionId) => {
+  if (sessionId && sessionId !== previousSessionId) {
+    initConversation();
+  }
+});
+
 onUnmounted(() => {
+  document.removeEventListener('click', closeHistorySessionMenu);
   document.removeEventListener('click', handleCodeBlockCopy);
   window.removeEventListener('friday-before-tab-close', handleTabCloseRequest);
+  stopHistoryResize();
 
   // 清理总结功能临时事件监听器
   if (unlistenSummaryChunk) { unlistenSummaryChunk(); unlistenSummaryChunk = null; }
@@ -1255,6 +1536,10 @@ onUnmounted(() => {
 onDeactivated(() => {
   rollbackDialogVisible.value = false;
   pendingApproval.value = null;
+});
+
+onActivated(() => {
+  historySidebarWidth.value = loadHistorySidebarWidth();
 });
 
 // ========== Agent 审批处理 ==========
@@ -1312,23 +1597,367 @@ async function handleRejectTool(decision) {
 </script>
 
 <style scoped>
+.conversation-page {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.conversation-history {
+  width: var(--history-width, 264px);
+  flex: 0 0 var(--history-width, 264px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px 12px 16px;
+  background: #fbfcfb;
+  border-right: 1px solid var(--border-color);
+  position: relative;
+}
+
+.history-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 3;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.history-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.history-resizer:hover::after { background: var(--text-tertiary); }
+
+.history-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-collapse-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-expand-btn {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  z-index: 20;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-expand-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 0 8px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.history-heading > span { margin-right: auto; }
+
+.history-search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-search-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  margin: 14px 4px 10px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-tertiary);
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.history-search.focused {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.history-search input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.history-search input::placeholder { color: var(--text-primary); opacity: 0.72; }
+.history-search input::-webkit-search-cancel-button { display: none; }
+
+.history-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-right: -8px;
+  padding: 2px 8px 2px 0;
+}
+
+[data-theme='dark'] .conversation-history { background: var(--bg-secondary); }
+
+.history-list::-webkit-scrollbar { width: 4px; }
+.history-list::-webkit-scrollbar-track { background: transparent; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+.history-session {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 36px;
+  margin: 6px 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.history-session:hover { background: var(--bg-hover); color: var(--text-primary); }
+.history-session.active { background: color-mix(in srgb, var(--text-primary) 7%, transparent); color: var(--text-primary); }
+
+.history-session-icon { flex: 0 0 auto; opacity: 0.82; }
+
+.history-session-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-session-title {
+  overflow: hidden;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 520;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-session-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+}
+
+.history-session:hover .history-session-menu-btn,
+.history-session-menu-btn:focus-visible {
+  opacity: 1;
+}
+
+.history-session-menu-btn:hover,
+.history-session-menu-btn:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.history-session-menu-overlay {
+  animation: historyMenuIn 0.12s ease-out;
+}
+
+@keyframes historyMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.history-session-menu {
+  min-width: 120px;
+  padding: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.history-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-menu-item:hover { background: var(--bg-hover); }
+.history-menu-item.delete { color: #ef4444; }
+
+.history-rename-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  animation: historyRenameFadeIn 0.15s ease;
+}
+
+@keyframes historyRenameFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.history-rename-dialog {
+  width: min(360px, calc(100vw - 32px));
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg-primary);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  animation: historyRenameModalIn 0.2s ease-out;
+}
+
+@keyframes historyRenameModalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.history-rename-title { margin-bottom: 16px; color: var(--text-primary); font-size: 16px; font-weight: 600; }
+.history-rename-input { width: 100%; box-sizing: border-box; padding: 10px 14px; border: 1.5px solid var(--border-color); border-radius: 10px; font-size: 14px; color: var(--text-primary); background: var(--bg-primary); outline: none; transition: border-color 0.2s ease; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+.history-rename-input:focus { border-color: var(--text-tertiary); }
+.history-rename-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.history-rename-actions button { padding: 8px 18px; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+.history-rename-actions button:first-child { background: var(--bg-secondary); color: var(--text-primary); }
+.history-rename-actions button:first-child:hover { background: var(--border-color); }
+.history-rename-actions button.confirm { background: var(--text-primary); color: #ffffff; }
+.history-rename-actions button.confirm:hover { background: var(--text-secondary); }
+
+
+.history-state {
+  padding: 30px 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.history-footer {
+  margin: 12px 4px 0;
+  padding-top: 13px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .conversation-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background-color: var(--bg-primary);
   overflow: hidden;
   position: relative;
+  isolation: isolate;
+}
+
+.embedded-friday-chat {
+  background-color: var(--bg-primary) !important;
+}
+
+/* 新建会话页仅保留输入区域，不展示功能快捷入口。 */
+.embedded-friday-chat :deep(.features-section) {
+  display: none;
 }
 
 .conversation-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 12px 16px;
   flex-shrink: 0;
   overflow: visible;
+  position: relative;
   -webkit-app-region: drag;
   app-region: drag;
 }
@@ -1348,6 +1977,11 @@ async function handleRejectTool(decision) {
   -webkit-app-region: no-drag;
   app-region: no-drag;
   position: relative;
+}
+
+.header-btn.knowledge-btn {
+  position: absolute;
+  right: 16px;
 }
 
 .header-btn:hover {
@@ -1415,6 +2049,10 @@ async function handleRejectTool(decision) {
   overflow-y: auto;
   padding: 20px 0;
   scroll-behavior: smooth;
+}
+
+@media (max-width: 860px) {
+  .conversation-history { display: none; }
 }
 
 .conversation-messages::-webkit-scrollbar {
