@@ -297,12 +297,11 @@ import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import ToolCallSection from '@/components/chat/ToolCallSection.vue';
 import FridayChat from '@/views/friday/FridayChat.vue';
 
-// keep-alive keeps previous route instances alive. Their route watchers can
-// observe a later `q` query, so dedupe initial sends across all instances.
-const handledInitialQueryKeys = new Set();
-
 const router = useRouter();
 const route = useRoute();
+// App.vue keys router views by fullPath. Keep this instance's route identity
+// so cached conversation views ignore updates intended for a newer instance.
+const instanceRouteFullPath = route.fullPath;
 const noteStore = useNoteStore();
 
 const inputText = ref('');
@@ -332,7 +331,6 @@ const historySessionMenuStyle = ref({});
 const showHistoryRenameDialog = ref(false);
 const historyRenameValue = ref('');
 const historyRenameInput = ref(null);
-let isOpeningNewConversation = false;
 let historyResizeStartX = 0;
 let historyResizeStartWidth = 0;
 
@@ -355,6 +353,7 @@ let unlistenAgentToolResult = null;
 let unlistenAgentApproval = null;
 let activeRequestId = '';
 let isDoneReceived = false;
+let handledInitialQueryKey = '';
 let activeInitRouteKey = '';
 
 // ========== Agent 模式状态 ==========
@@ -501,8 +500,7 @@ function focusHistorySearch() {
 }
 
 function createNewConversation() {
-  if (isStreaming.value || isOpeningNewConversation) return;
-  isOpeningNewConversation = true;
+  if (isStreaming.value) return;
   showNewConversation.value = true;
 }
 
@@ -971,7 +969,6 @@ async function sendChatMessage(text) {
   const mode = route.query.mode || 'chat';
   const modelId = route.query.modelId || '';
   const model = loadModelConfig(modelId);
-
   if (!model) {
     alert('未配置大模型，请先在设置中添加自己的模型');
     router.push('/settings/model');
@@ -1170,12 +1167,12 @@ async function triggerAiResponse() {
 }
 
 async function initConversation() {
+  if (route.fullPath !== instanceRouteFullPath) return;
   const initRouteKey = `${route.fullPath}`;
   if (activeInitRouteKey === initRouteKey) return;
   activeInitRouteKey = initRouteKey;
 
   showNewConversation.value = false;
-  isOpeningNewConversation = false;
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -1240,9 +1237,12 @@ async function initConversation() {
 
   const query = route.query.q;
   if (query) {
+    // Async history loading may have finished after this cached instance was
+    // replaced by another route. Never send that newer route's first message.
+    if (route.fullPath !== instanceRouteFullPath) return;
     const queryKey = `${route.params.sessionId || ''}::${route.query.q}::${route.query.mode || ''}`;
-    if (handledInitialQueryKeys.has(queryKey)) return;
-    handledInitialQueryKeys.add(queryKey);
+    if (handledInitialQueryKey === queryKey) return;
+    handledInitialQueryKey = queryKey;
 
     const alreadyHasMessage = messages.value.length > 0
       && messages.value[messages.value.length - 1].role === 'user'
