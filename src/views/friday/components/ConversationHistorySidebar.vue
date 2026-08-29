@@ -76,6 +76,9 @@
         <button type="button" class="history-menu-item" @click="renameHistorySession">
           <span>{{ t('history.rename') }}</span>
         </button>
+        <button type="button" class="history-menu-item" @click="shareHistorySession">
+          <span>{{ t('history.share') }}</span>
+        </button>
         <button type="button" class="history-menu-item delete" @click="deleteHistorySession">
           <span>{{ t('history.delete') }}</span>
         </button>
@@ -95,6 +98,8 @@
       </div>
     </div>
   </Teleport>
+
+  <ShareSessionModal ref="shareSessionModal" />
 </template>
 
 <script setup>
@@ -102,6 +107,7 @@ import { computed, nextTick, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
 import { useFridayStore } from '@/store';
+import ShareSessionModal from '@/views/history/ShareSessionModal.vue';
 
 const props = defineProps({
   sessions: { type: Array, default: () => [] },
@@ -122,6 +128,7 @@ const historySessionMenuStyle = ref({});
 const showHistoryRenameDialog = ref(false);
 const historyRenameValue = ref('');
 const historyRenameInput = ref(null);
+const shareSessionModal = ref(null);
 let historyResizeStartX = 0;
 let historyResizeStartWidth = 0;
 
@@ -161,6 +168,14 @@ async function deleteHistorySession() {
     console.error('Failed to delete session:', err);
   }
   closeHistorySessionMenu();
+}
+
+function shareHistorySession() {
+  const sessionId = activeHistorySessionMenuId.value;
+  const session = props.sessions.find(item => item.id === sessionId);
+  closeHistorySessionMenu();
+  if (!session) return;
+  shareSessionModal.value?.open(session);
 }
 
 async function renameHistorySession() {
@@ -223,13 +238,9 @@ onUnmounted(stopHistoryResize);
   flex-direction: column;
   min-width: 0;
   padding: 20px 12px 16px;
-  background: #fbfcfb;
+  background: var(--bg-primary);
   border-right: 1px solid var(--border-color);
   position: relative;
-}
-
-[data-theme='dark'] .conversation-history {
-  background: var(--bg-secondary);
 }
 
 .history-resizer {
@@ -307,7 +318,7 @@ onUnmounted(stopHistoryResize);
 }
 
 .history-search.focused {
-  background: var(--bg-primary);
+  background: var(--bg-hover);
   border-color: var(--border-color);
   color: var(--text-secondary);
 }
@@ -377,7 +388,7 @@ onUnmounted(stopHistoryResize);
 }
 
 .history-session.active {
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  background: var(--bg-active);
   color: var(--text-primary);
 }
 

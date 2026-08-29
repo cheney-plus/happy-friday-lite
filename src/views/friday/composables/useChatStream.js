@@ -1,7 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { electronService } from '@/services/electron';
-import { useFridayStore } from '@/store';
+import { useFridayStore, useTabStore } from '@/store';
 import { getFridayTabId, isNewSessionId } from '@/utils/fridayNavigation';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
 
@@ -9,6 +9,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   const route = useRoute();
   const router = useRouter();
   const fridayStore = useFridayStore();
+  const tabStore = useTabStore();
 
   const isStreaming = ref(false);
   const streamingContent = ref('');
@@ -39,7 +40,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   });
 
   watch(isStreaming, (streaming) => {
-    fridayStore.setTabStreaming(getFridayTabId(route), streaming);
+    fridayStore.setTabStreaming(getFridayTabId(route, tabStore), streaming);
     if (!streaming) autoApproveAll.value = false;
   });
 
@@ -93,48 +94,41 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     isStreaming.value = false;
   }
 
+  function toIpcPayload(value) {
+    if (value == null) return value;
+    // Pinia/Vue Proxy cannot be structured-cloned by Electron IPC.
+    return JSON.parse(JSON.stringify(value));
+  }
+
   async function invokeChat({ mode, model, userMessage, attachments, thinkMode, kbName, kbCategoryId }) {
     const enableThinking = thinkMode === 'deep';
     const sessionId = currentSessionId.value || '';
-    if (mode === 'agent') {
-      return electronService.invoke('agent-invoke', {
-        requestId: activeRequestId,
-        sessionId,
-        model,
-        message: userMessage,
-        attachments,
-        enableThinking
-      });
-    }
-    if (mode === 'chat') {
-      return electronService.invoke('chat_with_memory', {
-        requestId: activeRequestId,
-        sessionId,
-        model,
-        message: userMessage,
-        attachments,
-        enableThinking,
-        kbName,
-        kbCategoryId
-      });
-    }
-    return electronService.invoke('chat_without_memory', {
+    const args = toIpcPayload({
       requestId: activeRequestId,
+      sessionId,
       model,
       message: userMessage,
-      attachments,
+      attachments: attachments || [],
       enableThinking,
-      kbName,
-      kbCategoryId
+      kbName: kbName || '',
+      kbCategoryId: kbCategoryId || ''
     });
+    if (mode === 'agent') {
+      return electronService.invoke('agent-invoke', args);
+    }
+    if (mode === 'chat') {
+      return electronService.invoke('chat_with_memory', args);
+    }
+    return electronService.invoke('chat_without_memory', args);
   }
 
   async function sendChatMessage(payload) {
-    const text = (payload.userMessage || payload.text || '').trim();
+    const data = toIpcPayload(payload) || {};
+    const text = (data.userMessage || data.text || '').trim();
     if (isStreaming.value || !text) return false;
 
-    const mode = payload.mode || currentMode.value || fridayStore.mode || 'chat';
-    const modelId = payload.modelId || fridayStore.modelId;
+    const mode = data.mode || currentMode.value || fridayStore.mode || 'chat';
+    const modelId = data.modelId || fridayStore.modelId;
     const model = loadModelConfig(modelId);
     if (!model) {
       window.alert(t('friday.modelRequired'));
@@ -144,10 +138,10 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
 
     currentMode.value = mode;
     fridayStore.setMode(mode);
-    if (payload.thinkMode) fridayStore.setThinkMode(payload.thinkMode);
+    if (data.thinkMode) fridayStore.setThinkMode(data.thinkMode);
     if (modelId) fridayStore.setModelId(modelId);
 
-    const userMessage = payload.userMessage || payload.text;
+    const userMessage = data.userMessage || data.text;
     messages.value.push({ role: 'user', content: userMessage });
     startStreaming();
 
@@ -156,10 +150,10 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
         mode,
         model,
         userMessage,
-        attachments: payload.attachments || [],
-        thinkMode: payload.thinkMode || fridayStore.thinkMode,
-        kbName: payload.kbName || '',
-        kbCategoryId: payload.kbCategoryId || ''
+        attachments: data.attachments || [],
+        thinkMode: data.thinkMode || fridayStore.thinkMode,
+        kbName: data.kbName || '',
+        kbCategoryId: data.kbCategoryId || ''
       });
     } catch (err) {
       console.error('Chat invoke error:', err);
@@ -413,7 +407,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     if (unlistenAgentToolCall) unlistenAgentToolCall();
     if (unlistenAgentToolResult) unlistenAgentToolResult();
     if (unlistenAgentApproval) unlistenAgentApproval();
-    fridayStore.setTabStreaming(getFridayTabId(route), false);
+    fridayStore.setTabStreaming(getFridayTabId(route, tabStore), false);
   }
 
   onMounted(bindListeners);

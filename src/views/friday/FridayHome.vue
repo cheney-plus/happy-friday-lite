@@ -38,7 +38,7 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { useAppStore, useFridayStore } from '@/store';
+import { useAppStore, useFridayStore, useTabStore } from '@/store';
 import { NEW_SESSION_ID, fridayChatLocation, getFridayTabId } from '@/utils/fridayNavigation';
 import FridayComposer from '@/views/friday/components/FridayComposer.vue';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
@@ -48,6 +48,7 @@ const router = useRouter();
 const { t } = useI18n();
 const appStore = useAppStore();
 const fridayStore = useFridayStore();
+const tabStore = useTabStore();
 const inputText = ref('');
 
 const isDark = computed(() => appStore.theme === 'dark');
@@ -102,8 +103,9 @@ function handleSend(payload) {
     router.push('/settings/model');
     return;
   }
-  fridayStore.setPendingLaunch(getFridayTabId(route), payload);
-  router.push(fridayChatLocation(route, { sessionId: NEW_SESSION_ID }));
+  fridayStore.setPendingLaunch(getFridayTabId(route, tabStore), payload);
+  inputText.value = '';
+  router.push(fridayChatLocation(route, { sessionId: NEW_SESSION_ID }, tabStore));
 }
 </script>
 

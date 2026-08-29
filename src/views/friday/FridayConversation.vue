@@ -1,6 +1,6 @@
 <template>
   <div class="conversation-page">
-    <header class="conversation-header">
+    <header class="conversation-header" :class="{ 'is-history-collapsed': !isShareMode && fridayStore.historyCollapsed }">
       <div class="header-center">
         <span class="header-title">{{ chatTitle }}</span>
         <span class="header-time">{{ chatTime }}</span>
@@ -102,7 +102,7 @@ import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted,
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
-import { useFridayStore } from '@/store';
+import { useFridayStore, useTabStore } from '@/store';
 import { useNoteStore } from '@/store/modules/note';
 import { handleCodeCopyClick, renderMarkdown, stripMarkdown } from '@/utils/markdown';
 import { fridayChatLocation, getFridayTabId, isNewSessionId } from '@/utils/fridayNavigation';
@@ -122,6 +122,7 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 const fridayStore = useFridayStore();
+const tabStore = useTabStore();
 const noteStore = useNoteStore();
 
 const isShareMode = computed(() => route.meta?.share === true || !electronService.isElectron);
@@ -233,7 +234,7 @@ function isActiveConversationRoute() {
 async function initConversation() {
   if (!isActiveConversationRoute()) return;
   const seq = ++initSeq;
-  const launch = isShareMode.value ? null : fridayStore.takePendingLaunch(getFridayTabId(route));
+  const launch = isShareMode.value ? null : fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
   const key = routeSessionKey();
   if (loadedRouteKey === key && !launch) return;
   loadedRouteKey = key;
@@ -308,6 +309,7 @@ async function handleComposerSend(payload) {
   if (isRollingBack.value) return;
   const sent = await sendChatMessage(payload);
   if (sent) {
+    inputText.value = '';
     isAtBottom.value = true;
     showScrollDownBtn.value = false;
     scrollToBottom(true);
@@ -424,14 +426,16 @@ onBeforeRouteLeave(async () => {
 watch(currentSessionId, (sessionId) => {
   const param = route.params.sessionId;
   if (sessionId && !isNewSessionId(sessionId) && isNewSessionId(param) && route.name === 'friday-chat') {
-    router.replace(fridayChatLocation(route, { sessionId }));
+    router.replace(fridayChatLocation(route, { sessionId }, tabStore));
   }
 });
 
 watch(() => routeSessionKey(), (next, prev) => {
   if (!isActiveConversationRoute() || next === prev) return;
+  if (isStreaming.value && messages.value.length) return;
   const nextSessionId = String(next).split('::')[0];
-  if (isNewSessionId(String(prev).split('::')[0]) && nextSessionId === currentSessionId.value) return;
+  if (nextSessionId && nextSessionId === currentSessionId.value) return;
+  if (isNewSessionId(String(prev || '').split('::')[0]) && !isNewSessionId(nextSessionId) && messages.value.length) return;
   initConversation();
 });
 
@@ -448,6 +452,10 @@ onMounted(async () => {
 });
 
 onActivated(() => {
+  const tabId = getFridayTabId(route, tabStore);
+  if (fridayStore.pendingLaunches[tabId] || fridayStore.pendingLaunches._default || loadedRouteKey !== routeSessionKey()) {
+    initConversation();
+  }
   scrollToBottom(true);
 });
 
@@ -485,6 +493,21 @@ onUnmounted(() => {
   position: relative;
   -webkit-app-region: drag;
   app-region: drag;
+}
+
+.conversation-header.is-history-collapsed {
+  padding-left: 56px;
+}
+
+.conversation-header.is-history-collapsed::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 56px;
+  height: 100%;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .header-btn {

@@ -39,6 +39,11 @@ function loadCachedHistorySessions() {
   }
 }
 
+function clonePlain(value) {
+  if (value == null) return value
+  return JSON.parse(JSON.stringify(value))
+}
+
 export const useFridayStore = defineStore('friday', {
   state: () => ({
     mode: readStorage(MODE_KEY, 'agent'),
@@ -64,13 +69,23 @@ export const useFridayStore = defineStore('friday', {
       writeStorage(SELECTED_MODEL_KEY, modelId)
     },
     setPendingLaunch(tabId, payload) {
-      this.pendingLaunches[tabId || '_default'] = payload
+      const key = tabId || '_default'
+      const plain = clonePlain(payload)
+      this.pendingLaunches[key] = plain
+      if (key !== '_default') this.pendingLaunches._default = plain
     },
     takePendingLaunch(tabId) {
-      const key = tabId || '_default'
-      const payload = this.pendingLaunches[key] || null
-      delete this.pendingLaunches[key]
-      return payload
+      const keys = [...new Set([tabId, '_default'].filter(Boolean))]
+      for (const key of keys) {
+        if (this.pendingLaunches[key]) {
+          const stored = this.pendingLaunches[key]
+          Object.keys(this.pendingLaunches).forEach((item) => {
+            if (this.pendingLaunches[item] === stored) delete this.pendingLaunches[item]
+          })
+          return clonePlain(stored)
+        }
+      }
+      return null
     },
     setTabStreaming(tabId, streaming) {
       const key = tabId || '_default'

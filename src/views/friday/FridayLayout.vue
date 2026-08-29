@@ -12,11 +12,11 @@
     />
 
     <div class="friday-main">
-      <router-view v-slot="{ Component }">
-        <keep-alive>
-          <component :is="Component" :key="String(route.name)" />
-        </keep-alive>
-      </router-view>
+      <div class="friday-outlet">
+        <router-view v-slot="{ Component, route: childRoute }">
+          <component :is="Component" :key="String(childRoute.name)" />
+        </router-view>
+      </div>
 
       <button
         v-if="fridayStore.historyCollapsed"
@@ -103,16 +103,30 @@ function onSessionRenamed({ sessionId, title }) {
 .friday-main {
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   height: 100%;
   overflow: hidden;
 }
 
-.friday-main :deep(.friday-home),
-.friday-main :deep(.conversation-page) {
+.friday-outlet {
+  position: relative;
+  z-index: 0;
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.friday-outlet :deep(.friday-home),
+.friday-outlet :deep(.conversation-page) {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
   height: 100%;
 }
@@ -121,7 +135,7 @@ function onSessionRenamed({ sessionId, title }) {
   position: absolute;
   top: 12px;
   left: 16px;
-  z-index: 20;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -133,6 +147,9 @@ function onSessionRenamed({ sessionId, title }) {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .history-expand-btn:hover {

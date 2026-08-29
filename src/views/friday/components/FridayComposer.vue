@@ -281,7 +281,6 @@ function handleSend() {
     modelId: fridayStore.modelId,
     thinkMode: fridayStore.thinkMode
   });
-  emit('update:modelValue', '');
   attachments.value = [];
 }
 

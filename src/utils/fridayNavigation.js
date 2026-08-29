@@ -1,13 +1,15 @@
 export const NEW_SESSION_ID = 'new';
 
-export function getFridayTabId(route) {
+export function getFridayTabId(route, tabStore) {
   const tabId = route?.query?.__tab;
-  return typeof tabId === 'string' && tabId ? tabId : '';
+  if (typeof tabId === 'string' && tabId) return tabId;
+  if (typeof tabStore?.activeTabId === 'string' && tabStore.activeTabId) return tabStore.activeTabId;
+  return '';
 }
 
-export function withFridayTabQuery(route, extra = {}) {
+export function withFridayTabQuery(route, extra = {}, tabStore) {
   const query = { ...extra };
-  const tabId = getFridayTabId(route);
+  const tabId = getFridayTabId(route, tabStore);
   if (tabId) query.__tab = tabId;
   return query;
 }
@@ -28,17 +30,17 @@ export function resolveFridayTabPath(fullPath, tabId) {
   return `${path}?${params.toString()}`;
 }
 
-export function fridayChatLocation(route, { sessionId, query = {} } = {}) {
+export function fridayChatLocation(route, { sessionId, query = {} } = {}, tabStore) {
   return {
     name: 'friday-chat',
     params: { sessionId: sessionId || NEW_SESSION_ID },
-    query: withFridayTabQuery(route, query)
+    query: withFridayTabQuery(route, query, tabStore)
   };
 }
 
-export function fridayHomeLocation(route) {
+export function fridayHomeLocation(route, tabStore) {
   return {
     name: 'friday',
-    query: withFridayTabQuery(route)
+    query: withFridayTabQuery(route, {}, tabStore)
   };
 }
