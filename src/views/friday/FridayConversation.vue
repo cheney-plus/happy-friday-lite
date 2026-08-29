@@ -7,12 +7,7 @@
       </div>
 
       <button v-if="!isShareMode" class="header-btn knowledge-btn" type="button" @click="handleAddToKnowledge(isStreaming)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          <line x1="12" y1="6" x2="12" y2="13"></line>
-          <line x1="9" y1="10" x2="15" y2="10"></line>
-        </svg>
+        <NotebookPen :size="18" :stroke-width="2" />
         <span class="btn-tooltip hover-tooltip">{{ t('friday.saveAsNote') }}</span>
       </button>
     </header>
@@ -101,6 +96,7 @@
 import { computed, inject, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { NotebookPen } from 'lucide-vue-next';
 import { electronService } from '@/services/electron';
 import { useFridayStore, useTabStore } from '@/store';
 import { useNoteStore } from '@/store/modules/note';

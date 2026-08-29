@@ -74,12 +74,19 @@
     <div v-if="activeHistorySessionMenuId" class="history-session-menu-backdrop" @click="closeHistorySessionMenu">
       <div class="history-session-menu" :style="historySessionMenuStyle" @click.stop>
         <button type="button" class="history-menu-item" @click="renameHistorySession">
+          <Pencil :size="14" :stroke-width="1.8" />
           <span>{{ t('history.rename') }}</span>
         </button>
+        <button type="button" class="history-menu-item" @click="saveHistorySessionAsNote">
+          <NotebookPen :size="14" :stroke-width="1.8" />
+          <span>{{ t('history.saveAsNote') }}</span>
+        </button>
         <button type="button" class="history-menu-item" @click="shareHistorySession">
+          <Share2 :size="14" :stroke-width="1.8" />
           <span>{{ t('history.share') }}</span>
         </button>
         <button type="button" class="history-menu-item delete" @click="deleteHistorySession">
+          <Trash2 :size="14" :stroke-width="1.8" />
           <span>{{ t('history.delete') }}</span>
         </button>
       </div>
@@ -99,15 +106,36 @@
     </div>
   </Teleport>
 
+  <Teleport to="body">
+    <div v-if="showHistoryDeleteDialog" class="history-delete-overlay" @click.self="showHistoryDeleteDialog = false">
+      <div class="history-delete-dialog">
+        <div class="history-delete-title">{{ t('history.confirmDelete') }}</div>
+        <p class="history-delete-message">{{ t('history.deleteWarning', { title: historyDeleteTitle }) }}</p>
+        <div class="history-rename-actions">
+          <button type="button" @click="showHistoryDeleteDialog = false">{{ t('history.cancel') }}</button>
+          <button type="button" class="delete-confirm" @click="confirmHistoryDelete">{{ t('history.delete') }}</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <ShareSessionModal ref="shareSessionModal" />
+
+  <Transition name="toast-fade">
+    <div v-if="toastVisible" class="history-save-toast">{{ toastMessage }}</div>
+  </Transition>
 </template>
 
 <script setup>
 import { computed, nextTick, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
+import { NotebookPen, Pencil, Share2, Trash2 } from 'lucide-vue-next';
 import { useFridayStore } from '@/store';
 import ShareSessionModal from '@/views/history/ShareSessionModal.vue';
+import { useConversationSummary } from '@/views/friday/composables/useConversationSummary';
+import { useToast } from '@/views/friday/composables/useToast';
+import { mapHistoryMessage } from '@/views/friday/utils/messages';
 
 const props = defineProps({
   sessions: { type: Array, default: () => [] },
@@ -129,6 +157,12 @@ const showHistoryRenameDialog = ref(false);
 const historyRenameValue = ref('');
 const historyRenameInput = ref(null);
 const shareSessionModal = ref(null);
+const historyDeleteSessionId = ref(null);
+const historyDeleteTitle = ref('');
+const showHistoryDeleteDialog = ref(false);
+const sessionMessages = ref([]);
+const { toastVisible, toastMessage, showToast } = useToast();
+const { handleAddToKnowledge } = useConversationSummary({ messages: sessionMessages, showToast, t });
 let historyResizeStartX = 0;
 let historyResizeStartWidth = 0;
 
@@ -157,8 +191,18 @@ function closeHistorySessionMenu() {
   activeHistorySessionMenuId.value = null;
 }
 
-async function deleteHistorySession() {
+function deleteHistorySession() {
   const sessionId = activeHistorySessionMenuId.value;
+  const session = props.sessions.find(item => item.id === sessionId);
+  if (!session) return;
+  historyDeleteSessionId.value = session.id;
+  historyDeleteTitle.value = session.title || t('friday.untitledSession');
+  showHistoryDeleteDialog.value = true;
+  closeHistorySessionMenu();
+}
+
+async function confirmHistoryDelete() {
+  const sessionId = historyDeleteSessionId.value;
   if (!sessionId) return;
   try {
     await electronService.invoke('delete_session', { sessionId });
@@ -166,8 +210,11 @@ async function deleteHistorySession() {
     emit('deleted', sessionId);
   } catch (err) {
     console.error('Failed to delete session:', err);
+  } finally {
+    showHistoryDeleteDialog.value = false;
+    historyDeleteSessionId.value = null;
+    historyDeleteTitle.value = '';
   }
-  closeHistorySessionMenu();
 }
 
 function shareHistorySession() {
@@ -176,6 +223,21 @@ function shareHistorySession() {
   closeHistorySessionMenu();
   if (!session) return;
   shareSessionModal.value?.open(session);
+}
+
+async function saveHistorySessionAsNote() {
+  const sessionId = activeHistorySessionMenuId.value;
+  closeHistorySessionMenu();
+  if (!sessionId) return;
+
+  try {
+    const messages = await electronService.invoke('get_session_messages', { sessionId });
+    sessionMessages.value = (messages || []).map(mapHistoryMessage);
+    handleAddToKnowledge(false);
+  } catch (err) {
+    console.error('Failed to load session messages:', err);
+    showToast(t('history.saveAsNoteFailed'));
+  }
 }
 
 async function renameHistorySession() {
@@ -450,7 +512,7 @@ onUnmounted(stopHistoryResize);
 }
 
 .history-session-menu {
-  min-width: 120px;
+  min-width: 150px;
   padding: 3px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -465,7 +527,9 @@ onUnmounted(stopHistoryResize);
 }
 
 .history-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 7px 12px;
   border: 0;
@@ -551,6 +615,70 @@ onUnmounted(stopHistoryResize);
 .history-rename-actions button.confirm {
   background: var(--text-primary);
   color: #ffffff;
+}
+
+.history-delete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.history-delete-dialog {
+  width: min(360px, calc(100vw - 32px));
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg-primary);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+.history-delete-title {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.history-delete-message {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.history-rename-actions button.delete-confirm {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.history-save-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 10003;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.92);
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  transform: translateX(-50%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 8px);
 }
 
 .history-state {
