@@ -163,16 +163,16 @@ function onSessionRenamed({ sessionId, title }) {
 .history-expand-btn {
   position: absolute;
   top: 12px;
-  left: 16px;
+  right: 16px;
   z-index: 30;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: 10px;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;

@@ -567,7 +567,13 @@ onUnmounted(() => {
 
 .header-btn.knowledge-btn {
   position: absolute;
+  top: 12px;
   right: 16px;
+}
+
+/* Reserve the far-right slot for the history expander while the panel is collapsed. */
+.conversation-header.is-history-collapsed .header-btn.knowledge-btn {
+  right: 60px;
 }
 
 .header-btn:hover {
