@@ -51,6 +51,7 @@ export const useFridayStore = defineStore('friday', {
     modelId: readStorage(SELECTED_MODEL_KEY, ''),
     pendingLaunches: {},
     streamingByTab: {},
+    immersiveHomeByTab: {},
     historySessions: loadCachedHistorySessions(),
     historySidebarWidth: loadHistorySidebarWidth()
   }),
@@ -93,6 +94,17 @@ export const useFridayStore = defineStore('friday', {
     },
     isTabStreaming(tabId) {
       return !!this.streamingByTab[tabId || '_default']
+    },
+    setTabImmersiveHome(tabId, immersive) {
+      this.immersiveHomeByTab[tabId || '_default'] = !!immersive
+    },
+    getTabImmersiveHome(tabId) {
+      const key = tabId || '_default'
+      if (!Object.prototype.hasOwnProperty.call(this.immersiveHomeByTab, key)) return undefined
+      return !!this.immersiveHomeByTab[key]
+    },
+    isTabImmersiveHome(tabId) {
+      return this.immersiveHomeByTab[tabId || '_default'] === true
     },
     setHistorySessions(sessions) {
       this.historySessions = Array.isArray(sessions) ? sessions : []

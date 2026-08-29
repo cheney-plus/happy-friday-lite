@@ -155,6 +155,7 @@ const {
   isThinking,
   sessionTitle,
   resetStreamState,
+  startStreaming,
   attachRequest,
   sendChatMessage,
   handleStop,
@@ -171,6 +172,19 @@ const {
   t
 });
 const { handleAddToKnowledge } = useConversationSummary({ messages, showToast, t });
+
+let pendingLaunch = null;
+if (!isShareMode.value) {
+  pendingLaunch = fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
+  const launchText = (pendingLaunch?.userMessage || pendingLaunch?.text || '').trim();
+  if (launchText) {
+    if (pendingLaunch.mode) currentMode.value = pendingLaunch.mode;
+    messages.value.push({ role: 'user', content: pendingLaunch.userMessage || pendingLaunch.text });
+    startStreaming();
+  } else {
+    pendingLaunch = null;
+  }
+}
 
 const chatTitle = computed(() => {
   if (sessionTitle.value) return sessionTitle.value;
@@ -236,14 +250,38 @@ function isActiveConversationRoute() {
 async function initConversation() {
   if (!isActiveConversationRoute()) return;
   const seq = ++initSeq;
-  const launch = isShareMode.value ? null : fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
+  let launch = pendingLaunch;
+  pendingLaunch = null;
+  if (!launch && !isShareMode.value) {
+    launch = fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
+  }
   const key = routeSessionKey();
   if (loadedRouteKey === key && !launch) return;
   loadedRouteKey = key;
 
+  const launchText = (launch?.userMessage || launch?.text || '').trim();
+  if (launchText) {
+    inputText.value = '';
+    chatTime.value = formatClock();
+    isAtBottom.value = true;
+    showScrollDownBtn.value = false;
+    currentSessionId.value = isNewSessionId(route.params.sessionId) ? '' : (route.params.sessionId || '');
+    if (launch.mode) {
+      currentMode.value = launch.mode;
+      fridayStore.setMode(launch.mode);
+    }
+    const alreadyShown = messages.value.some(msg => msg.role === 'user' && msg.content === (launch.userMessage || launch.text));
+    await sendChatMessage(launch, {
+      skipUserPush: alreadyShown,
+      skipStart: isStreaming.value
+    });
+    if (seq !== initSeq) return;
+    scrollToBottom(true);
+    return;
+  }
+
   resetStreamState();
   messages.value = [];
-  inputText.value = launch ? '' : inputText.value;
   chatTime.value = formatClock();
   currentMode.value = fridayStore.mode || 'chat';
   sessionTitle.value = '';
@@ -297,11 +335,6 @@ async function initConversation() {
       await loadSessionHistory(currentSessionId.value);
       if (seq !== initSeq) return;
     }
-  }
-
-  if (launch?.text) {
-    await sendChatMessage(launch);
-    if (seq !== initSeq) return;
   }
 
   scrollToBottom(true);
@@ -454,6 +487,10 @@ onMounted(async () => {
 });
 
 onActivated(() => {
+  if (isStreaming.value) {
+    scrollToBottom(true);
+    return;
+  }
   const tabId = getFridayTabId(route, tabStore);
   if (fridayStore.pendingLaunches[tabId] || fridayStore.pendingLaunches._default || loadedRouteKey !== routeSessionKey()) {
     initConversation();

@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container" :class="{ 'is-share-view': isShareView }">
+  <div class="app-container" :class="{ 'is-share-view': isShareView, 'is-friday-immersive-home': isFridayImmersiveHome }">
     <TabBar v-if="!isShareView" />
     <div class="main-body">
       <Sidebar v-if="!isShareView" />
@@ -22,22 +22,27 @@ import Sidebar from '@/components/layout/Sidebar.vue';
 import TabBar from '@/components/layout/TabBar.vue';
 import DeepSeekHarness from '@/views/harness/DeepSeekHarness.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useAppStore, useTabStore } from '@/store';
+import { useAppStore, useFridayStore, useTabStore } from '@/store';
 import { electronService } from '@/services/electron';
 import { setI18nLanguage } from '@/i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { allMenuConfigs, isElectronEnvironment } from '@/config/menu';
 import { useTheme } from '@/utils/theme';
-import { resolveFridayTabPath } from '@/utils/fridayNavigation';
+import { getFridayTabId, resolveFridayTabPath } from '@/utils/fridayNavigation';
 
 const appStore = useAppStore();
 const tabStore = useTabStore();
+const fridayStore = useFridayStore();
 const route = useRoute();
 const router = useRouter();
 const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
 
 // 分享视图：隐藏侧边栏/标签栏，全屏展示对话界面
 const isShareView = computed(() => route.meta?.share === true || !isElectronEnvironment());
+const isFridayImmersiveHome = computed(() => {
+  if (isShareView.value || !route.path.startsWith('/friday')) return false;
+  return fridayStore.isTabImmersiveHome(getFridayTabId(route, tabStore));
+});
 const isHarnessRoute = computed(() => route.name === 'harness');
 const hasVisitedHarness = ref(false);
 const routerViewKey = computed(() => {
@@ -95,6 +100,8 @@ watch(
 
     if (rootPath === '/friday') {
       const tab = tabStore.addFridayTab();
+      const pathOnly = (newPath.split('?')[0] || '').replace(/\/$/, '');
+      if (pathOnly === '/friday') fridayStore.setTabImmersiveHome(tab.id, true);
       const nextPath = resolveFridayTabPath(newPath, tab.id);
       tabStore.updateTabFullPath(tab.id, nextPath);
       if (nextPath !== newPath) router.replace(nextPath);
@@ -217,6 +224,15 @@ onUnmounted(() => {
 }
 
 .app-container.is-share-view .content-wrapper {
+  border-radius: 0;
+}
+
+.app-container.is-friday-immersive-home .main-body {
+  padding: 0;
+}
+
+.app-container.is-friday-immersive-home .content-wrapper {
+  background-color: var(--bg-secondary);
   border-radius: 0;
 }
 </style>

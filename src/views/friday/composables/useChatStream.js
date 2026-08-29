@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useFridayStore, useTabStore } from '@/store';
@@ -122,10 +122,11 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     return electronService.invoke('chat_without_memory', args);
   }
 
-  async function sendChatMessage(payload) {
+  async function sendChatMessage(payload, { skipUserPush = false, skipStart = false } = {}) {
     const data = toIpcPayload(payload) || {};
     const text = (data.userMessage || data.text || '').trim();
-    if (isStreaming.value || !text) return false;
+    if (!text) return false;
+    if (isStreaming.value && !skipStart) return false;
 
     const mode = data.mode || currentMode.value || fridayStore.mode || 'chat';
     const modelId = data.modelId || fridayStore.modelId;
@@ -142,24 +143,23 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     if (modelId) fridayStore.setModelId(modelId);
 
     const userMessage = data.userMessage || data.text;
-    messages.value.push({ role: 'user', content: userMessage });
-    startStreaming();
+    if (!skipUserPush) messages.value.push({ role: 'user', content: userMessage });
+    if (!skipStart) startStreaming();
 
-    try {
-      await invokeChat({
-        mode,
-        model,
-        userMessage,
-        attachments: data.attachments || [],
-        thinkMode: data.thinkMode || fridayStore.thinkMode,
-        kbName: data.kbName || '',
-        kbCategoryId: data.kbCategoryId || ''
-      });
-    } catch (err) {
+    await nextTick();
+
+    invokeChat({
+      mode,
+      model,
+      userMessage,
+      attachments: data.attachments || [],
+      thinkMode: data.thinkMode || fridayStore.thinkMode,
+      kbName: data.kbName || '',
+      kbCategoryId: data.kbCategoryId || ''
+    }).catch((err) => {
       console.error('Chat invoke error:', err);
       pushErrorMessage(`${t('friday.requestFailed')}${err?.message || t('friday.retryLater')}`);
-      return false;
-    }
+    });
     return true;
   }
 
@@ -410,7 +410,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     fridayStore.setTabStreaming(getFridayTabId(route, tabStore), false);
   }
 
-  onMounted(bindListeners);
+  bindListeners();
   onUnmounted(unbindListeners);
 
   return {

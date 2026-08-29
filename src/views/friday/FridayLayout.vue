@@ -1,5 +1,5 @@
 <template>
-  <div class="friday-layout">
+  <div class="friday-layout" :class="{ 'is-immersive-home': immersiveChrome }">
     <ConversationHistorySidebar
       v-if="!historyCollapsed"
       :sessions="historySessions"
@@ -33,20 +33,29 @@
 </template>
 
 <script setup>
-import { computed, provide, ref } from 'vue';
+import { computed, provide, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { Clock } from 'lucide-vue-next';
-import { fridayChatLocation, fridayHomeLocation, isNewSessionId } from '@/utils/fridayNavigation';
+import { useFridayStore, useTabStore } from '@/store';
+import { fridayChatLocation, fridayHomeLocation, getFridayTabId, isNewSessionId } from '@/utils/fridayNavigation';
 import ConversationHistorySidebar from '@/views/friday/components/ConversationHistorySidebar.vue';
 import { useConversationHistory } from '@/views/friday/composables/useConversationHistory';
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+const fridayStore = useFridayStore();
+const tabStore = useTabStore();
 const { historySessions, historyLoading } = useConversationHistory();
 const historyCollapsed = ref(true);
+const isFridayHome = computed(() => route.name === 'friday');
+const immersiveChrome = computed(() => isFridayHome.value && historyCollapsed.value);
 provide('fridayHistoryCollapsed', historyCollapsed);
+
+watch(isFridayHome, (isHome) => {
+  fridayStore.setTabImmersiveHome(getFridayTabId(route, tabStore), isHome);
+}, { immediate: true });
 
 const currentSessionId = computed(() => {
   const sessionId = route.params.sessionId;
@@ -98,6 +107,14 @@ function onSessionRenamed({ sessionId, title }) {
   min-width: 0;
   background: var(--bg-primary);
   overflow: hidden;
+}
+
+.friday-layout.is-immersive-home {
+  background: transparent;
+}
+
+.friday-layout.is-immersive-home :deep(.friday-home) {
+  background-color: transparent;
 }
 
 .friday-main {
