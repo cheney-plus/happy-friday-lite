@@ -104,6 +104,81 @@ function serveShareApi(res, sessionId) {
   }
 }
 
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function getSharedMessageContent(message) {
+  if (typeof message?.content === 'string' && message.content.trim()) return message.content
+  const segments = message?.metadata?.segments
+  if (!Array.isArray(segments)) return ''
+  return segments
+    .filter(segment => segment?.type === 'text' && segment.content)
+    .map(segment => segment.content)
+    .join('\n\n')
+}
+
+// A framework-free page keeps LAN conversation links readable in browsers that
+// cannot load Vite's module-based application bundle.
+function serveSharedConversationPage(res, sessionId) {
+  try {
+    const session = db.getSession(sessionId)
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end('<!doctype html><title>Not Found</title><p>Conversation not found.</p>')
+      return
+    }
+
+    const title = session.title || 'Friday Conversation'
+    const messages = db.getMessages(sessionId)
+    const content = messages
+      .map((message) => {
+        const text = getSharedMessageContent(message)
+        if (!text) return ''
+        const role = message.role === 'user' ? 'You' : 'Friday'
+        const roleClass = message.role === 'user' ? 'user' : 'assistant'
+        return `<div class="message ${roleClass}"><div class="role">${role}</div><div class="content">${escapeHtml(text)}</div></div>`
+      })
+      .filter(Boolean)
+      .join('') || '<p class="empty">This conversation has no messages.</p>'
+
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f5f5; color: #1c1917; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+    .page { max-width: 860px; margin: 0 auto; padding: 32px 20px 48px; }
+    .header { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e7e5e4; }
+    h1 { margin: 0; font-size: 22px; line-height: 1.35; font-weight: 600; word-break: break-word; }
+    .message { margin: 0 0 16px; padding: 16px; border: 1px solid #e7e5e4; border-radius: 8px; background: #fff; }
+    .message.user { border-left: 3px solid #2563eb; }
+    .role { margin-bottom: 8px; color: #78716c; font-size: 13px; font-weight: 600; }
+    .content { white-space: pre-wrap; overflow-wrap: break-word; word-wrap: break-word; line-height: 1.65; font-size: 15px; }
+    .empty { color: #78716c; text-align: center; }
+    @media (max-width: 480px) { .page { padding: 20px 12px 32px; } .message { padding: 14px; } h1 { font-size: 20px; } }
+  </style>
+</head>
+<body><div class="page"><div class="header"><h1>${escapeHtml(title)}</h1></div>${content}</div></body>
+</html>`
+
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end(html)
+  } catch (e) {
+    res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end('<!doctype html><title>Not Found</title><p>Conversation not found.</p>')
+  }
+}
+
 // 笔记分享数据接口：返回笔记内容（只读查看）
 function serveNoteShareApi(res, noteId) {
   try {
@@ -153,6 +228,13 @@ function handleRequest(req, res) {
       return
     }
 
+    // Serve shared conversations directly instead of relying on an ES module SPA.
+    const sharePageMatch = url.pathname.match(/^\/share\/([^/]+)$/)
+    if (sharePageMatch) {
+      serveSharedConversationPage(res, decodeURIComponent(sharePageMatch[1]))
+      return
+    }
+
     // 其余请求交给静态文件服务（含 SPA 回退）
     serveStatic(res, url.pathname)
   } catch (e) {
@@ -198,11 +280,11 @@ export function stopShareServer() {
   }
 }
 
-// 生成分享链接：使用 hash 路由，浏览器打开后由前端路由进入分享视图
+// Generate a framework-free page so recipients can use older browsers too.
 export function getShareUrl(sessionId) {
   if (!serverPort) return null
   const ip = getLocalIp()
-  return `http://${ip}:${serverPort}/#/share/${encodeURIComponent(sessionId)}`
+  return `http://${ip}:${serverPort}/share/${encodeURIComponent(sessionId)}`
 }
 
 // 生成笔记分享链接

@@ -29,6 +29,9 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   let unlistenAgentApproval = null;
   let activeRequestId = '';
   let isDoneReceived = false;
+  let pendingContent = '';
+  let pendingReasoning = '';
+  let chunkFlushFrame = null;
 
   const isThinking = computed(() => {
     if (!isStreaming.value || currentMode.value !== 'agent') return false;
@@ -45,6 +48,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   });
 
   function resetStreamState() {
+    clearPendingChunks();
     isStreaming.value = false;
     streamingContent.value = '';
     streamingReasoning.value = '';
@@ -57,6 +61,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   }
 
   function startStreaming() {
+    clearPendingChunks();
     isStreaming.value = true;
     streamingContent.value = '';
     streamingReasoning.value = '';
@@ -67,6 +72,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   }
 
   function attachRequest(requestId, { output = '', segments = [] } = {}) {
+    clearPendingChunks();
     activeRequestId = requestId;
     isDoneReceived = false;
     isStreaming.value = true;
@@ -79,6 +85,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   }
 
   function pushErrorMessage(errorContent) {
+    flushPendingChunksImmediately();
     if (streamingContent.value || streamingReasoning.value) {
       messages.value.push({
         role: 'assistant',
@@ -92,6 +99,60 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     streamingReasoning.value = '';
     agentSegments.value = [];
     isStreaming.value = false;
+  }
+
+  function clearPendingChunks() {
+    if (chunkFlushFrame !== null) {
+      window.cancelAnimationFrame(chunkFlushFrame);
+      chunkFlushFrame = null;
+    }
+    pendingContent = '';
+    pendingReasoning = '';
+  }
+
+  function appendAgentText(content) {
+    if (!content || currentMode.value !== 'agent') return;
+    const segs = agentSegments.value;
+    const last = segs.length > 0 ? segs[segs.length - 1] : null;
+    if (last && last.type === 'text') {
+      last.content += content;
+      return;
+    }
+    segs.push({
+      type: 'text',
+      id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      content,
+      isStreaming: true
+    });
+  }
+
+  function flushPendingChunks() {
+    chunkFlushFrame = null;
+    const content = pendingContent;
+    const reasoning = pendingReasoning;
+    pendingContent = '';
+    pendingReasoning = '';
+
+    if (content) {
+      streamingContent.value += content;
+      appendAgentText(content);
+    }
+    if (reasoning) streamingReasoning.value += reasoning;
+  }
+
+  function flushPendingChunksImmediately() {
+    if (chunkFlushFrame !== null) {
+      window.cancelAnimationFrame(chunkFlushFrame);
+    }
+    flushPendingChunks();
+  }
+
+  function queueChunk(content, reasoning = '') {
+    pendingContent += content || '';
+    pendingReasoning += reasoning || '';
+    if (chunkFlushFrame === null) {
+      chunkFlushFrame = window.requestAnimationFrame(flushPendingChunks);
+    }
   }
 
   function toIpcPayload(value) {
@@ -226,27 +287,13 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     unlistenChunk = electronService.listen('chat-chunk', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
-      streamingContent.value += data.content;
-      if (currentMode.value === 'agent') {
-        const segs = agentSegments.value;
-        const last = segs.length > 0 ? segs[segs.length - 1] : null;
-        if (last && last.type === 'text') {
-          last.content += data.content;
-        } else {
-          segs.push({
-            type: 'text',
-            id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            content: data.content,
-            isStreaming: true
-          });
-        }
-      }
+      queueChunk(data.content);
     });
 
     unlistenReasoning = electronService.listen('chat-reasoning-chunk', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
-      streamingReasoning.value += data.content;
+      queueChunk('', data.content);
     });
 
     unlistenDone = electronService.listen('chat-done', (event) => {
@@ -254,6 +301,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       if (data.requestId !== activeRequestId) return;
       if (isDoneReceived) return;
       isDoneReceived = true;
+      flushPendingChunksImmediately();
       isStreaming.value = false;
 
       if (data.userMessageId) {
@@ -313,6 +361,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     unlistenAgentToolCall = electronService.listen('agent-tool-call', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      flushPendingChunksImmediately();
       const segs = agentSegments.value;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
       if (last && last.type === 'text') last.isStreaming = false;
@@ -342,6 +391,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     unlistenAgentToolResult = electronService.listen('agent-tool-result', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      flushPendingChunksImmediately();
       const seg = agentSegments.value.find(s => s.type === 'tool' && s.toolCallId === data.toolCallId);
       if (seg && seg.status !== 'rejected') {
         seg.status = data.status || 'success';
@@ -352,6 +402,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     unlistenAgentApproval = electronService.listen('agent-tool-approval', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      flushPendingChunksImmediately();
       if (autoApproveAll.value) {
         electronService.invoke('agent-tool-approval-resume', {
           requestId: data.requestId,
@@ -407,6 +458,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     if (unlistenAgentToolCall) unlistenAgentToolCall();
     if (unlistenAgentToolResult) unlistenAgentToolResult();
     if (unlistenAgentApproval) unlistenAgentApproval();
+    clearPendingChunks();
     fridayStore.setTabStreaming(getFridayTabId(route, tabStore), false);
   }
 
