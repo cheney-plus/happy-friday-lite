@@ -52,7 +52,6 @@ export const useFridayStore = defineStore('friday', {
     pendingLaunches: {},
     streamingByTab: {},
     historySessions: loadCachedHistorySessions(),
-    historyCollapsed: false,
     historySidebarWidth: loadHistorySidebarWidth()
   }),
   actions: {
@@ -109,9 +108,6 @@ export const useFridayStore = defineStore('friday', {
     },
     removeHistorySession(sessionId) {
       this.setHistorySessions(this.historySessions.filter(item => item.id !== sessionId))
-    },
-    setHistoryCollapsed(collapsed) {
-      this.historyCollapsed = collapsed
     },
     setHistorySidebarWidth(width) {
       this.historySidebarWidth = Math.min(400, Math.max(200, width))

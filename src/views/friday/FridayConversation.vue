@@ -1,6 +1,6 @@
 <template>
   <div class="conversation-page">
-    <header class="conversation-header" :class="{ 'is-history-collapsed': !isShareMode && fridayStore.historyCollapsed }">
+    <header class="conversation-header" :class="{ 'is-history-collapsed': !isShareMode && historyCollapsed }">
       <div class="header-center">
         <span class="header-title">{{ chatTitle }}</span>
         <span class="header-time">{{ chatTime }}</span>
@@ -98,7 +98,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
@@ -124,8 +124,10 @@ const { t } = useI18n();
 const fridayStore = useFridayStore();
 const tabStore = useTabStore();
 const noteStore = useNoteStore();
+const injectedHistoryCollapsed = inject('fridayHistoryCollapsed', ref(false));
 
 const isShareMode = computed(() => route.meta?.share === true || !electronService.isElectron);
+const historyCollapsed = computed(() => !!injectedHistoryCollapsed.value);
 const inputText = ref('');
 const messagesContainer = ref(null);
 const isAtBottom = ref(true);

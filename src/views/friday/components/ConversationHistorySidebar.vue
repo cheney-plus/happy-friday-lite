@@ -6,7 +6,7 @@
   >
     <div class="history-heading">
       <span>{{ t('friday.historyTitle') }}</span>
-      <button class="history-icon-btn" type="button" :title="t('friday.historyCollapse')" @click="fridayStore.setHistoryCollapsed(true)">
+      <button class="history-icon-btn" type="button" :title="t('friday.historyCollapse')" @click="$emit('collapse')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
@@ -115,7 +115,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['select', 'create', 'deleted', 'renamed']);
+const emit = defineEmits(['select', 'create', 'deleted', 'renamed', 'collapse']);
 
 const { t } = useI18n();
 const fridayStore = useFridayStore();

@@ -1,7 +1,7 @@
 <template>
   <div class="friday-layout">
     <ConversationHistorySidebar
-      v-if="!fridayStore.historyCollapsed"
+      v-if="!historyCollapsed"
       :sessions="historySessions"
       :current-session-id="currentSessionId"
       :loading="historyLoading"
@@ -9,6 +9,7 @@
       @create="createNewConversation"
       @deleted="onSessionDeleted"
       @renamed="onSessionRenamed"
+      @collapse="historyCollapsed = true"
     />
 
     <div class="friday-main">
@@ -19,25 +20,23 @@
       </div>
 
       <button
-        v-if="fridayStore.historyCollapsed"
+        v-if="historyCollapsed"
         class="history-expand-btn"
         type="button"
         :title="t('friday.historyExpand')"
-        @click="fridayStore.setHistoryCollapsed(false)"
+        @click="historyCollapsed = false"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
+        <Clock :size="18" :stroke-width="2" />
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, provide, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { useFridayStore } from '@/store';
+import { Clock } from 'lucide-vue-next';
 import { fridayChatLocation, fridayHomeLocation, isNewSessionId } from '@/utils/fridayNavigation';
 import ConversationHistorySidebar from '@/views/friday/components/ConversationHistorySidebar.vue';
 import { useConversationHistory } from '@/views/friday/composables/useConversationHistory';
@@ -45,8 +44,9 @@ import { useConversationHistory } from '@/views/friday/composables/useConversati
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
-const fridayStore = useFridayStore();
 const { historySessions, historyLoading } = useConversationHistory();
+const historyCollapsed = ref(true);
+provide('fridayHistoryCollapsed', historyCollapsed);
 
 const currentSessionId = computed(() => {
   const sessionId = route.params.sessionId;
