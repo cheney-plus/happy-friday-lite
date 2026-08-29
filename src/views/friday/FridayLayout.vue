@@ -9,7 +9,7 @@
       @create="createNewConversation"
       @deleted="onSessionDeleted"
       @renamed="onSessionRenamed"
-      @collapse="historyCollapsed = true"
+      @collapse="collapseHistory"
     />
 
     <div class="friday-main">
@@ -24,7 +24,7 @@
         class="history-expand-btn"
         type="button"
         :title="t('friday.historyExpand')"
-        @click="historyCollapsed = false"
+        @click="expandHistory"
       >
         <Clock :size="18" :stroke-width="2" />
       </button>
@@ -33,11 +33,11 @@
 </template>
 
 <script setup>
-import { computed, provide, ref, watch } from 'vue';
+import { computed, provide, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { Clock } from 'lucide-vue-next';
-import { useFridayStore, useTabStore } from '@/store';
+import { useTabStore } from '@/store';
 import { fridayChatLocation, fridayHomeLocation, getFridayTabId, isNewSessionId } from '@/utils/fridayNavigation';
 import ConversationHistorySidebar from '@/views/friday/components/ConversationHistorySidebar.vue';
 import { useConversationHistory } from '@/views/friday/composables/useConversationHistory';
@@ -45,17 +45,12 @@ import { useConversationHistory } from '@/views/friday/composables/useConversati
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
-const fridayStore = useFridayStore();
 const tabStore = useTabStore();
 const { historySessions, historyLoading } = useConversationHistory();
 const historyCollapsed = ref(true);
 const isFridayHome = computed(() => route.name === 'friday');
 const immersiveChrome = computed(() => isFridayHome.value && historyCollapsed.value);
 provide('fridayHistoryCollapsed', historyCollapsed);
-
-watch(isFridayHome, (isHome) => {
-  fridayStore.setTabImmersiveHome(getFridayTabId(route, tabStore), isHome);
-}, { immediate: true });
 
 const currentSessionId = computed(() => {
   const sessionId = route.params.sessionId;
@@ -75,13 +70,30 @@ function openSession(session) {
 }
 
 function createNewConversation() {
-  if (route.name === 'friday') return;
-  router.push(fridayHomeLocation(route));
+  goHome();
+}
+
+function collapseHistory() {
+  historyCollapsed.value = true;
+}
+
+function expandHistory() {
+  historyCollapsed.value = false;
+}
+
+function goHome() {
+  // Navigation must not change the history panel state selected by the user.
+  const location = fridayHomeLocation(route, tabStore);
+  const tabId = getFridayTabId(route, tabStore);
+
+  // Persist the target before navigation so a tab switch cannot restore its old chat URL.
+  if (tabId) tabStore.updateTabFullPath(tabId, router.resolve(location).fullPath);
+  if (route.name !== 'friday') router.push(location);
 }
 
 function onSessionDeleted(sessionId) {
   if (sessionId === currentSessionId.value) {
-    router.push(fridayHomeLocation(route));
+    goHome();
   }
 }
 
@@ -110,7 +122,7 @@ function onSessionRenamed({ sessionId, title }) {
 }
 
 .friday-layout.is-immersive-home {
-  background: transparent;
+  background: var(--bg-secondary);
 }
 
 .friday-layout.is-immersive-home :deep(.friday-home) {

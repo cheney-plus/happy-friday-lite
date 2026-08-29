@@ -105,7 +105,6 @@ function handleSend(payload) {
   }
   const tabId = getFridayTabId(route, tabStore);
   fridayStore.setPendingLaunch(tabId, payload);
-  fridayStore.setTabImmersiveHome(tabId, false);
   inputText.value = '';
   router.push(fridayChatLocation(route, { sessionId: NEW_SESSION_ID }, tabStore));
 }

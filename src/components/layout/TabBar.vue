@@ -94,7 +94,7 @@
 </template>
 
 <script setup>
-import { useTabStore, useAppStore, useFridayStore } from '@/store';
+import { useTabStore, useAppStore } from '@/store';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import {
@@ -122,7 +122,6 @@ import DeepSeekIcon from '@/components/icons/DeepSeekIcon.vue';
 
 const tabStore = useTabStore();
 const appStore = useAppStore();
-const fridayStore = useFridayStore();
 const { t } = useI18n();
 const router = useRouter();
 
@@ -286,7 +285,6 @@ const handleKeydown = (event) => {
 
 const addFridayTab = () => {
   const tab = tabStore.addFridayTab();
-  fridayStore.setTabImmersiveHome(tab.id, true);
   router.push(tab.fullPath);
 };
 
