@@ -2128,6 +2128,29 @@ const editor = useEditor({
         return true;
       }
 
+      // Keep Tab inside the editor: nest/unnest list items, or indent plain text.
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        const { $from } = view.state.selection;
+        let listItemType = null;
+        for (let depth = $from.depth; depth > 0; depth -= 1) {
+          const name = $from.node(depth).type.name;
+          if (name === 'taskItem' || name === 'listItem') {
+            listItemType = name;
+            break;
+          }
+        }
+        const command = listItemType
+          ? (event.shiftKey ? 'liftListItem' : 'sinkListItem')
+          : null;
+        if (command && editor.value?.can()?.[command]?.(listItemType)) {
+          editor.value.chain().focus()[command](listItemType).run();
+        } else if (!event.shiftKey) {
+          editor.value?.chain().focus().insertContent('    ').run();
+        }
+        return true;
+      }
+
       if (fimCompletionVisible.value && event.key !== 'Tab') {
         dismissFimCompletion();
       }

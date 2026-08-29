@@ -76,19 +76,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue';
-import { marked } from 'marked';
-
-const renderer = new marked.Renderer();
-renderer.code = function ({ text, lang }) {
-  const language = lang || '';
-  const escapedText = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-block-lang">${language}</span><button class="code-copy-btn" data-code="${encodeURIComponent(text)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div><pre><code class="language-${language}">${escapedText}</code></pre></div>`;
-};
-
-marked.setOptions({ breaks: true, gfm: true, renderer });
+import { handleCodeCopyClick, renderMarkdown, stripMarkdown } from '@/utils/markdown';
 
 const props = defineProps({
   content: { type: String, default: '' },
@@ -105,6 +93,8 @@ defineEmits(['action']);
 
 const copied = ref(false);
 const thinkingCollapsed = ref(false);
+let cachedContent = '';
+let cachedHtml = '';
 
 const hasReasoning = computed(() => !!(props.reasoning || props.reasoningStreamingContent));
 
@@ -119,31 +109,42 @@ const renderedReasoning = computed(() => {
     .split('\n')
     .map(line => `> ${line}`)
     .join('\n');
-  return marked.parse(quoted);
+  return renderMarkdown(quoted);
 });
 
 function toggleThinking() {
   thinkingCollapsed.value = !thinkingCollapsed.value;
 }
 
-const renderedContent = computed(() => marked.parse(props.content));
+const renderedContent = computed(() => {
+  const content = props.content || '';
+  if (!content) {
+    cachedContent = '';
+    cachedHtml = '';
+    return '';
+  }
 
-function stripMarkdown(text) {
-  return text
-    .replace(/```[\s\S]*?```/g, (match) => match.replace(/```.*\n?/g, ''))
-    .replace(/`[^`]+`/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    .replace(/~~([^~]+)~~/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^\s*[-*+]\s+/gm, '')
-    .replace(/^\s*\d+\.\s+/gm, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
+  // During streaming, keep completed paragraphs rendered and only parse the tail.
+  // This avoids reparsing the entire response for every animation-frame update.
+  if (props.isStreaming && content.indexOf('\n\n') >= 0) {
+    const boundary = content.lastIndexOf('\n\n');
+    const stableContent = content.slice(0, boundary + 2);
+    const tail = content.slice(boundary + 2);
+    if (cachedContent && !stableContent.startsWith(cachedContent)) {
+      cachedContent = '';
+      cachedHtml = '';
+    }
+    if (stableContent !== cachedContent) {
+      cachedContent = stableContent;
+      cachedHtml = renderMarkdown(stableContent);
+    }
+    return cachedHtml + renderMarkdown(tail);
+  }
+
+  cachedContent = content;
+  cachedHtml = renderMarkdown(content);
+  return cachedHtml;
+});
 
 async function handleCopy() {
   try {
@@ -165,31 +166,12 @@ async function handleCopy() {
   }
 }
 
-async function handleCodeBlockCopy(event) {
-  const btn = event.target.closest('.code-copy-btn');
-  if (!btn) return;
-
-  const code = decodeURIComponent(btn.dataset.code);
-  try {
-    await navigator.clipboard.writeText(code);
-    btn.classList.add('copied');
-    const svg = btn.innerHTML;
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    setTimeout(() => {
-      btn.classList.remove('copied');
-      btn.innerHTML = svg;
-    }, 2000);
-  } catch (err) {
-    console.error('Failed to copy code:', err);
-  }
-}
-
 onMounted(() => {
-  document.addEventListener('click', handleCodeBlockCopy);
+  document.addEventListener('click', handleCodeCopyClick);
 });
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleCodeBlockCopy);
+  document.removeEventListener('click', handleCodeCopyClick);
 });
 </script>
 

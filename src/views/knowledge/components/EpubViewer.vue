@@ -6,6 +6,7 @@
       :default-dark-mode="isDark"
       @ready="onReady"
       @progress="onProgress"
+      @toc="onToc"
       @error="onError"
     />
     <div v-if="loading" class="epub-loading">
@@ -66,13 +67,34 @@ async function loadEpub() {
 function onReady(handle) {
   readerHandle = handle;
   loading.value = false;
+  emitToc();
+}
+
+function emitToc() {
+  const items = readerHandle?.getToc?.() || [];
+  const flatten = (entries = [], level = 1) => entries.flatMap(item => [
+    { id: item.href || `toc-${level}-${item.label}`, title: item.label || '未命名章节', level, href: item.href },
+    ...flatten(item.subitems || item.children || [], level + 1)
+  ]);
+  const toc = flatten(items);
+  if (toc.length) emit('toc-ready', toc);
 }
 
 function onProgress(info) {
+  emitToc();
   if (info && info.fraction !== undefined) {
     const percent = Math.round((info.fraction || 0) * 100);
     emit('page-info', { current: percent, total: 100 });
+    if (info.tocItem?.href) emit('active-section', info.tocItem.href);
   }
+}
+
+function onToc(items) {
+  const flatten = (entries = [], level = 1) => entries.flatMap(item => [
+    { id: item.href || `toc-${level}-${item.label}`, title: item.label || '未命名章节', level, href: item.href },
+    ...flatten(item.subitems || item.children || [], level + 1)
+  ]);
+  emit('toc-ready', flatten(items));
 }
 
 function onError(err) {
@@ -89,7 +111,9 @@ function prevPage() {
   if (readerHandle) readerHandle.prevPage();
 }
 
-defineExpose({ nextPage, prevPage });
+function scrollToSection(item) { if (readerHandle && item?.href) readerHandle.goTo(item.href); }
+
+defineExpose({ nextPage, prevPage, scrollToSection });
 
 onMounted(() => {
   loadEpub();

@@ -28,6 +28,13 @@ a {
   color: inherit;
 }
 
+/* Keep keyboard focus usable without adding a visual adjustment effect to buttons. */
+button:focus-visible,
+[role='button']:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .electron-drag-region {
   -webkit-app-region: drag;
   app-region: drag;

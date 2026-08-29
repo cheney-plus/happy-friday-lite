@@ -39,7 +39,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 const props = defineProps({
   filePath: { type: String, required: true }
 });
-const emit = defineEmits(['page-info']);
+const emit = defineEmits(['page-info', 'toc-ready', 'active-section']);
 
 const containerRef = ref(null);
 const pagesRef = ref(null);
@@ -64,6 +64,7 @@ let intersectionObserver = null;
 let resizeObserver = null;
 let resizeTimer = null;
 let defaultPageHeight = 1100;
+let tocItems = [];
 
 // 距当前页超过此值的已渲染页面会被清理，以控制内存
 const CLEAR_DISTANCE = 8;
@@ -104,9 +105,50 @@ async function loadPdf() {
     setupIntersectionObserver();
     setupResizeObserver();
     emit('page-info', { current: 1, total: totalPages.value });
+    await buildPdfToc();
   } catch (e) {
     error.value = '加载 PDF 失败: ' + (e.message || e);
     loading.value = false;
+  }
+}
+
+async function buildPdfToc() {
+  const fallback = () => Array.from({ length: totalPages.value }, (_, i) => ({
+    id: `page-${i + 1}`, title: `第 ${i + 1} 页`, level: 1, page: i + 1
+  }));
+  try {
+    const outline = await pdfDoc?.getOutline();
+    if (!outline?.length) {
+      tocItems = fallback();
+      emit('toc-ready', tocItems);
+      return;
+    }
+    const items = [];
+    async function visit(entries, level = 1) {
+      for (const entry of entries || []) {
+        let page;
+        if (entry.dest) {
+          try {
+            const destination = typeof entry.dest === 'string'
+              ? await pdfDoc.getDestination(entry.dest)
+              : entry.dest;
+            const ref = destination?.[0];
+            if (ref) page = (await pdfDoc.getPageIndex(ref)) + 1;
+          } catch (_) {
+            // 某些外部链接或损坏的目标没有对应页面，仍保留章节名称
+          }
+        }
+        const id = `outline-${items.length + 1}`;
+        items.push({ id, title: entry.title || '未命名章节', level, page });
+        await visit(entry.items, level + 1);
+      }
+    }
+    await visit(outline);
+    tocItems = items.length ? items : fallback();
+    emit('toc-ready', tocItems);
+  } catch (_) {
+    tocItems = fallback();
+    emit('toc-ready', tocItems);
   }
 }
 
@@ -248,6 +290,8 @@ function onScroll() {
     if (page !== currentPage.value) {
       currentPage.value = page;
       emit('page-info', { current: page, total: totalPages.value });
+      const section = [...tocItems].filter(item => item.page && item.page <= page).at(-1);
+      emit('active-section', section?.id || `page-${page}`);
     }
   }, 100);
 }
@@ -265,7 +309,9 @@ function scrollToPage(page) {
   }
 }
 
-defineExpose({ scrollToPage });
+function scrollToSection(item) { if (item?.page) scrollToPage(item.page); }
+
+defineExpose({ scrollToPage, scrollToSection });
 
 onMounted(() => {
   loadPdf();

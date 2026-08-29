@@ -150,12 +150,7 @@
                     <span>{{ t('history.rename') }}</span>
                   </button>
                   <button class="dropdown-item" @click.stop="handleRowMenuSaveAsNote(session)">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                      <line x1="12" y1="6" x2="12" y2="13"></line>
-                      <line x1="9" y1="10" x2="15" y2="10"></line>
-                    </svg>
+                    <NotebookPen :size="13" :stroke-width="2" />
                     <span>{{ t('history.saveAsNote') }}</span>
                   </button>
                   <button class="dropdown-item" @click.stop="handleRowMenuShare(session)">
@@ -219,12 +214,7 @@
             <span>{{ t('history.rename') }}</span>
           </button>
           <button class="menu-item" @click="handleContextMenuSaveAsNote">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-              <line x1="12" y1="6" x2="12" y2="13"></line>
-              <line x1="9" y1="10" x2="15" y2="10"></line>
-            </svg>
+            <NotebookPen :size="14" :stroke-width="2" />
             <span>{{ t('history.saveAsNote') }}</span>
           </button>
           <button class="menu-item" @click="handleShare">
@@ -290,34 +280,7 @@
       </div>
     </Teleport>
 
-    <!-- 分享链接弹窗 -->
-    <Teleport to="body">
-      <div v-if="shareModal.visible" class="modal-overlay" @click.self="closeShareModal">
-        <div class="modal-box share-modal">
-          <div class="modal-title">{{ t('history.shareTitle') }}</div>
-          <div class="modal-desc">{{ t('history.shareDesc', { title: shareModal.sessionTitle }) }}</div>
-          <div v-if="shareModal.loading" class="share-loading">
-            <span class="share-spinner"></span>
-            <span>{{ t('history.shareLoading') }}</span>
-          </div>
-          <template v-else-if="shareModal.url">
-            <div class="share-link-box">
-              <input class="share-link-input" :value="shareModal.url" readonly ref="shareLinkInputRef" @click="selectShareLink" />
-              <button class="share-copy-btn" :class="{ copied: shareModal.copied }" @click="copyShareLink">
-                <span v-if="shareModal.copied">{{ t('history.shareCopied') }}</span>
-                <span v-else>{{ t('history.shareCopy') }}</span>
-              </button>
-            </div>
-            <div class="share-tip">{{ t('history.shareTip') }}</div>
-          </template>
-          <div v-else class="share-error">{{ shareModal.error || t('history.shareError') }}</div>
-          <div class="modal-actions">
-            <button v-if="shareModal.url" class="btn btn-confirm" @click="openShareLink">{{ t('history.shareOpen') }}</button>
-            <button class="btn btn-cancel" @click="closeShareModal">{{ t('history.close') }}</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ShareSessionModal ref="shareSessionModal" />
 
     <Transition name="toast-fade">
       <div v-if="saveToastVisible" class="save-toast">
@@ -335,6 +298,8 @@ import { electronService } from '@/services/electron';
 import { useNoteStore } from '@/store/modules/note';
 import { marked } from 'marked';
 import { buildConversationSummaryPrompt } from '@/config/prompts';
+import { NotebookPen } from 'lucide-vue-next';
+import ShareSessionModal from '@/views/history/ShareSessionModal.vue';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -379,18 +344,8 @@ const deleteModal = ref({
   session: null
 });
 
-const shareModal = ref({
-  visible: false,
-  loading: false,
-  url: '',
-  copied: false,
-  sessionTitle: '',
-  error: '',
-  session: null
-});
-
 const renameInputRef = ref(null);
-const shareLinkInputRef = ref(null);
+const shareSessionModal = ref(null);
 
 const saveToastVisible = ref(false);
 const saveToastMessage = ref('');
@@ -518,7 +473,7 @@ const openSession = (session) => {
   router.push({
     name: 'friday-chat',
     params: { sessionId: session.id },
-    query: { mode: session.mode || 'chat', title: session.title, hideBack: 'true' }
+    query: { mode: session.mode || 'chat', title: session.title || '' }
   });
 };
 
@@ -712,75 +667,14 @@ const handleRowMenuDelete = (session) => {
 // 分享
 const handleRowMenuShare = (session) => {
   closeRowMenu();
-  openShareModal(session);
+  shareSessionModal.value?.open(session);
 };
 
 const handleShare = () => {
   const session = contextMenu.value.session;
   if (!session) return;
   closeContextMenu();
-  openShareModal(session);
-};
-
-const openShareModal = async (session) => {
-  shareModal.value = {
-    visible: true,
-    loading: true,
-    url: '',
-    copied: false,
-    sessionTitle: session.title || t('history.newConversation'),
-    error: '',
-    session
-  };
-  try {
-    const result = await electronService.invoke('get-share-link', { sessionId: session.id });
-    if (result && result.success && result.url) {
-      shareModal.value.loading = false;
-      shareModal.value.url = result.url;
-    } else {
-      shareModal.value.loading = false;
-      shareModal.value.error = (result && result.error) || t('history.shareError');
-    }
-  } catch (err) {
-    console.error('Failed to get share link:', err);
-    shareModal.value.loading = false;
-    shareModal.value.error = t('history.shareError');
-  }
-};
-
-const closeShareModal = () => {
-  shareModal.value.visible = false;
-  shareModal.value.url = '';
-  shareModal.value.copied = false;
-  shareModal.value.error = '';
-  shareModal.value.session = null;
-};
-
-const selectShareLink = () => {
-  if (shareLinkInputRef.value) {
-    shareLinkInputRef.value.select();
-  }
-};
-
-const copyShareLink = async () => {
-  const url = shareModal.value.url;
-  if (!url) return;
-  try {
-    await navigator.clipboard.writeText(url);
-    shareModal.value.copied = true;
-    setTimeout(() => {
-      if (shareModal.value.visible) shareModal.value.copied = false;
-    }, 2000);
-  } catch (err) {
-    // clipboard API 不可用时回退到选中文本手动复制
-    selectShareLink();
-  }
-};
-
-const openShareLink = () => {
-  const url = shareModal.value.url;
-  if (!url) return;
-  electronService.invoke('open-external', url);
+  shareSessionModal.value?.open(session);
 };
 
 // 多选
@@ -1622,95 +1516,6 @@ onUnmounted(() => {
 .delete-modal-icon {
   color: #f59e0b;
   margin-bottom: 12px;
-}
-
-/* ========== 分享弹窗 ========== */
-.share-modal {
-  min-width: 420px;
-  max-width: 480px;
-}
-
-.share-loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 0;
-  color: var(--text-tertiary);
-  font-size: 13.5px;
-}
-
-.share-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--accent-color);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
-}
-
-.share-link-box {
-  display: flex;
-  gap: 8px;
-  margin: 4px 0 0;
-}
-
-.share-link-input {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 12px;
-  border: 1.5px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 12.5px;
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
-  outline: none;
-  cursor: text;
-}
-
-.share-link-input:focus {
-  border-color: var(--accent-color);
-  background: var(--bg-primary);
-}
-
-.share-copy-btn {
-  flex-shrink: 0;
-  padding: 0 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--accent-color);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.share-copy-btn:hover {
-  opacity: 0.9;
-}
-
-.share-copy-btn.copied {
-  background: #16a34a;
-}
-
-.share-tip {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  line-height: 1.5;
-}
-
-.share-error {
-  padding: 14px;
-  margin-top: 4px;
-  border-radius: 8px;
-  background: rgba(220, 38, 38, 0.08);
-  color: #dc2626;
-  font-size: 13px;
 }
 
 .save-toast {

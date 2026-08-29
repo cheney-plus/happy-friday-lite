@@ -39,7 +39,7 @@
       <textarea
         :value="modelValue"
         class="main-input"
-        :placeholder="isStreaming ? 'AI 正在思考...' : placeholder"
+        :placeholder="isStreaming ? t('friday.aiThinking') : placeholder"
         rows="1"
         @input="handleInput"
         @keydown.enter.exact="handleSendKeydown"
@@ -49,6 +49,7 @@
 
       <div class="input-actions">
         <div class="action-left">
+          <slot name="actions-left"></slot>
         </div>
 
         <div class="action-right">
@@ -59,7 +60,7 @@
               </svg>
             </button>
 
-            <button class="action-btn icon-only" @click.stop="toggleKbDropdown($event)" :title="t('friday.referenceKb')">
+            <button v-if="showKbButton" class="action-btn icon-only" @click.stop="toggleKbDropdown($event)" :title="t('friday.referenceKb')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                 <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
@@ -82,7 +83,7 @@
               v-else
               key="send"
               class="send-btn"
-              :class="{ active: modelValue.trim() }"
+              :class="{ active: (modelValue || '').trim() }"
               @click="$emit('send')"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -166,6 +167,7 @@ const props = defineProps({
   isStreaming: { type: Boolean, default: false },
   noteReferences: { type: Array, default: () => [] },
   showReferenceButtons: { type: Boolean, default: false },
+  showKbButton: { type: Boolean, default: true },
   attachments: { type: Array, default: () => [] },
   selectableKbList: { type: Array, default: () => [] },
   // 下拉弹出方向：'down' 向下（默认），'up' 向上（适用于输入框靠近视口底部的场景）

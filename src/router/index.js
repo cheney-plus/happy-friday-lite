@@ -73,13 +73,19 @@ export const routes = [
   },
   {
     path: '/friday',
-    name: 'friday',
-    component: () => import('@/views/friday/FridayChat.vue')
-  },
-  {
-    path: '/friday/chat/:sessionId?',
-    name: 'friday-chat',
-    component: () => import('@/views/friday/FridayConversation.vue')
+    component: () => import('@/views/friday/FridayLayout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'friday',
+        component: () => import('@/views/friday/FridayHome.vue')
+      },
+      {
+        path: 'chat/:sessionId?',
+        name: 'friday-chat',
+        component: () => import('@/views/friday/FridayConversation.vue')
+      }
+    ]
   },
   {
     // 内网分享：复用对话界面，通过 meta.share 标记为分享模式（隐藏输入框）

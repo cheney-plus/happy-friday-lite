@@ -19,13 +19,13 @@
           <span v-if="note.updatedAt">更新于 {{ formatTime(note.updatedAt) }}</span>
         </div>
       </div>
-      <div class="note-body" v-html="note.content || ''"></div>
+      <div class="note-body" ref="contentRef" v-html="note.content || ''"></div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue';
 import { formatRelativeTime as formatTime } from '../utils';
 
 const props = defineProps({
@@ -35,6 +35,30 @@ const props = defineProps({
 const loading = ref(true);
 const error = ref('');
 const note = ref({});
+const contentRef = ref(null);
+const emit = defineEmits(['toc-ready', 'active-section']);
+let headingObserver;
+
+function buildToc() {
+  const headings = [...(contentRef.value?.querySelectorAll('h1,h2,h3,h4,h5,h6') || [])];
+  const used = new Map();
+  const items = headings.map((el) => {
+    const title = el.textContent.trim() || '未命名章节';
+    const base = title.toLowerCase().replace(/[^\w\u4e00-\u9fff]+/g, '-').replace(/^-|-$/g, '') || 'section';
+    const count = used.get(base) || 0; used.set(base, count + 1);
+    const id = count ? `${base}-${count + 1}` : base; el.id = id;
+    return { id, title, level: Number(el.tagName.slice(1)) };
+  });
+  emit('toc-ready', items);
+  headingObserver?.disconnect();
+  headingObserver = new IntersectionObserver((entries) => {
+    const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) emit('active-section', visible.target.id);
+  }, { root: contentRef.value?.closest('.note-viewer'), rootMargin: '-10% 0px -75% 0px' });
+  headings.forEach(h => headingObserver.observe(h));
+}
+function scrollToSection(item) { contentRef.value?.querySelector(`#${CSS.escape(item.id)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+defineExpose({ scrollToSection });
 
 async function loadNote() {
   loading.value = true;
@@ -76,6 +100,8 @@ async function loadNote() {
     }
     note.value = noteData;
     loading.value = false;
+    await nextTick();
+    buildToc();
   } catch (e) {
     error.value = '加载笔记失败: ' + (e.message || e);
     loading.value = false;
@@ -85,6 +111,7 @@ async function loadNote() {
 onMounted(() => {
   loadNote();
 });
+onBeforeUnmount(() => headingObserver?.disconnect());
 </script>
 
 <style scoped lang="scss">

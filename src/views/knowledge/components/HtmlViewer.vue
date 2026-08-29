@@ -10,14 +10,16 @@
     <iframe
       v-else
       class="html-iframe"
+      ref="iframeRef"
       :srcdoc="htmlContent"
-      sandbox="allow-scripts allow-pointer-lock allow-popups allow-forms allow-modals"
+      @load="onFrameLoad"
+      sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-forms allow-modals"
     ></iframe>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 
 const props = defineProps({
   filePath: { type: String, required: true }
@@ -26,6 +28,34 @@ const props = defineProps({
 const htmlContent = ref('');
 const loading = ref(true);
 const error = ref('');
+const iframeRef = ref(null);
+const emit = defineEmits(['toc-ready', 'active-section']);
+let frameScrollHandler;
+
+function onFrameLoad() {
+  const doc = iframeRef.value?.contentDocument;
+  if (!doc) return;
+  const headings = [...doc.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+  const used = new Map();
+  const items = headings.map((el) => {
+    const title = el.textContent.trim() || '未命名章节';
+    const base = title.toLowerCase().replace(/[^\w\u4e00-\u9fff]+/g, '-').replace(/^-|-$/g, '') || 'section';
+    const count = used.get(base) || 0; used.set(base, count + 1);
+    const id = count ? `${base}-${count + 1}` : base; el.id = id;
+    return { id, title, level: Number(el.tagName.slice(1)) };
+  });
+  emit('toc-ready', items);
+  frameScrollHandler = () => {
+    const visible = headings.filter(h => h.getBoundingClientRect().top <= 100).at(-1);
+    if (visible) emit('active-section', visible.id);
+  };
+  doc.addEventListener('scroll', frameScrollHandler, { passive: true });
+}
+function scrollToSection(item) {
+  const target = iframeRef.value?.contentDocument?.getElementById(item.id);
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+defineExpose({ scrollToSection });
 
 async function loadHtml() {
   loading.value = true;
@@ -53,6 +83,10 @@ async function loadHtml() {
 
 onMounted(() => {
   loadHtml();
+});
+onBeforeUnmount(() => {
+  const doc = iframeRef.value?.contentDocument;
+  if (doc && frameScrollHandler) doc.removeEventListener('scroll', frameScrollHandler);
 });
 </script>
 
