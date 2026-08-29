@@ -140,6 +140,8 @@ let pendingRollbackUserMsgIndex = null;
 let leavingAfterStop = false;
 let loadedRouteKey = '';
 let initSeq = 0;
+let scrollFrame = null;
+let forceScrollPending = false;
 
 const { toastVisible, toastMessage, showToast } = useToast();
 const {
@@ -193,11 +195,18 @@ function routeSessionKey() {
 }
 
 function scrollToBottom(force = false) {
-  nextTick(() => {
-    if (!messagesContainer.value) return;
-    if (force || isAtBottom.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    }
+  forceScrollPending = forceScrollPending || force;
+  if (scrollFrame !== null) return;
+  scrollFrame = window.requestAnimationFrame(() => {
+    scrollFrame = null;
+    const shouldScroll = forceScrollPending || isAtBottom.value;
+    forceScrollPending = false;
+    if (!shouldScroll) return;
+    nextTick(() => {
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      }
+    });
   });
 }
 
@@ -211,6 +220,11 @@ function checkScrollPosition() {
 
 function scrollToBottomForce() {
   if (!messagesContainer.value) return;
+  if (scrollFrame !== null) {
+    window.cancelAnimationFrame(scrollFrame);
+    scrollFrame = null;
+  }
+  forceScrollPending = false;
   messagesContainer.value.scrollTo({ top: messagesContainer.value.scrollHeight, behavior: 'smooth' });
   showScrollDownBtn.value = false;
   isAtBottom.value = true;
@@ -500,6 +514,7 @@ onDeactivated(() => {
 });
 
 onUnmounted(() => {
+  if (scrollFrame !== null) window.cancelAnimationFrame(scrollFrame);
   document.removeEventListener('click', handleCodeCopyClick);
   window.removeEventListener('friday-before-tab-close', handleTabCloseRequest);
   messagesContainer.value?.removeEventListener('scroll', checkScrollPosition);

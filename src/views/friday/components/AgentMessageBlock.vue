@@ -7,7 +7,7 @@
     <div class="agent-timeline">
       <template v-for="(seg, si) in segments" :key="seg.id || `${si}`">
         <div v-if="seg.type === 'text' && seg.content" class="agent-text-body">
-          <div class="markdown-body" v-html="renderMarkdown(seg.content)"></div>
+          <div class="markdown-body" v-html="renderSegmentMarkdown(seg)"></div>
           <span v-if="seg.isStreaming" class="streaming-cursor"></span>
         </div>
         <ToolCallSection
@@ -71,6 +71,22 @@ defineProps({
 defineEmits(['action']);
 
 const { t } = useI18n();
+
+const segmentHtmlCache = new Map();
+
+function renderSegmentMarkdown(segment) {
+  const key = segment.id || segment;
+  const content = segment.content || '';
+  const cached = segmentHtmlCache.get(key);
+  if (cached && cached.content === content) return cached.html;
+  const html = renderMarkdown(content);
+  segmentHtmlCache.set(key, { content, html });
+  if (segmentHtmlCache.size > 100) {
+    const firstKey = segmentHtmlCache.keys().next().value;
+    segmentHtmlCache.delete(firstKey);
+  }
+  return html;
+}
 </script>
 
 <style scoped>

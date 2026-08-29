@@ -93,6 +93,8 @@ defineEmits(['action']);
 
 const copied = ref(false);
 const thinkingCollapsed = ref(false);
+let cachedContent = '';
+let cachedHtml = '';
 
 const hasReasoning = computed(() => !!(props.reasoning || props.reasoningStreamingContent));
 
@@ -114,7 +116,35 @@ function toggleThinking() {
   thinkingCollapsed.value = !thinkingCollapsed.value;
 }
 
-const renderedContent = computed(() => renderMarkdown(props.content));
+const renderedContent = computed(() => {
+  const content = props.content || '';
+  if (!content) {
+    cachedContent = '';
+    cachedHtml = '';
+    return '';
+  }
+
+  // During streaming, keep completed paragraphs rendered and only parse the tail.
+  // This avoids reparsing the entire response for every animation-frame update.
+  if (props.isStreaming && content.indexOf('\n\n') >= 0) {
+    const boundary = content.lastIndexOf('\n\n');
+    const stableContent = content.slice(0, boundary + 2);
+    const tail = content.slice(boundary + 2);
+    if (cachedContent && !stableContent.startsWith(cachedContent)) {
+      cachedContent = '';
+      cachedHtml = '';
+    }
+    if (stableContent !== cachedContent) {
+      cachedContent = stableContent;
+      cachedHtml = renderMarkdown(stableContent);
+    }
+    return cachedHtml + renderMarkdown(tail);
+  }
+
+  cachedContent = content;
+  cachedHtml = renderMarkdown(content);
+  return cachedHtml;
+});
 
 async function handleCopy() {
   try {
