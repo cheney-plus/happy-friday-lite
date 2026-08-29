@@ -8,6 +8,14 @@
         </div>
       </div>
       <div class="header-right">
+        <div v-if="file.type === 'epub' && tocItems.length" ref="tocMenuWrapRef" class="toc-menu-wrap">
+          <button class="toc-menu-btn" title="打开目录" @click="tocMenuOpen = !tocMenuOpen">
+            <span class="toc-menu-icon">☰</span><span>目录</span>
+          </button>
+          <div v-if="tocMenuOpen" class="toc-menu-popover">
+            <DocumentToc :items="tocItems" :active-id="activeTocId" @select="selectEpubTocItem" />
+          </div>
+        </div>
         <div v-if="showPageNav" class="page-nav">
           <button class="page-btn" :disabled="currentPage <= 1" @click="prevPage" title="上一页">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -30,46 +38,62 @@
       </div>
     </div>
     <div class="viewer-body">
+      <DocumentToc v-if="file.type !== 'epub'" :items="tocItems" :active-id="activeTocId" @select="selectTocItem" />
+      <div class="viewer-content">
       <PdfViewer
         v-if="file.type === 'pdf'"
         ref="pdfViewerRef"
         :file-path="file.path"
         @page-info="onPageInfo"
+        @toc-ready="onTocReady"
+        @active-section="activeTocId = $event"
       />
       <EpubViewer
         v-else-if="file.type === 'epub'"
-        ref="epubViewerRef"
         :file-path="file.path"
+        ref="epubViewerRef"
+        @toc-ready="onTocReady"
         @page-info="onPageInfo"
       />
       <MarkdownViewer
         v-else-if="file.type === 'markdown'"
+        ref="markdownViewerRef"
         :file-path="file.path"
+        @toc-ready="onTocReady"
+        @active-section="activeTocId = $event"
       />
       <NoteViewer
         v-else-if="file.type === 'note'"
+        ref="noteViewerRef"
         :file-path="file.path"
+        @toc-ready="onTocReady"
+        @active-section="activeTocId = $event"
       />
       <HtmlViewer
         v-else-if="file.type === 'html'"
+        ref="htmlViewerRef"
         :file-path="file.path"
+        @toc-ready="onTocReady"
+        @active-section="activeTocId = $event"
       />
       <TextViewer
         v-else
         :file-path="file.path"
       />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import PdfViewer from './PdfViewer.vue';
 import EpubViewer from './EpubViewer.vue';
 import MarkdownViewer from './MarkdownViewer.vue';
 import NoteViewer from './NoteViewer.vue';
 import HtmlViewer from './HtmlViewer.vue';
 import TextViewer from './TextViewer.vue';
+import DocumentToc from './DocumentToc.vue';
 import { getFileIconComponent } from '../utils';
 
 const props = defineProps({
@@ -81,6 +105,13 @@ const totalPages = ref(0);
 
 const pdfViewerRef = ref(null);
 const epubViewerRef = ref(null);
+const markdownViewerRef = ref(null);
+const noteViewerRef = ref(null);
+const htmlViewerRef = ref(null);
+const tocItems = ref([]);
+const activeTocId = ref('');
+const tocMenuOpen = ref(false);
+const tocMenuWrapRef = ref(null);
 
 const showPageNav = computed(() => ['pdf', 'epub'].includes(props.file.type));
 
@@ -93,6 +124,40 @@ function onPageInfo(info) {
   currentPage.value = info.current;
   totalPages.value = info.total;
 }
+
+function onTocReady(items) {
+  tocItems.value = Array.isArray(items) ? items : [];
+  activeTocId.value = tocItems.value[0]?.id || '';
+}
+
+function selectTocItem(item) {
+  const viewer = { pdf: pdfViewerRef, epub: epubViewerRef, markdown: markdownViewerRef, note: noteViewerRef, html: htmlViewerRef }[props.file.type];
+  viewer?.value?.scrollToSection?.(item);
+}
+function selectEpubTocItem(item) { selectTocItem(item); tocMenuOpen.value = false; }
+
+function closeTocOnOutside(event) {
+  if (tocMenuOpen.value && !tocMenuWrapRef.value?.contains(event.target)) {
+    tocMenuOpen.value = false;
+  }
+}
+
+function closeTocOnEscape(event) {
+  if (event.key === 'Escape') tocMenuOpen.value = false;
+}
+
+watch(() => props.file.path, () => { tocItems.value = []; activeTocId.value = ''; tocMenuOpen.value = false; });
+
+onMounted(() => {
+  document.addEventListener('pointerdown', closeTocOnOutside);
+  document.addEventListener('focusin', closeTocOnOutside);
+  document.addEventListener('keydown', closeTocOnEscape);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeTocOnOutside);
+  document.removeEventListener('focusin', closeTocOnOutside);
+  document.removeEventListener('keydown', closeTocOnEscape);
+});
 
 function prevPage() {
   if (props.file.type === 'pdf') {
@@ -254,5 +319,14 @@ function nextPage() {
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  display: flex;
+}
+.toc-menu-wrap { position: relative; }
+.toc-menu-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-secondary); cursor: pointer; font-size: 12px; }
+.toc-menu-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.toc-menu-icon { font-size: 15px; line-height: 1; }
+.toc-menu-popover { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: 260px; height: min(60vh, 480px); box-shadow: 0 8px 24px rgba(0,0,0,.16); border: 1px solid var(--border-color); }
+.toc-menu-popover :deep(.document-toc) { width: 100%; height: 100%; border: 0; }
+.viewer-content { flex: 1; min-width: 0; min-height: 0; overflow: hidden;
 }
 </style>

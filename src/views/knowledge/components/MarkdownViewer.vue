@@ -1,6 +1,6 @@
 <template>
   <div class="markdown-viewer">
-    <div class="md-content" v-html="renderedHtml"></div>
+    <div class="md-content" ref="contentRef" v-html="renderedHtml"></div>
     <div v-if="loading" class="md-loading">
       <div class="spinner"></div>
       <span>加载中...</span>
@@ -12,7 +12,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue';
 import { marked } from 'marked';
 
 const props = defineProps({
@@ -22,6 +22,32 @@ const props = defineProps({
 const renderedHtml = ref('');
 const loading = ref(true);
 const error = ref('');
+const contentRef = ref(null);
+const emit = defineEmits(['toc-ready', 'active-section']);
+let headingObserver;
+
+function buildToc() {
+  const headings = [...(contentRef.value?.querySelectorAll('h1,h2,h3,h4,h5,h6') || [])];
+  const used = new Map();
+  const items = headings.map((el) => {
+    const title = el.textContent.trim() || '未命名章节';
+    const base = title.toLowerCase().replace(/[^\w\u4e00-\u9fff]+/g, '-').replace(/^-|-$/g, '') || 'section';
+    const count = used.get(base) || 0; used.set(base, count + 1);
+    const id = count ? `${base}-${count + 1}` : base;
+    el.id = id;
+    return { id, title, level: Number(el.tagName.slice(1)) };
+  });
+  emit('toc-ready', items);
+  headingObserver?.disconnect();
+  headingObserver = new IntersectionObserver((entries) => {
+    const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) emit('active-section', visible.target.id);
+  }, { root: contentRef.value?.parentElement, rootMargin: '-10% 0px -75% 0px' });
+  headings.forEach(h => headingObserver.observe(h));
+}
+
+function scrollToSection(item) { contentRef.value?.querySelector(`#${CSS.escape(item.id)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+defineExpose({ scrollToSection });
 
 marked.setOptions({
   breaks: true,
@@ -46,6 +72,8 @@ async function loadMarkdown() {
     }
     renderedHtml.value = marked.parse(result.content || '');
     loading.value = false;
+    await nextTick();
+    buildToc();
   } catch (e) {
     error.value = '加载文件失败: ' + (e.message || e);
     loading.value = false;
@@ -55,6 +83,7 @@ async function loadMarkdown() {
 onMounted(() => {
   loadMarkdown();
 });
+onBeforeUnmount(() => headingObserver?.disconnect());
 </script>
 
 <style scoped lang="scss">
