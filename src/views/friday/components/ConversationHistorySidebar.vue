@@ -30,14 +30,17 @@
     <div class="history-list">
       <div v-if="loading && !sessions.length" class="history-state">{{ t('history.loading') }}</div>
       <template v-else-if="filteredSessions.length">
-        <button
+        <div
           v-for="session in filteredSessions"
           :key="session.id"
-          type="button"
           class="history-session"
+          role="button"
+          tabindex="0"
           :class="{ active: session.id === currentSessionId }"
           :title="session.title || t('friday.untitledSession')"
           @click="$emit('select', session)"
+          @keydown.enter="$emit('select', session)"
+          @keydown.space.prevent="$emit('select', session)"
         >
           <svg class="history-session-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="18" height="15" rx="3"></rect>
@@ -61,7 +64,7 @@
               <circle cx="12" cy="19" r="1.5"></circle>
             </svg>
           </button>
-        </button>
+        </div>
       </template>
       <div v-else class="history-state">{{ historySearch ? t('friday.historyNoMatch') : t('friday.historyEmpty') }}</div>
     </div>
