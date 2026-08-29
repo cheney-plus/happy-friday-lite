@@ -7,7 +7,7 @@
         <div class="content-wrapper">
           <router-view v-slot="{ Component }">
             <keep-alive :max="8">
-              <component v-if="!isHarnessRoute" :is="Component" :key="route.fullPath" />
+              <component v-if="!isHarnessRoute" :is="Component" :key="routerViewKey" />
             </keep-alive>
           </router-view>
           <DeepSeekHarness v-if="hasVisitedHarness" v-show="isHarnessRoute" />
@@ -28,6 +28,7 @@ import { setI18nLanguage } from '@/i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { allMenuConfigs, isElectronEnvironment } from '@/config/menu';
 import { useTheme } from '@/utils/theme';
+import { resolveFridayTabPath } from '@/utils/fridayNavigation';
 
 const appStore = useAppStore();
 const tabStore = useTabStore();
@@ -39,6 +40,12 @@ const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
 const isShareView = computed(() => route.meta?.share === true || !isElectronEnvironment());
 const isHarnessRoute = computed(() => route.name === 'harness');
 const hasVisitedHarness = ref(false);
+const routerViewKey = computed(() => {
+  if (route.meta?.share) return route.fullPath;
+  if (typeof route.query.__tab === 'string' && route.query.__tab) return route.query.__tab;
+  if (route.path.startsWith('/friday')) return tabStore.activeTabId || 'friday';
+  return route.fullPath;
+});
 
 let unlistenConfig = null;
 
@@ -79,17 +86,18 @@ watch(
     if (activeTab) {
       const activeRootPath = '/' + activeTab.path.split('/')[1];
       if (activeRootPath === rootPath) {
-        tabStore.updateTabFullPath(activeTab.id, newPath);
+        const nextPath = rootPath === '/friday' ? resolveFridayTabPath(newPath, activeTab.id) : newPath;
+        tabStore.updateTabFullPath(activeTab.id, nextPath);
+        if (nextPath !== newPath) router.replace(nextPath);
         return;
       }
     }
 
     if (rootPath === '/friday') {
       const tab = tabStore.addFridayTab();
-      if (newPath !== '/friday') {
-        tabStore.updateTabFullPath(tab.id, newPath);
-      }
-      router.replace(newPath !== '/friday' ? newPath : tab.fullPath);
+      const nextPath = resolveFridayTabPath(newPath, tab.id);
+      tabStore.updateTabFullPath(tab.id, nextPath);
+      if (nextPath !== newPath) router.replace(nextPath);
     } else {
       tabStore.addTab({
         id: newPath,

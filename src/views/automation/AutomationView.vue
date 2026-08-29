@@ -536,7 +536,7 @@ const openRun = (run) => {
   router.push({
     name: 'friday-chat',
     params: { sessionId: run.sessionId },
-    query: { mode: 'agent', automationRun: run.id, from: 'automation' }
+    query: { mode: 'agent', automationRun: run.id }
   });
 };
 
