@@ -35,6 +35,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+const PDFJS_WASM_URL = `${import.meta.env.BASE_URL}pdfjs/wasm/`;
 
 const props = defineProps({
   filePath: { type: String, required: true }
@@ -57,17 +58,21 @@ const pageHeights = reactive({});
 const canvasRefs = {};
 const renderTasks = {};
 const renderingPages = new Set();
+const queuedPages = new Set();
+const renderTokens = {};
 let loadingTask = null;
 let pdfDoc = null;
 let scrollTimer = null;
 let intersectionObserver = null;
 let resizeObserver = null;
 let resizeTimer = null;
+let activeRenderCount = 0;
+let lastContainerWidth = 0;
 let defaultPageHeight = 1100;
 let tocItems = [];
 
-// 距当前页超过此值的已渲染页面会被清理，以控制内存
-const CLEAR_DISTANCE = 8;
+const CLEAR_DISTANCE = 3;
+const MAX_CONCURRENT_RENDERS = 1;
 
 function getPageHeight(page) {
   return pageHeights[page] || defaultPageHeight;
@@ -95,7 +100,7 @@ async function loadPdf() {
       return;
     }
     const data = new Uint8Array(result.data);
-    loadingTask = pdfjsLib.getDocument({ data });
+    loadingTask = pdfjsLib.getDocument({ data, wasmUrl: PDFJS_WASM_URL });
     pdfDoc = await loadingTask.promise;
     totalPages.value = pdfDoc.numPages;
     // 用首页尺寸估算默认高度，让滚动条初始就较准确
@@ -171,8 +176,7 @@ function setupIntersectionObserver() {
     handleIntersection,
     {
       root: pagesRef.value,
-      // 在可视区域上下各扩展 600px，提前渲染即将进入视口的页面
-      rootMargin: '600px 0px',
+      rootMargin: '300px 0px',
     }
   );
   const wrappers = pagesRef.value.querySelectorAll('.pdf-page-wrapper');
@@ -183,7 +187,11 @@ function setupIntersectionObserver() {
 
 function setupResizeObserver() {
   if (resizeObserver) resizeObserver.disconnect();
+  lastContainerWidth = containerRef.value?.clientWidth || 0;
   resizeObserver = new ResizeObserver(() => {
+    const containerWidth = containerRef.value?.clientWidth || 0;
+    if (Math.abs(containerWidth - lastContainerWidth) < 1) return;
+    lastContainerWidth = containerWidth;
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       // 容器尺寸变化后需按新宽度重渲染：清空已渲染页面与缓存高度
@@ -215,6 +223,8 @@ function maybeClearPage(page) {
 }
 
 function clearPage(page) {
+  queuedPages.delete(page);
+  renderTokens[page] = (renderTokens[page] || 0) + 1;
   const canvas = canvasRefs[page];
   if (canvas) {
     // 重置 width 会清空 canvas 并释放显存
@@ -229,7 +239,7 @@ function clearPage(page) {
 }
 
 function clearAllPages() {
-  for (const page of [...renderedPages]) {
+  for (const page of Object.keys(canvasRefs).map(Number)) {
     clearPage(page);
   }
   Object.keys(pageHeights).forEach((key) => {
@@ -237,29 +247,50 @@ function clearAllPages() {
   });
 }
 
-async function renderPage(pageNum) {
+function renderPage(pageNum) {
+  if (renderedPages.has(pageNum) || renderingPages.has(pageNum)) return;
+  queuedPages.add(pageNum);
+  drainRenderQueue();
+}
+
+function drainRenderQueue() {
+  while (activeRenderCount < MAX_CONCURRENT_RENDERS && queuedPages.size) {
+    const [pageNum] = [...queuedPages].sort((a, b) =>
+      Math.abs(a - currentPage.value) - Math.abs(b - currentPage.value)
+    );
+    queuedPages.delete(pageNum);
+    void renderPageNow(pageNum);
+  }
+}
+
+async function renderPageNow(pageNum) {
   if (renderedPages.has(pageNum) || renderingPages.has(pageNum)) return;
   const canvas = canvasRefs[pageNum];
   if (!canvas || !pdfDoc) return;
 
+  const renderToken = (renderTokens[pageNum] || 0) + 1;
+  renderTokens[pageNum] = renderToken;
   renderingPages.add(pageNum);
+  activeRenderCount += 1;
   try {
-    const ctx = canvas.getContext('2d');
     const page = await pdfDoc.getPage(pageNum);
-    if (!containerRef.value) return; // 组件已卸载
-    const containerWidth = containerRef.value.clientWidth - 48;
+    if (!containerRef.value || renderTokens[pageNum] !== renderToken) return;
     const baseViewport = page.getViewport({ scale: 1 });
+    const containerWidth = containerRef.value.clientWidth - 48;
     const displayScale = Math.min(containerWidth / baseViewport.width, 1.5);
+    const displayWidth = displayScale * baseViewport.width;
+    const displayHeight = displayScale * baseViewport.height;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const renderScale = displayScale * dpr;
     const renderViewport = page.getViewport({ scale: renderScale });
+    const ctx = canvas.getContext('2d', { alpha: false });
     canvas.width = Math.floor(renderViewport.width);
     canvas.height = Math.floor(renderViewport.height);
-    canvas.style.width = Math.floor(displayScale * baseViewport.width) + 'px';
-    canvas.style.height = Math.floor(displayScale * baseViewport.height) + 'px';
+    canvas.style.width = Math.floor(displayWidth) + 'px';
+    canvas.style.height = Math.floor(displayHeight) + 'px';
 
     // 用真实高度更新 wrapper，保证滚动条准确
-    pageHeights[pageNum] = Math.floor(displayScale * baseViewport.height);
+    pageHeights[pageNum] = Math.floor(displayHeight);
 
     if (renderTasks[pageNum]) renderTasks[pageNum].cancel();
     renderTasks[pageNum] = page.render({
@@ -268,7 +299,7 @@ async function renderPage(pageNum) {
     });
     try {
       await renderTasks[pageNum].promise;
-      renderedPages.add(pageNum);
+      if (renderTokens[pageNum] === renderToken) renderedPages.add(pageNum);
     } catch (e) {
       if (e && e.name !== 'RenderingCancelledException') {
         console.error('Render error:', e);
@@ -276,6 +307,8 @@ async function renderPage(pageNum) {
     }
   } finally {
     renderingPages.delete(pageNum);
+    activeRenderCount -= 1;
+    drainRenderQueue();
   }
 }
 
@@ -284,11 +317,10 @@ function onScroll() {
   scrollTimer = setTimeout(() => {
     const container = pagesRef.value;
     if (!container) return;
-    const scrollTop = container.scrollTop;
-    const pageHeight = container.scrollHeight / totalPages.value;
-    const page = Math.min(Math.floor(scrollTop / pageHeight) + 1, totalPages.value);
+    const page = getPageAtViewportTop(container);
     if (page !== currentPage.value) {
       currentPage.value = page;
+      clearDistantPages();
       emit('page-info', { current: page, total: totalPages.value });
       const section = [...tocItems].filter(item => item.page && item.page <= page).at(-1);
       emit('active-section', section?.id || `page-${page}`);
@@ -296,13 +328,33 @@ function onScroll() {
   }, 100);
 }
 
+function getPageAtViewportTop(container) {
+  const containerTop = container.getBoundingClientRect().top;
+  const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+  for (const wrapper of wrappers) {
+    if (wrapper.getBoundingClientRect().bottom > containerTop + 1) {
+      return Number(wrapper.dataset.page);
+    }
+  }
+  return totalPages.value;
+}
+
+function clearDistantPages() {
+  const cachedPages = new Set([...renderedPages, ...queuedPages, ...renderingPages]);
+  for (const page of cachedPages) {
+    if (Math.abs(page - currentPage.value) > CLEAR_DISTANCE) clearPage(page);
+  }
+}
+
 function scrollToPage(page) {
   const container = pagesRef.value;
   if (!container || page < 1 || page > totalPages.value) return;
   const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${page}"]`);
   if (wrapper) {
-    container.scrollTo({ top: wrapper.offsetTop, behavior: 'smooth' });
     currentPage.value = page;
+    // 先中止跳转前页面的解码任务，避免目标页被串行队列阻塞。
+    clearDistantPages();
+    container.scrollTo({ top: wrapper.offsetTop, behavior: 'auto' });
     emit('page-info', { current: page, total: totalPages.value });
     // 跳转目标页可能尚未渲染，主动触发一次
     renderPage(page);
@@ -320,6 +372,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (intersectionObserver) intersectionObserver.disconnect();
   if (resizeObserver) resizeObserver.disconnect();
+  queuedPages.clear();
   for (const pageNum in renderTasks) {
     renderTasks[pageNum].cancel();
   }

@@ -1,10 +1,38 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { resolve } from "path";
+import { createReadStream, readFileSync } from "node:fs";
+
+const PDFJS_WASM_FILES = ['openjpeg.wasm', 'jbig2.wasm'];
+const pdfjsWasmDir = resolve(__dirname, 'node_modules/pdfjs-dist/wasm');
+
+function pdfjsWasmAssets() {
+  return {
+    name: 'pdfjs-wasm-assets',
+    configureServer(server) {
+      server.middlewares.use('/pdfjs/wasm', (req, res, next) => {
+        const fileName = (req.url || '').replace(/^\//, '');
+        if (!PDFJS_WASM_FILES.includes(fileName)) return next();
+        res.setHeader('Content-Type', 'application/wasm');
+        createReadStream(resolve(pdfjsWasmDir, fileName)).pipe(res);
+      });
+    },
+    generateBundle() {
+      for (const fileName of PDFJS_WASM_FILES) {
+        this.emitFile({
+          type: 'asset',
+          fileName: `pdfjs/wasm/${fileName}`,
+          source: readFileSync(resolve(pdfjsWasmDir, fileName))
+        });
+      }
+    }
+  };
+}
 
 export default defineConfig(() => ({
   plugins: [
     vue(),
+    pdfjsWasmAssets(),
   ],
   resolve: {
     alias: {

@@ -321,6 +321,7 @@
       "main.js",
       "preload.cjs",
       "src-electron/**/*",
+      "src/config/prompts.js",
       "node_modules/@deepseek-ai/**/*",
       "public/skills/**/*",
       "python/requirements.txt",
