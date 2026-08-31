@@ -637,6 +637,19 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 20px 0;
+  /* The app-wide reset disables selection; conversation text must remain copyable. */
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.conversation-messages .messages-inner,
+.conversation-messages .messages-inner :deep(*) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .conversation-messages::-webkit-scrollbar {
