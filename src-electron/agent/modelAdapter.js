@@ -15,6 +15,7 @@
 import { ChatOpenAI } from '@langchain/openai'
 import { createLogger } from './logger.js'
 import { recordUsage } from '../usage.js'
+import { normalizeOpenAIBaseUrl } from '../openaiUrl.js'
 
 const log = createLogger('Model')
 
@@ -31,13 +32,9 @@ const log = createLogger('Model')
 export function createLangChainModel(modelConfig) {
   const { provider, baseUrl, apiKey, modelName, enableThinking } = modelConfig
 
-  // 构造 baseURL：LangChain SDK 会自动追加 /chat/completions
-  // - 非 'other' provider：直接用 baseUrl（如 https://api.deepseek.com）
-  // - 'other' provider：baseUrl 可能含 /chat/completions，需剥离避免重复
-  let lcBaseUrl = (baseUrl || '').replace(/\/+$/, '')
-  if (provider === 'other') {
-    lcBaseUrl = lcBaseUrl.replace(/\/chat\/completions\/?$/i, '')
-  }
+  // LangChain SDK appends /chat/completions, so accept either a base URL or
+  // a full endpoint and always pass it a normalized base URL.
+  const lcBaseUrl = normalizeOpenAIBaseUrl(baseUrl)
 
   log.info(`创建模型: provider=${provider}, model=${modelName}, baseURL=${lcBaseUrl}, thinking=${!!enableThinking}`)
 

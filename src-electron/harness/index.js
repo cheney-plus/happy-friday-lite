@@ -8,6 +8,7 @@ import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import yaml from 'js-yaml'
 import { getDataDir, loadConfig } from '../config.js'
+import { normalizeOpenAIBaseUrl } from '../openaiUrl.js'
 import {
   acquireLocalMcpServer,
   getLocalMcpStatus,
@@ -150,10 +151,9 @@ function selectedModel() {
     error.code = 'HARNESS_MODEL_REQUIRED'
     throw error
   }
-  let baseUrl = String(model.baseUrl).replace(/\/+$/, '')
-  if (model.provider === 'other') {
-    baseUrl = baseUrl.replace(/\/chat\/completions\/?$/i, '')
-  }
+  // DSH appends /chat/completions for the openai-completions API. Normalize
+  // both provider base URLs and custom full endpoints before writing settings.
+  const baseUrl = normalizeOpenAIBaseUrl(model.baseUrl)
   return {
     provider: String(model.provider || 'other'),
     providerLabel: model.providerLabel || model.provider || 'Custom',
