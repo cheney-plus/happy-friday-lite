@@ -14,7 +14,8 @@ export function mapHistoryMessage(raw) {
   const msg = {
     role: raw.role,
     content: raw.content,
-    id: raw.id
+    id: raw.id,
+    reasoning: raw.reasoning || raw.metadata?.reasoning
   };
   if (raw.metadata?.segments && Array.isArray(raw.metadata.segments)) {
     msg.segments = raw.metadata.segments;

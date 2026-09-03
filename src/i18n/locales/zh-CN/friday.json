@@ -55,6 +55,7 @@
   "copied": "已复制",
   "rollback": "回退",
   "thinking": "思考中",
+  "thinkingProcess": "思考过程",
   "aiThinking": "AI 正在思考...",
   "modelRequired": "未配置大模型，请先在设置中添加自己的模型",
   "requestFailed": "请求失败：",

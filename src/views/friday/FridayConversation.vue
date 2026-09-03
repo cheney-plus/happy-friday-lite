@@ -19,6 +19,7 @@
           <AgentMessageBlock
             v-else-if="msg.segments && msg.segments.length > 0"
             :segments="msg.segments"
+            :reasoning="msg.reasoning"
             :show-actions="!isShareMode"
             :show-divider="true"
             @action="(type) => handleAction(type, index)"
@@ -38,6 +39,8 @@
         <AgentMessageBlock
           v-if="currentMode === 'agent' && (isStreaming || agentSegments.length > 0)"
           :segments="agentSegments"
+          :reasoning-streaming-content="streamingReasoning"
+          :is-streaming="isStreaming"
           :thinking="isThinking"
         />
         <AIMessage
