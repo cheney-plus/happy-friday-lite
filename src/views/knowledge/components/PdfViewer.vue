@@ -8,11 +8,13 @@
         :data-page="page"
         :style="{ height: getPageHeight(page) + 'px' }"
       >
-        <canvas
-          :ref="el => setCanvasRef(el, page)"
-          class="pdf-canvas"
-          v-show="renderedPages.has(page)"
-        ></canvas>
+        <div class="pdf-page-layer" v-show="renderedPages.has(page)">
+          <canvas
+            :ref="el => setCanvasRef(el, page)"
+            class="pdf-canvas"
+          ></canvas>
+          <div :ref="el => setTextLayerRef(el, page)" class="pdf-text-layer"></div>
+        </div>
         <div v-show="!renderedPages.has(page)" class="pdf-page-placeholder">
           <div class="placeholder-spinner"></div>
           <span>{{ page }} / {{ totalPages }}</span>
@@ -56,6 +58,7 @@ const pageHeights = reactive({});
 
 // 非响应式内部状态
 const canvasRefs = {};
+const textLayerRefs = {};
 const renderTasks = {};
 const renderingPages = new Set();
 const queuedPages = new Set();
@@ -81,6 +84,11 @@ function getPageHeight(page) {
 function setCanvasRef(el, page) {
   if (el) canvasRefs[page] = el;
   else delete canvasRefs[page];
+}
+
+function setTextLayerRef(el, page) {
+  if (el) textLayerRefs[page] = el;
+  else delete textLayerRefs[page];
 }
 
 async function loadPdf() {
@@ -231,6 +239,8 @@ function clearPage(page) {
     canvas.width = 0;
     canvas.height = 0;
   }
+  const textLayer = textLayerRefs[page];
+  if (textLayer) textLayer.replaceChildren();
   if (renderTasks[page]) {
     renderTasks[page].cancel();
     delete renderTasks[page];
@@ -280,6 +290,7 @@ async function renderPageNow(pageNum) {
     const displayScale = Math.min(containerWidth / baseViewport.width, 1.5);
     const displayWidth = displayScale * baseViewport.width;
     const displayHeight = displayScale * baseViewport.height;
+    const displayViewport = page.getViewport({ scale: displayScale });
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const renderScale = displayScale * dpr;
     const renderViewport = page.getViewport({ scale: renderScale });
@@ -288,6 +299,26 @@ async function renderPageNow(pageNum) {
     canvas.height = Math.floor(renderViewport.height);
     canvas.style.width = Math.floor(displayWidth) + 'px';
     canvas.style.height = Math.floor(displayHeight) + 'px';
+
+    const textLayer = textLayerRefs[pageNum];
+    if (textLayer) {
+      textLayer.replaceChildren();
+      textLayer.style.width = `${Math.floor(displayWidth)}px`;
+      textLayer.style.height = `${Math.floor(displayHeight)}px`;
+      const textContent = await page.getTextContent();
+      for (const item of textContent.items) {
+        if (!item.str) continue;
+        const tx = pdfjsLib.Util.transform(displayViewport.transform, item.transform);
+        const fontHeight = Math.max(Math.hypot(tx[2], tx[3]), 1);
+        const span = document.createElement('span');
+        span.textContent = item.str;
+        span.style.left = `${tx[4]}px`;
+        span.style.top = `${tx[5] - fontHeight}px`;
+        span.style.fontSize = `${fontHeight}px`;
+        span.style.fontFamily = item.fontName || 'sans-serif';
+        textLayer.appendChild(span);
+      }
+    }
 
     // 用真实高度更新 wrapper，保证滚动条准确
     pageHeights[pageNum] = Math.floor(displayHeight);
@@ -411,11 +442,39 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+.pdf-page-layer {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
 .pdf-canvas {
+  display: block;
   max-width: 100%;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   border-radius: 4px;
   background: #fff;
+}
+
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  -webkit-user-select: text;
+  user-select: text;
+  color: transparent;
+  cursor: text;
+}
+
+.pdf-text-layer :deep(span) {
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0 0;
+  color: transparent;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .pdf-page-placeholder {

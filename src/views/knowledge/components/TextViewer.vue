@@ -70,6 +70,8 @@ onMounted(() => {
   height: 100%;
   overflow: hidden;
   background: var(--bg-primary);
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .text-content {
@@ -88,9 +90,13 @@ onMounted(() => {
   white-space: pre-wrap;
   word-break: break-word;
   tab-size: 2;
+  -webkit-user-select: text;
+  user-select: text;
 
   code {
     font-family: inherit;
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
 
