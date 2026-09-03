@@ -22,7 +22,7 @@ import { exec } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { z } from 'zod'
-import { registerTool } from '../registry.js'
+import { registerTool, isValidRiskAssessment, riskAssessmentSchema } from '../registry.js'
 import { waitForApproval } from '../../humanInTheLoop.js'
 
 // 只读命令白名单（无需审批）
@@ -34,11 +34,11 @@ const READONLY_WHITELIST = new Set([
 // 危险命令黑名单（直接拒绝）
 const DANGEROUS_PATTERNS = [
   /rm\s+-rf\s+\/($|\s)/,    // rm -rf /
-  /mkfs/,                     // mkfs
-  /dd\s+if=/,                 // dd if=
-  /shutdown/,                 // shutdown
-  /reboot/,                   // reboot
-  /halt/,                     // halt
+  /mkfs/i,                    // mkfs
+  /dd\s+if=/i,                // dd if=
+  /shutdown/i,                // shutdown
+  /reboot/i,                  // reboot
+  /halt/i,                    // halt
   /:\(\)\s*\{\s*:\|:&\s*\};/, // fork bomb
   />\s*\/dev\/sd[a-z]/,       // 写入磁盘设备
   /mv\s+\S+\s+\/\s*$/         // mv 任意文件到根目录
@@ -48,12 +48,14 @@ const schema = z.object({
   command: z.string().describe('要执行的 shell 命令'),
   timeoutMs: z
     .number()
+    .int()
+    .min(1000)
+    .max(30000)
     .optional()
     .describe('超时时间（毫秒），默认 30000'),
-  riskAssessment: z.object({
-    level: z.enum(['high', 'medium', 'low']),
-    evaluation: z.string().min(1)
-  }).optional().describe('仅当命令不是只读白名单、即将触发审批时必填；需结合本次命令说明具体风险')
+  riskAssessment: riskAssessmentSchema
+    .optional()
+    .describe('仅当命令不是只读白名单、即将触发审批时必填；需结合本次命令说明具体风险')
 })
 
 /**
@@ -62,6 +64,10 @@ const schema = z.object({
  * @returns {{ safe: boolean, needApproval: boolean, reason?: string }}
  */
 function analyzeCommand(command) {
+  if (typeof command !== 'string' || !command.trim()) {
+    return { safe: false, needApproval: false, reason: '命令不能为空' }
+  }
+
   // 检查危险命令黑名单
   for (const pattern of DANGEROUS_PATTERNS) {
     if (pattern.test(command)) {
@@ -74,8 +80,10 @@ function analyzeCommand(command) {
   const firstToken = trimmed.split(/\s+/)[0]
   const baseCmd = path.basename(firstToken)
 
-  // 白名单命令：安全，无需审批
-  if (READONLY_WHITELIST.has(baseCmd)) {
+  // 白名单只适用于不含 shell 控制语法的单条命令；复合命令必须审批，
+  // 否则 `ls; rm ...` 或命令替换可能借助第一个 token 绕过审批。
+  const shellSyntax = /[;&|<>`$()\n\r]/
+  if (READONLY_WHITELIST.has(baseCmd) && !shellSyntax.test(trimmed)) {
     return { safe: true, needApproval: false }
   }
 
@@ -100,7 +108,7 @@ async function handler(args, ctx) {
   // MCP 模式（ctx.autoApprove=true）下无前端审批通道，跳过审批直接执行，
   // 与本地 MCP server（如 Claude Desktop）执行 shell 的惯例一致。
   if (analysis.needApproval && !ctx.autoApprove && !ctx.unattended) {
-    if (!riskAssessment || !['high', 'medium', 'low'].includes(riskAssessment.level) || !String(riskAssessment.evaluation || '').trim()) {
+    if (!isValidRiskAssessment(riskAssessment)) {
       return '参数错误：该命令需要审批，必须提供结合本次命令的 riskAssessment（level 与 evaluation）。'
     }
     ctx.logger.info(`[execute_command] 非白名单命令，请求用户审批: ${command}`)

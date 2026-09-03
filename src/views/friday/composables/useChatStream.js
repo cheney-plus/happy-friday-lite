@@ -403,10 +403,9 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
       flushPendingChunksImmediately();
-      const approvalArguments = {
-        ...(data.arguments && typeof data.arguments === 'object' ? data.arguments : {}),
-        ...(data.riskAssessment ? { riskAssessment: data.riskAssessment } : {})
-      };
+      const approvalArguments = data.arguments && typeof data.arguments === 'object'
+        ? data.arguments
+        : {};
       if (autoApproveAll.value) {
         electronService.invoke('agent-tool-approval-resume', {
           requestId: data.requestId,
@@ -427,7 +426,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
           toolName: data.toolName,
           toolCallId: existingSeg.toolCallId,
           arguments: approvalArguments,
-          riskAssessment: data.riskAssessment || approvalArguments.riskAssessment
+          riskAssessment: data.riskAssessment
         };
         return;
       }
@@ -437,7 +436,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
         toolName: data.toolName,
         toolCallId: data.toolCallId,
         arguments: approvalArguments,
-        riskAssessment: data.riskAssessment || approvalArguments.riskAssessment
+        riskAssessment: data.riskAssessment
       };
       const segs = agentSegments.value;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
