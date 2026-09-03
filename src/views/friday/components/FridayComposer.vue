@@ -312,6 +312,12 @@ onDeactivated(closeAllDropdowns);
   border-radius: 28px;
 }
 
+/* Conversation input follows the same fluid content width as the message list. */
+.friday-composer.is-conversation :deep(.input-wrapper) {
+  width: 100%;
+  max-width: 900px;
+}
+
 .friday-composer.is-home :deep(.main-input) {
   padding: 18px 28px 6px;
   font-size: 16px;

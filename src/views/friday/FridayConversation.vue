@@ -665,9 +665,9 @@ onUnmounted(() => {
 }
 
 .messages-inner {
-  max-width: 800px;
+  width: calc(100% - 100px);
+  max-width: 900px;
   margin: 0 auto;
-  padding: 0 24px;
   display: flex;
   flex-direction: column;
   gap: 24px;
