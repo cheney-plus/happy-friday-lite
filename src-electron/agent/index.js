@@ -185,6 +185,8 @@ export async function createAgent(modelConfig, options = {}) {
       '## 行为准则\n' +
       '1. 优先使用工具获取信息，避免凭空回答\n' +
       '2. 写操作（创建笔记/日程/文件、执行 Python 代码、POST/PUT/PATCH/DELETE 请求）需用户审批后执行\n' +
+      '2.1 调用任何需要审批的工具时，必须填写 riskAssessment。evaluation 必须结合本次实际参数说明具体影响对象、范围或潜在危害，禁止使用泛化的固定句式。\n' +
+      '2.2 如果工具需要审批但未填写 riskAssessment，必须先补充风险等级和具体评价，不能省略、留空或使用“请用户确认”等占位文本。\n' +
       '3. 涉及用户隐私的信息不得外泄\n' +
       '4. 用中文回答用户问题\n' +
       '5. 所有文件操作路径必须位于 `/SANDBOX/` 下（/SKILL/、/memories/ 除外）\n\n' +

@@ -33,6 +33,8 @@ const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000
 // 输出截断阈值
 const MAX_OUTPUT = 30 * 1024
 
+// 保持为纯 ZodObject，便于注册器统一追加 riskAssessment 并生成 OpenAI object schema。
+// packages/requirements 的二选一约束在 handler 中继续校验，避免 refine 产生 ZodEffects。
 const schema = z.object({
   packages: z
     .array(z.string())
@@ -53,10 +55,7 @@ const schema = z.object({
     .boolean()
     .optional()
     .describe('是否升级已安装的包到最新版本（添加 --upgrade 参数）。默认 false。')
-}).refine(
-  (data) => !!data.packages || data.requirements === true,
-  { message: '必须传 packages（包名列表）或 requirements=true，至少二选一' }
-)
+})
 
 /**
  * 校验包名列表合法性，防止 shell 注入或路径穿越
@@ -153,6 +152,9 @@ function buildInstallArgs(preArgs, { packages, requirements, upgrade }) {
 
 async function handler(args, ctx) {
   const { packages, requirements, upgrade } = args
+  if ((!packages || packages.length === 0) && requirements !== true) {
+    return '参数错误：必须传 packages（包名列表）或 requirements=true，至少二选一。'
+  }
   const timeoutMs = args.timeoutMs || DEFAULT_TIMEOUT_MS
   const requirementsPath = getRequirementsPath()
 

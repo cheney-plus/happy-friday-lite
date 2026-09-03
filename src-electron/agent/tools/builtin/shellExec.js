@@ -49,7 +49,11 @@ const schema = z.object({
   timeoutMs: z
     .number()
     .optional()
-    .describe('超时时间（毫秒），默认 30000')
+    .describe('超时时间（毫秒），默认 30000'),
+  riskAssessment: z.object({
+    level: z.enum(['high', 'medium', 'low']),
+    evaluation: z.string().min(1)
+  }).optional().describe('仅当命令不是只读白名单、即将触发审批时必填；需结合本次命令说明具体风险')
 })
 
 /**
@@ -81,6 +85,7 @@ function analyzeCommand(command) {
 
 async function handler(args, ctx) {
   const { command, timeoutMs = 30000 } = args
+  const riskAssessment = ctx.currentRiskAssessment
   ctx.logger.info(`[execute_command] cmd="${command}"`)
 
   // 分析命令安全性
@@ -95,6 +100,9 @@ async function handler(args, ctx) {
   // MCP 模式（ctx.autoApprove=true）下无前端审批通道，跳过审批直接执行，
   // 与本地 MCP server（如 Claude Desktop）执行 shell 的惯例一致。
   if (analysis.needApproval && !ctx.autoApprove && !ctx.unattended) {
+    if (!riskAssessment || !['high', 'medium', 'low'].includes(riskAssessment.level) || !String(riskAssessment.evaluation || '').trim()) {
+      return '参数错误：该命令需要审批，必须提供结合本次命令的 riskAssessment（level 与 evaluation）。'
+    }
     ctx.logger.info(`[execute_command] 非白名单命令，请求用户审批: ${command}`)
     const approvalToolCallId = `execute_command_approval_${Date.now()}`
     ctx.emit('agent-tool-approval', {
@@ -102,6 +110,7 @@ async function handler(args, ctx) {
       toolCallId: approvalToolCallId,
       toolName: 'execute_command',
       arguments: { command },
+      riskAssessment,
       description: analysis.reason || `命令需要审批: ${command}`
     })
 

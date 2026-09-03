@@ -48,6 +48,18 @@
                   </div>
                   <pre class="info-value args-block"><code>{{ formattedArgs }}</code></pre>
                 </div>
+                <div class="risk-card" :class="`risk-${riskLevel}`">
+                  <div class="risk-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 3 3.5 19a1.5 1.5 0 0 0 1.3 2.2h14.4a1.5 1.5 0 0 0 1.3-2.2L12 3Z"></path>
+                      <path d="M12 9v4"></path><path d="M12 17h.01"></path>
+                    </svg>
+                  </div>
+                  <div class="risk-copy">
+                    <div class="risk-title">执行风险评估 <span class="risk-level">{{ riskLabel }}</span></div>
+                    <div class="risk-description">{{ riskDescription }}</div>
+                  </div>
+                </div>
               </div>
 
               <div class="reason-section">
@@ -100,7 +112,8 @@ import { ref, computed, watch } from 'vue'
 const props = defineProps({
   visible: { type: Boolean, default: false },
   toolName: { type: String, default: '' },
-  arguments: { type: [Object, String], default: () => ({}) }
+  arguments: { type: [Object, String], default: () => ({}) },
+  riskAssessment: { type: Object, default: null }
 })
 
 const emit = defineEmits(['approve', 'approve-all', 'reject'])
@@ -126,7 +139,8 @@ const formattedArgs = computed(() => {
   if (args === null) return String(props.arguments)
   if (typeof args !== 'object' || args === null) return String(args)
   try {
-    return JSON.stringify(args, null, 2)
+    const { riskAssessment: _riskAssessment, ...displayArgs } = args
+    return JSON.stringify(displayArgs, null, 2)
   } catch (_e) {
     return String(args)
   }
@@ -134,9 +148,23 @@ const formattedArgs = computed(() => {
 
 const argsCount = computed(() => {
   const args = parsedArgs.value
-  if (args && typeof args === 'object') return Object.keys(args).length
+  if (args && typeof args === 'object') return Object.keys(args).filter(key => key !== 'riskAssessment').length
   return 0
 })
+
+const risk = computed(() => {
+  const supplied = props.riskAssessment || parsedArgs.value?.riskAssessment
+  if (supplied && typeof supplied === 'object') {
+    const normalizedLevel = { high: 'high', medium: 'medium', low: 'low', 高: 'high', 中: 'medium', 低: 'low' }[String(supplied.level).toLowerCase()]
+    if (normalizedLevel && String(supplied.evaluation || '').trim()) {
+      return { level: normalizedLevel, label: { high: '高风险', medium: '中风险', low: '低风险' }[normalizedLevel], description: String(supplied.evaluation).trim() }
+    }
+  }
+  return { level: 'unknown', label: '未提供', description: '模型未返回本次操作的风险评估，请核对参数后再决定是否批准。' }
+})
+const riskLevel = computed(() => risk.value.level)
+const riskLabel = computed(() => risk.value.label)
+const riskDescription = computed(() => risk.value.description)
 
 // 弹窗打开时重置拒绝原因
 watch(() => props.visible, (v) => {
@@ -377,10 +405,31 @@ function handleReject() {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 220px;
+  max-height: 128px;
   overflow-y: auto;
   color: var(--text-primary, #1c1917);
 }
+
+.risk-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 11px;
+  border: 1px solid;
+  border-radius: 9px;
+}
+.risk-icon { display: flex; padding-top: 1px; flex-shrink: 0; }
+.risk-copy { min-width: 0; }
+.risk-title { font-size: 12.5px; font-weight: 650; line-height: 1.4; }
+.risk-level { margin-left: 5px; font-size: 11px; font-weight: 700; }
+.risk-description { margin-top: 2px; font-size: 11.5px; line-height: 1.45; opacity: .86; }
+.risk-low { color: #15803d; background: rgba(34, 197, 94, .08); border-color: rgba(34, 197, 94, .25); }
+.risk-medium { color: #b45309; background: rgba(245, 158, 11, .1); border-color: rgba(245, 158, 11, .3); }
+.risk-high { color: #b91c1c; background: rgba(239, 68, 68, .1); border-color: rgba(239, 68, 68, .3); }
+.risk-unknown { color: var(--text-secondary, #64748b); background: var(--bg-primary, #fff); border-color: var(--border-color, #cbd5e1); }
+[data-theme='dark'] .risk-low { color: #86efac; }
+[data-theme='dark'] .risk-medium { color: #fcd34d; }
+[data-theme='dark'] .risk-high { color: #fca5a5; }
 
 .args-block code {
   font-family: inherit;

@@ -660,21 +660,41 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
           approvalToolCallId = req.id || approvalToolCallId
           approvalToolName = req.name || approvalToolName
           approvalToolArgs = req.args || req.arguments || {}
+          const riskAssessment = approvalToolArgs?.riskAssessment || approvalToolArgs?.risk_assessment
+          if (!riskAssessment || !['high', 'medium', 'low'].includes(String(riskAssessment.level || '').toLowerCase()) || !String(riskAssessment.evaluation || '').trim()) {
+            log.warn(`工具 ${approvalToolName} 缺少有效 riskAssessment，要求模型重新调用`)
+            currentInput = buildResumeCommand({
+              type: 'reject',
+              reason: '该工具调用缺少必填的 riskAssessment。请根据本次实际参数补充 level（high/medium/low）和具体 evaluation 后重新调用。'
+            })
+            continue
+          }
           emitApprovalRequest(mainWindow, {
             requestId,
             toolCallId: approvalToolCallId,
             toolName: approvalToolName,
             arguments: approvalToolArgs,
+            riskAssessment,
             description: interrupt.value?.description || `工具 ${approvalToolName} 需要审批`
           })
         } else {
           // 兜底：直接用 interrupt value
           approvalToolArgs = interrupt.value
+          const riskAssessment = approvalToolArgs?.riskAssessment || approvalToolArgs?.risk_assessment
+          if (!riskAssessment || !['high', 'medium', 'low'].includes(String(riskAssessment.level || '').toLowerCase()) || !String(riskAssessment.evaluation || '').trim()) {
+            log.warn(`工具 ${approvalToolName} 缺少有效 riskAssessment，要求模型重新调用`)
+            currentInput = buildResumeCommand({
+              type: 'reject',
+              reason: '该工具调用缺少必填的 riskAssessment。请根据本次实际参数补充 level（high/medium/low）和具体 evaluation 后重新调用。'
+            })
+            continue
+          }
           emitApprovalRequest(mainWindow, {
             requestId,
             toolCallId: approvalToolCallId,
             toolName: approvalToolName,
             arguments: approvalToolArgs,
+            riskAssessment,
             description: '操作需要审批'
           })
         }

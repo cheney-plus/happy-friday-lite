@@ -84,6 +84,7 @@
       :visible="!!pendingApproval"
       :tool-name="pendingApproval?.toolName || ''"
       :arguments="pendingApproval?.arguments || {}"
+      :risk-assessment="pendingApproval?.riskAssessment"
       @approve="handleApproveTool"
       @approve-all="handleApproveAll"
       @reject="handleRejectTool"
