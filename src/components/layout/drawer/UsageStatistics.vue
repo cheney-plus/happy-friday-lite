@@ -71,19 +71,19 @@
         <div class="summary-grid">
           <div class="summary-card primary">
             <div class="summary-label">{{ t('drawer.usage.totalTokens') }}</div>
-            <div class="summary-value">{{ formatNumber(stats.summary.totalTokens) }}</div>
+            <div class="summary-value">{{ formatUsage(stats.summary.totalTokens) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('drawer.usage.promptTokens') }}</div>
-            <div class="summary-value">{{ formatNumber(stats.summary.totalPrompt) }}</div>
+            <div class="summary-value">{{ formatUsage(stats.summary.totalPrompt) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('drawer.usage.completionTokens') }}</div>
-            <div class="summary-value">{{ formatNumber(stats.summary.totalCompletion) }}</div>
+            <div class="summary-value">{{ formatUsage(stats.summary.totalCompletion) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('drawer.usage.reasoningTokens') }}</div>
-            <div class="summary-value">{{ formatNumber(stats.summary.totalReasoning) }}</div>
+            <div class="summary-value">{{ formatUsage(stats.summary.totalReasoning) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('drawer.usage.requests') }}</div>
@@ -102,7 +102,7 @@
               v-for="day in trendBars"
               :key="day.date"
               class="trend-col"
-              :title="`${day.label}: ${formatNumber(day.tokens)}`"
+              :title="`${day.label}: ${formatUsage(day.tokens)}`"
             >
               <div class="trend-bar-wrap">
                 <div
@@ -111,7 +111,7 @@
                 ></div>
               </div>
               <span class="trend-label">{{ day.shortLabel }}</span>
-              <span class="trend-value">{{ formatShort(day.tokens) }}</span>
+              <span class="trend-value">{{ formatUsage(day.tokens) }}</span>
             </div>
           </div>
         </section>
@@ -130,7 +130,7 @@
                 {{ item.modelName || item.provider || '-' }}
               </div>
               <div class="list-stats">
-                <span class="list-tokens">{{ formatNumber(item.totalTokens) }}</span>
+                <span class="list-tokens">{{ formatUsage(item.totalTokens) }}</span>
                 <span class="list-req">{{ formatNumber(item.requests) }} {{ t('drawer.usage.requests') }}</span>
               </div>
               <div class="list-bar">
@@ -157,7 +157,7 @@
                 {{ sourceLabel(item.source) }}
               </div>
               <div class="list-stats">
-                <span class="list-tokens">{{ formatNumber(item.totalTokens) }}</span>
+                <span class="list-tokens">{{ formatUsage(item.totalTokens) }}</span>
                 <span class="list-req">{{ formatNumber(item.requests) }} {{ t('drawer.usage.requests') }}</span>
               </div>
               <div class="list-bar">
@@ -278,11 +278,13 @@ function formatNumber(n) {
   return v.toLocaleString(locale.value === 'zh-CN' ? 'zh-CN' : 'en-US')
 }
 
-function formatShort(n) {
+function formatUsage(n) {
   const v = Number(n) || 0
-  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M'
-  if (v >= 1_000) return (v / 1_000).toFixed(1) + 'k'
-  return String(v)
+  if (v < 1_000_000) return formatNumber(v)
+
+  const valueInMillions = v / 1_000_000
+  const formatted = valueInMillions.toFixed(1).replace(/\.0$/, '')
+  return formatted + 'M'
 }
 
 function barPct(value, max) {
@@ -307,7 +309,8 @@ const SOURCE_COLORS = {
   rag: '#f59e0b',
   title: '#10b981',
   fim: '#3b82f6',
-  note_ai: '#8b5cf6',
+  note: '#8b5cf6',
+  harness: '#0ea5e9',
   unknown: '#9ca3af'
 }
 
@@ -321,8 +324,8 @@ function sourceLabel(src) {
     agent: 'sourceAgent',
     rag: 'sourceRag',
     title: 'sourceTitle',
-    fim: 'sourceFim',
-    note_ai: 'sourceNoteAi',
+    note: 'sourceNote',
+    harness: 'sourceHarness',
     unknown: 'sourceUnknown'
   }
   const key = map[src] || 'sourceUnknown'
