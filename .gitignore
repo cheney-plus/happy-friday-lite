@@ -54,3 +54,4 @@ release/
 *.md
 !README.md
 !README.zh-CN.md
+!第一迭代改造计划.md
