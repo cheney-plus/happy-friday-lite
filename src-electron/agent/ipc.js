@@ -30,7 +30,7 @@ import { buildLlmMessage } from '../attachmentContext.js'
 import { createAgentWithContext } from './index.js'
 import { createLogger } from './logger.js'
 import { listSkills, generateSkillIndex, deleteSkill, importSkill } from './skills.js'
-import { listRegisteredTools, listToolNames } from './tools/registry.js'
+import { listRegisteredTools, listToolNames, getRiskAssessment, stripRiskAssessment } from './tools/registry.js'
 import {
   listMcpServers,
   addMcpServers,
@@ -574,7 +574,7 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
           // 新工具调用开始，关闭当前 text 段
           currentTextSegment = null
           const toolCallId = data?.run_id || `tool_${segments.length}_${Date.now()}`
-          const toolArgs = data?.input || {}
+          const toolArgs = stripRiskAssessment(data?.input || {})
           // 对 interruptOn 工具：on_tool_start 在 interrupt 之后才触发
           // （LangGraph 在 tool 实际执行前才触发 on_tool_start，而 interrupt 在此之前已暂停）
           // 此时审批代码已推送一个 pending_approval / running（已批准）段，这里复用而非新建，避免重复
@@ -660,24 +660,29 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
           approvalToolCallId = req.id || approvalToolCallId
           approvalToolName = req.name || approvalToolName
           approvalToolArgs = req.args || req.arguments || {}
-          emitApprovalRequest(mainWindow, {
-            requestId,
-            toolCallId: approvalToolCallId,
-            toolName: approvalToolName,
-            arguments: approvalToolArgs,
-            description: interrupt.value?.description || `工具 ${approvalToolName} 需要审批`
-          })
         } else {
           // 兜底：直接用 interrupt value
-          approvalToolArgs = interrupt.value
-          emitApprovalRequest(mainWindow, {
-            requestId,
-            toolCallId: approvalToolCallId,
-            toolName: approvalToolName,
-            arguments: approvalToolArgs,
-            description: '操作需要审批'
-          })
+          approvalToolArgs = interrupt.value || {}
         }
+
+        const riskAssessment = getRiskAssessment(approvalToolArgs)
+        const businessArgs = stripRiskAssessment(approvalToolArgs)
+        if (!riskAssessment) {
+          log.warn(`工具 ${approvalToolName} 缺少有效 riskAssessment，要求模型重新调用`)
+          currentInput = buildResumeCommand({
+            type: 'reject',
+            reason: '该工具调用缺少必填的 riskAssessment。请根据本次实际参数补充 level（high/medium/low）和具体 evaluation 后重新调用。'
+          })
+          continue
+        }
+        emitApprovalRequest(mainWindow, {
+          requestId,
+          toolCallId: approvalToolCallId,
+          toolName: approvalToolName,
+          arguments: businessArgs,
+          riskAssessment,
+          description: interrupt.value?.description || `工具 ${approvalToolName} 需要审批`
+        })
 
         // 添加需要审批的 tool 段
         // 优化：复用 on_tool_start 已推送的 running 段，避免出现重复的工具调用段
@@ -694,14 +699,14 @@ async function streamAgentWithHITL({ agent, input, config, requestId, mainWindow
           // 用 interrupt 中的工具信息覆盖（更准确，包含 LLM 的 tool_call_id）
           approvalToolSeg.toolCallId = approvalToolCallId
           approvalToolSeg.toolName = approvalToolName
-          approvalToolSeg.arguments = approvalToolArgs
+          approvalToolSeg.arguments = businessArgs
         } else {
           // 兜底：on_tool_start 未触发时（理论上不会发生），新建段
           approvalToolSeg = {
             type: 'tool',
             toolCallId: approvalToolCallId,
             toolName: approvalToolName,
-            arguments: approvalToolArgs,
+            arguments: businessArgs,
             status: 'pending_approval',
             output: '',
             requireApproval: true

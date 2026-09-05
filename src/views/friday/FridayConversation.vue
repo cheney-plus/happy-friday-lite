@@ -19,6 +19,7 @@
           <AgentMessageBlock
             v-else-if="msg.segments && msg.segments.length > 0"
             :segments="msg.segments"
+            :reasoning="msg.reasoning"
             :show-actions="!isShareMode"
             :show-divider="true"
             @action="(type) => handleAction(type, index)"
@@ -38,6 +39,8 @@
         <AgentMessageBlock
           v-if="currentMode === 'agent' && (isStreaming || agentSegments.length > 0)"
           :segments="agentSegments"
+          :reasoning-streaming-content="streamingReasoning"
+          :is-streaming="isStreaming"
           :thinking="isThinking"
         />
         <AIMessage
@@ -81,6 +84,7 @@
       :visible="!!pendingApproval"
       :tool-name="pendingApproval?.toolName || ''"
       :arguments="pendingApproval?.arguments || {}"
+      :risk-assessment="pendingApproval?.riskAssessment"
       @approve="handleApproveTool"
       @approve-all="handleApproveAll"
       @reject="handleRejectTool"
@@ -637,6 +641,19 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 20px 0;
+  /* The app-wide reset disables selection; conversation text must remain copyable. */
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.conversation-messages .messages-inner,
+.conversation-messages .messages-inner :deep(*) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .conversation-messages::-webkit-scrollbar {
@@ -649,9 +666,9 @@ onUnmounted(() => {
 }
 
 .messages-inner {
-  max-width: 800px;
+  width: calc(100% - 100px);
+  max-width: 900px;
   margin: 0 auto;
-  padding: 0 24px;
   display: flex;
   flex-direction: column;
   gap: 24px;

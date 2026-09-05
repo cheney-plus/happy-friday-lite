@@ -403,6 +403,9 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
       flushPendingChunksImmediately();
+      const approvalArguments = data.arguments && typeof data.arguments === 'object'
+        ? data.arguments
+        : {};
       if (autoApproveAll.value) {
         electronService.invoke('agent-tool-approval-resume', {
           requestId: data.requestId,
@@ -417,12 +420,13 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       if (existingSeg) {
         existingSeg.status = 'pending_approval';
         existingSeg.requireApproval = true;
-        existingSeg.arguments = data.arguments;
+        existingSeg.arguments = approvalArguments;
         pendingApproval.value = {
           requestId: data.requestId,
           toolName: data.toolName,
           toolCallId: existingSeg.toolCallId,
-          arguments: data.arguments
+          arguments: approvalArguments,
+          riskAssessment: data.riskAssessment
         };
         return;
       }
@@ -431,7 +435,8 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
         requestId: data.requestId,
         toolName: data.toolName,
         toolCallId: data.toolCallId,
-        arguments: data.arguments
+        arguments: approvalArguments,
+        riskAssessment: data.riskAssessment
       };
       const segs = agentSegments.value;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
@@ -441,7 +446,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
         id: data.toolCallId,
         toolCallId: data.toolCallId,
         toolName: data.toolName,
-        arguments: data.arguments,
+        arguments: approvalArguments,
         status: 'pending_approval',
         output: '',
         requireApproval: true

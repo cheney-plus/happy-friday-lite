@@ -33,6 +33,8 @@ const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000
 // 输出截断阈值
 const MAX_OUTPUT = 30 * 1024
 
+// 保持为纯 ZodObject，便于注册器统一追加 riskAssessment 并生成 OpenAI object schema。
+// packages/requirements 的二选一约束在 handler 中继续校验，避免 refine 产生 ZodEffects。
 const schema = z.object({
   packages: z
     .array(z.string())
@@ -52,11 +54,15 @@ const schema = z.object({
   upgrade: z
     .boolean()
     .optional()
-    .describe('是否升级已安装的包到最新版本（添加 --upgrade 参数）。默认 false。')
-}).refine(
-  (data) => !!data.packages || data.requirements === true,
-  { message: '必须传 packages（包名列表）或 requirements=true，至少二选一' }
-)
+    .describe('是否升级已安装的包到最新版本（添加 --upgrade 参数）。默认 false。'),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(1000)
+    .max(DEFAULT_TIMEOUT_MS)
+    .optional()
+    .describe('安装超时时间（毫秒），范围 1000 至 300000，默认 300000')
+})
 
 /**
  * 校验包名列表合法性，防止 shell 注入或路径穿越
@@ -104,6 +110,7 @@ function runPip(command, args, timeoutMs) {
     let stdout = ''
     let stderr = ''
     let timedOut = false
+    let settled = false
 
     proc.stdout.on('data', (d) => {
       stdout += d.toString('utf-8')
@@ -119,14 +126,19 @@ function runPip(command, args, timeoutMs) {
       try { proc.kill('SIGKILL') } catch (_e) { /* ignore */ }
     }, timeoutMs)
 
-    proc.on('error', () => {
+    const finish = (result) => {
+      if (settled) return
+      settled = true
       clearTimeout(timer)
-      resolve({ exitCode: -1, stdout, stderr: stderr + '\n进程启动失败', timedOut })
+      resolve(result)
+    }
+
+    proc.on('error', () => {
+      finish({ exitCode: -1, stdout, stderr: stderr + '\n进程启动失败', timedOut })
     })
 
     proc.on('close', (code) => {
-      clearTimeout(timer)
-      resolve({ exitCode: code || 0, stdout, stderr, timedOut })
+      finish({ exitCode: typeof code === 'number' ? code : -1, stdout, stderr, timedOut })
     })
   })
 }
@@ -153,7 +165,11 @@ function buildInstallArgs(preArgs, { packages, requirements, upgrade }) {
 
 async function handler(args, ctx) {
   const { packages, requirements, upgrade } = args
-  const timeoutMs = args.timeoutMs || DEFAULT_TIMEOUT_MS
+  const hasPackages = Array.isArray(packages) && packages.length > 0
+  if (hasPackages === (requirements === true)) {
+    return '参数错误：packages 与 requirements=true 必须且只能传一个。'
+  }
+  const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const requirementsPath = getRequirementsPath()
 
   ctx.logger.info(

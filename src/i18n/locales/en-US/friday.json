@@ -55,6 +55,7 @@
   "copied": "Copied",
   "rollback": "Rollback",
   "thinking": "Thinking",
+  "thinkingProcess": "Thought process",
   "aiThinking": "AI is thinking...",
   "modelRequired": "No model configured. Add a model in Settings first.",
   "requestFailed": "Request failed: ",

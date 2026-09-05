@@ -3,6 +3,7 @@ import http from 'http'
 import { AppError } from './error.js'
 import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_ERROR, NOTE_AI_CHUNK, NOTE_AI_ERROR } from './events.js'
 import { recordUsage } from './usage.js'
+import { buildChatCompletionsUrl } from './openaiUrl.js'
 import {
   FIM_SYSTEM_PROMPT,
   SESSION_TITLE_SYSTEM_PROMPT,
@@ -28,12 +29,8 @@ function recordUsageFromChunk(parsed, model, source) {
   })
 }
 
-function buildApiUrl(baseUrl, provider) {
-  // “其他”厂商的对话模型地址为完整的 URL，不做路径拼接
-  if (provider === 'other') {
-    return baseUrl.replace(/\/+$/, '')
-  }
-  return `${baseUrl.replace(/\/+$/, '')}/chat/completions`
+function buildApiUrl(baseUrl) {
+  return buildChatCompletionsUrl(baseUrl)
 }
 
 function buildStreamBody(model, messages, enableThinking) {
@@ -67,7 +64,7 @@ function buildStreamBody(model, messages, enableThinking) {
 }
 
 export function streamChat(mainWindow, messages, model, requestId, sessionId, enableThinking, cancelToken) {
-  const url = new URL(buildApiUrl(model.baseUrl, model.provider))
+  const url = new URL(buildApiUrl(model.baseUrl))
   const body = buildStreamBody(model, messages, enableThinking)
   const bodyStr = JSON.stringify(body)
 
@@ -225,7 +222,7 @@ export function streamChat(mainWindow, messages, model, requestId, sessionId, en
 }
 
 export function fimCompletion(model, prefix, suffix, cancelToken) {
-  const url = buildApiUrl(model.baseUrl, model.provider)
+  const url = buildApiUrl(model.baseUrl)
 
   const userContent = buildFimUserPrompt(prefix, suffix)
 
@@ -325,7 +322,7 @@ export function fimCompletion(model, prefix, suffix, cancelToken) {
 }
 
 export async function generateTitle(model, userMessage) {
-  const url = buildApiUrl(model.baseUrl, model.provider)
+  const url = buildApiUrl(model.baseUrl)
 
   const messages = [
     { role: 'system', content: SESSION_TITLE_SYSTEM_PROMPT },
@@ -620,7 +617,7 @@ export async function streamChatWithRagAgent(mainWindow, messages, model, reques
   console.log(`[RAG-Agent] ====== Agent 开始 ======`)
   console.log(`[RAG-Agent] 知识库: "${ragConfig?.kbName || '全部知识库'}", 分类: "${ragConfig?.kbCategoryId || '无'}"`)
 
-  const url = buildApiUrl(model.baseUrl, model.provider)
+  const url = buildApiUrl(model.baseUrl)
 
   // Agent 系统指令：追加到已有 system 消息后，说明工具使用时机
   const agentInstruction = `\n\n【知识库工具使用说明】
@@ -772,7 +769,7 @@ export function streamNoteAI(mainWindow, action, noteContent, selectedText, mode
     { role: 'user', content: userContent }
   ]
 
-  const url = new URL(buildApiUrl(model.baseUrl, model.provider))
+  const url = new URL(buildApiUrl(model.baseUrl))
   const body = buildStreamBody(model, messages, false)
   const bodyStr = JSON.stringify(body)
 

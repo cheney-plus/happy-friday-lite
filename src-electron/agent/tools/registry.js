@@ -23,6 +23,7 @@
  */
 
 import { tool } from '@langchain/core/tools'
+import { z } from 'zod'
 import { createLogger } from '../logger.js'
 import { logToolCall } from '../memory.js'
 
@@ -30,6 +31,39 @@ const log = createLogger('Tool')
 
 // 工具注册表：Map<name, ToolDefinition>
 const registry = new Map()
+
+export const riskAssessmentSchema = z.object({
+  level: z.enum(['high', 'medium', 'low']).describe('风险等级，只能填写 high、medium 或 low'),
+  evaluation: z.string().trim().min(1).describe('对本次具体工具调用影响范围和潜在危害的简短评价')
+}).describe('执行风险评估：必须根据本次实际参数填写，不得泛化')
+
+const RISK_LEVELS = new Set(['high', 'medium', 'low'])
+
+export function isValidRiskAssessment(value) {
+  return !!value && typeof value === 'object' &&
+    RISK_LEVELS.has(String(value.level || '').toLowerCase()) &&
+    typeof value.evaluation === 'string' && value.evaluation.trim().length > 0
+}
+
+export function getRiskAssessment(args) {
+  const value = args?.riskAssessment || args?.risk_assessment
+  return isValidRiskAssessment(value)
+    ? { level: String(value.level).toLowerCase(), evaluation: value.evaluation.trim() }
+    : null
+}
+
+export function stripRiskAssessment(args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return args
+  const { riskAssessment: _riskAssessment, risk_assessment: _riskAssessmentSnake, ...businessArgs } = args
+  return businessArgs
+}
+
+function withRiskAssessment(schema) {
+  if (typeof schema?.extend !== 'function') {
+    throw new TypeError('需要审批的工具必须使用纯 z.object(...) schema，不能使用 refine/and 等包装')
+  }
+  return schema.extend({ riskAssessment: riskAssessmentSchema })
+}
 
 /**
  * Tool 上下文（ctx）
@@ -94,11 +128,20 @@ export function buildLangChainTools(ctx) {
   const tools = []
   for (const def of registry.values()) {
     const { name, description, schema, handler, meta } = def
+    const toolSchema = meta.requireApproval ? withRiskAssessment(schema) : schema
+    const toolDescription = meta.requireApproval
+      ? `${description}\n\n【审批要求】调用前必须在 riskAssessment 中填写本次实际操作的风险等级（high/medium/low）和简短、具体的风险评价。`
+      : description
 
     // 包装 handler：增加日志、审计、IPC 通知
     const wrappedHandler = async (args) => {
       const startTime = Date.now()
       const toolCallId = `${name}_${startTime}_${Math.random().toString(36).slice(2, 8)}`
+      const riskAssessment = getRiskAssessment(args)
+      const handlerArgs = stripRiskAssessment(args)
+      // 风险评估是调用协议元数据，不属于任何工具的业务参数。
+      delete handlerArgs.riskAssessment
+      delete handlerArgs.risk_assessment
 
       log.info(`调用工具: ${name}, args=${JSON.stringify(args)}`)
 
@@ -107,20 +150,24 @@ export function buildLangChainTools(ctx) {
         requestId: ctx.requestId,
         toolCallId,
         toolName: name,
-        arguments: args,
+        arguments: handlerArgs,
+        riskAssessment,
         requireApproval: !!meta.requireApproval && !ctx.unattended
       })
 
       let output = ''
       let status = 'success'
       try {
-        output = await handler(args, ctx)
+        ctx.currentRiskAssessment = riskAssessment
+        output = await handler(handlerArgs, ctx)
         log.info(`工具完成: ${name}, duration=${Date.now() - startTime}ms, outputLen=${String(output).length}`)
       } catch (e) {
         status = 'error'
         output = `工具执行失败: ${e.message}`
         log.error(`工具失败: ${name}, error=${e.message}`)
         log.error(e.stack)
+      } finally {
+        delete ctx.currentRiskAssessment
       }
 
       // 推送工具结果事件到前端
@@ -138,7 +185,7 @@ export function buildLangChainTools(ctx) {
           threadId: ctx.threadId,
           requestId: ctx.requestId,
           toolName: name,
-          arguments: args,
+          arguments: handlerArgs,
           output,
           status,
           durationMs: Date.now() - startTime
@@ -153,8 +200,8 @@ export function buildLangChainTools(ctx) {
     // 使用 LangChain tool() 函数创建工具
     const lcTool = tool(wrappedHandler, {
       name,
-      description,
-      schema
+      description: toolDescription,
+      schema: toolSchema
     })
     tools.push(lcTool)
   }

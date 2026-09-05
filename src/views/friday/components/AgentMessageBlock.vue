@@ -5,6 +5,22 @@
       <span class="ai-name">{{ t('friday.assistantName') }}</span>
     </div>
     <div class="agent-timeline">
+      <div v-if="hasReasoning" class="thinking-section">
+        <button class="thinking-toggle" type="button" :aria-expanded="!thinkingCollapsed" @click="toggleThinking">
+          <span>{{ t('friday.thinkingProcess') }}</span>
+          <svg class="thinking-arrow" :class="{ collapsed: thinkingCollapsed }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+        <div v-show="!thinkingCollapsed" class="thinking-body">
+          <div class="markdown-body" v-html="renderedReasoning"></div>
+          <span v-if="reasoningStreaming" class="streaming-cursor"></span>
+        </div>
+      </div>
+      <div v-if="thinking && !hasReasoning" class="thinking-indicator">
+        <span class="thinking-text">{{ t('friday.thinking') }}</span>
+        <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+      </div>
       <template v-for="(seg, si) in segments" :key="seg.id || `${si}`">
         <div v-if="seg.type === 'text' && seg.content" class="agent-text-body">
           <div class="markdown-body" v-html="renderSegmentMarkdown(seg)"></div>
@@ -19,10 +35,6 @@
           :default-collapsed="seg.status === 'success' && !seg.requireApproval"
         />
       </template>
-      <div v-if="thinking" class="thinking-indicator">
-        <span class="thinking-text">{{ t('friday.thinking') }}</span>
-        <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
-      </div>
     </div>
     <div v-if="showActions" class="agent-footer">
       <div class="footer-left">
@@ -57,13 +69,17 @@
 </template>
 
 <script setup>
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ToolCallSection from '@/components/chat/ToolCallSection.vue';
 import { renderMarkdown } from '@/utils/markdown';
 
-defineProps({
+const props = defineProps({
   segments: { type: Array, default: () => [] },
   thinking: { type: Boolean, default: false },
+  isStreaming: { type: Boolean, default: false },
+  reasoning: { type: String, default: '' },
+  reasoningStreamingContent: { type: String, default: '' },
   showActions: { type: Boolean, default: false },
   showDivider: { type: Boolean, default: false }
 });
@@ -71,6 +87,24 @@ defineProps({
 defineEmits(['action']);
 
 const { t } = useI18n();
+const thinkingCollapsed = ref(!props.isStreaming);
+const effectiveReasoning = computed(() => props.reasoningStreamingContent || props.reasoning || '');
+const hasReasoning = computed(() => !!effectiveReasoning.value.trim());
+const reasoningStreaming = computed(() => props.isStreaming && !!props.reasoningStreamingContent);
+const renderedReasoning = computed(() => renderMarkdown(effectiveReasoning.value.split('\n').map(line => `> ${line}`).join('\n')));
+
+watch(() => props.isStreaming, (streaming, wasStreaming) => {
+  if (!streaming) thinkingCollapsed.value = true;
+  else if (!wasStreaming) thinkingCollapsed.value = false;
+});
+
+watch(() => props.thinking, (thinking, wasThinking) => {
+  if (wasThinking && !thinking) thinkingCollapsed.value = true;
+});
+
+function toggleThinking() {
+  thinkingCollapsed.value = !thinkingCollapsed.value;
+}
 
 const segmentHtmlCache = new Map();
 
@@ -233,6 +267,33 @@ function renderSegmentMarkdown(segment) {
   vertical-align: text-bottom;
   animation: blink 0.8s infinite;
 }
+
+.thinking-section { color: var(--text-secondary); }
+.thinking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.thinking-toggle:hover { color: var(--text-primary); }
+.thinking-arrow { transition: transform 0.18s ease; }
+.thinking-arrow.collapsed { transform: rotate(-90deg); }
+.thinking-body {
+  margin-top: 5px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.thinking-body :deep(.markdown-body) { user-select: text; }
+.thinking-body :deep(blockquote) { margin: 0; padding: 0; border: 0; background: transparent; }
 
 @keyframes blink {
   0%, 50% { opacity: 1; }

@@ -66,7 +66,7 @@ function saveStore(store) {
  *   - completionTokens: 输出 token 数
  *   - totalTokens: 总 token 数
  *   - reasoningTokens: 思考 token 数（可选）
- *   - source: 调用来源（chat / note_ai / agent / rag / title / fim）
+ *   - source: 调用来源（chat / note / agent / rag / title / fim / harness）
  */
 export function recordUsage(record) {
   if (!record) return
@@ -138,13 +138,13 @@ export function getUsageStats(range = 'all') {
   const modelMap = new Map()
   // 按日期聚合（YYYY-MM-DD）
   const dayMap = new Map()
-  // 按来源聚合：预初始化所有已知来源（含 title 归并到 chat），即使为 0 也显示
+  // 按来源聚合：预初始化所有已知来源（含 title 归并到 chat、笔记相关来源归并到 note），即使为 0 也显示
   const sourceMap = new Map([
     ['chat', { source: 'chat', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
     ['agent', { source: 'agent', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
     ['rag', { source: 'rag', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
-    ['note_ai', { source: 'note_ai', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
-    ['fim', { source: 'fim', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }]
+    ['note', { source: 'note', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }],
+    ['harness', { source: 'harness', promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 }]
   ])
 
   for (const r of records) {
@@ -187,8 +187,8 @@ export function getUsageStats(range = 'all') {
     d.totalTokens += r.totalTokens
     d.requests += 1
 
-    // 来源聚合：标题生成(title)归并到对话(chat)
-    const src = r.source === 'title' ? 'chat' : (r.source || 'chat')
+    // 来源聚合：标题归并到对话，笔记 AI/FIM 归并到笔记，所有 DSH 别名归并到 Harness。
+    const src = normalizeUsageSource(r.source)
     if (!sourceMap.has(src)) {
       sourceMap.set(src, { source: src, promptTokens: 0, completionTokens: 0, totalTokens: 0, requests: 0 })
     }
@@ -215,6 +215,26 @@ export function getUsageStats(range = 'all') {
     byModel,
     byDay,
     bySource
+  }
+}
+
+function normalizeUsageSource(source) {
+  const normalized = String(source || '').toLowerCase()
+  switch (normalized) {
+    case 'title':
+      return 'chat'
+    case 'note':
+    case 'note_ai':
+    case 'fim':
+      return 'note'
+    case 'dsh':
+    case 'harness':
+    case 'deepseek-harness':
+    case 'deepseek_harness':
+    case 'deepseekharness':
+      return 'harness'
+    default:
+      return source || 'chat'
   }
 }
 
