@@ -1,27 +1,243 @@
 <template>
   <main class="login-page">
-    <section class="login-panel">
-      <img :src="logo" alt="Happy Friday" class="login-logo">
-      <div class="login-heading"><h1>登录企业空间</h1><p>使用企业账号继续访问你的工作数据。</p></div>
-      <form @submit.prevent="submit">
-        <label>服务地址<input v-model.trim="serverURL" type="url" placeholder="http://127.0.0.1:8080" required></label>
-        <label>邮箱<input v-model.trim="email" type="email" autocomplete="email" required></label>
-        <label>密码<input v-model="password" type="password" autocomplete="current-password" required></label>
+    <div class="login-content">
+      <div class="login-brand">
+        <div class="login-logo-row">
+          <img :src="logoImage" alt="" class="login-logo" draggable="false" />
+          <img :src="wordmark" alt="Happy Friday" class="login-wordmark" draggable="false" />
+        </div>
+        <p class="login-kicker">{{ t('auth.kicker') }}</p>
+      </div>
+
+      <form class="login-card" @submit.prevent="submit">
+        <div class="login-heading">
+          <h1>{{ t('auth.title') }}</h1>
+          <p>{{ t('auth.description') }}</p>
+        </div>
+
+        <label class="login-field">
+          <span>{{ t('auth.serverURL') }}</span>
+          <input
+            v-model.trim="serverURL"
+            type="url"
+            :placeholder="t('auth.serverPlaceholder')"
+            required
+          >
+        </label>
+        <label class="login-field">
+          <span>{{ t('auth.email') }}</span>
+          <input
+            v-model.trim="email"
+            type="email"
+            autocomplete="email"
+            required
+          >
+        </label>
+        <label class="login-field">
+          <span>{{ t('auth.password') }}</span>
+          <input
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          >
+        </label>
+
         <p v-if="error" class="login-error">{{ error }}</p>
-        <button type="submit" :disabled="loading">{{ loading ? '正在登录...' : '登录' }}</button>
+
+        <button class="login-submit" type="submit" :disabled="loading">
+          {{ loading ? t('auth.submitting') : t('auth.submit') }}
+        </button>
       </form>
-    </section>
+    </div>
   </main>
 </template>
+
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/store'
 import { getServerURL } from '@/services/enterprise'
-const router = useRouter(); const auth = useAuthStore(); const serverURL = ref(getServerURL()); const email = ref(''); const password = ref(''); const error = ref(''); const loading = ref(false)
-const logo = new URL('@/assets/images/friday-w.png', import.meta.url).href
-async function submit() { loading.value = true; error.value = ''; try { await auth.signIn({ serverURL: serverURL.value, email: email.value, password: password.value }); router.replace('/friday') } catch (e) { error.value = e?.message || '登录失败，请检查服务地址和账号信息。' } finally { loading.value = false } }
+import { useTheme } from '@/utils/theme'
+
+const { t } = useI18n()
+const router = useRouter()
+const auth = useAuthStore()
+const { appliedTheme } = useTheme()
+
+const serverURL = ref(getServerURL())
+const email = ref('')
+const password = ref('')
+const error = ref('')
+const loading = ref(false)
+
+const isDark = computed(() => appliedTheme.value === 'dark')
+const logoImage = new URL('@/assets/images/friday-w.png', import.meta.url).href
+const wordmark = computed(() => (
+  isDark.value
+    ? new URL('@/assets/images/HPTEXT-w.png', import.meta.url).href
+    : new URL('@/assets/images/HPTEXT-b.png', import.meta.url).href
+))
+
+async function submit() {
+  loading.value = true
+  error.value = ''
+  try {
+    await auth.signIn({
+      serverURL: serverURL.value,
+      email: email.value,
+      password: password.value
+    })
+    router.replace('/friday')
+  } catch (e) {
+    error.value = e?.message || t('auth.failed')
+  } finally {
+    loading.value = false
+  }
+}
 </script>
+
 <style scoped>
-.login-page{min-height:100vh;display:grid;place-items:center;background:#edf2f7;padding:24px}.login-panel{width:min(420px,100%);background:#fff;border:1px solid #d9e0e8;padding:38px;border-radius:8px;box-shadow:0 12px 32px #22304d18}.login-logo{width:58px;height:58px;object-fit:contain;background:#192335;border-radius:8px;padding:7px}.login-heading h1{font-size:24px;margin:22px 0 8px}.login-heading p{color:#657080;margin:0 0 26px}form{display:grid;gap:16px}label{display:grid;gap:7px;color:#344054;font-weight:600}input{height:40px;padding:0 10px;border:1px solid #b9c4d0;border-radius:4px;font:inherit;color:#172033}button{height:42px;background:#0b63ce;border:0;border-radius:4px;color:#fff;font:600 15px inherit;cursor:pointer}button:disabled{opacity:.65}.login-error{margin:0;color:#b42318;font-size:13px}
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  padding: 40px 24px;
+  background-color: var(--bg-primary);
+  overflow: auto;
+}
+
+.login-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  width: min(420px, 100%);
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-logo {
+  height: 56px;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.login-wordmark {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.login-kicker {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--text-tertiary);
+}
+
+.login-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px 28px 24px;
+  background-color: var(--bg-secondary);
+  border-radius: 10px;
+}
+
+.login-heading h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.login-heading p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.login-field input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 400;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.login-field input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.login-field input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.login-submit {
+  margin-top: 4px;
+  height: 42px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.login-submit:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.login-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #dc2626;
+}
 </style>

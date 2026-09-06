@@ -1,14 +1,14 @@
 <template>
-  <div class="tab-bar-container">
+  <div class="tab-bar-container" :class="{ locked }">
     <div v-if="isMac" class="mac-traffic-lights-spacer"></div>
-    <div class="tab-bar-left" :class="{ 'linux-left': !isMac }">
+    <div v-if="!locked" class="tab-bar-left" :class="{ 'linux-left': !isMac }">
       <button class="sidebar-toggle-btn" @click="appStore.toggleSidebar()">
         <PanelLeftClose v-if="appStore.sidebarVisible" :size="16" :stroke-width="1.8" />
         <PanelLeftOpen v-else :size="16" :stroke-width="1.8" />
       </button>
     </div>
 
-    <div class="tabs-area" ref="tabsAreaRef">
+    <div v-show="!locked" class="tabs-area" ref="tabsAreaRef" :inert="locked">
       <div class="tabs-scroll" ref="tabsScrollRef" @wheel.prevent="onWheel">
         <template v-for="(tab, index) in tabStore.openedTabs" :key="tab.id">
           <span v-if="index > 0" :class="['tab-divider', { hidden: tabStore.activeTabId === tab.id || tabStore.openedTabs[index - 1]?.id === tabStore.activeTabId }]"></span>
@@ -42,6 +42,7 @@
 
       <div class="tabs-area-spacer"></div>
     </div>
+    <div v-show="locked" class="auth-gate-spacer"></div>
 
     <div v-if="!isMac" class="linux-window-controls">
       <button class="window-ctrl-btn minimize-btn" @click="handleMinimize">
@@ -119,6 +120,10 @@ import {
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { electronService } from '@/services/electron';
 import DeepSeekIcon from '@/components/icons/DeepSeekIcon.vue';
+
+const props = defineProps({
+  locked: { type: Boolean, default: false }
+});
 
 const tabStore = useTabStore();
 const appStore = useAppStore();
@@ -260,6 +265,10 @@ const hideContextMenu = () => {
   contextMenu.value.visible = false;
 };
 
+watch(() => props.locked, (val) => {
+  if (val) hideContextMenu();
+});
+
 const closeOtherTabs = () => {
   if (!canCloseOthers.value) return;
   tabStore.closeOtherTabs(contextMenu.value.tabId);
@@ -359,6 +368,12 @@ const handleClose = () => {
 .sidebar-toggle-btn:hover {
   background-color: var(--bg-hover);
   opacity: 0.85;
+}
+
+.auth-gate-spacer {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
 }
 
 .tabs-area {

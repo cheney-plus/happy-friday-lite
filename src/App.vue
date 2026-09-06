@@ -1,8 +1,8 @@
 <template>
-  <div class="app-container" :class="{ 'is-share-view': isShareView }">
-    <TabBar v-if="!isShareView" />
+  <div class="app-container" :class="{ 'is-share-view': isShareView, 'is-auth-gate': isAuthGate }">
+    <TabBar v-if="!isShareView" :locked="isAuthGate" />
     <div class="main-body">
-      <Sidebar v-if="!isShareView" />
+      <Sidebar v-if="!isShareView && !isAuthGate" />
       <main class="main-content">
         <div class="content-wrapper">
           <router-view v-slot="{ Component }">
@@ -38,6 +38,8 @@ const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
 
 // 分享视图：隐藏侧边栏/标签栏，全屏展示对话界面
 const isShareView = computed(() => route.meta?.share === true || !isElectronEnvironment());
+// 企业认证：锁定标签页、头像与侧栏，仅允许操作登录界面
+const isAuthGate = computed(() => route.name === 'login');
 const isHarnessRoute = computed(() => route.name === 'harness');
 const hasVisitedHarness = ref(false);
 const routerViewKey = computed(() => {
@@ -60,7 +62,7 @@ watch(
 watch(
   () => route.fullPath,
   (newPath) => {
-    if (!newPath || newPath === '/') return;
+    if (!newPath || newPath === '/' || newPath.startsWith('/login')) return;
 
     const rootPath = '/' + newPath.split('/')[1];
     const menu = allMenuConfigs.find(m => m.path === rootPath);
@@ -218,6 +220,14 @@ onUnmounted(() => {
 
 .app-container.is-share-view .content-wrapper {
   border-radius: 0;
+}
+
+.app-container.is-auth-gate .main-body {
+  pointer-events: none;
+}
+
+.app-container.is-auth-gate .content-wrapper {
+  pointer-events: auto;
 }
 
 </style>

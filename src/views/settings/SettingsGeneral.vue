@@ -3,6 +3,22 @@
     <h1 class="settings-title">{{ t('settings.title') }}</h1>
 
     <div class="settings-content">
+      <!-- 账号 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.account') }}</div>
+        <div class="group-content">
+          <div class="setting-item">
+            <div class="item-label-group">
+              <span class="item-label">{{ t('settings.signedInAs') }}</span>
+              <span class="item-hint">{{ accountLabel }}</span>
+            </div>
+            <button class="text-btn danger-btn" type="button" @click="handleSignOut">
+              {{ t('settings.signOut') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 通用设置 -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.general') }}</div>
@@ -582,7 +598,7 @@
 import { reactive, ref, computed, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { useAppStore } from '@/store';
+import { useAppStore, useAuthStore } from '@/store';
 import { useTheme } from '@/utils/theme';
 import { electronService } from '@/services/electron';
 import { setI18nLanguage } from '@/i18n';
@@ -592,6 +608,7 @@ import packageJson from '../../../package.json';
 const { t } = useI18n();
 const router = useRouter();
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const { currentMode, appliedTheme, setTheme: applyTheme, initTheme } = useTheme();
 
 const showThemeDropdown = ref(false);
@@ -635,6 +652,11 @@ const settings = reactive({
   messageNotify: false,
   noteFimCompletion: appStore.noteFimCompletion,
   scheduleDefaultView: appStore.scheduleDefaultView || 'month'
+});
+
+const accountLabel = computed(() => {
+  const profile = authStore.profile || {};
+  return profile.email || profile.name || profile.displayName || t('settings.enterpriseAccount');
 });
 
 const enabledModuleCount = computed(() => Object.values(appStore.sidebarModules).filter(Boolean).length);
@@ -700,6 +722,13 @@ const confirmDialog = (message, options = {}) => showDialog({
   confirmText: options.confirmText || t('settings.dialogConfirm'),
   cancelText: options.cancelText || t('settings.dialogCancel')
 });
+
+const handleSignOut = async () => {
+  const confirmed = await confirmDialog(t('settings.signOutConfirm'));
+  if (!confirmed) return;
+  await authStore.signOut();
+  router.replace('/login');
+};
 
 const handleExportAllNotes = async () => {
   if (noteExporting.value) return;
@@ -1727,6 +1756,14 @@ const openAuthorEmail = () => {
 
 .text-btn:hover {
   background-color: var(--bg-hover);
+}
+
+.danger-btn {
+  color: #dc2626;
+}
+
+.danger-btn:hover {
+  background-color: rgba(220, 38, 38, 0.08);
 }
 
 .primary-btn {
