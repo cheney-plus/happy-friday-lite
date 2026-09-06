@@ -40,6 +40,9 @@
         >
           <component :is="item.iconComponent" :size="20" :stroke-width="1.6" />
         </router-link>
+        <button class="menu-item logout-button" type="button" title="退出登录" @click="signOut">
+          <LogOut :size="20" :stroke-width="1.6" />
+        </button>
       </div>
     </div>
 
@@ -56,12 +59,14 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAppStore } from '@/store';
+import { useAppStore, useAuthStore } from '@/store';
 import { useI18n } from 'vue-i18n';
+import { LogOut } from 'lucide-vue-next';
 import { sidebarMenuConfig, sidebarBottomMenuConfig } from '@/config/menu';
 import AvatarDrawer from './AvatarDrawer.vue';
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const router = useRouter();
 const { t } = useI18n();
 
@@ -91,6 +96,11 @@ const showTooltip = (event, text) => {
 
 const hideTooltip = () => {
   tooltip.visible = false;
+};
+
+const signOut = async () => {
+  await authStore.signOut();
+  router.replace('/login');
 };
 
 // ========== Avatar drawer ==========
@@ -147,6 +157,8 @@ onMounted(() => {
   cursor: pointer;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+.logout-button { margin-top: 8px; color: var(--text-tertiary); }
 
 .sidebar-avatar:hover {
   transform: scale(1.12);

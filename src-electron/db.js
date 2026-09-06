@@ -460,6 +460,17 @@ export function createSession(title, mode = 'chat') {
   return { id, title: title || '新对话', mode, createdAt: now, updatedAt: now }
 }
 
+// 企业版客户端先在服务端生成会话 ID；主进程仅保留运行时 LLM 历史镜像。
+export function createSessionWithID(id, title, mode = 'chat') {
+  const now = nowISO()
+  db.run(
+    'INSERT OR IGNORE INTO sessions (id, title, mode, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
+    [id, title || '新对话', mode, now, now]
+  )
+  saveDb()
+  return getSession(id)
+}
+
 export function getSessions() {
   return queryAll('SELECT * FROM sessions ORDER BY updatedAt DESC')
 }

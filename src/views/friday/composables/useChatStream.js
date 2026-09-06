@@ -4,6 +4,7 @@ import { electronService } from '@/services/electron';
 import { useFridayStore, useTabStore } from '@/store';
 import { getFridayTabId, isNewSessionId } from '@/utils/fridayNavigation';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
+import { getAccessToken, getServerURL, invokeEnterprise } from '@/services/enterprise';
 
 export function useChatStream({ messages, currentSessionId, currentMode, onHistoryRefresh, t }) {
   const route = useRoute();
@@ -167,7 +168,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     const args = toIpcPayload({
       requestId: activeRequestId,
       sessionId,
-      model,
+      model: { ...model, enterprise: { serverURL: getServerURL(), accessToken: getAccessToken() } },
       message: userMessage,
       attachments: attachments || [],
       enableThinking,
@@ -204,6 +205,12 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     if (modelId) fridayStore.setModelId(modelId);
 
     const userMessage = data.userMessage || data.text;
+    // 服务端是企业用户数据的唯一来源；本地 SQLite 只作为主进程运行时历史镜像。
+    if (isNewSessionId(currentSessionId.value)) {
+      const session = await invokeEnterprise('create_session', { title: userMessage.slice(0, 20) || '新对话', mode });
+      currentSessionId.value = session.id;
+    }
+    const remoteUserMessage = await invokeEnterprise('save_message', { sessionId: currentSessionId.value, role: 'user', content: userMessage });
     if (!skipUserPush) messages.value.push({ role: 'user', content: userMessage });
     if (!skipStart) startStreaming();
 
@@ -221,6 +228,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       console.error('Chat invoke error:', err);
       pushErrorMessage(`${t('friday.requestFailed')}${err?.message || t('friday.retryLater')}`);
     });
+    if (!skipUserPush && messages.value.length) messages.value[messages.value.length - 1].id = remoteUserMessage.id;
     return true;
   }
 
@@ -329,6 +337,12 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
           newMsg.segments = JSON.parse(JSON.stringify(segs));
         }
         messages.value.push(newMsg);
+        invokeEnterprise('save_message', {
+          sessionId: currentSessionId.value,
+          role: 'assistant',
+          content: newMsg.content,
+          metadata: newMsg.segments ? JSON.stringify({ segments: newMsg.segments }) : ''
+        }).then((saved) => { newMsg.id = saved.id }).catch((error) => console.error('Failed to persist assistant message:', error));
       }
 
       if (data.sessionId && isNewSessionId(currentSessionId.value)) {

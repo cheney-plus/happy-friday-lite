@@ -22,6 +22,10 @@ func NewApp(db *sql.DB, cfg platform.Config) *App { return &App{db: db, cfg: cfg
 
 func (a *App) Router() http.Handler {
 	r := chi.NewRouter()
+	r.Use(cors)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/", http.StatusFound)
+	})
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeData(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -47,8 +51,24 @@ func (a *App) Router() http.Handler {
 			r.Route("/admin", func(r chi.Router) { r.Use(requireAdmin); a.adminAPI(r) })
 		})
 	})
+	r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/", http.StatusFound)
+	})
 	r.Mount("/admin", a.adminWebRoutes())
 	return r
+}
+
+func cors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *App) ready(w http.ResponseWriter, r *http.Request) {

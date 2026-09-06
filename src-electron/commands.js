@@ -278,9 +278,7 @@ export function registerCommands(mainWindow) {
         isNewSession = true
       } else {
         const existing = db.getSession(currentSessionId)
-        if (!existing) {
-          throw new Error('Session not found')
-        }
+        if (!existing) db.createSessionWithID(currentSessionId, message.slice(0, 20) || '新对话')
       }
 
       // 保存用户消息到数据库（简洁引用格式）

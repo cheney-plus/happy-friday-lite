@@ -1,7 +1,9 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import DeepSeekHarness from '@/views/harness/DeepSeekHarness.vue'
+import { useAuthStore } from '@/store'
 
 export const routes = [
+  { path: '/login', name: 'login', component: () => import('@/views/auth/LoginView.vue'), meta: { public: true } },
   {
     path: '/',
     redirect: '/friday'
@@ -103,11 +105,18 @@ export const routes = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/knowledge'
+    redirect: '/friday'
   }
 ]
 
 export const router = createRouter({
   history: createWebHashHistory(),
   routes
+})
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  if (!auth.ready) await auth.restore()
+  if (to.meta.public) return auth.authenticated ? '/friday' : true
+  return auth.authenticated ? true : { name: 'login' }
 })

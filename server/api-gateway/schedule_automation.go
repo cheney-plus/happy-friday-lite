@@ -81,7 +81,7 @@ func (a *App) createSchedule(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, "DATABASE_ERROR", "could not create event")
 		return
 	}
-	writeData(w, 201, map[string]string{"id": id})
+	writeData(w, 201, map[string]any{"id": id, "title": in.Title, "start": in.StartDate, "end": in.EndDate, "startTime": in.StartTime, "endTime": in.EndTime, "allDay": in.AllDay, "description": in.Description, "color": in.Color, "reminder": in.Reminder, "completed": in.Completed, "priority": in.Priority, "createdAt": n, "updatedAt": n})
 }
 func (a *App) updateSchedule(w http.ResponseWriter, r *http.Request) {
 	var in scheduleInput

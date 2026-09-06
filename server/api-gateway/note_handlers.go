@@ -181,7 +181,7 @@ func (a *App) createNote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, "DATABASE_ERROR", "could not create note")
 		return
 	}
-	writeData(w, 201, map[string]string{"id": id, "createdAt": n, "updatedAt": n})
+	writeData(w, 201, map[string]any{"id": id, "notebookId": input.NotebookID, "title": input.Title, "content": input.Content, "contentText": input.ContentText, "createdAt": n, "updatedAt": n})
 }
 func (a *App) getNote(w http.ResponseWriter, r *http.Request) {
 	p, id := principal(r), chi.URLParam(r, "id")

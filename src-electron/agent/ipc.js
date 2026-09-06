@@ -99,9 +99,7 @@ export function registerAgentCommands(mainWindow) {
         log.info(`创建新会话: ${currentSessionId}`)
       } else {
         const existing = db.getSession(currentSessionId)
-        if (!existing) {
-          throw new Error(`会话不存在: ${currentSessionId}`)
-        }
+        if (!existing) db.createSessionWithID(currentSessionId, message.slice(0, 20) || '新 Agent 对话', 'agent')
       }
 
       // 在 agent_threads 表也记录一份（独立追踪 Agent 会话）

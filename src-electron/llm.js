@@ -27,6 +27,20 @@ function recordUsageFromChunk(parsed, model, source) {
     reasoningTokens: u.completion_tokens_details?.reasoning_tokens || 0,
     source
   })
+  // 模型请求仍由客户端直连；只将用量结果回传企业服务端，不代理模型调用。
+  const enterprise = model?.enterprise
+  if (enterprise?.serverURL && enterprise?.accessToken) {
+    fetch(`${enterprise.serverURL.replace(/\/$/, '')}/api/v1/usage-records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${enterprise.accessToken}` },
+      body: JSON.stringify({
+        modelConfigId: model.id || '', modelName: model.modelName || parsed.model || '', provider: model.provider || '',
+        promptTokens: Number(u.prompt_tokens) || 0, completionTokens: Number(u.completion_tokens) || 0,
+        totalTokens: Number(u.total_tokens) || (Number(u.prompt_tokens) || 0) + (Number(u.completion_tokens) || 0),
+        reasoningTokens: Number(u.completion_tokens_details?.reasoning_tokens) || 0, source
+      })
+    }).catch(error => console.warn('[Usage] failed to send enterprise usage:', error.message))
+  }
 }
 
 function buildApiUrl(baseUrl) {

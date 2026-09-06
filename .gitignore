@@ -55,3 +55,7 @@ release/
 !README.md
 !README.zh-CN.md
 !第一迭代改造计划.md
+
+# Enterprise server runtime files
+server/api-gateway/.env.local
+server/api-gateway/data/
