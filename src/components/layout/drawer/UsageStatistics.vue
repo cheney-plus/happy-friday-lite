@@ -180,6 +180,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BarChart3, X, RefreshCw, Trash2, Loader2, AlertCircle } from 'lucide-vue-next'
+import { electronService } from '@/services/electron'
 
 const { t, locale } = useI18n()
 
@@ -242,7 +243,7 @@ async function loadStats() {
   loading.value = true
   loadError.value = ''
   try {
-    const res = await window.electronAPI?.invoke('usage-get-stats', { range: range.value })
+    const res = await electronService.invoke('usage-get-stats', { range: range.value })
     if (!res || res.success === false) {
       loadError.value = (res && res.error) || t('drawer.usage.loadFailed')
       stats.value = null
@@ -260,7 +261,7 @@ async function loadStats() {
 async function onClear() {
   if (!window.confirm(t('drawer.usage.clearConfirm'))) return
   try {
-    const res = await window.electronAPI?.invoke('usage-clear')
+    const res = await electronService.invoke('usage-clear')
     if (res && res.success !== false) {
       stats.value = null
       await loadStats()

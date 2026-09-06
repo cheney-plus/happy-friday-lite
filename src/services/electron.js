@@ -1,6 +1,9 @@
 export const electronService = {
   async invoke(command, args) {
-    if (isAuthenticated() && enterpriseCommands.has(command)) {
+    if (enterpriseCommands.has(command)) {
+      if (!isAuthenticated()) {
+        throw new Error('请先登录企业服务')
+      }
       return invokeEnterprise(command, args)
     }
     if (window.electronAPI) {
@@ -49,5 +52,5 @@ const enterpriseCommands = new Set([
   'get_sessions', 'get_sessions_with_stats', 'get_session', 'create_session', 'update_session_title', 'delete_session', 'get_session_messages', 'save_message', 'rollback_session',
   'get_notebooks', 'get_notebook', 'create_notebook', 'update_notebook', 'delete_notebook', 'get_notes', 'get_note', 'create_note', 'import_note', 'update_note', 'delete_note', 'search_notes',
   'get_schedule_events', 'get_schedule_events_by_date_range', 'create_schedule_event', 'update_schedule_event', 'delete_schedule_event',
-  'automation-list-tasks', 'automation-list-runs', 'automation-create-task', 'automation-update-task', 'automation-delete-task', 'automation-delete-run', 'usage-get-stats'
+  'automation-list-tasks', 'automation-list-runs', 'automation-create-task', 'automation-update-task', 'automation-delete-task', 'automation-delete-run', 'usage-get-stats', 'usage-clear'
 ])

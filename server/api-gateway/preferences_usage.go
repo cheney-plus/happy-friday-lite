@@ -58,6 +58,7 @@ func (a *App) usageRoutes() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", a.listUsage)
 	r.Post("/", a.createUsage)
+	r.Delete("/", a.clearUsage)
 	r.Get("/summary", a.usageSummary)
 	return r
 }
@@ -104,6 +105,15 @@ func (a *App) createUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, 201, map[string]string{"id": id})
+}
+
+func (a *App) clearUsage(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if _, err := a.db.ExecContext(r.Context(), `DELETE FROM llm_usage_records WHERE organization_id = ? AND user_id = ?`, p.OrganizationID, p.UserID); err != nil {
+		writeError(w, 500, "DATABASE_ERROR", "could not clear usage records")
+		return
+	}
+	writeData(w, http.StatusOK, map[string]bool{"cleared": true})
 }
 func (a *App) listUsage(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)

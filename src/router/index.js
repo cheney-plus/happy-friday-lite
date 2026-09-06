@@ -11,12 +11,12 @@ export const routes = [
   {
     path: '/knowledge',
     name: 'knowledge',
-    component: () => import('@/views/knowledge/KnowledgeList.vue')
+    redirect: '/friday'
   },
   {
     path: '/file-viewer',
     name: 'file-viewer',
-    component: () => import('@/views/knowledge/FileViewerPage.vue')
+    redirect: '/friday'
   },
   {
     path: '/note',
@@ -66,7 +66,9 @@ export const routes = [
   {
     path: '/settings/model',
     name: 'settings-model',
-    component: () => import('@/views/settings/SettingsModel.vue')
+    // Enterprise model credentials are administered at /admin/ on the server.
+    // Do not expose the legacy local API-key configuration page to employees.
+    redirect: '/settings'
   },
   {
     path: '/settings/modules',

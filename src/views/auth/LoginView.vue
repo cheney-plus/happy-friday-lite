@@ -115,25 +115,25 @@ async function submit() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32px;
-  width: min(420px, 100%);
+  gap: 36px;
+  width: min(460px, 100%);
 }
 
 .login-brand {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .login-logo-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .login-logo {
-  height: 56px;
+  height: 60px;
   width: auto;
   object-fit: contain;
   user-select: none;
@@ -141,7 +141,7 @@ async function submit() {
 }
 
 .login-wordmark {
-  height: 28px;
+  height: 46px;
   width: auto;
   object-fit: contain;
   user-select: none;
@@ -150,7 +150,7 @@ async function submit() {
 
 .login-kicker {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 2px;
   color: var(--text-tertiary);
 }

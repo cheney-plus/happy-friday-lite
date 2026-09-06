@@ -10,6 +10,14 @@ export function isAuthenticated() { return Boolean(storage().getItem(ACCESS_KEY)
 export function getAccessToken() { return storage().getItem(ACCESS_KEY) || '' }
 export function getProfile() { try { return JSON.parse(storage().getItem(PROFILE_KEY) || 'null') } catch { return null } }
 export function clearSession() { [ACCESS_KEY, REFRESH_KEY, PROFILE_KEY].forEach(key => storage().removeItem(key)) }
+export function clearUserScopedCache() {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('happy-friday-') && key !== SERVER_KEY) localStorage.removeItem(key)
+    }
+    sessionStorage.clear()
+  } catch {}
+}
 
 async function request(path, options = {}, retry = true) {
   const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers }
@@ -28,6 +36,8 @@ async function request(path, options = {}, retry = true) {
 export async function login({ serverURL, email, password, deviceName = 'Happy Friday Desktop' }) {
   if (serverURL) setServerURL(serverURL)
   const data = await request('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email, password, deviceName }) }, false)
+  // A desktop can be shared. Never retain the preceding user's cached view state.
+  clearUserScopedCache()
   storage().setItem(ACCESS_KEY, data.accessToken); storage().setItem(REFRESH_KEY, data.refreshToken)
   const profile = await request('/api/v1/me'); storage().setItem(PROFILE_KEY, JSON.stringify(profile))
   await refreshModels()
@@ -40,8 +50,8 @@ export async function refresh() {
   storage().setItem(ACCESS_KEY, data.accessToken); storage().setItem(REFRESH_KEY, data.refreshToken)
   return data
 }
-export async function logout() { const token = storage().getItem(REFRESH_KEY); try { if (token) await request('/api/v1/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken: token }) }, false) } finally { clearSession() } }
-export async function restoreSession() { if (!isAuthenticated()) return null; try { const profile = await request('/api/v1/me'); storage().setItem(PROFILE_KEY, JSON.stringify(profile)); await refreshModels(); return profile } catch { clearSession(); return null } }
+export async function logout() { const token = storage().getItem(REFRESH_KEY); try { if (token) await request('/api/v1/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken: token }) }, false) } finally { clearSession(); clearUserScopedCache() } }
+export async function restoreSession() { if (!isAuthenticated()) return null; try { const profile = await request('/api/v1/me'); storage().setItem(PROFILE_KEY, JSON.stringify(profile)); await refreshModels(); return profile } catch { clearSession(); clearUserScopedCache(); return null } }
 export async function refreshModels() { const models = await request('/api/v1/model-configs/active'); const normalized = models.map(item => ({ ...item, providerLabel: item.displayName, id: item.id })); storage().setItem('happy-friday-custom-models', JSON.stringify(normalized)); if (!localStorage.getItem('happy-friday-selected-model') && normalized[0]) localStorage.setItem('happy-friday-selected-model', normalized[0].id); return normalized }
 export const enterpriseAPI = { request, login, logout, restoreSession, refreshModels }
 
@@ -81,6 +91,7 @@ export async function invokeEnterprise(command, args = {}) {
     case 'automation-delete-task': return route('DELETE', `/api/v1/automation/tasks/${args.taskId}`)
     case 'automation-delete-run': return route('DELETE', `/api/v1/automation/runs/${args.runId}`)
     case 'usage-get-stats': { const data = await route('GET', '/api/v1/usage-records/summary'); return { success: true, data: { summary: { totalPrompt: data.promptTokens, totalCompletion: data.completionTokens, totalTokens: data.totalTokens, totalReasoning: data.reasoningTokens, totalRequests: data.requests }, byModel: [], byDay: [], bySource: [] } } }
+    case 'usage-clear': return route('DELETE', '/api/v1/usage-records')
     default: return undefined
   }
 }
