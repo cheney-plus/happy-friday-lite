@@ -207,7 +207,7 @@ async function handleSend() {
   activeRequestId = `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   try {
-    await electronService.invoke('agent-invoke', {
+    await electronService.invoke('chat_without_memory', {
       requestId: activeRequestId,
       sessionId: sessionId,
       model: model,
@@ -225,7 +225,7 @@ async function handleSend() {
 async function handleStop() {
   if (!isStreaming.value || !activeRequestId) return;
   try {
-    await electronService.invoke('agent-stop', { requestId: activeRequestId });
+    await electronService.invoke('stop_chat', { requestId: activeRequestId });
   } catch (err) {
     console.error('[ScheduleAssistant] Stop error:', err);
   }

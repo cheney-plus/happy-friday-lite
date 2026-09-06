@@ -13,15 +13,6 @@
 // 知识库检索工具
 import './builtin/knowledgeBase.js'
 
-// 笔记操作工具（search/get/create/update）
-import './builtin/noteOps.js'
-
-// 日程操作工具（list/create/update/delete）
-import './builtin/scheduleOps.js'
-
-// 自动化任务操作工具（list/create/update/delete）
-import './builtin/automationOps.js'
-
 // Agent 文件操作工具（list/read/write）
 import './builtin/fileOps.js'
 

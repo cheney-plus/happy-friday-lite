@@ -4,7 +4,7 @@ import { electronService } from '@/services/electron';
 import { useFridayStore, useTabStore } from '@/store';
 import { getFridayTabId, isNewSessionId } from '@/utils/fridayNavigation';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
-import { getAccessToken, getServerURL, invokeEnterprise } from '@/services/enterprise';
+import { invokeEnterprise } from '@/services/enterprise';
 
 export function useChatStream({ messages, currentSessionId, currentMode, onHistoryRefresh, t }) {
   const route = useRoute();
@@ -165,23 +165,23 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   async function invokeChat({ mode, model, userMessage, attachments, thinkMode, kbName, kbCategoryId }) {
     const enableThinking = thinkMode === 'deep';
     const sessionId = currentSessionId.value || '';
+    const historyMessages = mode === 'chat' && sessionId
+      ? await invokeEnterprise('get_session_messages', { sessionId })
+      : [];
     const args = toIpcPayload({
       requestId: activeRequestId,
       sessionId,
-      model: { ...model, enterprise: { serverURL: getServerURL(), accessToken: getAccessToken() } },
+      model,
       message: userMessage,
+      historyMessages,
       attachments: attachments || [],
       enableThinking,
       kbName: kbName || '',
       kbCategoryId: kbCategoryId || ''
     });
-    if (mode === 'agent') {
-      return electronService.invoke('agent-invoke', args);
-    }
-    if (mode === 'chat') {
-      return electronService.invoke('chat_with_memory', args);
-    }
-    return electronService.invoke('chat_without_memory', args);
+    // Enterprise conversation data is persisted by the service. The local
+    // runtime only streams the model response and never maintains a mirror.
+    return electronService.invoke(mode === 'chat' ? 'chat_with_memory' : 'chat_without_memory', args);
   }
 
   async function sendChatMessage(payload, { skipUserPush = false, skipStart = false } = {}) {
@@ -205,7 +205,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     if (modelId) fridayStore.setModelId(modelId);
 
     const userMessage = data.userMessage || data.text;
-    // 服务端是企业用户数据的唯一来源；本地 SQLite 只作为主进程运行时历史镜像。
+    // 服务端是企业用户数据的唯一来源；本地运行时不保存会话历史。
     if (isNewSessionId(currentSessionId.value)) {
       const session = await invokeEnterprise('create_session', { title: userMessage.slice(0, 20) || '新对话', mode });
       currentSessionId.value = session.id;

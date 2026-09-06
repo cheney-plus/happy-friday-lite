@@ -1,11 +1,9 @@
 import { ipcMain, shell, dialog } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import TurndownService from 'turndown'
 import { CancellationTokens } from './cancellation.js'
 import { loadConfig, saveConfig, getDataDir } from './config.js'
-import * as db from './db.js'
-import { streamChat, streamChatWithRagAgent, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
+import { streamChat, streamChatWithRagAgent, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
 import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
 import {
@@ -16,64 +14,20 @@ import {
   verifyPythonDeps,
   invalidatePythonCache
 } from './python-env.js'
-import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT, BACKUP_PROGRESS } from './events.js'
+import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, NOTE_AI_DONE, NOTE_FIM_RESULT, BACKUP_PROGRESS } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
-import { cleanHistoryNow } from './historyClean.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
-import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
 import { listProviderModels } from './modelCatalog.js'
-import { registerAgentCommands } from './agent/ipc.js'
 import {
   registerHarnessCommands,
   syncHarnessConfigurationIfRunning
 } from './harness/index.js'
 import { getLogDir, setLoggingEnabled } from './logger.js'
-import { getShareUrl, getNoteShareUrl } from './shareServer.js'
-import {
-  createAutomationTask,
-  getActiveAutomationRun,
-  isAutomationRunActive,
-  isAutomationTaskRunning,
-  updateAutomationTask,
-  runAutomationTaskNow
-} from './automation.js'
 
 const cancelTokens = new CancellationTokens()
 
-function noteFileName(title, usedNames, exportDir) {
-  const baseName = String(title || '未命名笔记')
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-    .replace(/[. ]+$/g, '')
-    .trim()
-    .slice(0, 120) || '未命名笔记'
-
-  let index = 1
-  let fileName = `${baseName}.md`
-  while (usedNames.has(fileName.toLowerCase()) || fs.existsSync(path.join(exportDir, fileName))) {
-    index += 1
-    fileName = `${baseName} (${index}).md`
-  }
-  usedNames.add(fileName.toLowerCase())
-  return fileName
-}
-
-function noteHtmlToMarkdown(html) {
-  const turndown = new TurndownService({
-    headingStyle: 'atx',
-    codeBlockStyle: 'fenced',
-    bulletListMarker: '-'
-  })
-  turndown.addRule('taskListItems', {
-    filter: node => node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem',
-    replacement: (content, node) => {
-      const checkbox = node.querySelector('input[type="checkbox"]')
-      return `- [${checkbox?.hasAttribute('checked') ? 'x' : ' '}] ${content.trim()}\n`
-    }
-  })
-  return turndown.turndown(html || '')
-}
 
 /**
  * 校验模型配置：确保用户已配置自己的大模型
@@ -86,68 +40,6 @@ function validateModelConfig(model) {
     throw new Error('未配置大模型，请在设置中添加自己的模型')
   }
   return model
-}
-
-// 扫描 KB 根目录下所有 .note 文件，返回匹配 noteId 的文件路径列表
-function findNoteRefFiles(noteId) {
-  const dataDir = getDataDir()
-  if (!dataDir) return []
-  const kbRoot = path.join(dataDir, 'knowledge')
-  if (!fs.existsSync(kbRoot)) return []
-
-  const results = []
-  function walk(dir) {
-    let entries
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch (e) {
-      return
-    }
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name)
-      if (entry.isDirectory()) {
-        walk(fullPath)
-      } else if (entry.name.endsWith('.note')) {
-        try {
-          const raw = fs.readFileSync(fullPath, 'utf-8')
-          const meta = JSON.parse(raw)
-          if (meta.noteId === noteId) {
-            results.push({ path: fullPath, meta })
-          }
-        } catch (e) {
-          // 损坏的 .note 文件，跳过
-        }
-      }
-    }
-  }
-  walk(kbRoot)
-  return results
-}
-
-// 笔记标题变更时，同步更新关联 .note 文件内 JSON 的 title 字段
-// 文件名使用 noteId 永不变，只需更新内容
-function syncNoteRefOnRename(noteId, newTitle) {
-  const refs = findNoteRefFiles(noteId)
-  for (const ref of refs) {
-    try {
-      const updatedMeta = { ...ref.meta, title: newTitle || '未命名笔记' }
-      fs.writeFileSync(ref.path, JSON.stringify(updatedMeta, null, 2), 'utf-8')
-    } catch (e) {
-      console.error('[Commands] syncNoteRefOnRename error:', e)
-    }
-  }
-}
-
-// 笔记删除时，同步删除关联的 .note 文件
-function syncNoteRefOnDelete(noteId) {
-  const refs = findNoteRefFiles(noteId)
-  for (const ref of refs) {
-    try {
-      fs.unlinkSync(ref.path)
-    } catch (e) {
-      console.error('[Commands] syncNoteRefOnDelete error:', e)
-    }
-  }
 }
 
 export function registerCommands(mainWindow) {
@@ -175,6 +67,22 @@ export function registerCommands(mainWindow) {
     return result
   })
 
+  // History cleanup preferences are device-local UI settings. Conversation
+  // records themselves stay on the enterprise service.
+  ipcMain.handle('history-get-config', () => loadConfig().history || null)
+
+  ipcMain.handle('history-set-config', (_event, history) => {
+    const config = loadConfig()
+    config.history = {
+      ...config.history,
+      autoClean: Boolean(history?.autoClean),
+      cleanBefore: history?.cleanBefore || '3months',
+      lastCleanAt: history?.lastCleanAt ?? config.history?.lastCleanAt ?? null
+    }
+    saveConfig(config)
+    return { success: true, history: config.history }
+  })
+
   ipcMain.handle('get-platform', () => {
     return process.platform
   })
@@ -197,124 +105,26 @@ export function registerCommands(mainWindow) {
     return properties.includes('multiSelections') ? result.filePaths : result.filePaths[0]
   })
 
-  ipcMain.handle('get_sessions', () => {
-    return db.getSessions()
-  })
-
-  ipcMain.handle('get_sessions_with_stats', (_event, args) => {
-    return db.getSessionsWithStats(args?.startDate, args?.endDate)
-  })
-
-  ipcMain.handle('get_session', (_event, args) => {
-    return db.getSession(args.sessionId)
-  })
-
-  ipcMain.handle('create_session', (_event, args) => {
-    return db.createSession(args?.title)
-  })
-
-  ipcMain.handle('update_session_title', (_event, args) => {
-    const result = db.updateSessionTitle(args.sessionId, args.title)
-    mainWindow.webContents.send(SESSION_TITLE_UPDATED, {
-      sessionId: args.sessionId,
-      title: args.title
-    })
-    return result
-  })
-
-  ipcMain.handle('delete_session', (_event, args) => {
-    const result = db.deleteSession(args.sessionId)
-    if (result.automationRunsDeleted > 0) {
-      mainWindow.webContents.send('automation-updated')
-    }
-    return true
-  })
-
-  ipcMain.handle('get_session_messages', (_event, args) => {
-    return db.getMessages(args.sessionId)
-  })
-
-  // 生成内网分享链接：返回只读对话查看页面的 URL
-  ipcMain.handle('get-share-link', (_event, args) => {
-    const url = getShareUrl(args.sessionId)
-    if (!url) {
-      return { success: false, error: '分享服务未启动' }
-    }
-    return { success: true, url }
-  })
-
-  // 生成笔记内网分享链接
-  ipcMain.handle('get-note-share-link', (_event, args) => {
-    const url = getNoteShareUrl(args.noteId)
-    if (!url) {
-      return { success: false, error: '分享服务未启动' }
-    }
-    return { success: true, url }
-  })
-
-  ipcMain.handle('save_message', (_event, args) => {
-    return db.saveMessage(args.sessionId, args.role, args.content)
-  })
-
-  ipcMain.handle('rollback_session', (_event, args) => {
-    db.rollbackSession(args.sessionId, args.messageId)
-    return true
-  })
-
   ipcMain.handle('chat_with_memory', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId, folderPath, topK, attachments } = args
+    const { requestId, sessionId, model, message, historyMessages: requestedHistory, enableThinking, systemPrompt, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
-    let currentSessionId = sessionId
-    let isNewSession = false
-    let userMessageId = null
+    const currentSessionId = sessionId
 
     // 校验模型配置：确保用户已配置自己的大模型
     const effectiveModel = validateModelConfig(model)
 
     try {
-      if (!currentSessionId) {
-        const session = db.createSession(message.slice(0, 20) || '新对话')
-        currentSessionId = session.id
-        isNewSession = true
-      } else {
-        const existing = db.getSession(currentSessionId)
-        if (!existing) db.createSessionWithID(currentSessionId, message.slice(0, 20) || '新对话')
-      }
-
-      // 保存用户消息到数据库（简洁引用格式）
-      const userMsg = db.saveMessage(currentSessionId, 'user', message)
-      userMessageId = userMsg.id
-      db.updateSessionTimestamp(currentSessionId)
-
-      if (isNewSession) {
-        const modelClone = { ...effectiveModel }
-        const sessionIdClone = currentSessionId
-        const userMsgClone = message
-        setImmediate(async () => {
-          try {
-            const title = await generateTitle(modelClone, userMsgClone)
-            db.updateSessionTitle(sessionIdClone, title)
-            mainWindow.webContents.send(SESSION_TITLE_UPDATED, {
-              sessionId: sessionIdClone,
-              title
-            })
-          } catch (_e) {
-          }
-        })
-      }
-
-      const dbMessages = db.getMessages(currentSessionId)
-      let historyMessages = dbMessages.map(m => ({
-        role: m.role,
-        content: m.content
-      }))
+      if (!currentSessionId) throw new Error('缺少服务端会话 ID')
+      const historyMessages = Array.isArray(requestedHistory)
+        ? requestedHistory.map(item => ({ role: item.role, content: item.content }))
+        : []
 
       // 如果有 @ 引用附件，将最后一条用户消息替换为 LLM 完整格式（含引用内容）
       // 数据库仍存储简洁格式，仅 LLM 输入使用完整格式
       if (attachments && attachments.length > 0) {
         const llmContent = buildLlmMessage(message, attachments, 'chat')
-        historyMessages = historyMessages.slice(0, -1)
-        historyMessages.push({ role: 'user', content: llmContent })
+        const lastUserIndex = historyMessages.map(item => item.role).lastIndexOf('user')
+        if (lastUserIndex >= 0) historyMessages[lastUserIndex] = { role: 'user', content: llmContent }
       }
 
       const appConfig = loadConfig()
@@ -349,26 +159,17 @@ export function registerCommands(mainWindow) {
 
       cancelTokens.remove(requestId)
 
-      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent)
-      db.updateSessionTimestamp(currentSessionId)
-
       mainWindow.webContents.send(CHAT_DONE, {
         requestId,
         sessionId: currentSessionId,
         fullContent,
         reasoningContent: fullReasoning,
-        messageId: assistantMsg.id,
-        userMessageId
+        messageId: null,
+        userMessageId: null
       })
 
       return { sessionId: currentSessionId }
     } catch (e) {
-      // 将异常也作为助手消息保存，历史记录再次打开时不会出现用户消息后空白。
-      if (currentSessionId && userMessageId) {
-        const errorContent = `请求失败：${e?.message || String(e)}`
-        db.saveMessage(currentSessionId, 'assistant', errorContent, { error: true })
-        db.updateSessionTimestamp(currentSessionId)
-      }
       // 任何阶段出错都通知前端，避免前端一直处于 streaming 状态
       mainWindow.webContents.send(CHAT_ERROR, {
         requestId,
@@ -448,92 +249,6 @@ export function registerCommands(mainWindow) {
     return true
   })
 
-  ipcMain.handle('get_notes', (_event, args) => {
-    return db.getNotes(args?.knowledgeBaseId, args?.notebookId)
-  })
-
-  ipcMain.handle('get_note', (_event, args) => {
-    return db.getNote(args.noteId)
-  })
-
-  ipcMain.handle('create_note', (_event, args) => {
-    return db.createNote(args?.knowledgeBaseId, args?.notebookId, args?.title)
-  })
-
-  ipcMain.handle('import_note', (_event, args) => {
-    return db.importNote(args?.knowledgeBaseId, args?.notebookId, args?.title, args?.content, args?.contentText)
-  })
-
-  ipcMain.handle('update_note', (_event, args) => {
-    const oldNote = db.getNote(args.noteId)
-    const updated = db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId)
-    // 标题变更时同步重命名关联的 .note 文件
-    if (updated && oldNote && oldNote.title !== updated.title) {
-      syncNoteRefOnRename(args.noteId, updated.title)
-    }
-    return updated
-  })
-
-  ipcMain.handle('delete_note', (_event, args) => {
-    const result = db.softDeleteNote(args.noteId)
-    // 笔记删除时同步删除关联的 .note 文件
-    if (result) {
-      syncNoteRefOnDelete(args.noteId)
-    }
-    return result
-  })
-
-  ipcMain.handle('search_notes', (_event, args) => {
-    return db.searchNotes(args.query)
-  })
-
-  ipcMain.handle('get_schedule_events', () => {
-    return db.getScheduleEvents()
-  })
-
-  ipcMain.handle('get_schedule_events_by_date_range', (_event, args) => {
-    return db.getScheduleEventsByDateRange(args.start, args.end)
-  })
-
-  ipcMain.handle('get_schedule_event', (_event, args) => {
-    return db.getScheduleEvent(args.eventId)
-  })
-
-  ipcMain.handle('create_schedule_event', (_event, args) => {
-    return db.createScheduleEvent(args)
-  })
-
-  ipcMain.handle('update_schedule_event', (_event, args) => {
-    return db.updateScheduleEvent(args.eventId, args)
-  })
-
-  ipcMain.handle('delete_schedule_event', (_event, args) => {
-    db.deleteScheduleEvent(args.eventId)
-    return true
-  })
-
-  ipcMain.handle('get_notebooks', () => {
-    console.log('[Commands] get_notebooks called')
-    return db.getNotebooks()
-  })
-
-  ipcMain.handle('get_notebook', (_event, args) => {
-    return db.getNotebook(args.notebookId)
-  })
-
-  ipcMain.handle('create_notebook', (_event, args) => {
-    console.log('[Commands] create_notebook called with:', args)
-    return db.createNotebook(args?.name, args?.description)
-  })
-
-  ipcMain.handle('update_notebook', (_event, args) => {
-    return db.updateNotebook(args.notebookId, args.name, args.description)
-  })
-
-  ipcMain.handle('delete_notebook', (_event, args) => {
-    return db.deleteNotebook(args.notebookId)
-  })
-
   ipcMain.handle('export_html_to_pdf', async (_event, args) => {
     await exportHtmlToPdf(args.html, args.savePath)
     return true
@@ -542,32 +257,6 @@ export function registerCommands(mainWindow) {
   ipcMain.handle('export_markdown', async (_event, args) => {
     await exportMarkdown(args.markdown, args.savePath)
     return true
-  })
-
-  ipcMain.handle('export_all_notes', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: '选择笔记导出目录',
-      properties: ['openDirectory', 'createDirectory']
-    })
-    if (result.canceled || !result.filePaths[0]) return { success: false, canceled: true }
-
-    const exportDir = result.filePaths[0]
-    const notes = db.getNotes()
-    const usedNames = new Set()
-    const errors = []
-    let exported = 0
-
-    for (const note of notes) {
-      try {
-        const fileName = noteFileName(note.title, usedNames, exportDir)
-        fs.writeFileSync(path.join(exportDir, fileName), noteHtmlToMarkdown(note.content), 'utf-8')
-        exported += 1
-      } catch (error) {
-        errors.push({ title: note.title || '未命名笔记', error: error.message })
-      }
-    }
-
-    return { success: errors.length === 0, exported, total: notes.length, errors, exportDir }
   })
 
   ipcMain.handle('open-external', (_event, url) => {
@@ -1220,31 +909,6 @@ export function registerCommands(mainWindow) {
     return { success: true, dir: result.filePaths[0] }
   })
 
-  // ========== 对话历史自动清理相关命令 ==========
-  // 获取对话历史清理配置
-  ipcMain.handle('history-get-config', async () => {
-    const config = loadConfig()
-    return config.history || null
-  })
-
-  // 设置对话历史清理配置
-  ipcMain.handle('history-set-config', async (_event, args) => {
-    const config = loadConfig()
-    config.history = { ...config.history, ...args }
-    saveConfig(config)
-    return { success: true, history: config.history }
-  })
-
-  // 立即执行一次对话历史清理（用户开启功能时触发，属用户主动操作）
-  ipcMain.handle('history-clean-now', async () => {
-    try {
-      const result = await cleanHistoryNow()
-      return { success: true, ...result }
-    } catch (e) {
-      return { success: false, error: e.message }
-    }
-  })
-
   // ========== RAG 知识检索相关命令 ==========
 
   // 手动构建单个文件的向量索引（右键"构建索引"）
@@ -1417,28 +1081,6 @@ export function registerCommands(mainWindow) {
   // RAG 判断已移除：现在由 RAG Agent 通过 Function Calling 自主决定是否检索，
   // 不再需要单独的预判断请求。详见 llm.js 中的 streamChatWithRagAgent。
 
-  // ========== 用量统计与余额查询 ==========
-  // 获取 Token 用量统计：按时间范围（today/7d/30d/all）聚合
-  ipcMain.handle('usage-get-stats', (_event, args) => {
-    const range = (args && args.range) || 'all'
-    try {
-      return { success: true, data: getUsageStats(range) }
-    } catch (e) {
-      console.error('[IPC] usage-get-stats 错误:', e)
-      return { success: false, error: e.message, data: null }
-    }
-  })
-
-  // 清空所有用量记录
-  ipcMain.handle('usage-clear', () => {
-    try {
-      clearUsage()
-      return { success: true }
-    } catch (e) {
-      return { success: false, error: e.message }
-    }
-  })
-
   // 查询单个模型的账户余额（仅支持部分厂商）
   ipcMain.handle('model-query-balance', async (_event, args) => {
     const model = args && args.model
@@ -1464,45 +1106,6 @@ export function registerCommands(mainWindow) {
     }
   })
 
-  // ========== Local DeepAgent automation ==========
-  ipcMain.handle('automation-list-tasks', () => db.getAutomationTasks())
-  ipcMain.handle('automation-list-runs', (_event, filters) => db.getAutomationRuns(filters || {}))
-  ipcMain.handle('automation-get-active-run', (_event, args) => {
-    if (!args?.runId) throw new Error('缺少执行记录 ID')
-    return getActiveAutomationRun(args.runId)
-  })
-  ipcMain.handle('automation-create-task', (_event, args) => createAutomationTask(args || {}))
-  ipcMain.handle('automation-update-task', (_event, args) => {
-    if (!args?.taskId) throw new Error('缺少任务 ID')
-    return updateAutomationTask(args.taskId, args)
-  })
-  ipcMain.handle('automation-delete-task', (_event, args) => {
-    if (!args?.taskId) throw new Error('缺少任务 ID')
-    db.deleteAutomationTask(args.taskId)
-    return { ok: true }
-  })
-  ipcMain.handle('automation-delete-run', (_event, args) => {
-    if (!args?.runId) throw new Error('缺少执行记录 ID')
-    if (isAutomationRunActive(args.runId)) return { ok: false, error: '任务正在执行，无法删除执行记录' }
-    const deleted = db.deleteAutomationRun(args.runId)
-    if (deleted) mainWindow.webContents.send('automation-updated')
-    return { ok: deleted }
-  })
-  ipcMain.handle('automation-run-task', async (_event, args) => {
-    if (!args?.taskId) throw new Error('缺少任务 ID')
-    if (!db.getAutomationTask(args.taskId)) throw new Error('自动化任务不存在')
-    if (isAutomationTaskRunning(args.taskId)) return { ok: false, error: '任务正在执行' }
-    runAutomationTaskNow(args.taskId).catch(error => {
-      console.error('[Automation] 手动执行任务失败:', error)
-    })
-    return { ok: true }
-  })
-
-  // ========== Agent 智能体相关命令 ==========
-  // 设计参考：src/views/knowledge/agent/Agent智能体设计.md
-  // Agent 模式提供工具调用能力（知识检索、笔记/日程操作、文件操作），
-  // 支持 HITL 审批。会话复用 sessions 表，与普通对话历史一致。
-  registerAgentCommands(mainWindow)
   registerHarnessCommands(mainWindow)
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')

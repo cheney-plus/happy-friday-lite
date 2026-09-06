@@ -10,7 +10,6 @@
  */
 
 import fs from 'fs'
-import * as db from './db.js'
 import { buildAttachmentContextPrompt } from '../src/config/prompts.js'
 
 const MAX_LLM_CONTENT_LENGTH = 2500
@@ -25,11 +24,8 @@ const truncateForLlm = (content) => {
 // - note: 通过 noteId 从数据库读取 contentText
 // - file: 通过 path 从磁盘读取
 const readAttachmentContent = (att) => {
-  if (att.kind === 'note') {
-    if (!att.noteId) return ''
-    const note = db.getNote(att.noteId)
-    return note?.contentText || note?.content || ''
-  }
+  // Notes are enterprise data. This local runtime never reads note content.
+  if (att.kind === 'note') return '(笔记内容仅可通过企业服务访问)'
   if (att.kind === 'file') {
     if (!att.path || !fs.existsSync(att.path)) return '(文件不存在)'
     try {

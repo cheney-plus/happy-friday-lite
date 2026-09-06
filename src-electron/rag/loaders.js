@@ -187,44 +187,8 @@ async function loadPptxFile(filePath) {
   })]
 }
 
-// 加载 .note 笔记引用文件
-// .note 文件是 JSON 元数据，包含 noteId，需要从数据库获取笔记内容
-async function loadNoteFile(filePath, db) {
-  const raw = fs.readFileSync(filePath, 'utf-8')
-  const meta = JSON.parse(raw)
-  const stat = fs.statSync(filePath)
-
-  if (!meta.noteId) {
-    throw new Error(`Invalid .note file: missing noteId in ${filePath}`)
-  }
-
-  // 从数据库获取笔记内容
-  const note = db.getNote(meta.noteId)
-  if (!note) {
-    throw new Error(`Note not found in DB: ${meta.noteId}`)
-  }
-
-  // 笔记内容是 HTML 格式，需要转为纯文本/markdown
-  // contentText 字段已经是纯文本
-  const content = note.contentText || note.content || ''
-  const title = note.title || meta.title || '未命名笔记'
-
-  return [new Document({
-    pageContent: `# ${title}\n\n${content}`,
-    metadata: {
-      source: filePath,
-      fileType: 'note',
-      fileSize: stat.size,
-      fileCreatedAt: note.createdAt || stat.birthtime.toISOString(),
-      fileModifiedAt: note.updatedAt || stat.mtime.toISOString(),
-      noteId: meta.noteId,
-      title: title
-    }
-  })]
-}
-
 // 主加载入口：根据文件类型选择加载器
-export async function loadDocument(filePath, db = null) {
+export async function loadDocument(filePath) {
   const ext = path.extname(filePath).toLowerCase().slice(1)
 
   if (!fs.existsSync(filePath)) {
@@ -268,10 +232,7 @@ export async function loadDocument(filePath, db = null) {
       return loadPptxFile(filePath)
 
     case 'note':
-      if (!db) {
-        throw new Error('Loading .note files requires db module')
-      }
-      return loadNoteFile(filePath, db)
+      throw new Error('Enterprise edition does not index local note references')
 
     default:
       // 未知类型尝试作为文本加载

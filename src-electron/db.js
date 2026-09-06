@@ -1,69 +1,36 @@
 import fs from 'fs'
 import path from 'path'
-import crypto from 'crypto'
 import initSqlJs from 'sql.js'
 
 let dataDir = null
 let db = null
+let saveTimer = null
+let dirty = false
 
-export function setDataDir(dir) {
-  dataDir = dir
-}
-
-function generateId() {
-  return crypto.randomUUID()
-}
-
-function nowISO() {
-  return new Date().toISOString()
-}
+export function setDataDir(dir) { dataDir = dir }
+function nowISO() { return new Date().toISOString() }
 
 function queryAll(sql, params = []) {
   const stmt = db.prepare(sql)
   stmt.bind(params)
   const rows = []
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject())
-  }
+  while (stmt.step()) rows.push(stmt.getAsObject())
   stmt.free()
   return rows
 }
+function queryOne(sql, params = []) { return queryAll(sql, params)[0] || null }
 
-// 原始查询函数（支持 UPDATE/DELETE 等无结果集语句，也支持 SELECT 返回行）
-// 供 RAG 队列等模块使用
 export function queryAllRaw(sql, params = []) {
-  if (sql.trim().toUpperCase().startsWith('SELECT')) {
-    return queryAll(sql, params)
-  }
+  if (sql.trim().toUpperCase().startsWith('SELECT')) return queryAll(sql, params)
   db.run(sql, params)
   saveDb()
   return []
 }
 
-function queryOne(sql, params = []) {
-  const rows = queryAll(sql, params)
-  return rows.length > 0 ? rows[0] : null
-}
-
-function runSql(sql, params = []) {
-  db.run(sql, params)
-}
-
-// 持久化：将内存数据库导出并同步写入磁盘
 function persistDb() {
-  if (!db) return
-  const data = db.export()
-  const buffer = Buffer.from(data)
-  const dbPath = path.join(dataDir, 'friday.db')
-  fs.writeFileSync(dbPath, buffer)
+  if (!db || !dataDir) return
+  fs.writeFileSync(path.join(dataDir, 'friday.db'), Buffer.from(db.export()))
 }
-
-// 防抖写入：多次写操作合并为一次磁盘 IO，避免每次 INSERT/UPDATE 都全量导出+同步写盘
-// 数据始终安全保留在内存中，flushDb()/closeDb() 会在退出或备份前强制落盘
-let saveTimer = null
-let dirty = false
-const SAVE_DEBOUNCE_MS = 200
-
 function saveDb() {
   dirty = true
   if (saveTimer) return
@@ -72,1111 +39,98 @@ function saveDb() {
     if (!dirty || !db) return
     dirty = false
     persistDb()
-  }, SAVE_DEBOUNCE_MS)
+  }, 200)
 }
 
 async function initDatabase() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
-  }
-
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   const SQL = await initSqlJs()
   const dbPath = path.join(dataDir, 'friday.db')
+  db = fs.existsSync(dbPath) ? new SQL.Database(fs.readFileSync(dbPath)) : new SQL.Database()
 
-  if (fs.existsSync(dbPath)) {
-    const fileBuffer = fs.readFileSync(dbPath)
-    db = new SQL.Database(fileBuffer)
-  } else {
-    db = new SQL.Database()
+  // Enterprise business data lives exclusively on the Go service. Remove the
+  // legacy local tables from existing installations as part of this upgrade.
+  for (const table of ['messages', 'sessions', 'notes', 'notebooks', 'schedule_events', 'automation_runs', 'automation_tasks', 'llm_usage_records']) {
+    db.run(`DROP TABLE IF EXISTS ${table}`)
   }
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT '新对话',
-      mode TEXT NOT NULL DEFAULT 'chat',
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `)
-
-  // 迁移：为旧版 sessions 表补充 mode 列
-  try {
-    db.run('ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT \'chat\'')
-  } catch (_e) {
-    // 列已存在，忽略
-  }
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sessionId TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (sessionId) REFERENCES sessions(id) ON DELETE CASCADE
-    );
-  `)
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS notes (
-      id TEXT PRIMARY KEY,
-      knowledgeBaseId TEXT,
-      notebookId TEXT,
-      title TEXT NOT NULL DEFAULT '新建笔记',
-      content TEXT NOT NULL DEFAULT '',
-      contentText TEXT NOT NULL DEFAULT '',
-      isDeleted INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `)
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS notebooks (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL DEFAULT '新建笔记本',
-      description TEXT NOT NULL DEFAULT '',
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `)
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS schedule_events (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT '',
-      start TEXT NOT NULL DEFAULT '',
-      end TEXT NOT NULL DEFAULT '',
-      startTime TEXT NOT NULL DEFAULT '',
-      endTime TEXT NOT NULL DEFAULT '',
-      allDay INTEGER NOT NULL DEFAULT 0,
-      description TEXT NOT NULL DEFAULT '',
-      color TEXT NOT NULL DEFAULT '#60a5fa',
-      reminder INTEGER NOT NULL DEFAULT 0,
-      completed INTEGER NOT NULL DEFAULT 0,
-      priority TEXT NOT NULL DEFAULT 'important',
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `)
-
-  // 迁移：为旧版 schedule_events 表补充 priority 列（已存在则忽略）
-  try {
-    db.run("ALTER TABLE schedule_events ADD COLUMN priority TEXT NOT NULL DEFAULT 'important'")
-  } catch (_e) {
-    // 列已存在，忽略
-  }
-
-  // 迁移：为 messages 表补充 metadata 列，存储 Agent 模式的工具调用时间线等附加数据
-  try {
-    db.run('ALTER TABLE messages ADD COLUMN metadata TEXT')
-  } catch (_e) {
-    // 列已存在，忽略
-  }
-
-  // RAG: 文件索引状态表
-  db.run(`
-    CREATE TABLE IF NOT EXISTS file_status (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      kb_type TEXT NOT NULL,
-      file_path TEXT NOT NULL,
-      last_modified TEXT NOT NULL,
-      index_status TEXT NOT NULL DEFAULT 'pending',
-      last_indexed_at TEXT,
-      chunk_count INTEGER NOT NULL DEFAULT 0,
-      UNIQUE(kb_type, file_path)
-    );
-  `)
-
-  // 迁移：为旧版 file_status 表补充 chunk_count 列（已存在则忽略）
-  try {
-    db.run('ALTER TABLE file_status ADD COLUMN chunk_count INTEGER NOT NULL DEFAULT 0')
-  } catch (_e) {
-    // 列已存在，忽略
-  }
-
-  // RAG: 父块文档存储表（Small-to-Big 检索）
-  db.run(`
-    CREATE TABLE IF NOT EXISTS parent_docs (
-      uuid TEXT PRIMARY KEY,
-      doc_id TEXT NOT NULL,
-      content TEXT NOT NULL,
-      source_path TEXT NOT NULL,
-      file_type TEXT,
-      file_size INTEGER,
-      file_created_at TEXT,
-      file_modified_at TEXT,
-      extra_metadata TEXT
-    );
-  `)
-
-  // ========== Agent 智能体相关表 ==========
-  // agent_threads: Agent 会话（与 sessions 表独立，避免污染对话历史）
-  db.run(`
-    CREATE TABLE IF NOT EXISTS agent_threads (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT '新 Agent 会话',
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `)
-
-  // agent_memories: 跨会话记忆（与 StoreBackend 双向同步）
-  db.run(`
-    CREATE TABLE IF NOT EXISTS agent_memories (
-      id TEXT PRIMARY KEY,
-      threadId TEXT,
-      namespace TEXT NOT NULL DEFAULT 'memories',
-      key TEXT NOT NULL,
-      value TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `)
-
-  // agent_tool_logs: 工具调用审计日志（「改进」能力的数据源）
-  db.run(`
-    CREATE TABLE IF NOT EXISTS agent_tool_logs (
-      id TEXT PRIMARY KEY,
-      threadId TEXT,
-      requestId TEXT,
-      toolName TEXT NOT NULL,
-      arguments TEXT,
-      output TEXT,
-      status TEXT NOT NULL DEFAULT 'success',
-      durationMs INTEGER DEFAULT 0,
-      createdAt TEXT NOT NULL
-    );
-  `)
-
-  // automation_tasks: 本地 DeepAgent 定时任务。cronExpression 使用本机时区的五字段 Cron。
-  db.run(`
-    CREATE TABLE IF NOT EXISTS automation_tasks (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      instruction TEXT NOT NULL,
-      modelId TEXT NOT NULL,
-      triggerType TEXT NOT NULL,
-      triggerConfig TEXT NOT NULL,
-      cronExpression TEXT,
-      nextRunAt TEXT,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      lastRunAt TEXT,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `)
-
-  // automation_runs: 每次自动或手动执行都保留独立的审计记录与 Agent 输出。
-  db.run(`
-    CREATE TABLE IF NOT EXISTS automation_runs (
-      id TEXT PRIMARY KEY,
-      taskId TEXT NOT NULL,
-      taskName TEXT,
-      sessionId TEXT,
-      trigger TEXT NOT NULL DEFAULT 'schedule',
-      status TEXT NOT NULL DEFAULT 'running',
-      startedAt TEXT NOT NULL,
-      completedAt TEXT,
-      durationMs INTEGER,
-      output TEXT,
-      error TEXT
-    );
-  `)
-
-  // 迁移：早期自动化运行记录没有关联可查看详情的 Agent 会话。
-  try {
-    db.run('ALTER TABLE automation_runs ADD COLUMN sessionId TEXT')
-  } catch (_e) {
-    // 列已存在，忽略
-  }
-
-  // 迁移：运行记录保留任务标题快照，避免任务删除后历史标题丢失。
-  try {
-    db.run('ALTER TABLE automation_runs ADD COLUMN taskName TEXT')
-  } catch (_e) {
-    // 列已存在，忽略
-  }
-  db.run(`
-    UPDATE automation_runs
-    SET taskName = COALESCE(
-      taskName,
-      (SELECT name FROM automation_tasks WHERE automation_tasks.id = automation_runs.taskId),
-      (SELECT title FROM sessions WHERE sessions.id = automation_runs.sessionId)
-    )
-    WHERE taskName IS NULL OR taskName = ''
-  `)
-
-  db.run('CREATE INDEX IF NOT EXISTS idx_messages_sessionId ON messages(sessionId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_notes_notebookId ON notes(notebookId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_notes_isDeleted ON notes(isDeleted)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_start ON schedule_events(start)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_end ON schedule_events(end)')
+  // These tables support capabilities not migrated to the service yet.
+  db.run(`CREATE TABLE IF NOT EXISTS file_status (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kb_type TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    last_modified TEXT NOT NULL,
+    index_status TEXT NOT NULL DEFAULT 'pending',
+    last_indexed_at TEXT,
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(kb_type, file_path)
+  )`)
+  db.run(`CREATE TABLE IF NOT EXISTS parent_docs (
+    uuid TEXT PRIMARY KEY, doc_id TEXT NOT NULL, content TEXT NOT NULL,
+    source_path TEXT NOT NULL, file_type TEXT, file_size INTEGER,
+    file_created_at TEXT, file_modified_at TEXT, extra_metadata TEXT
+  )`)
+  db.run(`CREATE TABLE IF NOT EXISTS agent_threads (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'New Agent Session',
+    createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+  )`)
+  db.run(`CREATE TABLE IF NOT EXISTS agent_memories (
+    id TEXT PRIMARY KEY, threadId TEXT, namespace TEXT NOT NULL DEFAULT 'memories',
+    key TEXT NOT NULL, value TEXT NOT NULL, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+  )`)
+  db.run(`CREATE TABLE IF NOT EXISTS agent_tool_logs (
+    id TEXT PRIMARY KEY, threadId TEXT, requestId TEXT, toolName TEXT NOT NULL,
+    arguments TEXT, output TEXT, status TEXT NOT NULL DEFAULT 'success',
+    durationMs INTEGER DEFAULT 0, createdAt TEXT NOT NULL
+  )`)
   db.run('CREATE INDEX IF NOT EXISTS idx_file_status_kb_type ON file_status(kb_type)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_file_status_index_status ON file_status(index_status)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_parent_docs_doc_id ON parent_docs(doc_id)')
   db.run('CREATE INDEX IF NOT EXISTS idx_parent_docs_source_path ON parent_docs(source_path)')
   db.run('CREATE INDEX IF NOT EXISTS idx_agent_memories_threadId ON agent_memories(threadId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_agent_memories_namespace ON agent_memories(namespace)')
   db.run('CREATE INDEX IF NOT EXISTS idx_agent_tool_logs_threadId ON agent_tool_logs(threadId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_agent_tool_logs_requestId ON agent_tool_logs(requestId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_automation_tasks_enabled ON automation_tasks(enabled)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_automation_tasks_nextRunAt ON automation_tasks(nextRunAt)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_taskId ON automation_runs(taskId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_sessionId ON automation_runs(sessionId)')
-  db.run('CREATE INDEX IF NOT EXISTS idx_automation_runs_startedAt ON automation_runs(startedAt)')
-
   saveDb()
-  await migrateFromJson()
 }
 
-async function migrateFromJson() {
-  const migratedFlag = path.join(dataDir, '.sqlite-migrated')
-  if (fs.existsSync(migratedFlag)) return
-
-  const migrateArray = (filename, insertFn) => {
-    const filePath = path.join(dataDir, filename)
-    if (!fs.existsSync(filePath)) return
-    try {
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-      if (!Array.isArray(data)) return
-      db.exec('BEGIN TRANSACTION')
-      try {
-        for (const item of data) insertFn(item)
-        db.exec('COMMIT')
-      } catch (e) {
-        db.exec('ROLLBACK')
-        throw e
-      }
-    } catch (_e) {}
-  }
-
-  migrateArray('sessions.json', (s) => {
-    db.run(
-      'INSERT OR IGNORE INTO sessions (id, title, createdAt, updatedAt) VALUES (?, ?, ?, ?)',
-      [s.id, s.title, s.createdAt, s.updatedAt]
-    )
-  })
-
-  migrateArray('messages.json', (m) => {
-    db.run(
-      'INSERT OR IGNORE INTO messages (id, sessionId, role, content, createdAt) VALUES (?, ?, ?, ?, ?)',
-      [m.id, m.sessionId, m.role, m.content, m.createdAt]
-    )
-  })
-
-  migrateArray('notes.json', (n) => {
-    db.run(
-      'INSERT OR IGNORE INTO notes (id, knowledgeBaseId, notebookId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [n.id, n.knowledgeBaseId || null, n.notebookId || null, n.title, n.content, n.contentText, n.isDeleted ? 1 : 0, n.createdAt, n.updatedAt]
-    )
-  })
-
-  migrateArray('notebooks.json', (nb) => {
-    db.run(
-      'INSERT OR IGNORE INTO notebooks (id, name, description, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-      [nb.id, nb.name || '新建笔记本', nb.description || '', nb.createdAt, nb.updatedAt]
-    )
-  })
-
-  migrateArray('schedule_events.json', (e) => {
-    db.run(
-      'INSERT OR IGNORE INTO schedule_events (id, title, start, end, startTime, endTime, allDay, description, color, reminder, completed, priority, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [e.id, e.title, e.start, e.end, e.startTime, e.endTime, e.allDay ? 1 : 0, e.description, e.color, e.reminder ? 1 : 0, e.completed ? 1 : 0, e.priority || 'important', e.createdAt, e.updatedAt]
-    )
-  })
-
-  saveDb()
-  fs.writeFileSync(migratedFlag, new Date().toISOString())
-}
-
-export async function initDb() {
-  await initDatabase()
-}
-
-// 确保数据库内容写入磁盘（备份前调用）
+export async function initDb() { await initDatabase() }
 export function flushDb() {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
-  if (dirty && db) {
-    dirty = false
-    persistDb()
-  }
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+  if (dirty && db) { dirty = false; persistDb() }
 }
+export function closeDb() { flushDb(); if (db) { db.close(); db = null } }
 
-export function closeDb() {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
-  if (db) {
-    if (dirty) {
-      dirty = false
-      persistDb()
-    }
-    db.close()
-    db = null
-  }
-}
-
-function normalizeEvent(row) {
-  if (!row) return row
-  row.allDay = !!row.allDay
-  row.reminder = !!row.reminder
-  row.completed = !!row.completed
-  if (!row.priority) row.priority = 'important'
-  return row
-}
-
-function normalizeNote(row) {
-  if (!row) return row
-  row.isDeleted = !!row.isDeleted
-  return row
-}
-
-function normalizeAutomationTask(row) {
-  if (!row) return row
-  row.enabled = !!row.enabled
-  try {
-    row.triggerConfig = JSON.parse(row.triggerConfig || '{}')
-  } catch (_e) {
-    row.triggerConfig = {}
-  }
-  return row
-}
-
-export function createSession(title, mode = 'chat') {
-  const now = nowISO()
-  const id = generateId()
-  db.run(
-    'INSERT INTO sessions (id, title, mode, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-    [id, title || '新对话', mode, now, now]
-  )
-  saveDb()
-  return { id, title: title || '新对话', mode, createdAt: now, updatedAt: now }
-}
-
-// 企业版客户端先在服务端生成会话 ID；主进程仅保留运行时 LLM 历史镜像。
-export function createSessionWithID(id, title, mode = 'chat') {
-  const now = nowISO()
-  db.run(
-    'INSERT OR IGNORE INTO sessions (id, title, mode, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-    [id, title || '新对话', mode, now, now]
-  )
-  saveDb()
-  return getSession(id)
-}
-
-export function getSessions() {
-  return queryAll('SELECT * FROM sessions ORDER BY updatedAt DESC')
-}
-
-export function getSessionsWithStats(startDate, endDate) {
-  let sql, params
-  if (startDate && endDate) {
-    sql = 'SELECT * FROM sessions WHERE updatedAt >= ? AND updatedAt < ? ORDER BY updatedAt DESC'
-    params = [startDate, endDate]
-  } else if (startDate) {
-    sql = 'SELECT * FROM sessions WHERE updatedAt >= ? ORDER BY updatedAt DESC'
-    params = [startDate]
-  } else if (endDate) {
-    sql = 'SELECT * FROM sessions WHERE updatedAt < ? ORDER BY updatedAt DESC'
-    params = [endDate]
-  } else {
-    sql = 'SELECT * FROM sessions ORDER BY updatedAt DESC'
-    params = []
-  }
-
-  const sessions = queryAll(sql, params).map(s => {
-    const stats = queryOne(
-      'SELECT COUNT(*) as messageCount FROM messages WHERE sessionId = ?',
-      [s.id]
-    )
-    const firstUserMsg = queryOne(
-      "SELECT content FROM messages WHERE sessionId = ? AND role = 'user' ORDER BY id ASC LIMIT 1",
-      [s.id]
-    )
-    return {
-      ...s,
-      messageCount: stats ? stats.messageCount : 0,
-      preview: firstUserMsg ? firstUserMsg.content : ''
-    }
-  })
-
-  // 是否还存在更早的会话（用于前端“查看更多”）
-  let hasMore = false
-  if (startDate) {
-    const older = queryOne(
-      'SELECT COUNT(*) as count FROM sessions WHERE updatedAt < ?',
-      [startDate]
-    )
-    hasMore = !!(older && older.count > 0)
-  }
-
-  return { sessions, hasMore }
-}
-
-export function getSession(sessionId) {
-  return queryOne('SELECT * FROM sessions WHERE id = ?', [sessionId])
-}
-
-export function deleteSession(sessionId) {
-  db.run('DELETE FROM automation_runs WHERE sessionId = ?', [sessionId])
-  const automationRunsDeleted = db.getRowsModified()
-  db.run('DELETE FROM messages WHERE sessionId = ?', [sessionId])
-  db.run('DELETE FROM sessions WHERE id = ?', [sessionId])
-  saveDb()
-  return { automationRunsDeleted }
-}
-
-export function updateSessionTitle(sessionId, title) {
-  db.run(
-    'UPDATE sessions SET title = ?, updatedAt = ? WHERE id = ?',
-    [title, nowISO(), sessionId]
-  )
-  saveDb()
-  return db.getRowsModified() > 0
-}
-
-export function updateSessionTimestamp(sessionId) {
-  db.run(
-    'UPDATE sessions SET updatedAt = ? WHERE id = ?',
-    [nowISO(), sessionId]
-  )
-  saveDb()
-}
-
-export function saveMessage(sessionId, role, content, metadata = null) {
-  const now = nowISO()
-  const metadataStr = metadata ? JSON.stringify(metadata) : null
-  db.run(
-    'INSERT INTO messages (sessionId, role, content, createdAt, metadata) VALUES (?, ?, ?, ?, ?)',
-    [sessionId, role, content, now, metadataStr]
-  )
-  const row = queryOne('SELECT last_insert_rowid() as id')
-  const id = row ? row.id : 0
-  saveDb()
-  return { id, sessionId, role, content, createdAt: now, metadata }
-}
-
-export function getMessages(sessionId) {
-  const rows = queryAll('SELECT * FROM messages WHERE sessionId = ? ORDER BY id ASC', [sessionId])
-  // 解析 metadata JSON
-  return rows.map(row => {
-    if (row.metadata && typeof row.metadata === 'string') {
-      try {
-        row.metadata = JSON.parse(row.metadata)
-      } catch (_e) {
-        // 解析失败保留原始字符串
-      }
-    }
-    return row
-  })
-}
-
-export function rollbackSession(sessionId, messageId) {
-  db.run(
-    'DELETE FROM messages WHERE sessionId = ? AND id >= ?',
-    [sessionId, messageId]
-  )
-  updateSessionTimestamp(sessionId)
-}
-
-/**
- * 清理在 beforeISO 之前最后活动的会话及其消息（对话历史）。
- * 以 sessions.updatedAt（最后活动时间）为判定依据：长期未活动的会话才会被清理。
- * agent_threads 与对话历史相互独立，不在清理范围内。
- * @param {string} beforeISO ISO 时间字符串，updatedAt 早于此值的会话将被删除
- * @returns {{ count: number }} 被清理的会话数量
- */
-export function cleanOldSessions(beforeISO) {
-  const rows = queryAll('SELECT id FROM sessions WHERE updatedAt < ?', [beforeISO])
-  if (rows.length === 0) return { count: 0 }
-
-  const ids = rows.map(r => r.id)
-  const placeholders = ids.map(() => '?').join(',')
-  // 先删消息（外键），再删会话本身
-  db.run(`DELETE FROM messages WHERE sessionId IN (${placeholders})`, ids)
-  db.run(`DELETE FROM sessions WHERE id IN (${placeholders})`, ids)
-  saveDb()
-  return { count: ids.length }
-}
-
-export function createNote(knowledgeBaseId, notebookId, title) {
-  const now = nowISO()
-  const id = generateId()
-  db.run(
-    'INSERT INTO notes (id, knowledgeBaseId, notebookId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)',
-    [id, knowledgeBaseId || null, notebookId || null, title || '新建笔记', '', '', now, now]
-  )
-  saveDb()
-  return {
-    id,
-    knowledgeBaseId: knowledgeBaseId || null,
-    notebookId: notebookId || null,
-    title: title || '新建笔记',
-    content: '',
-    contentText: '',
-    isDeleted: false,
-    createdAt: now,
-    updatedAt: now
-  }
-}
-
-export function importNote(knowledgeBaseId, notebookId, title, content, contentText) {
-  const now = nowISO()
-  const id = generateId()
-  db.run(
-    'INSERT INTO notes (id, knowledgeBaseId, notebookId, title, content, contentText, isDeleted, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)',
-    [id, knowledgeBaseId || null, notebookId || null, title || '新建笔记', content || '', contentText || '', now, now]
-  )
-  saveDb()
-  return {
-    id,
-    knowledgeBaseId: knowledgeBaseId || null,
-    notebookId: notebookId || null,
-    title: title || '新建笔记',
-    content: content || '',
-    contentText: contentText || '',
-    isDeleted: false,
-    createdAt: now,
-    updatedAt: now
-  }
-}
-
-export function getNotes(knowledgeBaseId, notebookId) {
-  if (knowledgeBaseId && notebookId) {
-    return queryAll(
-      'SELECT * FROM notes WHERE isDeleted = 0 AND knowledgeBaseId = ? AND notebookId = ? ORDER BY updatedAt DESC',
-      [knowledgeBaseId, notebookId]
-    ).map(normalizeNote)
-  }
-  if (knowledgeBaseId) {
-    return queryAll(
-      'SELECT * FROM notes WHERE isDeleted = 0 AND knowledgeBaseId = ? ORDER BY updatedAt DESC',
-      [knowledgeBaseId]
-    ).map(normalizeNote)
-  }
-  if (notebookId) {
-    return queryAll(
-      'SELECT * FROM notes WHERE isDeleted = 0 AND notebookId = ? ORDER BY updatedAt DESC',
-      [notebookId]
-    ).map(normalizeNote)
-  }
-  return queryAll(
-    'SELECT * FROM notes WHERE isDeleted = 0 ORDER BY updatedAt DESC'
-  ).map(normalizeNote)
-}
-
-export function getNote(noteId) {
-  return normalizeNote(queryOne(
-    'SELECT * FROM notes WHERE id = ? AND isDeleted = 0',
-    [noteId]
-  ))
-}
-
-export function updateNote(noteId, title, content, contentText, notebookId) {
-  const now = nowISO()
-  if (notebookId !== undefined) {
-    db.run(
-      'UPDATE notes SET title = ?, content = ?, contentText = ?, notebookId = ?, updatedAt = ? WHERE id = ?',
-      [title, content, contentText, notebookId, now, noteId]
-    )
-  } else {
-    db.run(
-      'UPDATE notes SET title = ?, content = ?, contentText = ?, updatedAt = ? WHERE id = ?',
-      [title, content, contentText, now, noteId]
-    )
-  }
-  const modified = db.getRowsModified()
-  saveDb()
-  if (modified > 0) {
-    return normalizeNote(queryOne('SELECT * FROM notes WHERE id = ?', [noteId]))
-  }
-  return null
-}
-
-export function softDeleteNote(noteId) {
-  db.run(
-    'UPDATE notes SET isDeleted = 1, updatedAt = ? WHERE id = ?',
-    [nowISO(), noteId]
-  )
-  const modified = db.getRowsModified()
-  saveDb()
-  return modified > 0
-}
-
-export function searchNotes(query) {
-  const q = `%${(query || '').toLowerCase()}%`
-  return queryAll(
-    "SELECT * FROM notes WHERE isDeleted = 0 AND (LOWER(title) LIKE ? OR LOWER(contentText) LIKE ?)",
-    [q, q]
-  ).map(normalizeNote)
-}
-
-export function getScheduleEvents() {
-  return queryAll(
-    'SELECT * FROM schedule_events ORDER BY start ASC, startTime ASC'
-  ).map(normalizeEvent)
-}
-
-export function getScheduleEventsByDateRange(start, end) {
-  return queryAll(
-    'SELECT * FROM schedule_events WHERE start <= ? AND end >= ? ORDER BY start ASC, startTime ASC',
-    [end, start]
-  ).map(normalizeEvent)
-}
-
-export function getScheduleEvent(eventId) {
-  return normalizeEvent(queryOne(
-    'SELECT * FROM schedule_events WHERE id = ?',
-    [eventId]
-  ))
-}
-
-export function createScheduleEvent(args) {
-  const now = nowISO()
-  const id = generateId()
-  const priority = args.priority || 'important'
-  db.run(
-    'INSERT INTO schedule_events (id, title, start, end, startTime, endTime, allDay, description, color, reminder, completed, priority, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [
-      id, args.title || '', args.startDate || '', args.endDate || '',
-      args.startTime || '', args.endTime || '', args.allDay ? 1 : 0,
-      args.description || '', args.color || '#60a5fa', args.reminder ? 1 : 0,
-      args.completed ? 1 : 0, priority, now, now
-    ]
-  )
-  saveDb()
-  return {
-    id,
-    title: args.title || '',
-    start: args.startDate || '',
-    end: args.endDate || '',
-    startTime: args.startTime || '',
-    endTime: args.endTime || '',
-    allDay: args.allDay || false,
-    description: args.description || '',
-    color: args.color || '#60a5fa',
-    reminder: args.reminder || false,
-    completed: args.completed || false,
-    priority,
-    createdAt: now,
-    updatedAt: now
-  }
-}
-
-export function updateScheduleEvent(eventId, args) {
-  const existing = queryOne('SELECT * FROM schedule_events WHERE id = ?', [eventId])
-  if (!existing) return null
-
-  const fields = []
-  const values = []
-
-  if (args.title !== undefined) { fields.push('title = ?'); values.push(args.title) }
-  if (args.startDate !== undefined) { fields.push('start = ?'); values.push(args.startDate) }
-  if (args.endDate !== undefined) { fields.push('end = ?'); values.push(args.endDate) }
-  if (args.startTime !== undefined) { fields.push('startTime = ?'); values.push(args.startTime) }
-  if (args.endTime !== undefined) { fields.push('endTime = ?'); values.push(args.endTime) }
-  if (args.allDay !== undefined) { fields.push('allDay = ?'); values.push(args.allDay ? 1 : 0) }
-  if (args.description !== undefined) { fields.push('description = ?'); values.push(args.description) }
-  if (args.color !== undefined) { fields.push('color = ?'); values.push(args.color) }
-  if (args.reminder !== undefined) { fields.push('reminder = ?'); values.push(args.reminder ? 1 : 0) }
-  if (args.completed !== undefined) { fields.push('completed = ?'); values.push(args.completed ? 1 : 0) }
-  if (args.priority !== undefined) { fields.push('priority = ?'); values.push(args.priority) }
-
-  if (fields.length > 0) {
-    fields.push('updatedAt = ?')
-    values.push(nowISO())
-    values.push(eventId)
-    db.run(
-      `UPDATE schedule_events SET ${fields.join(', ')} WHERE id = ?`,
-      values
-    )
-    saveDb()
-  }
-
-  return normalizeEvent(queryOne('SELECT * FROM schedule_events WHERE id = ?', [eventId]))
-}
-
-export function deleteScheduleEvent(eventId) {
-  db.run('DELETE FROM schedule_events WHERE id = ?', [eventId])
-  saveDb()
-}
-
-// ========== Automation tasks ==========
-
-export function createAutomationTask(args) {
-  const now = nowISO()
-  const id = generateId()
-  db.run(
-    `INSERT INTO automation_tasks
-      (id, name, instruction, modelId, triggerType, triggerConfig, cronExpression, nextRunAt, enabled, lastRunAt, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      args.name || '',
-      args.instruction || '',
-      args.modelId || '',
-      args.triggerType || 'daily',
-      JSON.stringify(args.triggerConfig || {}),
-      args.cronExpression || null,
-      args.nextRunAt || null,
-      args.enabled === false ? 0 : 1,
-      null,
-      now,
-      now
-    ]
-  )
-  saveDb()
-  return normalizeAutomationTask(queryOne('SELECT * FROM automation_tasks WHERE id = ?', [id]))
-}
-
-export function getAutomationTasks() {
-  return queryAll('SELECT * FROM automation_tasks ORDER BY createdAt DESC').map(normalizeAutomationTask)
-}
-
-export function getAutomationTask(taskId) {
-  return normalizeAutomationTask(queryOne('SELECT * FROM automation_tasks WHERE id = ?', [taskId]))
-}
-
-export function updateAutomationTask(taskId, args) {
-  const fields = []
-  const values = []
-  const valuesByField = {
-    name: args.name,
-    instruction: args.instruction,
-    modelId: args.modelId,
-    triggerType: args.triggerType,
-    cronExpression: args.cronExpression,
-    nextRunAt: args.nextRunAt,
-    lastRunAt: args.lastRunAt
-  }
-  for (const [field, value] of Object.entries(valuesByField)) {
-    if (value !== undefined) {
-      fields.push(`${field} = ?`)
-      values.push(value)
-    }
-  }
-  if (args.triggerConfig !== undefined) {
-    fields.push('triggerConfig = ?')
-    values.push(JSON.stringify(args.triggerConfig || {}))
-  }
-  if (args.enabled !== undefined) {
-    fields.push('enabled = ?')
-    values.push(args.enabled ? 1 : 0)
-  }
-  if (fields.length === 0) return getAutomationTask(taskId)
-  fields.push('updatedAt = ?')
-  values.push(nowISO(), taskId)
-  db.run(`UPDATE automation_tasks SET ${fields.join(', ')} WHERE id = ?`, values)
-  saveDb()
-  return getAutomationTask(taskId)
-}
-
-export function deleteAutomationTask(taskId) {
-  db.run('DELETE FROM automation_tasks WHERE id = ?', [taskId])
-  saveDb()
-}
-
-export function deleteAutomationRun(runId) {
-  const run = queryOne('SELECT sessionId FROM automation_runs WHERE id = ?', [runId])
-  if (!run) return false
-
-  db.run('DELETE FROM automation_runs WHERE id = ?', [runId])
-  if (run.sessionId) {
-    db.run('DELETE FROM messages WHERE sessionId = ?', [run.sessionId])
-    db.run('DELETE FROM sessions WHERE id = ?', [run.sessionId])
-  }
-  saveDb()
-  return true
-}
-
-export function createAutomationRun({ taskId, taskName = '', sessionId = null, trigger = 'schedule' }) {
-  const id = generateId()
-  const startedAt = nowISO()
-  db.run(
-    'INSERT INTO automation_runs (id, taskId, taskName, sessionId, trigger, status, startedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, taskId, taskName, sessionId, trigger, 'running', startedAt]
-  )
-  saveDb()
-  return queryOne('SELECT * FROM automation_runs WHERE id = ?', [id])
-}
-
-export function completeAutomationRun(runId, { status, output = '', error = '' }) {
-  const existing = queryOne('SELECT * FROM automation_runs WHERE id = ?', [runId])
-  if (!existing) return null
-  const completedAt = nowISO()
-  const durationMs = Math.max(0, new Date(completedAt).getTime() - new Date(existing.startedAt).getTime())
-  db.run(
-    'UPDATE automation_runs SET status = ?, completedAt = ?, durationMs = ?, output = ?, error = ? WHERE id = ?',
-    [status, completedAt, durationMs, output, error, runId]
-  )
-  saveDb()
-  return queryOne('SELECT * FROM automation_runs WHERE id = ?', [runId])
-}
-
-export function recoverInterruptedAutomationRuns() {
-  const completedAt = nowISO()
-  db.run(
-    `UPDATE automation_runs
-     SET status = 'failed', completedAt = ?, durationMs = MAX(0, CAST((julianday(?) - julianday(startedAt)) * 86400000 AS INTEGER)),
-         error = '应用在任务完成前退出，执行已中断。'
-     WHERE status = 'running'`,
-    [completedAt, completedAt]
-  )
-  const recovered = db.getRowsModified()
-  if (recovered > 0) saveDb()
-  return recovered
-}
-
-export function getAutomationRuns(filters = {}) {
-  const { status, taskId, startDate, endDate, limit = 200 } = filters
-  const clauses = []
-  const values = []
-  if (status && status !== 'all') { clauses.push('status = ?'); values.push(status) }
-  if (taskId && taskId !== 'all') { clauses.push('taskId = ?'); values.push(taskId) }
-  if (startDate) { clauses.push('startedAt >= ?'); values.push(new Date(`${startDate}T00:00:00`).toISOString()) }
-  if (endDate) { clauses.push('startedAt <= ?'); values.push(new Date(`${endDate}T23:59:59.999`).toISOString()) }
-  values.push(Math.min(Math.max(Number(limit) || 200, 1), 500))
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
-  return queryAll(
-    `SELECT runs.*, COALESCE(runs.taskName, tasks.name) AS taskName FROM automation_runs runs
-     LEFT JOIN automation_tasks tasks ON tasks.id = runs.taskId
-     ${where} ORDER BY startedAt DESC LIMIT ?`,
-    values
-  )
-}
-
-export function createNotebook(name, description) {
-  const now = nowISO()
-  const id = generateId()
-  db.run(
-    'INSERT INTO notebooks (id, name, description, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-    [id, name || '新建笔记本', description || '', now, now]
-  )
-  saveDb()
-  const notebook = {
-    id,
-    name: name || '新建笔记本',
-    description: description || '',
-    createdAt: now,
-    updatedAt: now
-  }
-  return notebook
-}
-
-export function getNotebooks() {
-  const notebooks = queryAll('SELECT * FROM notebooks ORDER BY updatedAt DESC')
-  return notebooks
-}
-
-export function getNotebook(notebookId) {
-  return queryOne('SELECT * FROM notebooks WHERE id = ?', [notebookId])
-}
-
-export function updateNotebook(notebookId, name, description) {
-  const now = nowISO()
-  db.run(
-    'UPDATE notebooks SET name = ?, description = ?, updatedAt = ? WHERE id = ?',
-    [name || '', description || '', now, notebookId]
-  )
-  const modified = db.getRowsModified()
-  saveDb()
-  if (modified > 0) {
-    return queryOne('SELECT * FROM notebooks WHERE id = ?', [notebookId])
-  }
-  return null
-}
-
-export function deleteNotebook(notebookId) {
-  db.run('DELETE FROM notebooks WHERE id = ?', [notebookId])
-  db.run('UPDATE notes SET notebookId = NULL WHERE notebookId = ?', [notebookId])
-  saveDb()
-  return db.getRowsModified() > 0
-}
-
-// ========== RAG: file_status 表操作 ==========
-
-// 插入或更新文件索引状态（不存在则插入，存在则更新）
 export function upsertFileStatus(kbType, filePath, lastModified, indexStatus = 'pending') {
-  db.run(
-    `INSERT INTO file_status (kb_type, file_path, last_modified, index_status, last_indexed_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(kb_type, file_path) DO UPDATE SET
-       last_modified = excluded.last_modified,
-       index_status = excluded.index_status`,
-    [kbType, filePath, lastModified, indexStatus, indexStatus === 'success' ? nowISO() : null]
-  )
+  db.run(`INSERT INTO file_status(kb_type,file_path,last_modified,index_status) VALUES(?,?,?,?)
+    ON CONFLICT(kb_type,file_path) DO UPDATE SET last_modified=excluded.last_modified,index_status=excluded.index_status`, [kbType, filePath, lastModified, indexStatus])
   saveDb()
 }
-
-// 获取单个文件的索引状态
-export function getFileStatus(kbType, filePath) {
-  return queryOne(
-    'SELECT * FROM file_status WHERE kb_type = ? AND file_path = ?',
-    [kbType, filePath]
-  )
-}
-
-// 获取某个知识库下所有文件状态
-export function getFileStatusByKbType(kbType) {
-  return queryAll(
-    'SELECT * FROM file_status WHERE kb_type = ?',
-    [kbType]
-  )
-}
-
-// 获取某个知识库下指定状态的文件
-export function getFileStatusByStatus(kbType, status) {
-  return queryAll(
-    'SELECT * FROM file_status WHERE kb_type = ? AND index_status = ?',
-    [kbType, status]
-  )
-}
-
-// 更新文件索引状态
+export function getFileStatus(kbType, filePath) { return queryOne('SELECT * FROM file_status WHERE kb_type=? AND file_path=?', [kbType, filePath]) }
+export function getFileStatusByKbType(kbType) { return queryAll('SELECT * FROM file_status WHERE kb_type=? ORDER BY id', [kbType]) }
+export function getFileStatusByStatus(kbType, status) { return queryAll('SELECT * FROM file_status WHERE kb_type=? AND index_status=? ORDER BY id', [kbType, status]) }
 export function updateFileStatus(kbType, filePath, indexStatus) {
-  const lastIndexedAt = indexStatus === 'success' ? nowISO() : null
-  db.run(
-    'UPDATE file_status SET index_status = ?, last_indexed_at = ? WHERE kb_type = ? AND file_path = ?',
-    [indexStatus, lastIndexedAt, kbType, filePath]
-  )
+  db.run('UPDATE file_status SET index_status=?,last_indexed_at=? WHERE kb_type=? AND file_path=?', [indexStatus, indexStatus === 'success' ? nowISO() : null, kbType, filePath])
   saveDb()
 }
+export function deleteFileStatus(kbType, filePath) { db.run('DELETE FROM file_status WHERE kb_type=? AND file_path=?', [kbType, filePath]); saveDb() }
+export function deleteFileStatusByKbType(kbType) { db.run('DELETE FROM file_status WHERE kb_type=?', [kbType]); saveDb() }
+export function setFileChunkCount(kbType, filePath, chunkCount) { db.run('UPDATE file_status SET chunk_count=? WHERE kb_type=? AND file_path=?', [chunkCount || 0, kbType, filePath]); saveDb() }
+export function getVectorCount(kbType) { return queryOne('SELECT COALESCE(SUM(chunk_count),0) AS total FROM file_status WHERE kb_type=?', [kbType])?.total || 0 }
 
-// 删除文件索引状态记录
-export function deleteFileStatus(kbType, filePath) {
-  db.run(
-    'DELETE FROM file_status WHERE kb_type = ? AND file_path = ?',
-    [kbType, filePath]
-  )
-  saveDb()
-}
-
-// 删除某个知识库下所有文件状态记录
-export function deleteFileStatusByKbType(kbType) {
-  db.run('DELETE FROM file_status WHERE kb_type = ?', [kbType])
-  saveDb()
-}
-
-// 设置某个文件的子块（向量）数量，用于在单个 Zvec collection 中按 kb_type 统计向量数
-export function setFileChunkCount(kbType, filePath, chunkCount) {
-  db.run(
-    'UPDATE file_status SET chunk_count = ? WHERE kb_type = ? AND file_path = ?',
-    [chunkCount || 0, kbType, filePath]
-  )
-  saveDb()
-}
-
-// 获取某个知识库类型的向量总数（SUM chunk_count）
-// Zvec collection.stats.docCount 只能返回所有知识库合计数，无法按 kb_type 分组，
-// 故通过 file_status.chunk_count 累加得到每个知识库的向量数。
-export function getVectorCount(kbType) {
-  const row = queryOne(
-    'SELECT COALESCE(SUM(chunk_count), 0) AS total FROM file_status WHERE kb_type = ?',
-    [kbType]
-  )
-  return row ? (row.total || 0) : 0
-}
-
-// ========== RAG: parent_docs 表操作 ==========
-
-// 插入父块文档
-export function insertParentDoc(args) {
-  db.run(
-    `INSERT OR REPLACE INTO parent_docs
-     (uuid, doc_id, content, source_path, file_type, file_size, file_created_at, file_modified_at, extra_metadata)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      args.uuid,
-      args.docId,
-      args.content,
-      args.sourcePath,
-      args.fileType || null,
-      args.fileSize || null,
-      args.fileCreatedAt || null,
-      args.fileModifiedAt || null,
-      args.extraMetadata ? JSON.stringify(args.extraMetadata) : null
-    ]
-  )
-  saveDb()
-}
-
-// 批量插入父块文档
+export function insertParentDoc(args) { insertParentDocsBatch([args]) }
 export function insertParentDocsBatch(docs) {
   db.exec('BEGIN TRANSACTION')
   try {
-    for (const args of docs) {
-      db.run(
-        `INSERT OR REPLACE INTO parent_docs
-         (uuid, doc_id, content, source_path, file_type, file_size, file_created_at, file_modified_at, extra_metadata)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          args.uuid,
-          args.docId,
-          args.content,
-          args.sourcePath,
-          args.fileType || null,
-          args.fileSize || null,
-          args.fileCreatedAt || null,
-          args.fileModifiedAt || null,
-          args.extraMetadata ? JSON.stringify(args.extraMetadata) : null
-        ]
-      )
-    }
+    for (const args of docs) db.run(`INSERT OR REPLACE INTO parent_docs(uuid,doc_id,content,source_path,file_type,file_size,file_created_at,file_modified_at,extra_metadata) VALUES(?,?,?,?,?,?,?,?,?)`, [args.uuid, args.docId, args.content, args.sourcePath, args.fileType || null, args.fileSize || null, args.fileCreatedAt || null, args.fileModifiedAt || null, args.extraMetadata ? JSON.stringify(args.extraMetadata) : null])
     db.exec('COMMIT')
-  } catch (e) {
-    db.exec('ROLLBACK')
-    throw e
-  }
+  } catch (error) { db.exec('ROLLBACK'); throw error }
   saveDb()
 }
-
-// 获取单个父块文档
-export function getParentDoc(uuid) {
-  const row = queryOne('SELECT * FROM parent_docs WHERE uuid = ?', [uuid])
-  if (row && row.extra_metadata) {
-    try {
-      row.extra_metadata = JSON.parse(row.extra_metadata)
-    } catch (_e) {}
-  }
+function parseParentDoc(row) {
+  if (row?.extra_metadata) { try { row.extra_metadata = JSON.parse(row.extra_metadata) } catch {} }
   return row
 }
-
-// 获取多个父块文档
+export function getParentDoc(uuid) { return parseParentDoc(queryOne('SELECT * FROM parent_docs WHERE uuid=?', [uuid])) }
 export function getParentDocs(uuids) {
-  if (!uuids || uuids.length === 0) return []
-  const placeholders = uuids.map(() => '?').join(',')
-  const rows = queryAll(
-    `SELECT * FROM parent_docs WHERE uuid IN (${placeholders})`,
-    uuids
-  )
-  return rows.map(row => {
-    if (row.extra_metadata) {
-      try {
-        row.extra_metadata = JSON.parse(row.extra_metadata)
-      } catch (_e) {}
-    }
-    return row
-  })
+  if (!uuids?.length) return []
+  return queryAll(`SELECT * FROM parent_docs WHERE uuid IN (${uuids.map(() => '?').join(',')})`, uuids).map(parseParentDoc)
 }
-
-// 删除指定来源文件的所有父块
-export function deleteParentDocsBySourcePath(sourcePath) {
-  db.run('DELETE FROM parent_docs WHERE source_path = ?', [sourcePath])
-  saveDb()
-}
-
-// 删除某个知识库类型下所有父块（通过 source_path 前缀匹配）
-export function deleteParentDocsByKbType(kbType, kbRootPath) {
-  db.run(
-    'DELETE FROM parent_docs WHERE source_path LIKE ?',
-    [`${kbRootPath}%`]
-  )
-  saveDb()
-}
+export function deleteParentDocsBySourcePath(sourcePath) { db.run('DELETE FROM parent_docs WHERE source_path=?', [sourcePath]); saveDb() }
+export function deleteParentDocsByKbType(_kbType, kbRootPath) { db.run('DELETE FROM parent_docs WHERE source_path LIKE ?', [`${kbRootPath}%`]); saveDb() }

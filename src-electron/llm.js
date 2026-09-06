@@ -2,7 +2,6 @@ import https from 'https'
 import http from 'http'
 import { AppError } from './error.js'
 import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_ERROR, NOTE_AI_CHUNK, NOTE_AI_ERROR } from './events.js'
-import { recordUsage } from './usage.js'
 import { buildChatCompletionsUrl } from './openaiUrl.js'
 import {
   FIM_SYSTEM_PROMPT,
@@ -16,17 +15,6 @@ import {
 function recordUsageFromChunk(parsed, model, source) {
   if (!parsed || !parsed.usage) return
   const u = parsed.usage
-  recordUsage({
-    modelId: model.id || '',
-    modelName: model.modelName || (parsed.model || ''),
-    provider: model.provider || '',
-    providerLabel: model.providerLabel || '',
-    promptTokens: u.prompt_tokens,
-    completionTokens: u.completion_tokens,
-    totalTokens: u.total_tokens || (Number(u.prompt_tokens || 0) + Number(u.completion_tokens || 0)),
-    reasoningTokens: u.completion_tokens_details?.reasoning_tokens || 0,
-    source
-  })
   // 模型请求仍由客户端直连；只将用量结果回传企业服务端，不代理模型调用。
   const enterprise = model?.enterprise
   if (enterprise?.serverURL && enterprise?.accessToken) {

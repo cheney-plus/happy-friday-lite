@@ -1737,7 +1737,7 @@ async function sendChatMessage(text) {
   const systemPrompt = t('note.aiSidebar.systemPrompt', { noteContent });
 
   try {
-    await electronService.invoke('chat_with_memory', {
+    await electronService.invoke('chat_without_memory', {
       requestId: activeRequestId,
       sessionId: currentSessionId.value || '',
       model: model,

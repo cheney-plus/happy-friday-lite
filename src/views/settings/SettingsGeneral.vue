@@ -941,9 +941,16 @@ const onAutoCleanToggle = async () => {
   await saveHistoryConfig();
   if (!historyConfig.autoClean) return;
   try {
-    const cleanResult = await electronService.invoke('history-clean-now');
+    const cleanResult = await electronService.invoke('history-clean-now', {
+      cleanBefore: historyConfig.cleanBefore
+    });
     if (cleanResult && cleanResult.success && cleanResult.lastCleanAt) {
       historyConfig.lastCleanAt = cleanResult.lastCleanAt;
+      await electronService.invoke('history-set-config', {
+        autoClean: historyConfig.autoClean,
+        cleanBefore: historyConfig.cleanBefore,
+        lastCleanAt: historyConfig.lastCleanAt
+      });
     }
   } catch (e) {
     console.error('立即清理对话历史失败:', e);

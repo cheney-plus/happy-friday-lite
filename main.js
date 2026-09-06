@@ -6,12 +6,9 @@ import { setDataDir as setConfigDataDir } from './src-electron/config.js'
 import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
 import { checkAutoBackup } from './src-electron/backup.js'
-import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
 import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
-import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
-import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
 import { stopHarnessSidecar } from './src-electron/harness/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -131,8 +128,6 @@ app.whenReady().then(async () => {
     console.error('[Main] ❌ Failed to register IPC commands:', error)
   }
 
-  startAutomationScheduler(mainWindow)
-
   // 3. 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
   try {
     kbWatcherHandle = startKnowledgeWatcher(mainWindow, dataDir)
@@ -169,12 +164,6 @@ app.whenReady().then(async () => {
   // 启动后检查自动备份（异步，不阻塞窗口）
   checkAutoBackup().catch(e => console.error('[Main] Auto backup check failed:', e))
 
-  // 启动后检查对话历史自动清理（异步，至多每天一次，不阻塞窗口）
-  checkAutoCleanHistory().catch(e => console.error('[Main] Auto history clean check failed:', e))
-
-  // 启动内网分享服务（只读 HTTP，供局域网浏览器查看对话）
-  startShareServer().catch(e => console.error('[Main] Share server failed to start:', e))
-
   // 若用户曾开启本机 MCP 服务，则自动拉起（异步，不阻塞窗口）
   import('./src-electron/agent/mcp.js')
     .then(({ autoStartLocalIfEnabled }) => autoStartLocalIfEnabled())
@@ -197,8 +186,6 @@ app.on('window-all-closed', function () {
     powerSaveBlocker.stop(powerBlockerId)
     powerBlockerId = null
   }
-  stopShareServer()
-  stopAutomationScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()

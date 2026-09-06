@@ -56,6 +56,14 @@ export async function refreshModels() { const models = await request('/api/v1/mo
 export const enterpriseAPI = { request, login, logout, restoreSession, refreshModels }
 
 const route = (method, path, body) => request(path, { method, body: body === undefined ? undefined : JSON.stringify(body) })
+
+function cleanupBefore(period) {
+  const date = new Date()
+  const months = { '1month': 1, '3months': 3, '6months': 6, '1year': 12 }[period] || 3
+  date.setMonth(date.getMonth() - months)
+  return date.toISOString()
+}
+
 export async function invokeEnterprise(command, args = {}) {
   switch (command) {
     case 'get_sessions': return route('GET', '/api/v1/conversations')
@@ -67,6 +75,10 @@ export async function invokeEnterprise(command, args = {}) {
     case 'get_session_messages': return route('GET', `/api/v1/conversations/${args.sessionId}/messages`)
     case 'save_message': return route('POST', `/api/v1/conversations/${args.sessionId}/messages`, { role: args.role, content: args.content, metadata: args.metadata || '' })
     case 'rollback_session': return route('POST', `/api/v1/conversations/${args.sessionId}/rollback`, { messageId: args.messageId })
+    case 'history-clean-now': {
+      const data = await route('POST', '/api/v1/conversations/cleanup', { before: cleanupBefore(args.cleanBefore) })
+      return { success: true, count: data.count || 0, lastCleanAt: new Date().toISOString() }
+    }
     case 'get_notebooks': return route('GET', '/api/v1/notebooks')
     case 'get_notebook': return route('GET', `/api/v1/notebooks/${args.notebookId}`)
     case 'create_notebook': return route('POST', '/api/v1/notebooks', args)
