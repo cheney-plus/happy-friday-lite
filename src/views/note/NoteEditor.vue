@@ -2239,8 +2239,9 @@ const editor = useEditor({
     Subscript,
     Typography,
     Table.configure({
-      resizable: false,
+      resizable: true,
       renderWrapper: true,
+      handleWidth: 8,
       cellMinWidth: 80,
     }),
     TableRow,
@@ -2878,7 +2879,8 @@ const fixEmptyTableCells = (html) => {
 
 @media (max-width: 900px) {
   .table-context-toolbar {
-    margin-right: 16px;
+    max-width: calc(100% - 16px);
+    width: calc(100% - 16px);
   }
 }
 
@@ -3686,6 +3688,28 @@ const fixEmptyTableCells = (html) => {
   min-width: 80px;
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+:deep(.prose-editor .column-resize-handle) {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -4px;
+  bottom: -2px;
+  width: 8px;
+  pointer-events: auto;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+:deep(.prose-editor .column-resize-handle:hover),
+:deep(.prose-editor.resize-cursor .column-resize-handle) {
+  background: rgba(59, 130, 246, 0.55);
+}
+
+:deep(.prose-editor.resize-cursor),
+:deep(.prose-editor .resize-cursor) {
+  cursor: col-resize;
 }
 
 :deep(.prose-editor .selectedCell) {
