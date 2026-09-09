@@ -10,6 +10,7 @@ export const useAppStore = defineStore('app', {
     scheduleDefaultView: 'month',
     sidebarModules: {
       note: true,
+      drawing: true,
       knowledge: true,
       schedule: true,
       automation: true,
@@ -36,6 +37,7 @@ export const useAppStore = defineStore('app', {
     setSidebarModules(modules = {}) {
       this.sidebarModules = {
         note: modules.note !== false,
+        drawing: modules.drawing !== false,
         knowledge: modules.knowledge !== false,
         schedule: modules.schedule !== false,
         automation: modules.automation !== false,

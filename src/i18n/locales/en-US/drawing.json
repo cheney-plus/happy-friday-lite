@@ -1,0 +1,31 @@
+{
+  "title": "Drawing",
+  "sidebar": {
+    "collapse": "Collapse directory",
+    "expand": "Expand directory",
+    "search": "Search canvases",
+    "searchPlaceholder": "Search canvases...",
+    "newCanvas": "New canvas",
+    "importCanvas": "Import canvas",
+    "moreOptions": "More options",
+    "allCanvases": "All canvases"
+  },
+  "canvas": {
+    "untitled": "Untitled canvas",
+    "mindMap": "Mind map",
+    "kanban": "Kanban",
+    "flowchart": "Flowchart",
+    "blankCanvas": "Blank canvas",
+    "updatedToday": "Today",
+    "updatedYesterday": "Yesterday",
+    "tools": {
+      "select": "Select",
+      "hand": "Pan canvas",
+      "draw": "Draw",
+      "shapes": "Shapes",
+      "text": "Text",
+      "image": "Image"
+    },
+    "placeholder": "Drawing tools are coming soon"
+  }
+}

@@ -27,6 +27,11 @@ export const routes = [
     component: () => import('@/views/note/NoteEdit.vue')
   },
   {
+    path: '/drawing',
+    name: 'drawing',
+    component: () => import('@/views/drawing/DrawingView.vue')
+  },
+  {
     path: '/schedule',
     name: 'schedule',
     component: () => import('@/views/schedule/ScheduleCalendar.vue')

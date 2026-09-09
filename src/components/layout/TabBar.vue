@@ -109,6 +109,7 @@ import {
   Layers,
   FolderKanban,
   FileText,
+  PencilRuler,
   CalendarDays,
   Workflow,
   BrainCircuit,
@@ -132,6 +133,7 @@ const isLinux = /Linux/.test(userAgent) && !/Android/.test(userAgent);
 const iconMap = {
   FolderKanban,
   FileText,
+  PencilRuler,
   CalendarDays,
   Workflow,
   BrainCircuit,

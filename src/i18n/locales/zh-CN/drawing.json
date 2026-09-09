@@ -1,0 +1,31 @@
+{
+  "title": "绘图",
+  "sidebar": {
+    "collapse": "收起目录",
+    "expand": "展开目录",
+    "search": "搜索画布",
+    "searchPlaceholder": "搜索画布...",
+    "newCanvas": "新建画布",
+    "importCanvas": "导入画布",
+    "moreOptions": "更多选项",
+    "allCanvases": "全部画布"
+  },
+  "canvas": {
+    "untitled": "未命名画布",
+    "mindMap": "思维导图",
+    "kanban": "看板",
+    "flowchart": "流程图",
+    "blankCanvas": "空白画布",
+    "updatedToday": "今天",
+    "updatedYesterday": "昨天",
+    "tools": {
+      "select": "选择",
+      "hand": "移动画布",
+      "draw": "绘制",
+      "shapes": "形状",
+      "text": "文本",
+      "image": "图片"
+    },
+    "placeholder": "绘图功能即将推出"
+  }
+}
