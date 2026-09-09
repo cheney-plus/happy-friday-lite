@@ -118,6 +118,21 @@
     "exportMarkdown": "Export Markdown",
     "fridayAssistant": "Friday Assistant"
   },
+  "table": {
+    "toolbarLabel": "Table tools",
+    "addRowBefore": "Insert row above",
+    "addRowAfter": "Insert row below",
+    "deleteRow": "Delete row",
+    "addColumnBefore": "Insert column left",
+    "addColumnAfter": "Insert column right",
+    "deleteColumn": "Delete column",
+    "mergeCells": "Merge cells",
+    "splitCell": "Split cell",
+    "toggleHeaderRow": "Toggle header row",
+    "toggleHeaderColumn": "Toggle header column",
+    "selectTable": "Select table",
+    "deleteTable": "Delete table"
+  },
   "linkDialog": {
     "edit": "Edit link",
     "editTitle": "Edit link",
