@@ -338,12 +338,58 @@
 
     <NoteBubbleMenu v-if="editor && !shareMode" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
 
+    <div v-if="editor && !shareMode && tableContextMenuVisible && isTableActive" ref="tableContextToolbarRef" class="table-context-toolbar" :style="tableToolbarStyle" role="menu" :aria-label="t('note.table.toolbarLabel')">
+      <div class="table-context-summary">
+        <Table2 :size="15" :stroke-width="2" />
+        <span>{{ tableDimensions.rows }} × {{ tableDimensions.cols }}</span>
+      </div>
+      <div class="table-context-divider"></div>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('addRowBefore')" :title="t('note.table.addRowBefore')" @mousedown.prevent @click="runTableCommand('addRowBefore')">
+        <Rows3 :size="15" :stroke-width="2" /><span>{{ t('note.table.addRowBefore') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('addRowAfter')" :title="t('note.table.addRowAfter')" @mousedown.prevent @click="runTableCommand('addRowAfter')">
+        <Rows3 :size="15" :stroke-width="2" /><span>{{ t('note.table.addRowAfter') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('deleteRow')" :title="t('note.table.deleteRow')" @mousedown.prevent @click="runTableCommand('deleteRow')">
+        <Trash2 :size="15" :stroke-width="2" /><span>{{ t('note.table.deleteRow') }}</span>
+      </button>
+      <div class="table-context-divider"></div>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('addColumnBefore')" :title="t('note.table.addColumnBefore')" @mousedown.prevent @click="runTableCommand('addColumnBefore')">
+        <Columns3 :size="15" :stroke-width="2" /><span>{{ t('note.table.addColumnBefore') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('addColumnAfter')" :title="t('note.table.addColumnAfter')" @mousedown.prevent @click="runTableCommand('addColumnAfter')">
+        <Columns3 :size="15" :stroke-width="2" /><span>{{ t('note.table.addColumnAfter') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('deleteColumn')" :title="t('note.table.deleteColumn')" @mousedown.prevent @click="runTableCommand('deleteColumn')">
+        <Trash2 :size="15" :stroke-width="2" /><span>{{ t('note.table.deleteColumn') }}</span>
+      </button>
+      <div class="table-context-divider"></div>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('mergeCells')" :title="t('note.table.mergeCells')" @mousedown.prevent @click="runTableCommand('mergeCells')">
+        <Combine :size="15" :stroke-width="2" /><span>{{ t('note.table.mergeCells') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :disabled="!canTableCommand('splitCell')" :title="t('note.table.splitCell')" @mousedown.prevent @click="runTableCommand('splitCell')">
+        <Split :size="15" :stroke-width="2" /><span>{{ t('note.table.splitCell') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :title="t('note.table.toggleHeaderRow')" @mousedown.prevent @click="runTableCommand('toggleHeaderRow')">
+        <PanelTop :size="15" :stroke-width="2" /><span>{{ t('note.table.toggleHeaderRow') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :title="t('note.table.toggleHeaderColumn')" @mousedown.prevent @click="runTableCommand('toggleHeaderColumn')">
+        <PanelLeft :size="15" :stroke-width="2" /><span>{{ t('note.table.toggleHeaderColumn') }}</span>
+      </button>
+      <button class="table-context-btn" type="button" :title="t('note.table.selectTable')" @mousedown.prevent @click="selectWholeTable">
+        <Table2 :size="15" :stroke-width="2" /><span>{{ t('note.table.selectTable') }}</span>
+      </button>
+      <button class="table-context-btn danger" type="button" :title="t('note.table.deleteTable')" @mousedown.prevent @click="deleteActiveTable">
+        <Trash2 :size="15" :stroke-width="2" /><span>{{ t('note.table.deleteTable') }}</span>
+      </button>
+    </div>
+
     <div v-if="!tocVisible && !shareMode" class="toc-btn" @click="emit('toggle-toc')">
       <span class="toc-char">{{ t('note.toc.char1') }}</span>
       <span class="toc-char">{{ t('note.toc.char2') }}</span>
     </div>
 
-    <EditorContent :editor="editor" class="editor-content" />
+    <EditorContent ref="editorContentRef" :editor="editor" class="editor-content" />
 
     <div
       v-if="fimCompletionVisible && fimCompletionText"
@@ -607,12 +653,13 @@
 import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import { Extension, Node } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Code2, Eraser, Heading,
   Highlighter, Image as ToolbarImage, Italic, Link2, List, ListChecks, ListOrdered,
-  Minus, Palette, Quote, Redo2, Sigma, Strikethrough, Table2, Underline as ToolbarUnderline, Undo2,
+  Columns3, Combine, Minus, Palette, PanelLeft, PanelTop, Quote, Redo2, Rows3, Sigma, Split,
+  Strikethrough, Table2, Trash2, Underline as ToolbarUnderline, Undo2,
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
@@ -672,6 +719,7 @@ import { DEFAULT_CATEGORIES } from '@/views/knowledge/constants';
 import { useAppStore } from '@/store';
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
+import { CellSelection } from '@tiptap/pm/tables';
 
 const EDITOR_MARKED_OPTIONS = { gfm: true, breaks: false };
 
@@ -1006,6 +1054,151 @@ const scheduleToolbarLayout = () => {
 
 const tableRows = ref(0);
 const tableCols = ref(0);
+const tableContextMenuVisible = ref(false);
+
+// Tiptap mutates the editor state in place, so this tick keeps table dimensions reactive.
+const tableSelectionTick = ref(0);
+const tableContextToolbarRef = ref(null);
+const editorContentRef = ref(null);
+const tableToolbarStyle = ref({
+  top: '0px',
+  left: '0px',
+  visibility: 'hidden',
+});
+
+let tableScrollTarget = null;
+
+const hideTableContextMenu = () => {
+  tableContextMenuVisible.value = false;
+  tableToolbarStyle.value = { ...tableToolbarStyle.value, visibility: 'hidden' };
+};
+
+const handleEditorContextMenu = (view, event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const cell = target?.closest('td, th');
+  if (!cell || !view.dom.contains(cell) || props.shareMode) {
+    hideTableContextMenu();
+    return false;
+  }
+
+  event.preventDefault();
+  const cellPos = view.posAtDOM(cell, 0);
+  const resolvedPos = view.state.doc.resolve(Math.max(0, Math.min(cellPos, view.state.doc.content.size)));
+  view.dispatch(view.state.tr.setSelection(TextSelection.near(resolvedPos)));
+  tableSelectionTick.value += 1;
+
+  const container = editorContentRef.value?.$el?.closest('.editor-wrapper')
+    || editorContentRef.value?.closest?.('.editor-wrapper');
+  if (!container) return true;
+
+  const containerRect = container.getBoundingClientRect();
+  tableToolbarStyle.value = {
+    top: `${Math.round(event.clientY - containerRect.top)}px`,
+    left: `${Math.round(event.clientX - containerRect.left)}px`,
+    visibility: 'hidden',
+  };
+  tableContextMenuVisible.value = true;
+
+  nextTick(() => {
+    const toolbar = tableContextToolbarRef.value;
+    if (!toolbar || !tableContextMenuVisible.value) return;
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const horizontalPadding = 8;
+    const verticalPadding = 8;
+    const left = Math.max(
+      horizontalPadding,
+      Math.min(event.clientX - containerRect.left, containerRect.width - toolbarRect.width - horizontalPadding),
+    );
+    const top = Math.max(
+      verticalPadding,
+      Math.min(event.clientY - containerRect.top, containerRect.height - toolbarRect.height - verticalPadding),
+    );
+    tableToolbarStyle.value = {
+      top: `${Math.round(top)}px`,
+      left: `${Math.round(left)}px`,
+      visibility: 'visible',
+    };
+  });
+  return true;
+};
+
+const handleDocumentContextMenu = (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const editorElement = editorContentRef.value?.$el || editorContentRef.value;
+  if (!target?.closest('.table-context-toolbar') && !editorElement?.contains?.(target)) {
+    hideTableContextMenu();
+  }
+};
+
+const getActiveTableContext = () => {
+  if (!editor.value) return null;
+  const { $from } = editor.value.state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === 'table') {
+      return {
+        node: $from.node(depth),
+        pos: $from.before(depth),
+      };
+    }
+  }
+  return null;
+};
+
+const tableContext = computed(() => {
+  tableSelectionTick.value;
+  const context = getActiveTableContext();
+  if (!context) return null;
+  let rows = 0;
+  let cols = 0;
+  context.node.forEach((row) => {
+    rows += 1;
+    if (!cols) cols = row.childCount;
+  });
+  return { ...context, rows, cols };
+});
+
+const isTableActive = computed(() => Boolean(tableContext.value));
+const tableDimensions = computed(() => ({
+  rows: tableContext.value?.rows || 0,
+  cols: tableContext.value?.cols || 0,
+}));
+
+const canTableCommand = (command) => {
+  if (!editor.value || !isTableActive.value) return false;
+  return Boolean(editor.value.can()?.[command]?.());
+};
+
+const runTableCommand = (command) => {
+  if (!editor.value || !isTableActive.value) return false;
+  const chain = editor.value.chain().focus();
+  if (typeof chain[command] !== 'function') return false;
+  const result = chain[command]().run();
+  tableSelectionTick.value += 1;
+  hideTableContextMenu();
+  return result;
+};
+
+const selectWholeTable = () => {
+  const context = getActiveTableContext();
+  if (!context || !editor.value) return false;
+  let firstCell = null;
+  let lastCell = null;
+  context.node.descendants((node, offset) => {
+    if (node.type.name !== 'tableCell' && node.type.name !== 'tableHeader') return;
+    const cellPos = context.pos + 1 + offset;
+    if (firstCell === null) firstCell = cellPos;
+    lastCell = cellPos;
+  });
+  if (firstCell === null || lastCell === null) return false;
+  editor.value.view.dispatch(editor.value.state.tr.setSelection(
+    CellSelection.create(editor.value.state.doc, firstCell, lastCell),
+  ));
+  tableSelectionTick.value += 1;
+  hideTableContextMenu();
+  return true;
+};
+
+const deleteActiveTable = () => runTableCommand('deleteTable');
 
 const selectTableCell = (row, col) => {
   tableRows.value = row;
@@ -2063,6 +2256,9 @@ const editor = useEditor({
     Typography,
     Table.configure({
       resizable: true,
+      renderWrapper: true,
+      handleWidth: 8,
+      cellMinWidth: 80,
     }),
     TableRow,
     TableCell,
@@ -2110,6 +2306,12 @@ const editor = useEditor({
       class: 'prose-editor',
     },
     handleKeyDown: (view, event) => {
+      if (event.key === 'Escape' && tableContextMenuVisible.value) {
+        event.preventDefault();
+        hideTableContextMenu();
+        return true;
+      }
+
       if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         openSearch();
@@ -2177,6 +2379,9 @@ const editor = useEditor({
 
       return false;
     },
+    handleDOMEvents: {
+      contextmenu: handleEditorContextMenu,
+    },
     handlePaste: (view, event, _slice) => {
       // 在代码块内粘贴时，使用默认纯文本粘贴
       const { state } = view;
@@ -2218,6 +2423,7 @@ const editor = useEditor({
     },
   },
   onUpdate: ({ editor }) => {
+    tableSelectionTick.value += 1;
     const html = editor.getHTML();
     emit('update:modelValue', html);
     emit('change', html);
@@ -2232,6 +2438,8 @@ const editor = useEditor({
     }, 2000);
   },
   onSelectionUpdate: () => {
+    tableSelectionTick.value += 1;
+    if (tableContextMenuVisible.value) hideTableContextMenu();
     if (fimCompletionVisible.value) {
       dismissFimCompletion();
     }
@@ -2476,9 +2684,13 @@ watch(() => appStore.noteFimCompletion, (enabled) => {
 });
 
 watch(currentHeadingLabel, scheduleToolbarLayout);
+watch(() => props.shareMode, (enabled) => {
+  if (enabled) hideTableContextMenu();
+});
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
+  document.addEventListener('contextmenu', handleDocumentContextMenu);
   setupChatListeners();
   setupFimListener();
   restoreChatSession();
@@ -2487,15 +2699,21 @@ onMounted(() => {
     scheduleToolbarLayout();
     toolbarResizeObserver = new ResizeObserver(scheduleToolbarLayout);
     toolbarResizeObserver.observe(toolbarRef.value);
+    tableScrollTarget = editorContentRef.value?.$el || editorContentRef.value;
+    tableScrollTarget?.addEventListener('scroll', hideTableContextMenu, { passive: true });
+    window.addEventListener('resize', hideTableContextMenu, { passive: true });
   });
 });
 
 onBeforeUnmount(() => {
   saveChatSession();
   document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener('contextmenu', handleDocumentContextMenu);
   cleanupChatListeners();
   cleanupFim();
   toolbarResizeObserver?.disconnect();
+  tableScrollTarget?.removeEventListener('scroll', hideTableContextMenu);
+  window.removeEventListener('resize', hideTableContextMenu);
   if (toolbarLayoutFrame !== null) cancelAnimationFrame(toolbarLayoutFrame);
   if (editor.value) {
     editor.value.destroy();
@@ -2506,6 +2724,9 @@ const handleClickOutside = (event) => {
   const target = event.target;
   if (!target.closest('.dropdown-wrapper')) {
     closeAllMenus();
+  }
+  if (!target.closest('.table-context-toolbar')) {
+    hideTableContextMenu();
   }
 };
 
@@ -2614,6 +2835,88 @@ const fixEmptyTableCells = (html) => {
 
 .note-search-bar.share-mode {
   top: 12px;
+}
+
+.table-context-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  max-width: calc(100% - 16px);
+  width: max-content;
+  box-sizing: border-box;
+  padding: 5px 7px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--bg-primary, #ffffff);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  color: var(--text-secondary, #4b5563);
+  z-index: 100;
+}
+
+.table-context-summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 8px;
+  color: var(--text-secondary, #4b5563);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table-context-divider {
+  width: 100%;
+  height: 1px;
+  margin: 3px 0;
+  background: var(--border-color, #e5e7eb);
+}
+
+.table-context-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #4b5563);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.table-context-btn:hover:not(:disabled) {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+.table-context-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.table-context-btn.danger {
+  color: #dc2626;
+}
+
+.table-context-btn.danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+@media (max-width: 900px) {
+  .table-context-toolbar {
+    max-width: calc(100% - 16px);
+    width: calc(100% - 16px);
+  }
 }
 
 .note-search-icon {
@@ -3387,17 +3690,66 @@ const fixEmptyTableCells = (html) => {
 
 :deep(.prose-editor table) {
   border-collapse: collapse;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  table-layout: fixed;
+}
+
+:deep(.prose-editor .tableWrapper) {
+  position: relative;
+  max-width: 100%;
   margin: 0.8em 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+:deep(.prose-editor .tableWrapper::-webkit-scrollbar) {
+  height: 6px;
+}
+
+:deep(.prose-editor .tableWrapper::-webkit-scrollbar-thumb) {
+  background: var(--border-color);
+  border-radius: 3px;
 }
 
 :deep(.prose-editor td),
 :deep(.prose-editor th) {
+  position: relative;
   border: 1px solid var(--border-color);
   padding: 8px 12px;
   text-align: left;
-  min-width: 100px;
+  min-width: 80px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+:deep(.prose-editor .column-resize-handle) {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -4px;
+  bottom: -2px;
+  width: 8px;
+  pointer-events: auto;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+:deep(.prose-editor .column-resize-handle:hover),
+:deep(.prose-editor.resize-cursor .column-resize-handle) {
+  background: rgba(59, 130, 246, 0.55);
+}
+
+:deep(.prose-editor.resize-cursor),
+:deep(.prose-editor .resize-cursor) {
+  cursor: col-resize;
+}
+
+:deep(.prose-editor .selectedCell) {
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.55);
 }
 
 :deep(.prose-editor th) {
@@ -3984,6 +4336,32 @@ const fixEmptyTableCells = (html) => {
 
 [data-theme='dark'] .submenu-arrow {
   color: #6b7280;
+}
+
+[data-theme='dark'] .table-context-toolbar {
+  border-color: #374151;
+  background: #1f2937;
+  color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme='dark'] .table-context-summary,
+[data-theme='dark'] .table-context-btn {
+  color: #d1d5db;
+}
+
+[data-theme='dark'] .table-context-btn:hover:not(:disabled) {
+  background: #374151;
+  color: #f9fafb;
+}
+
+[data-theme='dark'] .table-context-btn.danger {
+  color: #f87171;
+}
+
+[data-theme='dark'] .table-context-btn.danger:hover:not(:disabled) {
+  background: rgba(127, 29, 29, 0.35);
+  color: #fca5a5;
 }
 
 [data-theme='dark'] .table-picker-info {

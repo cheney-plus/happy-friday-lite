@@ -118,6 +118,21 @@
     "exportMarkdown": "导出 Markdown",
     "fridayAssistant": "Friday 助理"
   },
+  "table": {
+    "toolbarLabel": "表格工具",
+    "addRowBefore": "上方插入行",
+    "addRowAfter": "下方插入行",
+    "deleteRow": "删除行",
+    "addColumnBefore": "左侧插入列",
+    "addColumnAfter": "右侧插入列",
+    "deleteColumn": "删除列",
+    "mergeCells": "合并单元格",
+    "splitCell": "拆分单元格",
+    "toggleHeaderRow": "切换标题行",
+    "toggleHeaderColumn": "切换标题列",
+    "selectTable": "选择整表",
+    "deleteTable": "删除整表"
+  },
   "linkDialog": {
     "edit": "编辑链接",
     "editTitle": "编辑链接",
