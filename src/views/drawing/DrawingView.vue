@@ -181,7 +181,8 @@ onUnmounted(stopResizing);
 .directory-heading { padding: 0 16px 10px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
 .canvas-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 14px 16px; overflow-y: auto; }
 .canvas-card { min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
-.canvas-card:hover, .canvas-card.active { border-color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-light); }
+.canvas-card:hover { border-color: #a8a29e; }
+.canvas-card.active, .canvas-card.active:hover { border-color: #1c1917; box-shadow: none; }
 .canvas-preview { position: relative; display: flex; align-items: center; justify-content: center; height: 92px; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
 .canvas-card-footer { display: flex; flex-direction: column; gap: 3px; padding: 9px; }
 .canvas-card-footer strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
