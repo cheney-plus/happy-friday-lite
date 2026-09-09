@@ -2814,7 +2814,7 @@ const fixEmptyTableCells = (html) => {
   flex-wrap: wrap;
   gap: 4px;
   max-width: calc(100% - 16px);
-  width: min(66.6667%, calc(100% - 16px));
+  width: min(72.0%, calc(100% - 16px));
   box-sizing: border-box;
   padding: 5px 7px;
   border: 1px solid var(--border-color, #e5e7eb);
