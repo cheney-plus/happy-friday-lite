@@ -338,7 +338,7 @@
 
     <NoteBubbleMenu v-if="editor && !shareMode" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
 
-    <div v-if="editor && !shareMode && isTableActive" ref="tableContextToolbarRef" class="table-context-toolbar" :style="tableToolbarStyle" role="toolbar" :aria-label="t('note.table.toolbarLabel')">
+    <div v-if="editor && !shareMode && tableContextMenuVisible && isTableActive" ref="tableContextToolbarRef" class="table-context-toolbar" :style="tableToolbarStyle" role="menu" :aria-label="t('note.table.toolbarLabel')">
       <div class="table-context-summary">
         <Table2 :size="15" :stroke-width="2" />
         <span>{{ tableDimensions.rows }} × {{ tableDimensions.cols }}</span>
@@ -351,7 +351,7 @@
         <Rows3 :size="15" :stroke-width="2" /><span>{{ t('note.table.addRowAfter') }}</span>
       </button>
       <button class="table-context-btn" type="button" :disabled="!canTableCommand('deleteRow')" :title="t('note.table.deleteRow')" @mousedown.prevent @click="runTableCommand('deleteRow')">
-        <Rows3 :size="15" :stroke-width="2" /><Trash2 :size="12" :stroke-width="2" /><span>{{ t('note.table.deleteRow') }}</span>
+        <Trash2 :size="15" :stroke-width="2" /><span>{{ t('note.table.deleteRow') }}</span>
       </button>
       <div class="table-context-divider"></div>
       <button class="table-context-btn" type="button" :disabled="!canTableCommand('addColumnBefore')" :title="t('note.table.addColumnBefore')" @mousedown.prevent @click="runTableCommand('addColumnBefore')">
@@ -361,7 +361,7 @@
         <Columns3 :size="15" :stroke-width="2" /><span>{{ t('note.table.addColumnAfter') }}</span>
       </button>
       <button class="table-context-btn" type="button" :disabled="!canTableCommand('deleteColumn')" :title="t('note.table.deleteColumn')" @mousedown.prevent @click="runTableCommand('deleteColumn')">
-        <Columns3 :size="15" :stroke-width="2" /><Trash2 :size="12" :stroke-width="2" /><span>{{ t('note.table.deleteColumn') }}</span>
+        <Trash2 :size="15" :stroke-width="2" /><span>{{ t('note.table.deleteColumn') }}</span>
       </button>
       <div class="table-context-divider"></div>
       <button class="table-context-btn" type="button" :disabled="!canTableCommand('mergeCells')" :title="t('note.table.mergeCells')" @mousedown.prevent @click="runTableCommand('mergeCells')">
@@ -653,7 +653,7 @@
 import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import { Extension, Node } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Code2, Eraser, Heading,
@@ -1054,9 +1054,9 @@ const scheduleToolbarLayout = () => {
 
 const tableRows = ref(0);
 const tableCols = ref(0);
+const tableContextMenuVisible = ref(false);
 
-// The table toolbar follows the editor selection. A small tick ref is used because
-// Tiptap mutates the editor state in place and Vue cannot observe that mutation.
+// Tiptap mutates the editor state in place, so this tick keeps table dimensions reactive.
 const tableSelectionTick = ref(0);
 const tableContextToolbarRef = ref(null);
 const editorContentRef = ref(null);
@@ -1068,52 +1068,66 @@ const tableToolbarStyle = ref({
 
 let tableScrollTarget = null;
 
-const findActiveTableElement = (context) => {
-  if (!editor.value || !context) return null;
-  const domNode = editor.value.view.nodeDOM(context.pos);
-  if (domNode instanceof HTMLElement) {
-    if (domNode.classList.contains('tableWrapper')) return domNode;
-    const wrapper = domNode.closest('.tableWrapper');
-    if (wrapper) return wrapper;
-  }
-
-  const selectionDom = editor.value.view.domAtPos(editor.value.state.selection.from)?.node;
-  return selectionDom instanceof HTMLElement ? selectionDom.closest('.tableWrapper, table') : null;
+const hideTableContextMenu = () => {
+  tableContextMenuVisible.value = false;
+  tableToolbarStyle.value = { ...tableToolbarStyle.value, visibility: 'hidden' };
 };
 
-const updateTableToolbarPosition = async () => {
-  if (!isTableActive.value) {
-    tableToolbarStyle.value = { ...tableToolbarStyle.value, visibility: 'hidden' };
-    return;
+const handleEditorContextMenu = (view, event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const cell = target?.closest('td, th');
+  if (!cell || !view.dom.contains(cell) || props.shareMode) {
+    hideTableContextMenu();
+    return false;
   }
 
-  await nextTick();
-  const toolbar = tableContextToolbarRef.value;
-  const container = toolbar?.closest('.editor-wrapper');
-  const table = findActiveTableElement(tableContext.value);
-  if (!toolbar || !container || !table) return;
+  event.preventDefault();
+  const cellPos = view.posAtDOM(cell, 0);
+  const resolvedPos = view.state.doc.resolve(Math.max(0, Math.min(cellPos, view.state.doc.content.size)));
+  view.dispatch(view.state.tr.setSelection(TextSelection.near(resolvedPos)));
+  tableSelectionTick.value += 1;
+
+  const container = editorContentRef.value?.$el?.closest('.editor-wrapper')
+    || editorContentRef.value?.closest?.('.editor-wrapper');
+  if (!container) return true;
 
   const containerRect = container.getBoundingClientRect();
-  const tableRect = table.getBoundingClientRect();
-  const toolbarRect = toolbar.getBoundingClientRect();
-  const horizontalPadding = 8;
-  const left = Math.max(
-    horizontalPadding,
-    Math.min(
-      tableRect.left - containerRect.left,
-      containerRect.width - toolbarRect.width - horizontalPadding,
-    ),
-  );
-  const above = tableRect.top - containerRect.top - toolbarRect.height - 8;
-  const top = above >= horizontalPadding
-    ? above
-    : tableRect.bottom - containerRect.top + 8;
-
   tableToolbarStyle.value = {
-    top: `${Math.round(Math.max(horizontalPadding, top))}px`,
-    left: `${Math.round(left)}px`,
-    visibility: 'visible',
+    top: `${Math.round(event.clientY - containerRect.top)}px`,
+    left: `${Math.round(event.clientX - containerRect.left)}px`,
+    visibility: 'hidden',
   };
+  tableContextMenuVisible.value = true;
+
+  nextTick(() => {
+    const toolbar = tableContextToolbarRef.value;
+    if (!toolbar || !tableContextMenuVisible.value) return;
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const horizontalPadding = 8;
+    const verticalPadding = 8;
+    const left = Math.max(
+      horizontalPadding,
+      Math.min(event.clientX - containerRect.left, containerRect.width - toolbarRect.width - horizontalPadding),
+    );
+    const top = Math.max(
+      verticalPadding,
+      Math.min(event.clientY - containerRect.top, containerRect.height - toolbarRect.height - verticalPadding),
+    );
+    tableToolbarStyle.value = {
+      top: `${Math.round(top)}px`,
+      left: `${Math.round(left)}px`,
+      visibility: 'visible',
+    };
+  });
+  return true;
+};
+
+const handleDocumentContextMenu = (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const editorElement = editorContentRef.value?.$el || editorContentRef.value;
+  if (!target?.closest('.table-context-toolbar') && !editorElement?.contains?.(target)) {
+    hideTableContextMenu();
+  }
 };
 
 const getActiveTableContext = () => {
@@ -1160,6 +1174,7 @@ const runTableCommand = (command) => {
   if (typeof chain[command] !== 'function') return false;
   const result = chain[command]().run();
   tableSelectionTick.value += 1;
+  hideTableContextMenu();
   return result;
 };
 
@@ -1179,6 +1194,7 @@ const selectWholeTable = () => {
     CellSelection.create(editor.value.state.doc, firstCell, lastCell),
   ));
   tableSelectionTick.value += 1;
+  hideTableContextMenu();
   return true;
 };
 
@@ -2290,6 +2306,12 @@ const editor = useEditor({
       class: 'prose-editor',
     },
     handleKeyDown: (view, event) => {
+      if (event.key === 'Escape' && tableContextMenuVisible.value) {
+        event.preventDefault();
+        hideTableContextMenu();
+        return true;
+      }
+
       if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         openSearch();
@@ -2357,6 +2379,9 @@ const editor = useEditor({
 
       return false;
     },
+    handleDOMEvents: {
+      contextmenu: handleEditorContextMenu,
+    },
     handlePaste: (view, event, _slice) => {
       // 在代码块内粘贴时，使用默认纯文本粘贴
       const { state } = view;
@@ -2414,6 +2439,7 @@ const editor = useEditor({
   },
   onSelectionUpdate: () => {
     tableSelectionTick.value += 1;
+    if (tableContextMenuVisible.value) hideTableContextMenu();
     if (fimCompletionVisible.value) {
       dismissFimCompletion();
     }
@@ -2658,33 +2684,36 @@ watch(() => appStore.noteFimCompletion, (enabled) => {
 });
 
 watch(currentHeadingLabel, scheduleToolbarLayout);
-watch(tableSelectionTick, updateTableToolbarPosition);
+watch(() => props.shareMode, (enabled) => {
+  if (enabled) hideTableContextMenu();
+});
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
+  document.addEventListener('contextmenu', handleDocumentContextMenu);
   setupChatListeners();
   setupFimListener();
   restoreChatSession();
   loadKbListFromDisk();
   nextTick(() => {
     scheduleToolbarLayout();
-    updateTableToolbarPosition();
     toolbarResizeObserver = new ResizeObserver(scheduleToolbarLayout);
     toolbarResizeObserver.observe(toolbarRef.value);
     tableScrollTarget = editorContentRef.value?.$el || editorContentRef.value;
-    tableScrollTarget?.addEventListener('scroll', updateTableToolbarPosition, { passive: true });
-    window.addEventListener('resize', updateTableToolbarPosition, { passive: true });
+    tableScrollTarget?.addEventListener('scroll', hideTableContextMenu, { passive: true });
+    window.addEventListener('resize', hideTableContextMenu, { passive: true });
   });
 });
 
 onBeforeUnmount(() => {
   saveChatSession();
   document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener('contextmenu', handleDocumentContextMenu);
   cleanupChatListeners();
   cleanupFim();
   toolbarResizeObserver?.disconnect();
-  tableScrollTarget?.removeEventListener('scroll', updateTableToolbarPosition);
-  window.removeEventListener('resize', updateTableToolbarPosition);
+  tableScrollTarget?.removeEventListener('scroll', hideTableContextMenu);
+  window.removeEventListener('resize', hideTableContextMenu);
   if (toolbarLayoutFrame !== null) cancelAnimationFrame(toolbarLayoutFrame);
   if (editor.value) {
     editor.value.destroy();
@@ -2695,6 +2724,9 @@ const handleClickOutside = (event) => {
   const target = event.target;
   if (!target.closest('.dropdown-wrapper')) {
     closeAllMenus();
+  }
+  if (!target.closest('.table-context-toolbar')) {
+    hideTableContextMenu();
   }
 };
 
@@ -2810,11 +2842,11 @@ const fixEmptyTableCells = (html) => {
   top: 0;
   left: 0;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   max-width: calc(100% - 16px);
-  width: min(72.0%, calc(100% - 16px));
+  width: max-content;
   box-sizing: border-box;
   padding: 5px 7px;
   border: 1px solid var(--border-color, #e5e7eb);
@@ -2822,14 +2854,15 @@ const fixEmptyTableCells = (html) => {
   background: var(--bg-primary, #ffffff);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
   color: var(--text-secondary, #4b5563);
-  z-index: 10;
+  z-index: 100;
 }
 
 .table-context-summary {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 5px;
-  padding: 0 6px;
+  min-height: 28px;
+  padding: 3px 8px;
   color: var(--text-secondary, #4b5563);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -2837,18 +2870,20 @@ const fixEmptyTableCells = (html) => {
 }
 
 .table-context-divider {
-  width: 1px;
-  height: 20px;
-  margin: 0 2px;
+  width: 100%;
+  height: 1px;
+  margin: 3px 0;
   background: var(--border-color, #e5e7eb);
 }
 
 .table-context-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 4px;
+  width: 100%;
   min-height: 28px;
-  padding: 3px 7px;
+  padding: 5px 8px;
   border: 0;
   border-radius: 4px;
   background: transparent;
