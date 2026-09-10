@@ -2,7 +2,7 @@
   <div class="drawing-page">
     <aside
       class="drawing-sidebar"
-      :class="{ collapsed: sidebarCollapsed }"
+      :class="{ collapsed: sidebarCollapsed, 'is-resizing': isResizing }"
       :style="{ width: `${sidebarCollapsed ? 0 : sidebarWidth}px` }"
     >
       <div v-if="!searchMode" class="drawing-sidebar-topbar">
@@ -100,8 +100,12 @@ import {
 } from 'lucide-vue-next';
 
 const { t } = useI18n();
-const sidebarWidth = ref(296);
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 340;
+const SIDEBAR_DEFAULT_WIDTH = 296;
+const sidebarWidth = ref(SIDEBAR_DEFAULT_WIDTH);
 const sidebarCollapsed = ref(false);
+const isResizing = ref(false);
 const searchMode = ref(false);
 const searchQuery = ref('');
 const searchInputRef = ref(null);
@@ -141,15 +145,20 @@ let initialPointerX = 0;
 let initialWidth = 0;
 
 const resizeSidebar = (event) => {
-  sidebarWidth.value = Math.min(420, Math.max(220, initialWidth + event.clientX - initialPointerX));
+  sidebarWidth.value = Math.min(
+    SIDEBAR_MAX_WIDTH,
+    Math.max(SIDEBAR_MIN_WIDTH, initialWidth + event.clientX - initialPointerX)
+  );
 };
 
 const stopResizing = () => {
+  isResizing.value = false;
   window.removeEventListener('mousemove', resizeSidebar);
   window.removeEventListener('mouseup', stopResizing);
 };
 
 const startResizing = (event) => {
+  isResizing.value = true;
   initialPointerX = event.clientX;
   initialWidth = sidebarWidth.value;
   window.addEventListener('mousemove', resizeSidebar);
@@ -162,6 +171,7 @@ onUnmounted(stopResizing);
 <style scoped>
 .drawing-page { position: relative; display: flex; height: 100%; min-height: 520px; color: var(--text-primary); background: var(--bg-primary); overflow: hidden; }
 .drawing-sidebar { position: relative; display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; overflow: hidden; border-right: 1px solid var(--border-color); background: var(--bg-primary); transition: width .2s ease; }
+.drawing-sidebar.is-resizing { transition: none; }
 .drawing-sidebar.collapsed { border-right-color: transparent; }
 .drawing-sidebar-topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 12px; box-sizing: border-box; }
 .topbar-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; cursor: pointer; }
@@ -179,12 +189,12 @@ onUnmounted(stopResizing);
 .sidebar-search { display: flex; align-items: center; gap: 6px; height: 56px; padding: 12px; box-sizing: border-box; color: var(--text-tertiary); }
 .sidebar-search input { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 14px; }
 .directory-heading { padding: 0 16px 10px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
-.canvas-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 14px 16px; overflow-y: auto; }
-.canvas-card { min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
+.canvas-list { display: grid; grid-template-columns: repeat(2, minmax(0, 150px)); gap: 10px; justify-content: start; padding: 0 14px 16px; overflow-y: auto; }
+.canvas-card { display: flex; flex-direction: column; min-width: 0; aspect-ratio: .9; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
 .canvas-card:hover { border-color: #a8a29e; }
 .canvas-card.active, .canvas-card.active:hover { border-color: #1c1917; box-shadow: none; }
-.canvas-preview { position: relative; display: flex; align-items: center; justify-content: center; height: 92px; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
-.canvas-card-footer { display: flex; flex-direction: column; gap: 3px; padding: 9px; }
+.canvas-preview { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; min-height: 0; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
+.canvas-card-footer { display: flex; flex-direction: column; gap: 3px; padding: 9px; flex-shrink: 0; }
 .canvas-card-footer strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-card-footer small { color: var(--text-tertiary); font-size: 10px; }
 .mindmap-preview { position: relative; width: 76px; height: 48px; }
