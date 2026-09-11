@@ -67,6 +67,7 @@ export default defineConfig(() => ({
             if (id.includes("@somecat/epub-reader") || id.includes("foliate-js")) return "vendor-epub";
             if (id.includes("highlight.js") || id.includes("lowlight")) return "vendor-highlight";
             if (id.includes("lucide-vue-next")) return "vendor-icons";
+            if (id.includes("@antv/x6")) return "vendor-x6";
             if (id.includes("marked")) return "vendor-marked";
             if (
               id.includes("vue/") ||
