@@ -28,6 +28,7 @@
   },
   "palette": {
     "close": "关闭",
+    "moreShapes": "更多图形",
     "dragHint": "拖拽到画布，或点击放置到中心",
     "lineHint": "选择线型后，从图形连接桩拖出连线；已选两个图形时会直接连接",
     "animationHint": "先选中图形或连线，再应用动画效果"

@@ -1,12 +1,13 @@
 <template>
-  <span class="shape-preview" :class="`is-${preview}`" aria-hidden="true">
+  <span class="shape-preview" :class="[`is-${preview}`, { 'is-compact': compact }]" aria-hidden="true">
     <i></i>
   </span>
 </template>
 
 <script setup>
 defineProps({
-  preview: { type: String, default: 'rect' }
+  preview: { type: String, default: 'rect' },
+  compact: { type: Boolean, default: false }
 })
 </script>
 
@@ -17,7 +18,11 @@ defineProps({
   justify-content: center;
   width: 44px;
   height: 32px;
-  color: var(--text-secondary);
+  color: inherit;
+}
+.shape-preview.is-compact {
+  width: 32px;
+  height: 24px;
 }
 .shape-preview i {
   display: block;

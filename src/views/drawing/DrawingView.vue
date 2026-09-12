@@ -99,6 +99,7 @@
         :key="drawingStore.currentCanvas.id"
         :canvas="drawingStore.currentCanvas"
         @change="onGraphChange"
+        @library-change="onLibraryChange"
       />
     </main>
 
@@ -167,9 +168,26 @@ const closeMenus = () => {
   cardMenu.visible = false
 }
 
+const collapsedByLibrary = ref(false)
+
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
+  collapsedByLibrary.value = false
   closeMenus()
+}
+
+const onLibraryChange = (open) => {
+  if (open) {
+    if (!sidebarCollapsed.value) {
+      sidebarCollapsed.value = true
+      collapsedByLibrary.value = true
+    }
+    return
+  }
+  if (collapsedByLibrary.value) {
+    sidebarCollapsed.value = false
+    collapsedByLibrary.value = false
+  }
 }
 
 const enterSearchMode = () => {

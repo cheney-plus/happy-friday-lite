@@ -28,6 +28,7 @@
       @set-edge="onSetEdge"
       @action="onAnimationAction"
       @insert-template="onInsertTemplate"
+      @library-change="$emit('library-change', $event)"
     />
 
     <PropertyPanel
@@ -76,7 +77,7 @@ const props = defineProps({
   canvas: { type: Object, required: true }
 })
 
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'library-change'])
 const { t } = useI18n()
 const { appliedTheme } = useTheme()
 

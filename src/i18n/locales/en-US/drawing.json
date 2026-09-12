@@ -28,6 +28,7 @@
   },
   "palette": {
     "close": "Close",
+    "moreShapes": "More shapes",
     "dragHint": "Drag onto the canvas, or click to place at the center",
     "lineHint": "Pick a line style, then drag from a port. Two selected shapes will be connected.",
     "animationHint": "Select a shape or line, then apply an animation"
