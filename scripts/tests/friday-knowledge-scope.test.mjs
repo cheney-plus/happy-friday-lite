@@ -18,9 +18,23 @@ test('resolves folder selection as the RAG knowledge scope', () => {
   ])
 
   assert.deepEqual(scope, {
+    useKnowledgeBase: true,
     kbName: 'Project Vault',
     kbCategoryId: 'local',
     folderPath: 'Notes'
+  })
+})
+
+test('resolves all-knowledge selection as an unrestricted RAG scope', () => {
+  const scope = resolveFridayKnowledgeScope([
+    { type: 'kb', name: '全部知识库', categoryId: null }
+  ])
+
+  assert.deepEqual(scope, {
+    useKnowledgeBase: true,
+    kbName: '',
+    kbCategoryId: '',
+    folderPath: ''
   })
 })
 

@@ -165,6 +165,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const validChannels = [
       'chat-chunk',
       'chat-reasoning-chunk',
+      'chat-rag-sources',
       'chat-done',
       'chat-error',
       'session-title-updated',

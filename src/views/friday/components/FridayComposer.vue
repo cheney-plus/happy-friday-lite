@@ -291,6 +291,7 @@ function handleSend() {
     text,
     userMessage: attData?.userMessage || text,
     attachments: attData?.attachments || [],
+    useKnowledgeBase: knowledgeScope.useKnowledgeBase,
     kbName: knowledgeScope.kbName,
     kbCategoryId: knowledgeScope.kbCategoryId,
     folderPath: knowledgeScope.folderPath,

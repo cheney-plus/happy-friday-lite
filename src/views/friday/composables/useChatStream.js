@@ -14,6 +14,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   const isStreaming = ref(false);
   const streamingContent = ref('');
   const streamingReasoning = ref('');
+  const streamingSources = ref([]);
   const agentSegments = ref([]);
   const pendingApproval = ref(null);
   const autoApproveAll = ref(false);
@@ -22,6 +23,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   let unlistenChunk = null;
   let unlistenReasoning = null;
   let unlistenDone = null;
+  let unlistenRagSources = null;
   let unlistenError = null;
   let unlistenTitle = null;
   let unlistenAgentToolCall = null;
@@ -52,6 +54,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     isStreaming.value = false;
     streamingContent.value = '';
     streamingReasoning.value = '';
+    streamingSources.value = [];
     agentSegments.value = [];
     pendingApproval.value = null;
     autoApproveAll.value = false;
@@ -65,6 +68,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     isStreaming.value = true;
     streamingContent.value = '';
     streamingReasoning.value = '';
+    streamingSources.value = [];
     agentSegments.value = [];
     pendingApproval.value = null;
     activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -77,6 +81,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     isDoneReceived = false;
     isStreaming.value = true;
     streamingContent.value = output || '';
+    streamingSources.value = [];
     agentSegments.value = segments.map(segment => ({
       ...segment,
       id: segment.id || segment.toolCallId || `segment-${Math.random().toString(36).slice(2, 8)}`,
@@ -90,13 +95,15 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       messages.value.push({
         role: 'assistant',
         content: `${streamingContent.value}\n\n${errorContent}`.trim(),
-        reasoning: streamingReasoning.value || undefined
+        reasoning: streamingReasoning.value || undefined,
+        sources: streamingSources.value.length ? [...streamingSources.value] : undefined
       });
     } else {
       messages.value.push({ role: 'assistant', content: errorContent });
     }
     streamingContent.value = '';
     streamingReasoning.value = '';
+    streamingSources.value = [];
     agentSegments.value = [];
     isStreaming.value = false;
   }
@@ -161,7 +168,20 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     return JSON.parse(JSON.stringify(value));
   }
 
-  async function invokeChat({ mode, model, userMessage, attachments, thinkMode, kbName, kbCategoryId, folderPath }) {
+  function mergeSources(existing, incoming) {
+    const merged = [];
+    const seen = new Set();
+    for (const source of [...(existing || []), ...(incoming || [])]) {
+      if (!source) continue;
+      const key = source.metadata?.noteId || source.filePath || source.source || source.snippet;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(source);
+    }
+    return merged;
+  }
+
+  async function invokeChat({ mode, model, userMessage, attachments, thinkMode, useKnowledgeBase, kbName, kbCategoryId, folderPath }) {
     const enableThinking = thinkMode === 'deep';
     const sessionId = currentSessionId.value || '';
     const args = toIpcPayload({
@@ -171,6 +191,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       message: userMessage,
       attachments: attachments || [],
       enableThinking,
+      useKnowledgeBase: !!useKnowledgeBase,
       kbName: kbName || '',
       kbCategoryId: kbCategoryId || '',
       folderPath: folderPath || ''
@@ -216,6 +237,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       userMessage,
       attachments: data.attachments || [],
       thinkMode: data.thinkMode || fridayStore.thinkMode,
+      useKnowledgeBase: data.useKnowledgeBase || false,
       kbName: data.kbName || '',
       kbCategoryId: data.kbCategoryId || '',
       folderPath: data.folderPath || ''
@@ -298,6 +320,12 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       queueChunk('', data.content);
     });
 
+    unlistenRagSources = electronService.listen('chat-rag-sources', (event) => {
+      const data = event.payload;
+      if (data.requestId !== activeRequestId) return;
+      streamingSources.value = mergeSources(streamingSources.value, Array.isArray(data.sources) ? data.sources : []);
+    });
+
     unlistenDone = electronService.listen('chat-done', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
@@ -317,11 +345,13 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
 
       const hasContent = streamingContent.value || data.fullContent;
       const hasReasoning = streamingReasoning.value || data.reasoningContent;
+      const finalSources = mergeSources(streamingSources.value, Array.isArray(data.sources) ? data.sources : []);
       if (hasContent || hasReasoning) {
         const newMsg = {
           role: 'assistant',
           content: data.fullContent || streamingContent.value,
           reasoning: data.reasoningContent || streamingReasoning.value || undefined,
+          sources: finalSources.length ? finalSources : undefined,
           id: data.messageId
         };
         if (currentMode.value === 'agent' && agentSegments.value.length > 0) {
@@ -340,6 +370,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       onHistoryRefresh?.();
       streamingContent.value = '';
       streamingReasoning.value = '';
+      streamingSources.value = [];
       agentSegments.value = [];
     });
 
@@ -460,6 +491,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     if (unlistenChunk) unlistenChunk();
     if (unlistenReasoning) unlistenReasoning();
     if (unlistenDone) unlistenDone();
+    if (unlistenRagSources) unlistenRagSources();
     if (unlistenError) unlistenError();
     if (unlistenTitle) unlistenTitle();
     if (unlistenAgentToolCall) unlistenAgentToolCall();
@@ -476,6 +508,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     isStreaming,
     streamingContent,
     streamingReasoning,
+    streamingSources,
     agentSegments,
     pendingApproval,
     sessionTitle,

@@ -2,6 +2,7 @@ export function resolveFridayKnowledgeScope(attachments = []) {
   const folderAttachment = attachments.find(item => item.type === 'kb-folder');
   if (folderAttachment) {
     return {
+      useKnowledgeBase: true,
       kbName: folderAttachment.kbName || folderAttachment.name || '',
       kbCategoryId: folderAttachment.categoryId || '',
       folderPath: folderAttachment.folderPath || folderAttachment.path || ''
@@ -11,13 +12,15 @@ export function resolveFridayKnowledgeScope(attachments = []) {
   const kbAttachment = attachments.find(item => item.type === 'kb');
   if (kbAttachment) {
     return {
-      kbName: kbAttachment.name || '',
+      useKnowledgeBase: true,
+      kbName: kbAttachment.categoryId ? (kbAttachment.name || '') : '',
       kbCategoryId: kbAttachment.categoryId || '',
       folderPath: ''
     };
   }
 
   return {
+    useKnowledgeBase: false,
     kbName: '',
     kbCategoryId: '',
     folderPath: ''
