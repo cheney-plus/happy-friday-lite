@@ -16,6 +16,7 @@ import { stopHarnessSidecar } from './src-electron/harness/index.js'
 import { initOfficeSession, shutdownOfficeHost } from './src-electron/office/office-session.js'
 import { registerOfficeIpc } from './src-electron/office/office-ipc.js'
 import { isHeadlessExportRun, runHeadlessExportEntry } from './src-electron/office/office-headless.js'
+import { startObsidianScheduler, stopObsidianScheduler } from './src-electron/obsidian/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -168,6 +169,7 @@ app.whenReady().then(async () => {
   }
 
   startAutomationScheduler(mainWindow)
+  startObsidianScheduler(mainWindow)
 
   // Office 工作区（happyoffice 编辑器以 WebContentsView 挂载到主窗口）
   try {
@@ -257,6 +259,7 @@ app.on('window-all-closed', function () {
   }
   stopShareServer()
   stopAutomationScheduler()
+  stopObsidianScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()
@@ -271,7 +274,8 @@ app.on('before-quit', (event) => {
     import('./src-electron/agent/mcp.js')
       .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections()),
     stopHarnessSidecar(),
-    Promise.resolve(shutdownOfficeHost())
+    Promise.resolve(shutdownOfficeHost()),
+    Promise.resolve(stopObsidianScheduler())
   ]).finally(() => {
     shutdownStarted = true
     app.quit()

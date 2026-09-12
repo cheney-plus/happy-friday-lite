@@ -158,7 +158,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-reveal-path',
       'office-open-dialog',
       'office-set-ai-model',
-      'office-is-dirty'
+      'office-is-dirty',
+      'obsidian-list-sources',
+      'obsidian-new-source-template',
+      'obsidian-save-source',
+      'obsidian-delete-source',
+      'obsidian-test-connection',
+      'obsidian-sync-now',
+      'obsidian-render-markdown'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -207,7 +214,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-opened',
       'office-view-closed',
       'office-file-saved',
-      'office-layout-sync'
+      'office-layout-sync',
+      'obsidian-sync-status'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

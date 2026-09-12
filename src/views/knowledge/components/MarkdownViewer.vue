@@ -12,7 +12,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue';
+import { ref, onMounted, nextTick, onBeforeUnmount, watch } from 'vue';
 import { marked } from 'marked';
 
 const props = defineProps({
@@ -23,6 +23,7 @@ const renderedHtml = ref('');
 const loading = ref(true);
 const error = ref('');
 const contentRef = ref(null);
+const linkMap = ref({});
 const emit = defineEmits(['toc-ready', 'active-section']);
 let headingObserver;
 
@@ -64,13 +65,19 @@ async function loadMarkdown() {
     return;
   }
   try {
-    const result = await api.invoke('kb-read-file', { filePath: props.filePath });
+    let result = await api.invoke('obsidian-render-markdown', { filePath: props.filePath });
+    if (!result.success) {
+      result = await api.invoke('kb-read-file', { filePath: props.filePath });
+      result.markdown = result.content || '';
+      result.linkMap = {};
+    }
     if (!result.success) {
       error.value = result.error || '读取文件失败';
       loading.value = false;
       return;
     }
-    renderedHtml.value = marked.parse(result.content || '');
+    linkMap.value = result.linkMap || {};
+    renderedHtml.value = marked.parse(result.markdown || result.content || '');
     loading.value = false;
     await nextTick();
     buildToc();
@@ -80,10 +87,27 @@ async function loadMarkdown() {
   }
 }
 
+async function handleContentClick(event) {
+  const link = event.target?.closest?.('a');
+  if (!link) return;
+  const href = link.getAttribute('href') || '';
+  if (!href.startsWith('obsidian-link:')) return;
+  event.preventDefault();
+  const target = linkMap.value[href];
+  if (target?.resolvedPath) {
+    await window.electronAPI?.invoke('kb-open-file-external', { filePath: target.resolvedPath });
+  }
+}
+
 onMounted(() => {
   loadMarkdown();
+  contentRef.value?.addEventListener('click', handleContentClick);
 });
-onBeforeUnmount(() => headingObserver?.disconnect());
+watch(() => props.filePath, () => loadMarkdown());
+onBeforeUnmount(() => {
+  headingObserver?.disconnect();
+  contentRef.value?.removeEventListener('click', handleContentClick);
+});
 </script>
 
 <style scoped lang="scss">
