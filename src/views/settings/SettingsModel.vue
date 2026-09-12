@@ -202,19 +202,32 @@
             <div class="form-group">
               <div class="model-name-label-row">
                 <label class="form-label">对话模型名称</label>
-                <button
-                  v-if="formData.provider && formData.provider !== 'other'"
-                  type="button"
-                  class="model-refresh-btn"
-                  :disabled="modelsLoading || !formData.apiKey"
-                  @click="loadAvailableModels"
-                >
-                  <svg :class="{ 'spin-icon': modelsLoading }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-                    <polyline points="21 3 21 9 15 9"></polyline>
-                  </svg>
-                  <span>{{ modelsLoading ? '获取中' : '刷新' }}</span>
-                </button>
+                <div class="model-label-actions">
+                  <button
+                    v-if="formData.provider && formData.provider !== 'other'"
+                    type="button"
+                    class="model-refresh-btn"
+                    :disabled="modelsLoading || !formData.apiKey"
+                    @click="loadAvailableModels"
+                  >
+                    <svg :class="{ 'spin-icon': modelsLoading }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                      <polyline points="21 3 21 9 15 9"></polyline>
+                    </svg>
+                    <span>{{ modelsLoading ? '获取中' : '刷新' }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="model-refresh-btn"
+                    :disabled="chatTest.loading || !canTestChat"
+                    @click="testChatConfig"
+                  >
+                    <svg v-if="chatTest.loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    </svg>
+                    <span>{{ chatTest.loading ? '测试中' : '测试' }}</span>
+                  </button>
+                </div>
               </div>
               <div v-if="availableChatModels.length || modelsLoading" class="custom-select model-name-select" ref="modelNameSelectRef">
                 <div
@@ -246,10 +259,24 @@
               </div>
               <input v-else type="text" v-model="formData.modelName" :placeholder="modelInputPlaceholder" class="form-input" />
               <p v-if="modelsError" class="model-fetch-error">{{ modelsError }}，可手动输入模型名称。</p>
+              <p v-if="chatTest.message" class="model-test-status" :class="chatTest.ok ? 'ok' : 'error'">{{ chatTest.message }}</p>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Embedding 模型<span class="optional-tag">可选</span></label>
+              <div class="model-name-label-row">
+                <label class="form-label">Embedding 模型<span class="optional-tag">可选</span></label>
+                <button
+                  type="button"
+                  class="model-refresh-btn"
+                  :disabled="embeddingTest.loading || !canTestEmbedding"
+                  @click="testEmbeddingConfig"
+                >
+                  <svg v-if="embeddingTest.loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                  </svg>
+                  <span>{{ embeddingTest.loading ? '测试中' : '测试' }}</span>
+                </button>
+              </div>
               <div v-if="availableEmbeddingModels.length" class="custom-select model-name-select" ref="embeddingModelSelectRef">
                 <div class="select-trigger" @click="toggleEmbeddingModelsDropdown">
                   <span :class="{ placeholder: !formData.embeddingModelName }">
@@ -275,6 +302,7 @@
                 </div>
               </div>
               <input v-else type="text" v-model="formData.embeddingModelName" placeholder="输入 Embedding 模型名称，如 text-embedding-v4" class="form-input" />
+              <p v-if="embeddingTest.message" class="model-test-status" :class="embeddingTest.ok ? 'ok' : 'error'">{{ embeddingTest.message }}</p>
             </div>
 
             <div v-if="formData.provider === 'other'" class="form-group">
@@ -426,6 +454,8 @@ const modelsLoading = ref(false);
 const modelsError = ref('');
 const showAvailableModelsDropdown = ref(false);
 const showEmbeddingModelsDropdown = ref(false);
+const chatTest = ref({ loading: false, ok: false, message: '' });
+const embeddingTest = ref({ loading: false, ok: false, message: '' });
 
 const providerList = [
   { value: 'doubao', label: '豆包', icon: new URL('@/assets/images/豆包.png', import.meta.url).href, baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
@@ -753,6 +783,23 @@ const isFormValid = computed(() => {
   return baseValid;
 });
 
+const canTestChat = computed(() => {
+  if (!formData.value.provider || !formData.value.apiKey || !formData.value.modelName) return false;
+  if (formData.value.provider === 'other' && !formData.value.modelUrl) return false;
+  return true;
+});
+
+const canTestEmbedding = computed(() => {
+  if (!formData.value.provider || !formData.value.embeddingModelName) return false;
+  if (formData.value.provider === 'other' && formData.value.useSeparateEmbeddingConfig) {
+    return !!(formData.value.embeddingApiKey && formData.value.embeddingUrl);
+  }
+  if (formData.value.provider === 'other') {
+    return !!(formData.value.apiKey && formData.value.modelUrl);
+  }
+  return !!formData.value.apiKey;
+});
+
 const closeModal = () => {
   showAddModal.value = false;
   resetForm();
@@ -776,7 +823,55 @@ const resetForm = () => {
   modelsError.value = '';
   showAvailableModelsDropdown.value = false;
   editingModelId.value = null;
+  chatTest.value = { loading: false, ok: false, message: '' };
+  embeddingTest.value = { loading: false, ok: false, message: '' };
 };
+
+function buildModelFromForm() {
+  const provider = providerList.find(p => p.value === formData.value.provider);
+  const isOther = formData.value.provider === 'other';
+  return {
+    provider: formData.value.provider,
+    providerLabel: provider?.label || '未知',
+    apiKey: formData.value.apiKey,
+    modelName: formData.value.modelName,
+    embeddingModelName: formData.value.embeddingModelName || '',
+    baseUrl: isOther ? formData.value.modelUrl : (provider?.baseUrl || ''),
+    modelUrl: formData.value.modelUrl,
+    useSeparateEmbeddingConfig: !!formData.value.useSeparateEmbeddingConfig,
+    embeddingApiKey: formData.value.embeddingApiKey || '',
+    embeddingBaseUrl: formData.value.embeddingUrl || '',
+    embeddingUrl: formData.value.embeddingUrl || ''
+  };
+}
+
+async function testChatConfig() {
+  if (!canTestChat.value) return;
+  chatTest.value = { loading: true, ok: false, message: '正在测试对话模型...' };
+  try {
+    const result = await electronService.invoke('model-test-chat', { model: buildModelFromForm() });
+    if (!result?.success) throw new Error(result?.error || '测试失败');
+    chatTest.value = { loading: false, ok: true, message: `对话模型可用：${result.data?.model || formData.value.modelName}` };
+  } catch (e) {
+    chatTest.value = { loading: false, ok: false, message: e?.message || '测试失败' };
+  }
+}
+
+async function testEmbeddingConfig() {
+  if (!canTestEmbedding.value) return;
+  embeddingTest.value = { loading: true, ok: false, message: '正在测试 Embedding 模型...' };
+  try {
+    const result = await electronService.invoke('model-test-embedding', { model: buildModelFromForm() });
+    if (!result?.success) throw new Error(result?.error || '测试失败');
+    embeddingTest.value = {
+      loading: false,
+      ok: true,
+      message: `Embedding 可用，维度：${result.data?.dimensions || '-'}`
+    };
+  } catch (e) {
+    embeddingTest.value = { loading: false, ok: false, message: e?.message || '测试失败' };
+  }
+}
 
 const handleSave = () => {
   if (isFormValid.value) {
@@ -1378,6 +1473,12 @@ function formatTime(ts) {
   justify-content: space-between;
 }
 
+.model-label-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .model-refresh-btn {
   display: inline-flex;
   align-items: center;
@@ -1434,6 +1535,20 @@ function formatTime(ts) {
   color: #dc2626;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.model-test-status {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.model-test-status.ok {
+  color: #16a34a;
+}
+
+.model-test-status.error {
+  color: #dc2626;
 }
 
 .optional-tag {

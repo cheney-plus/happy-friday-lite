@@ -24,6 +24,7 @@ import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
 import { listProviderModels } from './modelCatalog.js'
+import { testChatModel, testEmbeddingModel } from './modelTester.js'
 import { registerAgentCommands } from './agent/ipc.js'
 import {
   registerHarnessCommands,
@@ -1464,6 +1465,24 @@ export function registerCommands(mainWindow) {
     } catch (e) {
       console.warn('[IPC] model-list-available error:', e.message)
       return { success: false, error: e.message, models: [] }
+    }
+  })
+
+  ipcMain.handle('model-test-chat', async (_event, args) => {
+    try {
+      const data = await testChatModel(args?.model || {})
+      return { success: true, data }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('model-test-embedding', async (_event, args) => {
+    try {
+      const data = await testEmbeddingModel(args?.model || {})
+      return { success: true, data }
+    } catch (e) {
+      return { success: false, error: e.message }
     }
   })
 

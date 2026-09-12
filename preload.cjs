@@ -106,6 +106,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'usage-clear',
       'model-query-balance',
       'model-list-available',
+      'model-test-chat',
+      'model-test-embedding',
       'automation-list-tasks',
       'automation-list-runs',
       'automation-get-active-run',
