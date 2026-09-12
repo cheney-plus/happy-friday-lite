@@ -32,8 +32,7 @@ export const PALETTE_GROUPS = [
       { id: 'dashed', kind: 'edge', style: 'dashed', preview: 'line-dashed' },
       { id: 'orthogonal', kind: 'edge', style: 'orthogonal', preview: 'line-orth' },
       { id: 'manhattan', kind: 'edge', style: 'manhattan', preview: 'line-manhattan' },
-      { id: 'curve', kind: 'edge', style: 'curve', preview: 'line-curve' },
-      { id: 'association', kind: 'edge', style: 'association', preview: 'line-assoc' }
+      { id: 'curve', kind: 'edge', style: 'curve', preview: 'line-curve' }
     ]
   },
   {
@@ -50,10 +49,8 @@ export const PALETTE_GROUPS = [
     id: 'mindmap',
     items: [
       { id: 'mindTemplate', kind: 'template', template: 'mindmap', preview: 'tpl-mind' },
-      { id: 'mindRoot', kind: 'node', shape: 'draw-mind-root', preview: 'mind-root', width: 160, height: 52, defaultLabel: '中心主题' },
-      { id: 'mindTopic', kind: 'node', shape: 'draw-mind-topic', preview: 'mind-topic', width: 132, height: 42, defaultLabel: '分支主题' },
-      { id: 'mindSub', kind: 'node', shape: 'draw-mind-sub', preview: 'mind-sub', width: 116, height: 34, defaultLabel: '子主题' },
-      { id: 'mindCallout', kind: 'node', shape: 'draw-mind-callout', preview: 'mind-callout', width: 120, height: 48, defaultLabel: '备注' }
+      { id: 'mindRoot', kind: 'node', shape: 'topic', preview: 'mind-root', width: 160, height: 50, defaultLabel: '中心主题' },
+      { id: 'mindTopic', kind: 'node', shape: 'topic', preview: 'mind-topic', width: 120, height: 40, defaultLabel: '分支主题' }
     ]
   },
   {
@@ -68,9 +65,7 @@ export const PALETTE_GROUPS = [
       { id: 'database', kind: 'node', shape: 'draw-cylinder', preview: 'cylinder', width: 110, height: 90, defaultLabel: '数据库' },
       { id: 'preparation', kind: 'node', shape: 'draw-preparation', preview: 'hexagon', width: 150, height: 70, defaultLabel: '准备' },
       { id: 'delay', kind: 'node', shape: 'draw-delay', preview: 'delay', width: 130, height: 64, defaultLabel: '延迟' },
-      { id: 'display', kind: 'node', shape: 'draw-display', preview: 'display', width: 140, height: 70, defaultLabel: '显示' },
-      { id: 'manual', kind: 'node', shape: 'draw-manual', preview: 'manual', width: 140, height: 70, defaultLabel: '手工操作' },
-      { id: 'connector', kind: 'node', shape: 'draw-connector', preview: 'circle', width: 44, height: 44, defaultLabel: 'A' }
+      { id: 'display', kind: 'node', shape: 'draw-display', preview: 'display', width: 140, height: 70, defaultLabel: '显示' }
     ]
   },
   {
@@ -83,7 +78,7 @@ export const PALETTE_GROUPS = [
       { id: 'erKey', kind: 'node', shape: 'draw-er-key', preview: 'er-key', width: 120, height: 52, defaultLabel: '主键' },
       { id: 'erRel', kind: 'node', shape: 'draw-er-rel', preview: 'diamond', width: 140, height: 88, defaultLabel: '关系' },
       { id: 'erIdent', kind: 'node', shape: 'draw-er-ident', preview: 'er-ident', width: 148, height: 92, defaultLabel: '标识关系' },
-      { id: 'erLine', kind: 'edge', style: 'er', preview: 'line-assoc' }
+      { id: 'erLine', kind: 'edge', style: 'er', preview: 'line-arrow' }
     ]
   },
   {
@@ -127,11 +122,11 @@ export const PALETTE_GROUPS = [
           { id: 'archTemplate', kind: 'template', template: 'architecture', preview: 'tpl-arch' },
           { id: 'archClient', kind: 'node', shape: 'draw-arch-client', preview: 'arch-client', width: 140, height: 64, defaultLabel: '客户端' },
           { id: 'archServer', kind: 'node', shape: 'draw-arch-server', preview: 'arch-server', width: 140, height: 64, defaultLabel: '服务' },
-          { id: 'archDb', kind: 'node', shape: 'draw-arch-db', preview: 'cylinder', width: 140, height: 64, defaultLabel: '数据库' },
-          { id: 'archCloud', kind: 'node', shape: 'draw-arch-cloud', preview: 'cloud', width: 140, height: 64, defaultLabel: '云服务' },
+          { id: 'archDb', kind: 'node', shape: 'draw-arch-db', preview: 'arch-db', width: 140, height: 64, defaultLabel: '数据库' },
+          { id: 'archCloud', kind: 'node', shape: 'draw-arch-cloud', preview: 'arch-cloud', width: 140, height: 64, defaultLabel: '云服务' },
           { id: 'archQueue', kind: 'node', shape: 'draw-arch-queue', preview: 'arch-queue', width: 140, height: 64, defaultLabel: '消息队列' },
           { id: 'archCache', kind: 'node', shape: 'draw-arch-cache', preview: 'arch-cache', width: 140, height: 64, defaultLabel: '缓存' },
-          { id: 'archGateway', kind: 'node', shape: 'draw-arch-gateway', preview: 'hexagon', width: 140, height: 64, defaultLabel: '网关' }
+          { id: 'archGateway', kind: 'node', shape: 'draw-arch-gateway', preview: 'arch-gateway', width: 140, height: 64, defaultLabel: '网关' }
         ]
       },
       {
@@ -166,7 +161,8 @@ export function findCatalogItem(id) {
 }
 
 const PRESERVE_STYLE_PREFIXES = [
-  'draw-mind-',
+  'topic',
+  'topic-child',
   'draw-arch-',
   'draw-er-',
   'draw-uml-',

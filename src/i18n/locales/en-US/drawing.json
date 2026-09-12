@@ -61,13 +61,17 @@
     "animation": "Animation"
   },
   "context": {
-    "cut": "Cut",
-    "copy": "Copy",
-    "paste": "Paste",
     "duplicate": "Duplicate",
     "delete": "Delete",
     "toFront": "Bring to front",
-    "toBack": "Send to back"
+    "toBack": "Send to back",
+    "addBranch": "Add branch topic",
+    "addChild": "Add subtopic",
+    "addSibling": "Add sibling",
+    "indent": "Indent",
+    "outdent": "Outdent",
+    "collapse": "Collapse",
+    "expand": "Expand"
   },
   "shapes": {
     "rect": "Rectangle",
@@ -94,7 +98,6 @@
     "orthogonal": "Orthogonal",
     "manhattan": "Elbow",
     "curve": "Curve",
-    "association": "Association",
     "pulse": "Pulse",
     "breathe": "Breathe",
     "bounce": "Bounce",
@@ -104,7 +107,6 @@
     "mindRoot": "Central topic",
     "mindTopic": "Main topic",
     "mindSub": "Subtopic",
-    "mindCallout": "Callout",
     "flowTemplate": "Insert flowchart",
     "terminator": "Start / End",
     "process": "Process",
@@ -115,8 +117,6 @@
     "preparation": "Preparation",
     "delay": "Delay",
     "display": "Display",
-    "manual": "Manual",
-    "connector": "Connector",
     "erTemplate": "Insert ER",
     "erEntity": "Entity",
     "erWeak": "Weak entity",

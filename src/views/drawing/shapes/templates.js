@@ -1,5 +1,6 @@
 import { uid } from './id.js'
 import { createEdgeMetadata } from './edgeStyles.js'
+import { mindTreeToCells } from './mindmap.js'
 
 function node(shape, x, y, width, height, label, extra = {}) {
   return {
@@ -26,28 +27,58 @@ function edge(source, target, style, extra = {}) {
 }
 
 export function createMindMapTemplate(ox = 80, oy = 80) {
-  const root = node('draw-mind-root', ox + 40, oy + 130, 160, 52, '中心主题')
-  const t1 = node('draw-mind-topic', ox + 280, oy + 40, 132, 42, '市场洞察')
-  const t2 = node('draw-mind-topic', ox + 280, oy + 136, 132, 42, '产品规划')
-  const t3 = node('draw-mind-topic', ox + 280, oy + 232, 132, 42, '落地执行')
-  const s1 = node('draw-mind-sub', ox + 460, oy + 18, 116, 34, '用户研究')
-  const s2 = node('draw-mind-sub', ox + 460, oy + 62, 116, 34, '竞品分析')
-  const mindEdge = (source, target) =>
-    createEdgeMetadata('curve', {
-      id: uid('e'),
-      source: { cell: source.id },
-      target: { cell: target.id },
-      attrs: {
-        line: {
-          stroke: '#93c5fd',
-          strokeWidth: 2,
-          targetMarker: null,
-          sourceMarker: null
-        }
-      }
-    })
   return {
-    cells: [root, t1, t2, t3, s1, s2, mindEdge(root, t1), mindEdge(root, t2), mindEdge(root, t3), mindEdge(t1, s1), mindEdge(t1, s2)]
+    cells: mindTreeToCells(
+      {
+        id: uid('n'),
+        type: 'topic',
+        label: '中心主题',
+        width: 160,
+        height: 50,
+        children: [
+          {
+            id: uid('n'),
+            type: 'topic-branch',
+            label: '市场洞察',
+            width: 120,
+            height: 40,
+            children: [
+              { id: uid('n'), type: 'topic-child', label: '用户研究', width: 100, height: 32 },
+              { id: uid('n'), type: 'topic-child', label: '竞品分析', width: 100, height: 32 }
+            ]
+          },
+          {
+            id: uid('n'),
+            type: 'topic-branch',
+            label: '产品规划',
+            width: 120,
+            height: 40
+          },
+          {
+            id: uid('n'),
+            type: 'topic-branch',
+            label: '落地执行',
+            width: 120,
+            height: 40,
+            children: [
+              {
+                id: uid('n'),
+                type: 'topic-child',
+                label: '版本节奏',
+                width: 100,
+                height: 32,
+                children: [
+                  { id: uid('n'), type: 'topic-child', label: '灰度发布', width: 100, height: 32 },
+                  { id: uid('n'), type: 'topic-child', label: '全量上线', width: 100, height: 32 }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      ox,
+      oy
+    )
   }
 }
 
@@ -208,20 +239,39 @@ export function cloneTemplateAt(data, dx = 0, dy = 0) {
     if (cell.id) idMap[cell.id] = nextId
     return { ...cell, id: nextId }
   })
+  const mindTreeId = uid('mt')
   return {
     cells: cloned.map((cell) => {
       if (cell.source || cell.target) {
-        return {
+        const next = {
           ...cell,
           source: remapTerminal(cell.source, idMap),
           target: remapTerminal(cell.target, idMap)
         }
+        if (cell.data?.mind) {
+          next.data = {
+            ...cell.data,
+            mind: { ...cell.data.mind, treeId: mindTreeId }
+          }
+        }
+        return next
       }
-      return {
+      const next = {
         ...cell,
         x: (cell.x || 0) + dx,
         y: (cell.y || 0) + dy
       }
+      if (cell.data?.mind) {
+        next.data = {
+          ...cell.data,
+          mind: {
+            ...cell.data.mind,
+            treeId: mindTreeId,
+            parentId: cell.data.mind.parentId ? idMap[cell.data.mind.parentId] || null : null
+          }
+        }
+      }
+      return next
     })
   }
 }

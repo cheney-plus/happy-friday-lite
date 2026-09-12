@@ -61,13 +61,17 @@
     "animation": "动画"
   },
   "context": {
-    "cut": "剪切",
-    "copy": "复制",
-    "paste": "粘贴",
     "duplicate": "创建副本",
     "delete": "删除",
     "toFront": "置于顶层",
-    "toBack": "置于底层"
+    "toBack": "置于底层",
+    "addBranch": "插入分支主题",
+    "addChild": "插入子主题",
+    "addSibling": "插入同级主题",
+    "indent": "降级",
+    "outdent": "升级",
+    "collapse": "收缩",
+    "expand": "展开"
   },
   "shapes": {
     "rect": "矩形",
@@ -94,7 +98,6 @@
     "orthogonal": "正交线",
     "manhattan": "折线",
     "curve": "曲线",
-    "association": "关联",
     "pulse": "脉冲",
     "breathe": "呼吸",
     "bounce": "弹跳",
@@ -104,7 +107,6 @@
     "mindRoot": "中心主题",
     "mindTopic": "分支主题",
     "mindSub": "子主题",
-    "mindCallout": "备注",
     "flowTemplate": "插入流程",
     "terminator": "开始/结束",
     "process": "处理",
@@ -115,8 +117,6 @@
     "preparation": "准备",
     "delay": "延迟",
     "display": "显示",
-    "manual": "手工操作",
-    "connector": "连接符",
     "erTemplate": "插入 ER",
     "erEntity": "实体",
     "erWeak": "弱实体",

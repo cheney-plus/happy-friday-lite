@@ -1,7 +1,51 @@
 <template>
   <span class="shape-preview" :class="[`is-${preview}`, { 'is-compact': compact }]" aria-hidden="true">
-    <svg v-if="path" class="shape-svg" viewBox="0 0 32 24">
+    <svg v-if="linePreview" class="shape-svg is-line" viewBox="0 0 32 24">
+      <path
+        class="line-path"
+        fill="none"
+        :d="linePreview.d"
+        :stroke-dasharray="linePreview.dashed ? '3.2 2.2' : null"
+      />
+      <path
+        v-if="linePreview.startHead"
+        class="line-head"
+        :class="{ 'is-open': linePreview.start === 'classic' }"
+        :d="linePreview.startHead"
+      />
+      <path
+        v-if="linePreview.endHead"
+        class="line-head"
+        :class="{ 'is-open': linePreview.end === 'classic' }"
+        :d="linePreview.endHead"
+      />
+    </svg>
+    <svg v-else-if="path" class="shape-svg" viewBox="0 0 32 24">
       <path :d="path" />
+    </svg>
+    <svg v-else-if="preview === 'anim-pulse'" class="shape-svg is-anim" viewBox="0 0 32 24">
+      <rect class="anim-shape" x="11" y="7.5" width="10" height="9" rx="2" />
+      <rect class="anim-hint" x="7.5" y="4.5" width="17" height="15" rx="3.5" />
+      <rect class="anim-hint faint" x="4.5" y="2" width="23" height="20" rx="5" />
+    </svg>
+    <svg v-else-if="preview === 'anim-breathe'" class="shape-svg is-anim" viewBox="0 0 32 24">
+      <rect class="anim-hint" x="6" y="4" width="20" height="16" rx="4" />
+      <rect class="anim-shape" x="10" y="7" width="12" height="10" rx="2.5" />
+    </svg>
+    <svg v-else-if="preview === 'anim-bounce'" class="shape-svg is-anim" viewBox="0 0 32 24">
+      <rect class="anim-shape" x="11" y="3.5" width="10" height="8" rx="2" />
+      <path class="anim-hint" d="M8 21 H24" />
+      <path class="anim-hint" d="M16 13.5 V17.5" />
+      <path class="anim-arrow" d="M13.2 16.2 L16 19.2 L18.8 16.2" />
+    </svg>
+    <svg v-else-if="preview === 'anim-flow'" class="shape-svg is-anim" viewBox="0 0 32 24">
+      <path class="anim-hint dashed" d="M3 12 C 9 6 14 18 20 12" />
+      <path class="anim-shape-stroke" d="M12 12 C 18 6 23 18 29 12" />
+      <path class="anim-arrow filled" d="M25.2 8.8 L30.2 12 L25.2 15.2 Z" />
+    </svg>
+    <svg v-else-if="preview === 'anim-stop'" class="shape-svg is-anim" viewBox="0 0 32 24">
+      <rect class="anim-shape" x="11.5" y="6" width="3.6" height="12" rx="1" />
+      <rect class="anim-shape" x="16.9" y="6" width="3.6" height="12" rx="1" />
     </svg>
     <i v-else></i>
   </span>
@@ -26,7 +70,47 @@ const SVG_PATHS = {
   'er-ident': 'M16 4.5 L25.5 12 L16 19.5 L6.5 12 Z'
 }
 
+const LINE_PREVIEWS = {
+  'line-straight': {
+    d: 'M3 12 H29'
+  },
+  'line-arrow': {
+    d: 'M3 12 H23',
+    end: 'block',
+    endHead: 'M23 8.2 L29.6 12 L23 15.8 Z'
+  },
+  'line-double': {
+    d: 'M9 12 H23',
+    start: 'block',
+    end: 'block',
+    startHead: 'M9 8.2 L2.4 12 L9 15.8 Z',
+    endHead: 'M23 8.2 L29.6 12 L23 15.8 Z'
+  },
+  'line-dashed': {
+    d: 'M3 12 H23',
+    dashed: true,
+    end: 'block',
+    endHead: 'M23 8.2 L29.6 12 L23 15.8 Z'
+  },
+  'line-orth': {
+    d: 'M4 18 H16 V7 H22.5',
+    end: 'block',
+    endHead: 'M22.5 3.4 L29.2 7 L22.5 10.6 Z'
+  },
+  'line-manhattan': {
+    d: 'M4 18 H11 V12 H18 V7 H22.5',
+    end: 'block',
+    endHead: 'M22.5 3.4 L29.2 7 L22.5 10.6 Z'
+  },
+  'line-curve': {
+    d: 'M4 18 C 12 18 12 6 22.5 6',
+    end: 'classic',
+    endHead: 'M21.2 2.6 L29 6 L21.2 9.4'
+  }
+}
+
 const path = computed(() => SVG_PATHS[props.preview] || '')
+const linePreview = computed(() => LINE_PREVIEWS[props.preview] || null)
 </script>
 
 <style scoped>
@@ -52,6 +136,45 @@ const path = computed(() => SVG_PATHS[props.preview] || '')
   stroke-width: 1.5;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+.shape-svg.is-line {
+  fill: none;
+}
+.line-head {
+  fill: currentColor;
+  stroke: none;
+}
+.line-head.is-open {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.shape-svg.is-anim .anim-shape {
+  fill: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+.shape-svg.is-anim .anim-shape-stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.shape-svg.is-anim .anim-hint {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: 0.42;
+}
+.shape-svg.is-anim .anim-hint.faint { opacity: 0.2; }
+.shape-svg.is-anim .anim-hint.dashed { stroke-dasharray: 2.4 1.8; }
+.shape-svg.is-anim .anim-arrow {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+}
+.shape-svg.is-anim .anim-arrow.filled {
+  fill: currentColor;
+  stroke: none;
 }
 .shape-preview i {
   display: block;
@@ -91,25 +214,13 @@ const path = computed(() => SVG_PATHS[props.preview] || '')
 .is-seq-act i { width: 6px; height: 20px; border-radius: 1px; }
 .is-arch-client i,
 .is-arch-server i,
+.is-arch-db i,
+.is-arch-cloud i,
 .is-arch-queue i,
-.is-arch-cache i { width: 28px; height: 14px; border-radius: 6px; }
+.is-arch-cache i,
+.is-arch-gateway i { width: 28px; height: 14px; border-radius: 6px; }
 .is-dfd-ext i { width: 26px; height: 16px; border-width: 2px; }
 .is-dfd-store i { width: 28px; height: 12px; border-left-width: 3px; border-right-width: 3px; }
-.is-line-straight i,
-.is-line-arrow i,
-.is-line-double i,
-.is-line-dashed i,
-.is-line-orth i,
-.is-line-manhattan i,
-.is-line-curve i,
-.is-line-assoc i { width: 30px; height: 0; border-top-width: 1.6px; border-radius: 0; background: none; }
-.is-line-dashed i { border-top-style: dashed; }
-.is-line-arrow i { clip-path: polygon(0 0, 100% 0, 100% 100%); }
-.is-anim-pulse i,
-.is-anim-breathe i,
-.is-anim-bounce i { width: 16px; height: 16px; border-radius: 50%; }
-.is-anim-flow i { width: 28px; height: 0; border-top: 1.6px dashed currentColor; }
-.is-anim-stop i { width: 12px; height: 12px; border-radius: 2px; }
 .is-tpl-mind i,
 .is-tpl-flow i,
 .is-tpl-er i,

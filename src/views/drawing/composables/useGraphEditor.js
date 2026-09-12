@@ -13,6 +13,16 @@ import {
 import { applyCellAnimation, restoreGraphAnimations } from '../shapes/animation.js'
 import { createNodeMetadata } from '../shapes/catalog.js'
 import { applyEdgeStyle, createEdgeMetadata, DEFAULT_EDGE_STYLE } from '../shapes/edgeStyles.js'
+import {
+  bindMindmapBehavior,
+  collectMindRemoval,
+  isMindNode,
+  layoutAllMindTrees,
+  layoutMindTree,
+  prepareMindClipboard,
+  remapPastedMindCells,
+  restoreMindClipboardSource
+} from '../shapes/mindmap.js'
 import { registerDrawingShapes } from '../shapes/register.js'
 import { cloneTemplateAt, TEMPLATE_BUILDERS } from '../shapes/templates.js'
 import { getCanvasTheme } from '../shapes/theme.js'
@@ -59,8 +69,9 @@ export function createDrawingGraph(container, minimapContainer, state) {
       createEdge() {
         return this.createEdge(createEdgeMetadata(state.edgeStyleId || DEFAULT_EDGE_STYLE))
       },
-      validateConnection({ targetMagnet, targetCell, sourceCell }) {
+      validateConnection({ targetCell, sourceCell }) {
         if (sourceCell && targetCell && sourceCell.id === targetCell.id) return false
+        if (Boolean(isMindNode(sourceCell)) !== Boolean(isMindNode(targetCell))) return false
         return true
       }
     },
@@ -73,6 +84,7 @@ export function createDrawingGraph(container, minimapContainer, state) {
     embedding: {
       enabled: true,
       findParent({ node }) {
+        if (isMindNode(node)) return []
         const bbox = node.getBBox()
         return this.getNodes().filter((parent) => {
           if (parent.id === node.id) return false
@@ -83,7 +95,11 @@ export function createDrawingGraph(container, minimapContainer, state) {
     },
     interacting: {
       nodeMovable: () => state.mode !== 'pan',
-      edgeMovable: () => state.mode !== 'pan',
+      edgeMovable: (view) => {
+        if (state.mode === 'pan') return false
+        const cell = view?.cell || view
+        return cell.shape !== 'mindmap-edge'
+      },
       magnetConnectable: () => state.mode !== 'pan'
     }
   })
@@ -107,7 +123,7 @@ export function createDrawingGraph(container, minimapContainer, state) {
     .use(
       new Transform({
         resizing: { enabled: true, minWidth: 20, minHeight: 20, orthogonal: false },
-        rotating: { enabled: true }
+        rotating: { enabled: (node) => !isMindNode(node) }
       })
     )
     .use(new Export())
@@ -126,6 +142,7 @@ export function createDrawingGraph(container, minimapContainer, state) {
   const dnd = new Dnd({ target: graph, scaled: false })
   bindKeys(graph)
   bindTools(graph)
+  bindMindmapBehavior(graph)
   return { graph, dnd }
 }
 
@@ -139,29 +156,24 @@ function bindKeys(graph) {
     return false
   })
   graph.bindKey(['meta+c', 'ctrl+c'], () => {
-    const cells = graph.getSelectedCells()
-    if (cells.length) graph.copy(cells)
+    copyDrawingCells(graph, graph.getSelectedCells())
     return false
   })
   graph.bindKey(['meta+x', 'ctrl+x'], () => {
-    const cells = graph.getSelectedCells()
-    if (cells.length) graph.cut(cells)
+    cutDrawingCells(graph, graph.getSelectedCells())
     return false
   })
   graph.bindKey(['meta+v', 'ctrl+v'], () => {
-    if (!graph.isClipboardEmpty()) graph.paste({ offset: 24 })
+    pasteDrawingCells(graph, 24)
     return false
   })
   graph.bindKey(['meta+d', 'ctrl+d'], () => {
-    const cells = graph.getSelectedCells()
-    if (!cells.length) return false
-    graph.copy(cells)
-    graph.paste({ offset: 28 })
+    duplicateDrawingCells(graph)
     return false
   })
   graph.bindKey(['backspace', 'delete'], () => {
     const cells = graph.getSelectedCells()
-    if (cells.length) graph.removeCells(cells)
+    if (cells.length) removeDrawingCells(graph, cells)
     return false
   })
   graph.bindKey(['meta+a', 'ctrl+a'], () => {
@@ -174,8 +186,49 @@ function bindKeys(graph) {
   })
 }
 
+export function removeDrawingCells(graph, cells) {
+  if (!cells?.length) return
+  const trees = new Set()
+  cells.forEach((cell) => {
+    const treeId = cell.getData?.()?.mind?.treeId
+    if (treeId) trees.add(treeId)
+  })
+  graph.removeCells(collectMindRemoval(graph, cells))
+  trees.forEach((treeId) => layoutMindTree(graph, treeId))
+}
+
+export function copyDrawingCells(graph, cells) {
+  if (!graph || !cells?.length) return
+  const bundle = prepareMindClipboard(graph, cells)
+  graph.copy(bundle)
+  restoreMindClipboardSource(bundle)
+}
+
+export function cutDrawingCells(graph, cells) {
+  if (!graph || !cells?.length) return
+  copyDrawingCells(graph, cells)
+  removeDrawingCells(graph, cells)
+}
+
+export function pasteDrawingCells(graph, offset = 24) {
+  if (!graph || graph.isClipboardEmpty()) return []
+  const pasted = graph.paste({ offset })
+  remapPastedMindCells(graph, pasted)
+  const alive = (pasted || []).filter((cell) => graph.getCellById(cell.id))
+  if (alive.length) graph.copy(alive)
+  return pasted
+}
+
+export function duplicateDrawingCells(graph) {
+  const cells = graph?.getSelectedCells() || []
+  if (!cells.length) return
+  copyDrawingCells(graph, cells)
+  pasteDrawingCells(graph, 28)
+}
+
 function bindTools(graph) {
   graph.on('edge:selected', ({ edge }) => {
+    if (edge.shape === 'mindmap-edge') return
     edge.addTools([
       { name: 'vertices', args: { stopPropagation: false } },
       { name: 'segments', args: { stopPropagation: false } },
@@ -228,6 +281,7 @@ export function normalizeGraphJSON(data) {
 
 export function loadGraphData(graph, data) {
   graph.fromJSON(normalizeGraphJSON(data))
+  layoutAllMindTrees(graph)
   graph.cleanHistory()
   if (graph.getCells().length) {
     graph.zoomToFit({ padding: 56, maxScale: 1 })

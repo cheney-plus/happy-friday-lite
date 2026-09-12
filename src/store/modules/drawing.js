@@ -6,7 +6,7 @@ import {
   createMindMapTemplate
 } from '@/views/drawing/shapes/templates.js'
 
-const STORAGE_KEY = 'hfl-drawing-canvases-v1'
+const STORAGE_KEY = 'hfl-drawing-canvases-v2'
 
 function canvasTitleKey(kind) {
   if (kind === 'mindmap') return 'mindMap'

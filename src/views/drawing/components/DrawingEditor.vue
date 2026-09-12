@@ -40,6 +40,11 @@
       :visible="menu.visible"
       :x="menu.x"
       :y="menu.y"
+      :is-mind="menu.isMind"
+      :can-indent="menu.canIndent"
+      :can-outdent="menu.canOutdent"
+      :can-collapse="menu.canCollapse"
+      :is-collapsed="menu.isCollapsed"
       @action="onMenuAction"
     />
 
@@ -61,13 +66,27 @@ import {
   connectSelected,
   createDrawingGraph,
   downloadFile,
+  duplicateDrawingCells,
   getViewportCenter,
   insertTemplate,
   loadGraphData,
+  removeDrawingCells,
   setInteractionMode,
   setPendingEdgeStyle,
   startCatalogDrag
 } from '../composables/useGraphEditor.js'
+import {
+  addMindChild,
+  addMindSibling,
+  canCollapseMindNode,
+  canIndentMindNode,
+  canOutdentMindNode,
+  indentMindNode,
+  isMindCollapsed,
+  isMindNode,
+  outdentMindNode,
+  setMindCollapsed
+} from '../shapes/mindmap.js'
 import DrawingContextMenu from './DrawingContextMenu.vue'
 import EditorToolbar from './EditorToolbar.vue'
 import PropertyPanel from './PropertyPanel.vue'
@@ -113,7 +132,16 @@ const zoomLabel = ref('100%')
 const gridVisible = ref(true)
 const isEmpty = ref(true)
 const cellCount = ref(0)
-const menu = reactive({ visible: false, x: 0, y: 0 })
+const menu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  isMind: false,
+  canIndent: false,
+  canOutdent: false,
+  canCollapse: false,
+  isCollapsed: false
+})
 const graphState = { mode: 'select', edgeStyleId: 'manhattan' }
 const propState = reactive({
   hasSelection: false,
@@ -199,7 +227,7 @@ const fitContent = () => {
 
 const deleteSelection = () => {
   const cells = graph.value?.getSelectedCells() || []
-  if (cells.length) graph.value.removeCells(cells)
+  if (cells.length) removeDrawingCells(graph.value, cells)
 }
 
 const addNodeAtCenter = (item) => {
@@ -294,20 +322,29 @@ const closeMenu = () => {
 
 const openMenu = (event) => {
   event.preventDefault()
+  const cells = graph.value?.getSelectedCells() || []
+  const mindNode = cells.find((cell) => isMindNode(cell))
   menu.visible = true
   menu.x = event.clientX
   menu.y = event.clientY
+  menu.isMind = Boolean(mindNode)
+  menu.canIndent = mindNode ? canIndentMindNode(graph.value, mindNode) : false
+  menu.canOutdent = mindNode ? canOutdentMindNode(graph.value, mindNode) : false
+  menu.canCollapse = mindNode ? canCollapseMindNode(graph.value, mindNode) : false
+  menu.isCollapsed = mindNode ? isMindCollapsed(mindNode) : false
 }
 
 const onMenuAction = (action) => {
   const cells = graph.value?.getSelectedCells() || []
-  if (action === 'cut' && cells.length) graph.value.cut(cells)
-  if (action === 'copy' && cells.length) graph.value.copy(cells)
-  if (action === 'paste' && !graph.value.isClipboardEmpty()) graph.value.paste({ offset: 24 })
-  if (action === 'duplicate' && cells.length) {
-    graph.value.copy(cells)
-    graph.value.paste({ offset: 28 })
-  }
+  const mindNode = cells.find((cell) => isMindNode(cell))
+  if (action === 'addBranch' && mindNode) addMindChild(graph.value, mindNode, { type: 'topic-branch' })
+  if (action === 'addChild' && mindNode) addMindChild(graph.value, mindNode, { type: 'topic-child' })
+  if (action === 'addSibling' && mindNode) addMindSibling(graph.value, mindNode)
+  if (action === 'indent' && mindNode) indentMindNode(graph.value, mindNode)
+  if (action === 'outdent' && mindNode) outdentMindNode(graph.value, mindNode)
+  if (action === 'collapse' && mindNode) setMindCollapsed(graph.value, mindNode, true)
+  if (action === 'expand' && mindNode) setMindCollapsed(graph.value, mindNode, false)
+  if (action === 'duplicate') duplicateDrawingCells(graph.value)
   if (action === 'delete') deleteSelection()
   if (action === 'front') cells.forEach((cell) => cell.toFront())
   if (action === 'back') cells.forEach((cell) => cell.toBack())
@@ -351,7 +388,13 @@ onMounted(() => {
   created.graph.on('cell:removed', syncHistory)
   created.graph.on('selection:changed', refreshProps)
   created.graph.on('blank:contextmenu', ({ e }) => openMenu(e))
-  created.graph.on('cell:contextmenu', ({ e }) => openMenu(e))
+  created.graph.on('cell:contextmenu', ({ e, cell }) => {
+    if (cell && !created.graph.isSelected(cell)) {
+      created.graph.cleanSelection()
+      created.graph.select(cell)
+    }
+    openMenu(e)
+  })
   created.graph.on('blank:click', closeMenu)
   created.graph.on('cell:click', closeMenu)
   created.graph.container.setAttribute('tabindex', '-1')

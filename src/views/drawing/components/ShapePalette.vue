@@ -3,6 +3,7 @@
     <Transition name="picker">
       <div
         v-if="!showLibrary"
+        ref="pickerRef"
         class="palette-picker"
         @pointerenter="onPickerEnter"
         @pointerleave="onPickerLeave"
@@ -14,6 +15,7 @@
             type="button"
             class="rail-button"
             :class="{ active: openGroup === group.id }"
+            :data-group="group.id"
             :aria-label="t(`drawing.groups.${group.id}`)"
             @pointerenter="openGroupPanel(group.id)"
             @focus="openGroupPanel(group.id, true)"
@@ -24,7 +26,12 @@
         </div>
 
         <Transition name="flyout">
-          <section v-if="activeGroup" class="palette-flyout">
+          <section
+            v-if="activeGroup"
+            ref="flyoutRef"
+            class="palette-flyout"
+            :style="{ top: `${flyoutOffset}px` }"
+          >
             <header class="flyout-header">
               <strong>{{ t(`drawing.groups.${activeGroup.id}`) }}</strong>
             </header>
@@ -117,7 +124,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Boxes,
@@ -141,9 +148,12 @@ const emit = defineEmits(['add-node', 'drag-node', 'set-edge', 'action', 'insert
 
 const { t } = useI18n()
 const groups = PALETTE_GROUPS
+const pickerRef = ref(null)
+const flyoutRef = ref(null)
 const openGroup = ref(null)
 const openChild = ref('timeline')
 const showLibrary = ref(false)
+const flyoutOffset = ref(0)
 const tooltip = reactive({ visible: false, text: '', x: 0, y: 0 })
 let openTimer = 0
 let closeTimer = 0
@@ -191,10 +201,18 @@ const clearHoverTimers = () => {
   closeTimer = 0
 }
 
+const buttonOffset = (id) => {
+  const picker = pickerRef.value
+  const button = picker?.querySelector(`[data-group="${id}"]`)
+  if (!picker || !button) return 0
+  return Math.max(0, button.getBoundingClientRect().top - picker.getBoundingClientRect().top)
+}
+
 const openGroupPanel = (id, immediate = false) => {
   clearHoverTimers()
   if (id === 'advanced' && !openChild.value) openChild.value = 'timeline'
   const apply = () => {
+    flyoutOffset.value = Math.round(buttonOffset(id))
     openGroup.value = id
   }
   if (immediate || openGroup.value) {
@@ -234,6 +252,23 @@ const closeLibrary = () => {
 
 watch(showLibrary, (open) => {
   emit('library-change', open)
+})
+
+const alignFlyout = async () => {
+  await nextTick()
+  const picker = pickerRef.value
+  const flyout = flyoutRef.value
+  const button = picker?.querySelector('.rail-button.active')
+  if (!picker || !flyout || !button) return
+  const pickerRect = picker.getBoundingClientRect()
+  const buttonRect = button.getBoundingClientRect()
+  const maxTop = window.innerHeight - pickerRect.top - flyout.offsetHeight - 16
+  const top = Math.min(Math.max(0, buttonRect.top - pickerRect.top), Math.max(0, maxTop))
+  flyoutOffset.value = Math.round(top)
+}
+
+watch([openGroup, openChild, showLibrary], () => {
+  if (openGroup.value && !showLibrary.value) alignFlyout()
 })
 
 const showItemTooltip = (event, item) => {
@@ -312,12 +347,14 @@ const onKeyDown = (event) => {
 onMounted(() => {
   document.addEventListener('mousedown', onPointerDown)
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('resize', alignFlyout)
 })
 
 onBeforeUnmount(() => {
   clearHoverTimers()
   document.removeEventListener('mousedown', onPointerDown)
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('resize', alignFlyout)
 })
 </script>
 
@@ -336,9 +373,9 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 .palette-picker {
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
 }
 .palette-rail {
   display: flex;
@@ -370,7 +407,9 @@ onBeforeUnmount(() => {
   background: var(--accent-light);
 }
 .palette-flyout {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
   display: flex;
   flex-direction: column;
   width: 204px;

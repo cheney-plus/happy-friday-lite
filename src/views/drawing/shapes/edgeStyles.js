@@ -90,19 +90,6 @@ export const EDGE_STYLES = {
       }
     }
   },
-  association: {
-    router: { name: 'normal' },
-    connector: { name: 'normal' },
-    attrs: {
-      line: {
-        stroke: '#64748b',
-        strokeWidth: 1.4,
-        strokeDasharray: 0,
-        targetMarker: { name: 'classic', width: 12, height: 8 },
-        sourceMarker: null
-      }
-    }
-  },
   er: {
     router: { name: 'er' },
     connector: { name: 'rounded', args: { radius: 6 } },

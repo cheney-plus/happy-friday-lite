@@ -1,4 +1,5 @@
 import { Graph, Shape } from '@antv/x6'
+import { registerMindmap } from './mindmap.js'
 import { FONT_FAMILY } from './theme.js'
 import { SIDE_PORTS } from './ports.js'
 
@@ -209,37 +210,6 @@ export function registerDrawingShapes() {
     },
     true
   )
-
-  registerRect('draw-mind-root', {
-    width: 160,
-    height: 52,
-    rx: 26,
-    ry: 26,
-    body: { fill: '#2563eb', stroke: '#1d4ed8' },
-    label: { fill: '#ffffff', fontWeight: 600 }
-  })
-  registerRect('draw-mind-topic', {
-    width: 132,
-    height: 42,
-    rx: 12,
-    ry: 12,
-    body: { fill: '#eff6ff', stroke: '#3b82f6' }
-  })
-  registerRect('draw-mind-sub', {
-    width: 116,
-    height: 34,
-    rx: 8,
-    ry: 8,
-    body: { fill: '#ffffff', stroke: '#93c5fd' },
-    label: { fontSize: 12 }
-  })
-  registerRect('draw-mind-callout', {
-    width: 120,
-    height: 48,
-    rx: 18,
-    ry: 18,
-    body: { fill: '#fef3c7', stroke: '#f59e0b' }
-  })
 
   registerRect('draw-er-entity', {
     width: 160,
@@ -457,4 +427,6 @@ export function registerDrawingShapes() {
     ry: 0,
     body: { fill: '#f8fafc', stroke: '#334155' }
   })
+
+  registerMindmap()
 }
