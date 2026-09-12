@@ -1,7 +1,12 @@
 <template>
   <div class="shape-palette" :class="{ 'is-library': showLibrary }" @mousedown.stop>
     <Transition name="picker">
-      <div v-if="!showLibrary" class="palette-picker">
+      <div
+        v-if="!showLibrary"
+        class="palette-picker"
+        @pointerenter="onPickerEnter"
+        @pointerleave="onPickerLeave"
+      >
         <div class="palette-rail">
           <button
             v-for="group in groups"
@@ -9,8 +14,10 @@
             type="button"
             class="rail-button"
             :class="{ active: openGroup === group.id }"
-            :title="t(`drawing.groups.${group.id}`)"
-            @click="toggleGroup(group.id)"
+            :aria-label="t(`drawing.groups.${group.id}`)"
+            @pointerenter="openGroupPanel(group.id)"
+            @focus="openGroupPanel(group.id, true)"
+            @click="openGroupPanel(group.id, true)"
           >
             <component :is="groupIcons[group.id]" :size="16" :stroke-width="1.8" />
           </button>
@@ -18,6 +25,9 @@
 
         <Transition name="flyout">
           <section v-if="activeGroup" class="palette-flyout">
+            <header class="flyout-header">
+              <strong>{{ t(`drawing.groups.${activeGroup.id}`) }}</strong>
+            </header>
             <div v-if="activeGroup.children" class="subtabs">
               <button
                 v-for="child in activeGroup.children"
@@ -131,10 +141,12 @@ const emit = defineEmits(['add-node', 'drag-node', 'set-edge', 'action', 'insert
 
 const { t } = useI18n()
 const groups = PALETTE_GROUPS
-const openGroup = ref('general')
+const openGroup = ref(null)
 const openChild = ref('timeline')
 const showLibrary = ref(false)
 const tooltip = reactive({ visible: false, text: '', x: 0, y: 0 })
+let openTimer = 0
+let closeTimer = 0
 
 const groupIcons = {
   general: Square,
@@ -172,14 +184,43 @@ const librarySections = computed(() => {
   return sections
 })
 
-const toggleGroup = (id) => {
-  openGroup.value = openGroup.value === id ? null : id
-  showLibrary.value = false
-  hideTooltip()
+const clearHoverTimers = () => {
+  window.clearTimeout(openTimer)
+  window.clearTimeout(closeTimer)
+  openTimer = 0
+  closeTimer = 0
+}
+
+const openGroupPanel = (id, immediate = false) => {
+  clearHoverTimers()
   if (id === 'advanced' && !openChild.value) openChild.value = 'timeline'
+  const apply = () => {
+    openGroup.value = id
+  }
+  if (immediate || openGroup.value) {
+    apply()
+    return
+  }
+  openTimer = window.setTimeout(apply, 80)
+}
+
+const onPickerEnter = () => {
+  window.clearTimeout(closeTimer)
+  closeTimer = 0
+}
+
+const onPickerLeave = (event) => {
+  if (event.pointerType === 'touch') return
+  window.clearTimeout(openTimer)
+  openTimer = 0
+  closeTimer = window.setTimeout(() => {
+    openGroup.value = null
+    hideTooltip()
+  }, 180)
 }
 
 const openLibrary = () => {
+  clearHoverTimers()
   showLibrary.value = true
   hideTooltip()
 }
@@ -187,7 +228,7 @@ const openLibrary = () => {
 const closeLibrary = () => {
   if (!showLibrary.value) return
   showLibrary.value = false
-  openGroup.value = 'general'
+  openGroup.value = null
   hideTooltip()
 }
 
@@ -254,6 +295,7 @@ const onPointerDown = (event) => {
   if (showLibrary.value) return
   const target = event.target
   if (typeof target?.closest !== 'function' || target.closest('.shape-palette')) return
+  clearHoverTimers()
   openGroup.value = null
   hideTooltip()
 }
@@ -273,6 +315,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearHoverTimers()
   document.removeEventListener('mousedown', onPointerDown)
   window.removeEventListener('keydown', onKeyDown)
 })
@@ -283,6 +326,7 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 20;
   top: 72px;
+  bottom: 16px;
   left: 16px;
   pointer-events: none;
 }
@@ -326,11 +370,13 @@ onBeforeUnmount(() => {
   background: var(--accent-light);
 }
 .palette-flyout {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 204px;
   max-height: min(420px, calc(100vh - 160px));
   padding: 10px;
+  overflow-x: hidden;
   border: 1px solid var(--border-color);
   border-radius: 14px;
   background: color-mix(in srgb, var(--bg-primary) 96%, transparent);
@@ -338,13 +384,34 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(18px);
   outline: none;
 }
+.palette-flyout::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10px;
+  width: 10px;
+}
+.flyout-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+.flyout-header strong {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
 .palette-flyout.library {
   position: absolute;
   top: 0;
+  bottom: 0;
   left: 0;
   width: 212px;
-  height: min(680px, calc(100vh - 88px));
-  max-height: min(680px, calc(100vh - 88px));
+  height: auto;
+  max-height: none;
   padding: 8px 0 8px 10px;
 }
 .library-header {
@@ -375,7 +442,9 @@ onBeforeUnmount(() => {
 }
 .close-button:hover { background: var(--bg-hover); color: var(--text-primary); }
 .flyout-body {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 0;
   min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text-tertiary) 55%, transparent) transparent;
@@ -419,18 +488,20 @@ onBeforeUnmount(() => {
 .subtab.active { color: var(--accent-color); border-color: var(--accent-color); background: var(--accent-light); }
 .shape-grid {
   display: grid;
-  grid-template-columns: repeat(5, 32px);
-  gap: 4px 6px;
-  justify-content: space-between;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
 }
 .shape-item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 100%;
+  aspect-ratio: 1;
+  height: auto;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 0;
   border-radius: 8px;
   color: var(--text-secondary);

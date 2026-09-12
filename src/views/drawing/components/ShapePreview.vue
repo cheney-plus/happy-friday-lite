@@ -1,14 +1,32 @@
 <template>
   <span class="shape-preview" :class="[`is-${preview}`, { 'is-compact': compact }]" aria-hidden="true">
-    <i></i>
+    <svg v-if="path" class="shape-svg" viewBox="0 0 32 24">
+      <path :d="path" />
+    </svg>
+    <i v-else></i>
   </span>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   preview: { type: String, default: 'rect' },
   compact: { type: Boolean, default: false }
 })
+
+const SVG_PATHS = {
+  star: 'M16 3 L18.12 9.09 L24.56 9.22 L19.42 13.11 L21.29 19.28 L16 15.6 L10.71 19.28 L12.58 13.11 L7.44 9.22 L13.88 9.09 Z',
+  hexagon: 'M10.5 5 H21.5 L27 12 L21.5 19 H10.5 L5 12 Z',
+  diamond: 'M16 4.5 L25.5 12 L16 19.5 L6.5 12 Z',
+  triangle: 'M16 5 L26.5 19.5 H5.5 Z',
+  parallelogram: 'M10 6 H26 L22 18 H6 Z',
+  display: 'M8 6 H26 V18 H8 L4 12 Z',
+  note: 'M8 4 H20 L24 8 V20 H8 Z',
+  'er-ident': 'M16 4.5 L25.5 12 L16 19.5 L6.5 12 Z'
+}
+
+const path = computed(() => SVG_PATHS[props.preview] || '')
 </script>
 
 <style scoped>
@@ -18,11 +36,22 @@ defineProps({
   justify-content: center;
   width: 44px;
   height: 32px;
+  overflow: visible;
   color: inherit;
 }
 .shape-preview.is-compact {
   width: 32px;
   height: 24px;
+}
+.shape-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 .shape-preview i {
   display: block;
@@ -36,25 +65,14 @@ defineProps({
 .is-circle i { width: 18px; height: 18px; border-radius: 50%; }
 .is-ellipse i,
 .is-terminator i { width: 28px; height: 16px; border-radius: 10px; }
-.is-diamond i,
-.is-er-ident i { width: 18px; height: 18px; transform: rotate(45deg); border-radius: 1px; }
-.is-triangle i {
-  width: 0; height: 0; border: 0; background: transparent;
-  border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 16px solid currentColor;
-}
-.is-parallelogram i { width: 28px; height: 14px; transform: skewX(-18deg); }
-.is-hexagon i { width: 24px; height: 16px; border-radius: 3px; clip-path: polygon(20% 0, 80% 0, 100% 50%, 80% 100%, 20% 100%, 0 50%); }
-.is-star i { width: 18px; height: 18px; clip-path: polygon(50% 0, 61% 35%, 100% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 0 35%, 39% 35%); }
 .is-cloud i { width: 28px; height: 16px; border-radius: 12px; }
 .is-cylinder i { width: 18px; height: 22px; border-radius: 10px / 5px; }
 .is-document i { width: 20px; height: 22px; border-radius: 2px 2px 8px 8px; }
 .is-sticky i { width: 18px; height: 18px; border-radius: 2px; background: #fef3c7; border-color: #f59e0b; }
-.is-note i { width: 18px; height: 20px; clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 0 100%); }
 .is-text i { width: 26px; height: 2px; border: 0; background: currentColor; box-shadow: 0 6px 0 currentColor, 0 12px 0 currentColor; }
 .is-image i { width: 24px; height: 18px; border-style: dashed; border-radius: 3px; }
 .is-container i { width: 30px; height: 20px; border-style: dashed; border-radius: 4px; }
 .is-delay i { width: 24px; height: 16px; border-radius: 0 10px 10px 0; }
-.is-display i { width: 26px; height: 16px; clip-path: polygon(12% 0, 100% 0, 100% 100%, 12% 100%, 0 50%); }
 .is-manual i { width: 26px; height: 16px; transform: skewY(-8deg); }
 .is-mind-root i { width: 28px; height: 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent-color) 18%, transparent); border-color: var(--accent-color); }
 .is-mind-topic i { width: 26px; height: 12px; border-radius: 6px; }
