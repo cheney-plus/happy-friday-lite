@@ -60,6 +60,7 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDrawingStore } from '@/store'
 import { useTheme } from '@/utils/theme'
 import { applyCellAnimation } from '../shapes/animation.js'
 import { getCanvasTheme } from '../shapes/theme.js'
@@ -103,6 +104,7 @@ const props = defineProps({
 const emit = defineEmits(['change', 'library-change'])
 const { t } = useI18n()
 const { appliedTheme } = useTheme()
+const drawingStore = useDrawingStore()
 
 function toColorInput(value, fallback) {
   if (typeof value === 'string' && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(value)) {
@@ -186,7 +188,9 @@ const refreshProps = () => {
   if (!cell) return
   propState.isNode = cell.isNode()
   propState.isEdge = cell.isEdge()
-  propState.label = cell.isNode() ? cell.attr('label/text') || cell.attr('text/text') || '' : ''
+  propState.label = cell.isNode()
+    ? cell.attr('label/text') || cell.attr('text/text') || ''
+    : cell.getLabels?.()[0]?.attrs?.label?.text || ''
   propState.fill = toColorInput(cell.attr('body/fill'), '#ffffff')
   propState.stroke = toColorInput(
     cell.isEdge() ? cell.attr('line/stroke') : cell.attr('body/stroke'),
@@ -277,7 +281,25 @@ const onAnimationAction = (type) => {
 }
 
 const onInsertTemplate = (name) => {
-  if (graph.value) insertTemplate(graph.value, name)
+  if (!graph.value) return
+  const sourceCanvas = name === 'flowchart'
+    ? drawingStore.canvases.find((canvas) => (
+      canvas.id === 'flowchart'
+      || canvas.titleKey === 'flowchart'
+      || canvas.title === t('drawing.canvas.flowchart')
+    ))
+    : name === 'er'
+      ? drawingStore.canvases.find((canvas) => (
+        canvas.id === 'er'
+        || canvas.titleKey === 'er'
+        || canvas.title === t('drawing.groups.er')
+      ))
+      : null
+  const rawSource = sourceCanvas
+    ? (sourceCanvas.id === props.canvas.id ? graph.value.toJSON() : sourceCanvas.graphJSON)
+    : null
+  const source = rawSource?.cells?.length ? JSON.parse(JSON.stringify(rawSource)) : null
+  insertTemplate(graph.value, name, source)
 }
 
 const onImagePicked = (event) => {
@@ -307,6 +329,26 @@ const updateSelection = (patch) => {
       cell.attr('label/text', patch.label)
       if (cell.shape === 'draw-uml-class') {
         cell.setData({ ...(cell.getData() || {}), className: patch.label })
+      }
+    }
+    if (patch.label != null && cell.isEdge()) {
+      const text = patch.label.trim()
+      if (!text) {
+        cell.setLabels([])
+      } else {
+        const currentLabel = cell.getLabels?.()[0] || {}
+        cell.setLabels([{
+          ...currentLabel,
+          position: currentLabel.position ?? 0.5,
+          attrs: {
+            ...currentLabel.attrs,
+            label: {
+              ...currentLabel.attrs?.label,
+              text,
+              fontSize: currentLabel.attrs?.label?.fontSize || 11
+            }
+          }
+        }])
       }
     }
     if (patch.fill != null && cell.isNode()) cell.attr('body/fill', patch.fill)

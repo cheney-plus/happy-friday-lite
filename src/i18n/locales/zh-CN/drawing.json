@@ -125,6 +125,7 @@
     "erRel": "关系",
     "erIdent": "标识关系",
     "erLine": "ER 连线",
+    "umlTemplate": "插入 UML 类图",
     "umlClass": "类",
     "umlInterface": "接口",
     "umlActor": "参与者",

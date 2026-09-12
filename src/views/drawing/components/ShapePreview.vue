@@ -47,6 +47,62 @@
       <rect class="anim-shape" x="11.5" y="6" width="3.6" height="12" rx="1" />
       <rect class="anim-shape" x="16.9" y="6" width="3.6" height="12" rx="1" />
     </svg>
+    <svg v-else-if="preview === 'tpl-mind'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <path d="M20 15 H29 M29 15 V6 M29 15 V24" />
+      <rect x="4" y="10" width="16" height="10" rx="3" class="template-accent" />
+      <rect x="30" y="2" width="14" height="8" rx="2" />
+      <rect x="30" y="11" width="14" height="8" rx="2" />
+      <rect x="30" y="20" width="14" height="8" rx="2" />
+    </svg>
+    <svg v-else-if="preview === 'tpl-flow'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <path d="M24 7 V10 M24 20 V23" class="template-link" />
+      <rect x="15" y="2" width="18" height="6" rx="3" class="template-accent" />
+      <rect x="15" y="11" width="18" height="8" rx="1.5" />
+      <path d="M24 21 L30 25 L24 29 L18 25 Z" />
+    </svg>
+    <svg v-else-if="preview === 'tpl-er'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <path d="M16 15 H20 M28 15 H32 M8 22 L14 18 M40 22 L34 18" class="template-link" />
+      <rect x="2" y="10" width="14" height="10" rx="1.5" class="template-accent" />
+      <path d="M24 9 L29 15 L24 21 L19 15 Z" />
+      <rect x="32" y="10" width="14" height="10" rx="1.5" />
+      <ellipse cx="8" cy="25" rx="6" ry="3" />
+      <ellipse cx="40" cy="25" rx="6" ry="3" />
+    </svg>
+    <svg v-else-if="preview === 'tpl-uml'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <path d="M18 15 H30" class="template-link" />
+      <rect x="2" y="5" width="16" height="20" rx="1" class="template-accent" />
+      <path d="M2 11 H18 M2 18 H18" />
+      <rect x="30" y="5" width="16" height="20" rx="1" />
+      <path d="M30 11 H46 M30 18 H46" />
+    </svg>
+    <svg v-else-if="preview === 'tpl-timeline'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <path d="M4 16 H44" class="template-link" />
+      <circle cx="11" cy="16" r="2.5" class="template-accent" />
+      <circle cx="24" cy="16" r="2.5" />
+      <circle cx="37" cy="16" r="2.5" />
+      <rect x="5" y="4" width="12" height="6" rx="1" />
+      <rect x="31" y="21" width="12" height="6" rx="1" />
+    </svg>
+    <svg v-else-if="preview === 'tpl-seq'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <rect x="3" y="2" width="10" height="5" rx="1" class="template-accent" />
+      <rect x="19" y="2" width="10" height="5" rx="1" />
+      <rect x="35" y="2" width="10" height="5" rx="1" />
+      <path d="M8 8 V28 M24 8 V28 M40 8 V28" class="template-dash" />
+      <path d="M8 13 H22 M24 19 H38" class="template-link" />
+    </svg>
+    <svg v-else-if="preview === 'tpl-arch'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <path d="M24 8 V13 M24 17 V22 M12 22 H36" class="template-link" />
+      <rect x="17" y="2" width="14" height="6" rx="2" class="template-accent" />
+      <rect x="17" y="12" width="14" height="6" rx="2" />
+      <rect x="5" y="22" width="14" height="6" rx="2" />
+      <rect x="29" y="22" width="14" height="6" rx="2" />
+    </svg>
+    <svg v-else-if="preview === 'tpl-dfd'" class="shape-svg is-template" viewBox="0 0 48 30">
+      <path d="M15 15 H20 M28 15 H33" class="template-link" />
+      <rect x="2" y="10" width="13" height="10" rx="1" class="template-accent" />
+      <circle cx="24" cy="15" r="5" />
+      <path d="M33 10 H46 M33 20 H46" />
+    </svg>
     <i v-else></i>
   </span>
 </template>
@@ -176,6 +232,10 @@ const linePreview = computed(() => LINE_PREVIEWS[props.preview] || null)
   fill: currentColor;
   stroke: none;
 }
+.shape-svg.is-template { fill: color-mix(in srgb, var(--bg-primary) 78%, transparent); stroke-width: 1.3; }
+.shape-svg.is-template .template-accent { fill: color-mix(in srgb, var(--accent-color) 18%, var(--bg-primary)); stroke: var(--accent-color); }
+.shape-svg.is-template .template-link { fill: none; stroke: currentColor; stroke-width: 1.35; }
+.shape-svg.is-template .template-dash { fill: none; stroke-dasharray: 2 2; }
 .shape-preview i {
   display: block;
   box-sizing: border-box;
@@ -221,11 +281,4 @@ const linePreview = computed(() => LINE_PREVIEWS[props.preview] || null)
 .is-arch-gateway i { width: 28px; height: 14px; border-radius: 6px; }
 .is-dfd-ext i { width: 26px; height: 16px; border-width: 2px; }
 .is-dfd-store i { width: 28px; height: 12px; border-left-width: 3px; border-right-width: 3px; }
-.is-tpl-mind i,
-.is-tpl-flow i,
-.is-tpl-er i,
-.is-tpl-timeline i,
-.is-tpl-seq i,
-.is-tpl-arch i,
-.is-tpl-dfd i { width: 28px; height: 18px; border-style: dashed; border-radius: 4px; }
 </style>

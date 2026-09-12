@@ -84,6 +84,7 @@ export const PALETTE_GROUPS = [
   {
     id: 'uml',
     items: [
+      { id: 'umlTemplate', kind: 'template', template: 'uml', preview: 'tpl-uml' },
       { id: 'umlClass', kind: 'node', shape: 'draw-uml-class', preview: 'uml-class', width: 200, height: 148, defaultLabel: 'Class', data: { className: 'Class', attributes: '+ id: string', methods: '+ save(): void' } },
       { id: 'umlInterface', kind: 'node', shape: 'draw-uml-interface', preview: 'rounded', width: 160, height: 56, defaultLabel: '«interface»' },
       { id: 'umlActor', kind: 'node', shape: 'draw-uml-actor', preview: 'actor', width: 64, height: 108, defaultLabel: 'Actor' },

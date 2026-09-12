@@ -125,6 +125,7 @@
     "erRel": "Relationship",
     "erIdent": "Identifying",
     "erLine": "ER connector",
+    "umlTemplate": "Insert UML class diagram",
     "umlClass": "Class",
     "umlInterface": "Interface",
     "umlActor": "Actor",

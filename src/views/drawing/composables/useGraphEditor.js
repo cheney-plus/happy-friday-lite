@@ -1,10 +1,10 @@
 import {
-  Clipboard,
   Dnd,
   Export,
   Graph,
   History,
   Keyboard,
+  Model,
   MiniMap,
   Selection,
   Snapline,
@@ -26,6 +26,10 @@ import {
 import { registerDrawingShapes } from '../shapes/register.js'
 import { cloneTemplateAt, TEMPLATE_BUILDERS } from '../shapes/templates.js'
 import { getCanvasTheme } from '../shapes/theme.js'
+
+// Graph instances are recreated whenever the active canvas changes. Keep the
+// serialized cells at module scope so copy/paste works between canvases.
+const drawingClipboard = { cells: [] }
 
 export function createDrawingGraph(container, minimapContainer, state) {
   registerDrawingShapes()
@@ -114,7 +118,6 @@ export function createDrawingGraph(container, minimapContainer, state) {
     )
     .use(new Snapline({ enabled: true }))
     .use(new Keyboard({ enabled: true, global: false }))
-    .use(new Clipboard({ enabled: true }))
     .use(new History({ enabled: true }))
     .use(
       new Transform({
@@ -196,7 +199,8 @@ export function removeDrawingCells(graph, cells) {
 export function copyDrawingCells(graph, cells) {
   if (!graph || !cells?.length) return
   const bundle = prepareMindClipboard(graph, cells)
-  graph.copy(bundle)
+  const cloned = Object.values(graph.cloneSubGraph(bundle))
+  drawingClipboard.cells = cloned.map((cell) => cell.toJSON())
   restoreMindClipboardSource(bundle)
 }
 
@@ -207,11 +211,19 @@ export function cutDrawingCells(graph, cells) {
 }
 
 export function pasteDrawingCells(graph, offset = 24) {
-  if (!graph || graph.isClipboardEmpty()) return []
-  const pasted = graph.paste({ offset })
+  if (!graph || !drawingClipboard.cells.length) return []
+  const cells = Model.fromJSON({ cells: drawingClipboard.cells })
+  const pasted = Object.values(graph.cloneCells(cells))
+  pasted.forEach((cell) => cell.translate(offset, offset))
+  const nodes = pasted.filter((cell) => cell.isNode())
+  const edges = pasted.filter((cell) => cell.isEdge())
+  graph.model.batchUpdate('paste', () => {
+    graph.addNodes(nodes)
+    graph.addEdges(edges)
+  })
   remapPastedMindCells(graph, pasted)
   const alive = (pasted || []).filter((cell) => graph.getCellById(cell.id))
-  if (alive.length) graph.copy(alive)
+  if (alive.length) copyDrawingCells(graph, alive)
   return pasted
 }
 
@@ -307,17 +319,34 @@ export function startCatalogDrag(graph, dnd, item, event, extra = {}) {
   dnd.start(node, event)
 }
 
-export function insertTemplate(graph, name) {
+export function insertTemplate(graph, name, source = null) {
   const builder = TEMPLATE_BUILDERS[name]
-  if (!builder) return
+  if (!builder && !source) return
   const bbox = graph.getCells().length ? graph.getContentBBox() : null
   const dx = bbox ? Math.round(bbox.x + bbox.width + 80) : 0
   const dy = bbox ? Math.round(bbox.y) : 0
-  const data = cloneTemplateAt(builder(), dx, dy)
+  const template = source ? normalizeTemplateSource(source) : builder()
+  const data = cloneTemplateAt(template, dx, dy)
   const nodes = data.cells.filter((cell) => !cell.source && !cell.target)
   const edges = data.cells.filter((cell) => cell.source || cell.target)
   if (nodes.length) graph.addNodes(nodes)
   if (edges.length) graph.addEdges(edges)
+}
+
+function normalizeTemplateSource(source) {
+  const cells = Array.isArray(source?.cells)
+    ? source.cells
+    : [...(source?.nodes || []), ...(source?.edges || [])]
+  return {
+    cells: cells.map((cell) => {
+      if (cell.source || cell.target || cell.x != null || !cell.position) return cell
+      return {
+        ...cell,
+        x: cell.position.x,
+        y: cell.position.y
+      }
+    })
+  }
 }
 
 export function applyAnimationToSelection(graph, type) {

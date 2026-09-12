@@ -2,7 +2,7 @@
   <aside v-if="hasSelection" class="property-panel" @mousedown.stop>
     <header>{{ t('drawing.props.title') }}</header>
 
-    <label v-if="isNode">
+    <label v-if="isNode || isEdge">
       <span>{{ t('drawing.props.label') }}</span>
       <input :value="label" type="text" @change="$emit('update', { label: $event.target.value })" />
     </label>

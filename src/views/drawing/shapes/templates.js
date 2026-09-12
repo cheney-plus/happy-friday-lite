@@ -83,26 +83,26 @@ export function createMindMapTemplate(ox = 80, oy = 80) {
 }
 
 export function createFlowchartTemplate(ox = 120, oy = 40) {
-  const start = node('draw-terminator', ox + 80, oy, 128, 52, '开始')
-  const process = node('draw-process', ox + 74, oy + 110, 140, 56, '处理请求')
-  const decision = node('draw-decision', ox + 70, oy + 210, 148, 92, '是否通过?')
-  const ok = node('draw-process', ox + 280, oy + 226, 140, 56, '完成任务')
-  const fail = node('draw-document', ox - 90, oy + 226, 130, 86, '记录问题')
-  const end = node('draw-terminator', ox + 80, oy + 360, 128, 52, '结束')
+  const start = node('draw-terminator', ox + 106, oy, 128, 52, '开始')
+  const intake = node('draw-process', ox + 100, oy + 92, 140, 56, '接收申请')
+  const review = node('draw-decision', ox + 96, oy + 190, 148, 92, '资料完整?')
+  const complete = node('draw-process', ox + 330, oy + 208, 140, 56, '创建记录')
+  const notify = node('draw-document', ox - 105, oy + 198, 130, 86, '补充材料')
+  const end = node('draw-terminator', ox + 336, oy + 338, 128, 52, '完成')
   return {
     cells: [
       start,
-      process,
-      decision,
-      ok,
-      fail,
+      intake,
+      review,
+      complete,
+      notify,
       end,
-      edge({ cell: start.id }, { cell: process.id }, 'manhattan'),
-      edge({ cell: process.id }, { cell: decision.id }, 'manhattan'),
-      edge({ cell: decision.id }, { cell: ok.id }, 'manhattan', { label: '是' }),
-      edge({ cell: decision.id }, { cell: fail.id }, 'manhattan', { label: '否' }),
-      edge({ cell: ok.id }, { cell: end.id }, 'manhattan'),
-      edge({ cell: fail.id }, { cell: end.id }, 'manhattan')
+      edge({ cell: start.id }, { cell: intake.id }, 'manhattan'),
+      edge({ cell: intake.id }, { cell: review.id }, 'manhattan'),
+      edge({ cell: review.id }, { cell: complete.id }, 'manhattan', { label: '是' }),
+      edge({ cell: review.id }, { cell: notify.id }, 'manhattan', { label: '否' }),
+      edge({ cell: notify.id }, { cell: intake.id }, 'manhattan', { label: '补充后提交' }),
+      edge({ cell: complete.id }, { cell: end.id }, 'manhattan')
     ]
   }
 }
@@ -128,22 +128,61 @@ export function createKanbanTemplate(ox = 40, oy = 40) {
 }
 
 export function createErTemplate(ox = 40, oy = 80) {
-  const user = node('draw-er-entity', ox, oy + 40, 160, 88, '用户')
-  const rel = node('draw-er-rel', ox + 210, oy + 40, 140, 88, '拥有')
-  const order = node('draw-er-entity', ox + 400, oy + 40, 160, 88, '订单')
-  const key = node('draw-er-key', ox, oy + 180, 120, 52, 'user_id')
-  const attr = node('draw-er-attr', ox + 420, oy + 180, 120, 52, 'amount')
+  const customer = node('draw-er-entity', ox, oy + 116, 160, 88, '客户')
+  const places = node('draw-er-rel', ox + 220, oy + 116, 140, 88, '下单')
+  const order = node('draw-er-entity', ox + 440, oy + 116, 160, 88, '订单')
+  const contains = node('draw-er-rel', ox + 650, oy + 116, 140, 88, '包含')
+  const product = node('draw-er-entity', ox + 870, oy + 116, 160, 88, '商品')
+  const customerKey = node('draw-er-key', ox + 10, oy + 270, 120, 52, 'customer_id')
+  const orderKey = node('draw-er-key', ox + 450, oy + 270, 120, 52, 'order_id')
+  const orderAmount = node('draw-er-attr', ox + 600, oy + 270, 120, 52, 'total')
+  const productKey = node('draw-er-key', ox + 880, oy + 270, 120, 52, 'product_id')
+  const quantity = node('draw-er-attr', ox + 740, oy + 10, 120, 52, 'quantity')
   return {
     cells: [
-      user,
-      rel,
+      customer,
+      places,
       order,
-      key,
-      attr,
-      edge({ cell: user.id }, { cell: rel.id }, 'er'),
-      edge({ cell: rel.id }, { cell: order.id }, 'er'),
-      edge({ cell: user.id }, { cell: key.id }, 'er'),
-      edge({ cell: order.id }, { cell: attr.id }, 'er')
+      contains,
+      product,
+      customerKey,
+      orderKey,
+      orderAmount,
+      productKey,
+      quantity,
+      edge({ cell: customer.id }, { cell: places.id }, 'er', { label: '1' }),
+      edge({ cell: places.id }, { cell: order.id }, 'er', { label: 'N' }),
+      edge({ cell: order.id }, { cell: contains.id }, 'er', { label: 'N' }),
+      edge({ cell: contains.id }, { cell: product.id }, 'er', { label: '1' }),
+      edge({ cell: customer.id }, { cell: customerKey.id }, 'er'),
+      edge({ cell: order.id }, { cell: orderKey.id }, 'er'),
+      edge({ cell: order.id }, { cell: orderAmount.id }, 'er'),
+      edge({ cell: product.id }, { cell: productKey.id }, 'er'),
+      edge({ cell: contains.id }, { cell: quantity.id }, 'er')
+    ]
+  }
+}
+
+export function createUmlTemplate(ox = 80, oy = 60) {
+  const order = node('draw-uml-class', ox, oy + 120, 200, 148, 'Order', {
+    data: { className: 'Order', attributes: '+ id: UUID\n+ status: OrderStatus\n+ total: Money', methods: '+ submit(): void\n+ cancel(): void' }
+  })
+  const item = node('draw-uml-class', ox + 330, oy + 120, 200, 148, 'OrderItem', {
+    data: { className: 'OrderItem', attributes: '+ quantity: number\n+ price: Money', methods: '+ subtotal(): Money' }
+  })
+  const service = node('draw-uml-interface', ox + 165, oy, 160, 56, '«interface»\nOrderRepository')
+  const product = node('draw-uml-class', ox + 660, oy + 120, 200, 148, 'Product', {
+    data: { className: 'Product', attributes: '+ sku: string\n+ name: string', methods: '+ isAvailable(): boolean' }
+  })
+  return {
+    cells: [
+      order,
+      item,
+      service,
+      product,
+      edge({ cell: order.id }, { cell: item.id }, 'arrow', { label: '1   *' }),
+      edge({ cell: item.id }, { cell: product.id }, 'arrow', { label: '*   1' }),
+      edge({ cell: order.id }, { cell: service.id }, 'dashed', { label: 'uses' })
     ]
   }
 }
@@ -219,6 +258,7 @@ export const TEMPLATE_BUILDERS = {
   flowchart: createFlowchartTemplate,
   kanban: createKanbanTemplate,
   er: createErTemplate,
+  uml: createUmlTemplate,
   timeline: createTimelineTemplate,
   sequence: createSequenceTemplate,
   architecture: createArchitectureTemplate,
