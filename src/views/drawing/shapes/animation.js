@@ -12,13 +12,15 @@ function stopCellAnimations(cell) {
 
 export function applyCellAnimation(cell, type) {
   stopCellAnimations(cell)
-  const data = { ...(cell.getData() || {}), animation: type || 'none' }
+  const allowed = cell.isEdge() ? ['none', 'flow'] : ['none', 'pulse', 'breathe', 'bounce']
+  const animation = allowed.includes(type) ? type : 'none'
+  const data = { ...(cell.getData() || {}), animation }
   cell.setData(data)
 
-  if (!type || type === 'none') return
+  if (animation === 'none') return
 
   if (cell.isEdge()) {
-    if (type === 'flow' || type === 'pulse') {
+    if (animation === 'flow') {
       const dash = cell.attr('line/strokeDasharray') || 0
       if (!dash || dash === 0 || dash === '0') {
         cell.attr('line/strokeDasharray', 8)

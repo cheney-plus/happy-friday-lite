@@ -156,7 +156,7 @@ const propState = reactive({
   isEdge: false,
   label: '',
   fill: '#ffffff',
-  stroke: '#94a3b8',
+  textColor: '#1c1917',
   strokeWidth: 1.5,
   fontSize: 13,
   animation: 'none'
@@ -192,10 +192,9 @@ const refreshProps = () => {
     ? cell.attr('label/text') || cell.attr('text/text') || ''
     : cell.getLabels?.()[0]?.attrs?.label?.text || ''
   propState.fill = toColorInput(cell.attr('body/fill'), '#ffffff')
-  propState.stroke = toColorInput(
-    cell.isEdge() ? cell.attr('line/stroke') : cell.attr('body/stroke'),
-    cell.isEdge() ? '#64748b' : '#94a3b8'
-  )
+  propState.textColor = cell.isEdge()
+    ? toColorInput(cell.getLabels?.()[0]?.attrs?.label?.fill || cell.getData()?.labelColor, '#1c1917')
+    : toColorInput(cell.attr('label/fill'), '#1c1917')
   propState.strokeWidth = Number(cell.isEdge() ? cell.attr('line/strokeWidth') : cell.attr('body/strokeWidth')) || 1.5
   propState.fontSize = Number(cell.attr('label/fontSize')) || 13
   propState.animation = cell.getData()?.animation || 'none'
@@ -345,17 +344,32 @@ const updateSelection = (patch) => {
             label: {
               ...currentLabel.attrs?.label,
               text,
-              fontSize: currentLabel.attrs?.label?.fontSize || 11
+              fontSize: currentLabel.attrs?.label?.fontSize || 11,
+              fill: currentLabel.attrs?.label?.fill || cell.getData()?.labelColor || '#1c1917'
             }
           }
         }])
       }
     }
-    if (patch.fill != null && cell.isNode()) cell.attr('body/fill', patch.fill)
-    if (patch.stroke != null) {
-      if (cell.isEdge()) cell.attr('line/stroke', patch.stroke)
-      else cell.attr('body/stroke', patch.stroke)
+    if (patch.textColor != null) {
+      if (cell.isEdge()) {
+        const data = cell.getData() || {}
+        cell.setData({ ...data, labelColor: patch.textColor })
+        const currentLabel = cell.getLabels?.()[0]
+        if (currentLabel) {
+          cell.setLabels([{
+            ...currentLabel,
+            attrs: {
+              ...currentLabel.attrs,
+              label: { ...currentLabel.attrs?.label, fill: patch.textColor }
+            }
+          }])
+        }
+      } else {
+        cell.attr('label/fill', patch.textColor)
+      }
     }
+    if (patch.fill != null && cell.isNode()) cell.attr('body/fill', patch.fill)
     if (patch.strokeWidth != null) {
       if (cell.isEdge()) cell.attr('line/strokeWidth', patch.strokeWidth)
       else cell.attr('body/strokeWidth', patch.strokeWidth)

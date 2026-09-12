@@ -9,12 +9,50 @@
 
     <label v-if="isNode">
       <span>{{ t('drawing.props.fill') }}</span>
-      <input :value="fill" type="color" @input="$emit('update', { fill: $event.target.value })" />
+      <div class="color-picker">
+        <button
+          v-for="color in fillColors"
+          :key="`fill-${color.value}`"
+          type="button"
+          class="color-swatch"
+          :class="{ selected: fill.toLowerCase() === color.value }"
+          :style="{ backgroundColor: color.value }"
+          :title="t(`drawing.colors.${color.name}`)"
+          :aria-label="t(`drawing.colors.${color.name}`)"
+          @click="$emit('update', { fill: color.value })"
+        ></button>
+        <input
+          :value="fill"
+          type="color"
+          :title="t('drawing.colors.custom')"
+          :aria-label="t('drawing.colors.custom')"
+          @input="$emit('update', { fill: $event.target.value })"
+        />
+      </div>
     </label>
 
     <label>
-      <span>{{ t('drawing.props.stroke') }}</span>
-      <input :value="stroke" type="color" @input="$emit('update', { stroke: $event.target.value })" />
+      <span>{{ t('drawing.props.textColor') }}</span>
+      <div class="color-picker">
+        <button
+          v-for="color in textColors"
+          :key="color.value"
+          type="button"
+          class="color-swatch"
+          :class="{ selected: textColor.toLowerCase() === color.value }"
+          :style="{ backgroundColor: color.value }"
+          :title="t(`drawing.colors.${color.name}`)"
+          :aria-label="t(`drawing.colors.${color.name}`)"
+          @click="$emit('update', { textColor: color.value })"
+        ></button>
+        <input
+          :value="textColor"
+          type="color"
+          :title="t('drawing.colors.custom')"
+          :aria-label="t('drawing.colors.custom')"
+          @input="$emit('update', { textColor: $event.target.value })"
+        />
+      </div>
     </label>
 
     <label>
@@ -31,10 +69,10 @@
       <span>{{ t('drawing.props.animation') }}</span>
       <select :value="animation" @change="$emit('update', { animation: $event.target.value })">
         <option value="none">{{ t('drawing.shapes.stopAnim') }}</option>
-        <option v-if="!isEdge" value="pulse">{{ t('drawing.shapes.pulse') }}</option>
-        <option v-if="!isEdge" value="breathe">{{ t('drawing.shapes.breathe') }}</option>
-        <option v-if="!isEdge" value="bounce">{{ t('drawing.shapes.bounce') }}</option>
-        <option value="flow">{{ t('drawing.shapes.flow') }}</option>
+        <option v-if="isNode" value="pulse">{{ t('drawing.shapes.pulse') }}</option>
+        <option v-if="isNode" value="breathe">{{ t('drawing.shapes.breathe') }}</option>
+        <option v-if="isNode" value="bounce">{{ t('drawing.shapes.bounce') }}</option>
+        <option v-if="isEdge" value="flow">{{ t('drawing.shapes.flow') }}</option>
       </select>
     </label>
   </aside>
@@ -49,7 +87,7 @@ defineProps({
   isEdge: { type: Boolean, default: false },
   label: { type: String, default: '' },
   fill: { type: String, default: '#ffffff' },
-  stroke: { type: String, default: '#94a3b8' },
+  textColor: { type: String, default: '#1c1917' },
   strokeWidth: { type: Number, default: 1.5 },
   fontSize: { type: Number, default: 13 },
   animation: { type: String, default: 'none' }
@@ -57,6 +95,29 @@ defineProps({
 
 defineEmits(['update'])
 const { t } = useI18n()
+
+const fillColors = [
+  { name: 'macaronPink', value: '#ffd6e7' },
+  { name: 'macaronYellow', value: '#ffe5b4' },
+  { name: 'macaronGreen', value: '#cdeccf' },
+  { name: 'macaronBlue', value: '#cfe8ff' },
+  { name: 'macaronPurple', value: '#e6d7ff' },
+  { name: 'paleYellow', value: '#fff7cc' },
+  { name: 'paleTeal', value: '#d6f5ee' },
+  { name: 'lightGray', value: '#f1f2f4' },
+  { name: 'white', value: '#ffffff' }
+]
+
+const textColors = [
+  { name: 'black', value: '#1c1917' },
+  { name: 'charcoal', value: '#374151' },
+  { name: 'slate', value: '#4b5563' },
+  { name: 'navy', value: '#1e3a8a' },
+  { name: 'darkGreen', value: '#166534' },
+  { name: 'darkRed', value: '#991b1b' },
+  { name: 'darkPurple', value: '#581c87' },
+  { name: 'darkTeal', value: '#0f766e' }
+]
 </script>
 
 <style scoped>
@@ -84,9 +145,25 @@ const { t } = useI18n()
   color: var(--text-primary);
   background: var(--bg-primary);
 }
-.property-panel input[type='color'] {
-  width: 100%;
-  height: 32px;
+.color-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 20px);
+  gap: 6px;
+  align-items: center;
+}
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(28, 25, 23, .16);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.color-swatch:hover { transform: scale(1.12); }
+.color-swatch.selected { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+.color-picker input[type='color'] {
+  width: 20px;
+  height: 20px;
   padding: 2px;
   border: 1px solid var(--border-color);
   border-radius: 8px;

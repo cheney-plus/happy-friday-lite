@@ -166,6 +166,7 @@ const PRESERVE_STYLE_PREFIXES = [
   'draw-dfd-',
   'draw-sticky',
   'draw-note',
+  'draw-text',
   'draw-image',
   'draw-seq-activation',
   'draw-tl-milestone'
