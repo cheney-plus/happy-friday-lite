@@ -55,7 +55,7 @@
                   :key="item.id"
                   type="button"
                   class="shape-item"
-                  :class="{ selected: item.kind === 'edge' && item.style === edgeStyleId }"
+                  :class="{ selected: item.kind === 'edge' && item.style === props.edgeStyleId }"
                   @mousedown="onItemMouseDown($event, item)"
                   @click="onItemClick(item)"
                   @mouseenter="showItemTooltip($event, item)"
@@ -97,7 +97,7 @@
                 :key="item.id"
                 type="button"
                 class="shape-item"
-                :class="{ selected: item.kind === 'edge' && item.style === edgeStyleId }"
+                :class="{ selected: item.kind === 'edge' && item.style === props.edgeStyleId }"
                 @mousedown="onItemMouseDown($event, item)"
                 @click="onItemClick(item)"
                 @mouseenter="showItemTooltip($event, item)"
@@ -140,7 +140,7 @@ import {
 import { PALETTE_GROUPS } from '../shapes/catalog.js'
 import ShapePreview from './ShapePreview.vue'
 
-defineProps({
+const props = defineProps({
   edgeStyleId: { type: String, default: 'manhattan' }
 })
 
@@ -314,7 +314,7 @@ const onItemClick = (item) => {
     emit('add-node', item)
     return
   }
-  if (item.kind === 'edge') emit('set-edge', item.style)
+  if (item.kind === 'edge') emit('set-edge', item.style === props.edgeStyleId ? null : item.style)
   if (item.kind === 'action') emit('action', item.action)
   if (item.kind === 'template') emit('insert-template', item.template)
 }

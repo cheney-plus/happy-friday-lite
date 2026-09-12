@@ -27,34 +27,13 @@
       <input :value="fontSize" type="range" min="10" max="28" step="1" @input="$emit('update', { fontSize: Number($event.target.value) })" />
     </label>
 
-    <label v-if="isEdge">
-      <span>{{ t('drawing.props.router') }}</span>
-      <select :value="router" @change="$emit('update', { router: $event.target.value })">
-        <option value="normal">Normal</option>
-        <option value="orth">Orth</option>
-        <option value="manhattan">Manhattan</option>
-        <option value="er">ER</option>
-        <option value="metro">Metro</option>
-      </select>
-    </label>
-
-    <label v-if="isEdge">
-      <span>{{ t('drawing.props.connector') }}</span>
-      <select :value="connector" @change="$emit('update', { connector: $event.target.value })">
-        <option value="normal">Normal</option>
-        <option value="rounded">Rounded</option>
-        <option value="smooth">Smooth</option>
-        <option value="jumpover">Jumpover</option>
-      </select>
-    </label>
-
     <label>
       <span>{{ t('drawing.props.animation') }}</span>
       <select :value="animation" @change="$emit('update', { animation: $event.target.value })">
         <option value="none">{{ t('drawing.shapes.stopAnim') }}</option>
-        <option value="pulse">{{ t('drawing.shapes.pulse') }}</option>
-        <option value="breathe">{{ t('drawing.shapes.breathe') }}</option>
-        <option value="bounce">{{ t('drawing.shapes.bounce') }}</option>
+        <option v-if="!isEdge" value="pulse">{{ t('drawing.shapes.pulse') }}</option>
+        <option v-if="!isEdge" value="breathe">{{ t('drawing.shapes.breathe') }}</option>
+        <option v-if="!isEdge" value="bounce">{{ t('drawing.shapes.bounce') }}</option>
         <option value="flow">{{ t('drawing.shapes.flow') }}</option>
       </select>
     </label>
@@ -73,8 +52,6 @@ defineProps({
   stroke: { type: String, default: '#94a3b8' },
   strokeWidth: { type: Number, default: 1.5 },
   fontSize: { type: Number, default: 13 },
-  router: { type: String, default: 'manhattan' },
-  connector: { type: String, default: 'rounded' },
   animation: { type: String, default: 'none' }
 })
 

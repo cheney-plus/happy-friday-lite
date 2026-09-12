@@ -1,6 +1,10 @@
 <template>
   <div class="drawing-editor">
-    <div ref="containerRef" class="graph-container" :class="{ 'is-pan': mode === 'pan' }"></div>
+    <div
+      ref="containerRef"
+      class="graph-container"
+      :class="{ 'is-pan': mode === 'pan', 'is-edge-pending': edgePending }"
+    ></div>
     <div v-if="isEmpty" class="empty-hint">{{ t('drawing.canvas.emptyHint') }}</div>
 
     <EditorToolbar
@@ -126,6 +130,7 @@ let pendingImageItem = null
 
 const mode = ref('select')
 const edgeStyleId = ref('manhattan')
+const edgePending = ref(false)
 const canUndo = ref(false)
 const canRedo = ref(false)
 const zoomLabel = ref('100%')
@@ -152,8 +157,6 @@ const propState = reactive({
   stroke: '#94a3b8',
   strokeWidth: 1.5,
   fontSize: 13,
-  router: 'manhattan',
-  connector: 'rounded',
   animation: 'none'
 })
 
@@ -191,10 +194,6 @@ const refreshProps = () => {
   )
   propState.strokeWidth = Number(cell.isEdge() ? cell.attr('line/strokeWidth') : cell.attr('body/strokeWidth')) || 1.5
   propState.fontSize = Number(cell.attr('label/fontSize')) || 13
-  const router = cell.getRouter?.()
-  const connector = cell.getConnector?.()
-  propState.router = typeof router === 'string' ? router : router?.name || 'manhattan'
-  propState.connector = typeof connector === 'string' ? connector : connector?.name || 'rounded'
   propState.animation = cell.getData()?.animation || 'none'
 }
 
@@ -210,6 +209,7 @@ const loadCanvas = () => {
 const setMode = (next) => {
   mode.value = next
   graphState.mode = next
+  if (next === 'pan') edgePending.value = false
   if (graph.value) setInteractionMode(graph.value, next)
 }
 
@@ -254,11 +254,21 @@ const onDragNode = (item, event) => {
 }
 
 const onSetEdge = (styleId) => {
+  if (!styleId) {
+    edgeStyleId.value = null
+    edgePending.value = false
+    return
+  }
   edgeStyleId.value = styleId
   graphState.edgeStyleId = styleId
+  edgePending.value = true
   if (!graph.value) return
   setPendingEdgeStyle(graph.value, styleId, graphState)
   connectSelected(graph.value, styleId)
+}
+
+const cancelPendingEdge = (event) => {
+  if (event.key === 'Escape') edgePending.value = false
 }
 
 const onAnimationAction = (type) => {
@@ -309,8 +319,6 @@ const updateSelection = (patch) => {
       else cell.attr('body/strokeWidth', patch.strokeWidth)
     }
     if (patch.fontSize != null && cell.isNode()) cell.attr('label/fontSize', patch.fontSize)
-    if (patch.router != null && cell.isEdge()) cell.setRouter({ name: patch.router })
-    if (patch.connector != null && cell.isEdge()) cell.setConnector({ name: patch.connector })
     if (patch.animation != null) applyCellAnimation(cell, patch.animation)
   })
   Object.assign(propState, patch)
@@ -387,6 +395,9 @@ onMounted(() => {
   created.graph.on('cell:added', syncHistory)
   created.graph.on('cell:removed', syncHistory)
   created.graph.on('selection:changed', refreshProps)
+  created.graph.on('edge:connected', ({ isNew }) => {
+    if (isNew) edgePending.value = false
+  })
   created.graph.on('blank:contextmenu', ({ e }) => openMenu(e))
   created.graph.on('cell:contextmenu', ({ e, cell }) => {
     if (cell && !created.graph.isSelected(cell)) {
@@ -400,6 +411,7 @@ onMounted(() => {
   created.graph.container.setAttribute('tabindex', '-1')
   created.graph.container.focus({ preventScroll: true })
   document.addEventListener('click', closeMenu)
+  document.addEventListener('keydown', cancelPendingEdge)
 
   loadCanvas()
 })
@@ -409,6 +421,7 @@ onDeactivated(() => graph.value?.disableKeyboard())
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu)
+  document.removeEventListener('keydown', cancelPendingEdge)
   clearTimeout(saveTimer)
   if (graph.value && !skipSave) emit('change', { id: props.canvas.id, graphJSON: graph.value.toJSON() })
   dnd?.dispose()
@@ -420,6 +433,8 @@ onBeforeUnmount(() => {
 .drawing-editor { position: relative; width: 100%; height: 100%; overflow: hidden; }
 .graph-container { width: 100%; height: 100%; }
 .graph-container.is-pan { cursor: grab; }
+.graph-container.is-edge-pending,
+.graph-container.is-edge-pending * { cursor: crosshair !important; }
 .empty-hint {
   position: absolute;
   top: 50%;

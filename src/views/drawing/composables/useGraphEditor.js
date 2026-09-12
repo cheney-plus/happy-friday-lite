@@ -231,9 +231,7 @@ function bindTools(graph) {
     if (edge.shape === 'mindmap-edge') return
     edge.addTools([
       { name: 'vertices', args: { stopPropagation: false } },
-      { name: 'segments', args: { stopPropagation: false } },
-      'source-arrowhead',
-      'target-arrowhead'
+      { name: 'segments', args: { stopPropagation: false } }
     ])
   })
   graph.on('edge:unselected', ({ edge }) => {
