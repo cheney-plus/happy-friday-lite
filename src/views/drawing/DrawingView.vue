@@ -66,10 +66,7 @@
           @contextmenu.prevent="openCardMenu($event, canvas)"
         >
           <div class="canvas-preview" :class="`preview-${canvas.kind}`">
-            <span v-if="canvas.kind === 'mindmap'" class="mindmap-preview"><i></i><i></i><i></i><b></b></span>
-            <span v-else-if="canvas.kind === 'kanban'" class="kanban-preview"><i></i><i></i><i></i></span>
-            <span v-else-if="canvas.kind === 'flowchart'" class="flowchart-preview"><i></i><i></i><i></i></span>
-            <PencilLine v-else :size="26" :stroke-width="1.5" />
+            <CanvasThumbnail :graph-json="canvas.graphJSON" />
           </div>
           <span class="canvas-card-footer">
             <input
@@ -118,7 +115,6 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
-  PencilLine,
   Plus,
   Search,
   Share2,
@@ -127,6 +123,7 @@ import {
 } from 'lucide-vue-next'
 import { useDrawingStore } from '@/store'
 import DrawingEditor from './components/DrawingEditor.vue'
+import CanvasThumbnail from './components/CanvasThumbnail.vue'
 
 const { t } = useI18n()
 const drawingStore = useDrawingStore()
