@@ -4,7 +4,7 @@
 
     <label v-if="isNode || isEdge">
       <span>{{ t('drawing.props.label') }}</span>
-      <input :value="label" type="text" @change="$emit('update', { label: $event.target.value })" />
+      <input :value="label" type="text" @input="$emit('update', { label: $event.target.value })" />
     </label>
 
     <label v-if="isNode">
@@ -56,13 +56,27 @@
     </label>
 
     <label>
-      <span>{{ t('drawing.props.strokeWidth') }}</span>
-      <input :value="strokeWidth" type="range" min="1" max="8" step="0.5" @input="$emit('update', { strokeWidth: Number($event.target.value) })" />
+      <span class="range-label">
+        <span>{{ t('drawing.props.strokeWidth') }}</span>
+        <output>{{ strokeWidth }}</output>
+      </span>
+      <input class="range-input" :value="strokeWidth" type="range" min="1" max="8" step="0.5" @input="$emit('update', { strokeWidth: Number($event.target.value) })" />
     </label>
 
-    <label v-if="isNode">
-      <span>{{ t('drawing.props.fontSize') }}</span>
-      <input :value="fontSize" type="range" min="10" max="28" step="1" @input="$emit('update', { fontSize: Number($event.target.value) })" />
+    <label v-if="isNode || isEdge">
+      <span class="range-label">
+        <span>{{ t('drawing.props.fontSize') }}</span>
+        <output>{{ fontSize }}</output>
+      </span>
+      <input class="range-input" :value="fontSize" type="range" min="10" max="28" step="1" @input="$emit('update', { fontSize: Number($event.target.value) })" />
+    </label>
+
+    <label v-if="isNode || isEdge">
+      <span class="range-label">
+        <span>{{ t('drawing.props.fontWeight') }}</span>
+        <output>{{ fontWeight }}</output>
+      </span>
+      <input class="range-input" :value="fontWeight" type="range" min="300" max="800" step="100" @input="$emit('update', { fontWeight: Number($event.target.value) })" />
     </label>
 
     <label>
@@ -90,6 +104,7 @@ defineProps({
   textColor: { type: String, default: '#1c1917' },
   strokeWidth: { type: Number, default: 1.5 },
   fontSize: { type: Number, default: 13 },
+  fontWeight: { type: Number, default: 400 },
   animation: { type: String, default: 'none' }
 })
 
@@ -136,6 +151,31 @@ const textColors = [
 }
 .property-panel header { margin-bottom: 12px; font-size: 13px; font-weight: 650; }
 .property-panel label { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; color: var(--text-secondary); font-size: 11px; }
+.range-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.range-label output { min-width: 28px; color: var(--text-primary); font-variant-numeric: tabular-nums; text-align: right; }
+.range-input {
+  width: 100%;
+  height: 4px;
+  margin: 4px 0 2px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+.range-input::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--accent-color) 22%, var(--border-color)); }
+.range-input::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border: 2px solid var(--bg-primary);
+  border-radius: 50%;
+  background: var(--accent-color);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .22);
+  appearance: none;
+}
+.range-input:hover::-webkit-slider-thumb { box-shadow: 0 1px 5px rgba(15, 23, 42, .3); }
+.range-input::-moz-range-track { height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--accent-color) 22%, var(--border-color)); }
+.range-input::-moz-range-thumb { width: 8px; height: 8px; border: 2px solid var(--bg-primary); border-radius: 50%; background: var(--accent-color); box-shadow: 0 1px 4px rgba(15, 23, 42, .22); }
 .property-panel input[type='text'],
 .property-panel select {
   height: 32px;

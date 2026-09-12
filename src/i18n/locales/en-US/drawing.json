@@ -56,6 +56,7 @@
     "textColor": "Text color",
     "strokeWidth": "Stroke width",
     "fontSize": "Font size",
+    "fontWeight": "Font weight",
     "router": "Router",
     "connector": "Connector",
     "animation": "Animation"

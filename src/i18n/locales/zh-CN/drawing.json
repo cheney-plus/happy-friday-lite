@@ -56,6 +56,7 @@
     "textColor": "文字颜色",
     "strokeWidth": "线宽",
     "fontSize": "字号",
+    "fontWeight": "字体粗度",
     "router": "路由",
     "connector": "连接器",
     "animation": "动画"

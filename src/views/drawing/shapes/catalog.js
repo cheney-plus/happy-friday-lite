@@ -121,6 +121,7 @@ export const PALETTE_GROUPS = [
       {
         id: 'architecture',
         items: [
+          { id: 'archTemplate', kind: 'template', template: 'architecture', preview: 'tpl-arch' },
           { id: 'rect', kind: 'node', shape: 'draw-rect', preview: 'rect', width: 140, height: 56, defaultLabel: '矩形' },
           { id: 'container', kind: 'node', shape: 'draw-container', preview: 'container', width: 280, height: 180, defaultLabel: '容器' },
           { id: 'text', kind: 'node', shape: 'draw-text', preview: 'text', width: 140, height: 36, defaultLabel: '文本' }

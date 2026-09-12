@@ -159,6 +159,7 @@ const propState = reactive({
   textColor: '#1c1917',
   strokeWidth: 1.5,
   fontSize: 13,
+  fontWeight: 400,
   animation: 'none'
 })
 
@@ -196,7 +197,13 @@ const refreshProps = () => {
     ? toColorInput(cell.getLabels?.()[0]?.attrs?.label?.fill || cell.getData()?.labelColor, '#1c1917')
     : toColorInput(cell.attr('label/fill'), '#1c1917')
   propState.strokeWidth = Number(cell.isEdge() ? cell.attr('line/strokeWidth') : cell.attr('body/strokeWidth')) || 1.5
-  propState.fontSize = Number(cell.attr('label/fontSize')) || 13
+  const edgeLabel = cell.isEdge() ? cell.getLabels?.()[0]?.attrs?.label || {} : {}
+  propState.fontSize = cell.isEdge()
+    ? Number(edgeLabel.fontSize) || 11
+    : Number(cell.attr('label/fontSize')) || 13
+  propState.fontWeight = cell.isEdge()
+    ? Number(edgeLabel.fontWeight) || 400
+    : Number(cell.attr('label/fontWeight')) || 400
   propState.animation = cell.getData()?.animation || 'none'
 }
 
@@ -293,6 +300,12 @@ const onInsertTemplate = (name) => {
         || canvas.titleKey === 'er'
         || canvas.title === t('drawing.groups.er')
       ))
+      : name === 'architecture'
+        ? drawingStore.canvases.find((canvas) => (
+          canvas.id === 'architecture'
+          || canvas.titleKey === 'architecture'
+          || canvas.title === t('drawing.groups.architecture')
+        ))
       : null
   const rawSource = sourceCanvas
     ? (sourceCanvas.id === props.canvas.id ? graph.value.toJSON() : sourceCanvas.graphJSON)
@@ -345,6 +358,7 @@ const updateSelection = (patch) => {
               ...currentLabel.attrs?.label,
               text,
               fontSize: currentLabel.attrs?.label?.fontSize || 11,
+              fontWeight: currentLabel.attrs?.label?.fontWeight || 400,
               fill: currentLabel.attrs?.label?.fill || cell.getData()?.labelColor || '#1c1917'
             }
           }
@@ -374,7 +388,38 @@ const updateSelection = (patch) => {
       if (cell.isEdge()) cell.attr('line/strokeWidth', patch.strokeWidth)
       else cell.attr('body/strokeWidth', patch.strokeWidth)
     }
-    if (patch.fontSize != null && cell.isNode()) cell.attr('label/fontSize', patch.fontSize)
+    if (patch.fontSize != null) {
+      if (cell.isEdge()) {
+        const currentLabel = cell.getLabels?.()[0]
+        if (currentLabel) {
+          cell.setLabels([{
+            ...currentLabel,
+            attrs: {
+              ...currentLabel.attrs,
+              label: { ...currentLabel.attrs?.label, fontSize: patch.fontSize }
+            }
+          }])
+        }
+      } else {
+        cell.attr('label/fontSize', patch.fontSize)
+      }
+    }
+    if (patch.fontWeight != null) {
+      if (cell.isEdge()) {
+        const currentLabel = cell.getLabels?.()[0]
+        if (currentLabel) {
+          cell.setLabels([{
+            ...currentLabel,
+            attrs: {
+              ...currentLabel.attrs,
+              label: { ...currentLabel.attrs?.label, fontWeight: patch.fontWeight }
+            }
+          }])
+        }
+      } else {
+        cell.attr('label/fontWeight', patch.fontWeight)
+      }
+    }
     if (patch.animation != null) applyCellAnimation(cell, patch.animation)
   })
   Object.assign(propState, patch)
