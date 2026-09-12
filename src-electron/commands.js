@@ -39,6 +39,7 @@ import {
   updateAutomationTask,
   runAutomationTaskNow
 } from './automation.js'
+import { registerObsidianCommands } from './obsidian/ipc.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -1506,6 +1507,7 @@ export function registerCommands(mainWindow) {
   // 支持 HITL 审批。会话复用 sessions 表，与普通对话历史一致。
   registerAgentCommands(mainWindow)
   registerHarnessCommands(mainWindow)
+  registerObsidianCommands(mainWindow)
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')
 }
