@@ -95,11 +95,7 @@ export function createDrawingGraph(container, minimapContainer, state) {
     },
     interacting: {
       nodeMovable: () => state.mode !== 'pan',
-      edgeMovable: (view) => {
-        if (state.mode === 'pan') return false
-        const cell = view?.cell || view
-        return cell.shape !== 'mindmap-edge'
-      },
+      edgeMovable: () => false,
       magnetConnectable: () => state.mode !== 'pan'
     }
   })
@@ -110,7 +106,7 @@ export function createDrawingGraph(container, minimapContainer, state) {
         enabled: true,
         multiple: true,
         rubberband: true,
-        movable: true,
+        movable: false,
         showNodeSelectionBox: true,
         showEdgeSelectionBox: true,
         pointerEvents: 'none'
@@ -229,10 +225,9 @@ export function duplicateDrawingCells(graph) {
 function bindTools(graph) {
   graph.on('edge:selected', ({ edge }) => {
     if (edge.shape === 'mindmap-edge') return
-    edge.addTools([
-      { name: 'vertices', args: { stopPropagation: false } },
-      { name: 'segments', args: { stopPropagation: false } }
-    ])
+    // X6's segments tool conflicts with routed edges (issues #2385/#3660).
+    // Keep vertex editing, which does not trigger the unstable segment rerouting.
+    edge.addTools({ name: 'vertices', args: { stopPropagation: true } })
   })
   graph.on('edge:unselected', ({ edge }) => {
     edge.removeTools()
