@@ -12,17 +12,28 @@
     <div class="panel-body">
       <!-- ============ Friday 助手卡片 ============ -->
       <div class="memory-section">
-        <h3 class="subsection-title">{{ t('drawer.memory.fridayCard') }}</h3>
+        <h3 class="subsection-title">{{ t('drawer.memory.fridayCard', { name: assistantName }) }}</h3>
         <div class="friday-card">
           <div
             class="friday-avatar-wrap"
           >
-            <img :src="avatarSrc" class="friday-avatar" :alt="t('drawer.memory.fridayName')" />
+            <img :src="avatarSrc" class="friday-avatar" :alt="assistantName" />
           </div>
           <div class="friday-info">
             <div class="info-row">
               <span class="info-label">{{ t('drawer.memory.name') }}</span>
-              <span class="info-value name">{{ t('drawer.memory.fridayName') }}</span>
+              <div class="assistant-name-control">
+                <input
+                  v-model="assistantNameDraft"
+                  class="assistant-name-input"
+                  :maxlength="ASSISTANT_NAME_MAX_LENGTH"
+                  :placeholder="t('drawer.memory.namePlaceholder')"
+                  @input="saveAssistantName"
+                />
+                <button class="name-reset-btn" type="button" @click="resetAssistantName">
+                  {{ t('drawer.memory.resetName') }}
+                </button>
+              </div>
             </div>
             <div class="info-row">
               <span class="info-label">{{ t('drawer.memory.birthDate') }}</span>
@@ -35,7 +46,7 @@
       <!-- ============ 记忆文件 ============ -->
       <div class="memory-section">
         <h3 class="subsection-title">{{ t('drawer.memory.memoryFiles') }}</h3>
-        <div class="section-hint">{{ t('drawer.memory.memoryFilesHint') }}</div>
+        <div class="section-hint">{{ t('drawer.memory.memoryFilesHint', { name: assistantName }) }}</div>
 
         <div v-if="memoryLoading" class="empty-hint">{{ t('drawer.memory.loading') }}</div>
         <div v-else class="memory-grid">
@@ -55,7 +66,7 @@
               </span>
             </div>
             <div class="memory-card-title">{{ t(`drawer.memory.files.${mf.nameKey}`) }}</div>
-            <div class="memory-card-desc">{{ t(`drawer.memory.files.${mf.descKey}`) }}</div>
+            <div class="memory-card-desc">{{ t(`drawer.memory.files.${mf.descKey}`, { name: assistantName }) }}</div>
             <div class="memory-card-meta">
               <span>{{ mf.content.length }} {{ t('drawer.memory.words') }}</span>
               <span v-if="mf.updatedAt" class="dot">·</span>
@@ -149,18 +160,42 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import {
   Brain, X, Pencil, Eye, Sparkles, User, BookOpen, Wrench
 } from 'lucide-vue-next';
+import { useFridayStore } from '@/store';
+import {
+  ASSISTANT_NAME_MAX_LENGTH,
+  normalizeAssistantName,
+  resolveAssistantName
+} from '@/views/friday/utils/assistantIdentity';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const fridayStore = useFridayStore();
 
 const emit = defineEmits(['close']);
 
 const avatarSrc = `${import.meta.env.BASE_URL}images/icon.png`;
+const assistantName = computed(() => resolveAssistantName(fridayStore.assistantName, locale.value));
+const assistantNameDraft = ref(assistantName.value);
+
+watch(assistantName, (value) => {
+  assistantNameDraft.value = value;
+});
+
+function saveAssistantName() {
+  const normalized = normalizeAssistantName(assistantNameDraft.value);
+  if (assistantNameDraft.value !== normalized) assistantNameDraft.value = normalized;
+  fridayStore.setAssistantName(normalized);
+}
+
+function resetAssistantName() {
+  fridayStore.resetAssistantName();
+  assistantNameDraft.value = assistantName.value;
+}
 
 // ---- 记忆文件 ----
 const memoryFiles = ref([]);
@@ -441,6 +476,50 @@ onUnmounted(() => {
 .info-value.name {
   font-size: 14px;
   font-weight: 600;
+}
+
+.assistant-name-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.assistant-name-input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.assistant-name-input:focus {
+  border-color: var(--accent-color);
+}
+
+.name-reset-btn {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.name-reset-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* ============ 记忆文件网格 ============ */

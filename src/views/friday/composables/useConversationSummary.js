@@ -6,7 +6,7 @@ import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 import { getAssistantContent } from '@/views/friday/utils/messages';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
 
-export function useConversationSummary({ messages, showToast, t }) {
+export function useConversationSummary({ messages, showToast, t, assistantName }) {
   const noteStore = useNoteStore();
   let unlistenSummaryChunk = null;
   let unlistenSummaryDone = null;
@@ -24,7 +24,7 @@ export function useConversationSummary({ messages, showToast, t }) {
         if (msg.role === 'user') return `${t('friday.transcriptUser')}${msg.content}`;
         if (msg.role === 'assistant') {
           const content = getAssistantContent(msg);
-          return content ? `${t('friday.transcriptAssistant')}${content}` : '';
+          return content ? `${t('friday.transcriptAssistant', { name: assistantName?.value || t('friday.assistantName') })}${content}` : '';
         }
         return '';
       })

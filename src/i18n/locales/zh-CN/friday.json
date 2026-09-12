@@ -1,7 +1,7 @@
 {
   "title": "Friday",
-  "placeholder": "有问题尽管问周五",
-  "greeting": "需要周五帮您做些什么？",
+  "placeholder": "有问题尽管问{name}",
+  "greeting": "需要{name}帮您做些什么？",
   "remove": "移除",
   "referenceNoteFile": "引用笔记/文件",
   "referenceKb": "引用知识库",
@@ -52,7 +52,7 @@
   "historyExpand": "展开会话历史",
   "moreActions": "更多操作",
   "assistantName": "周五",
-  "defaultTitle": "与 Friday 的对话",
+  "defaultTitle": "与 {name} 的对话",
   "untitledSession": "新对话",
   "saveAsNote": "保存为笔记",
   "save": "保存",
@@ -73,7 +73,7 @@
   "leaveStreamingConfirm": "AI 正在回答，离开将中断对话。已生成的内容会被保存，确认离开吗？",
   "closeStreamingConfirm": "AI 正在回答，关闭将中断对话。已生成的内容会被保存，确认关闭吗？",
   "transcriptUser": "【用户】",
-  "transcriptAssistant": "【周五】",
+  "transcriptAssistant": "【{name}】",
   "summaryFallbackTitle": "对话总结",
   "inputPlaceholder": "输入消息..."
 }

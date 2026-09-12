@@ -2,7 +2,7 @@
   <div class="friday-composer" :class="`is-${variant}`" @click="closeAllDropdowns">
     <ChatInputBox
       v-model="inputText"
-      :placeholder="placeholder || t('friday.placeholder')"
+      :placeholder="placeholder || t('friday.placeholder', { name: assistantName })"
       :is-streaming="isStreaming"
       :attachments="attachments"
       :show-reference-buttons="true"
@@ -116,6 +116,7 @@ import {
   buildFridayAttachmentData,
   resolveFridayKnowledgeScope
 } from '@/views/friday/utils/knowledgeScope';
+import { resolveAssistantName } from '@/views/friday/utils/assistantIdentity';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -126,7 +127,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'send', 'stop']);
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const fridayStore = useFridayStore();
 const { selectableKbList, loadKbListFromDisk } = useKnowledgeBaseList();
 const { customModels, modelList, loadCustomModels } = useModelCatalog();
@@ -144,6 +145,7 @@ const showModeDropdown = ref(false);
 const showModelDropdown = ref(false);
 const modeDropdownStyle = ref({});
 const modelDropdownStyle = ref({});
+const assistantName = computed(() => resolveAssistantName(fridayStore.assistantName, locale.value));
 
 const chatModes = computed(() => [
   { value: 'chat', label: t('friday.modeChat') },

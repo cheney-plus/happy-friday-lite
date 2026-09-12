@@ -45,6 +45,7 @@
                     v-else
                     :content="msg.content"
                     :reasoning="msg.reasoning"
+                    :display-name="assistantName"
                     :show-divider="true"
                     :show-rollback="false"
                   />
@@ -58,6 +59,7 @@
                   <AIMessage
                     :content="streamingContent"
                     :reasoning-streaming-content="streamingReasoning"
+                    :display-name="assistantName"
                     :is-streaming="true"
                     :show-divider="false"
                     :show-rollback="false"
@@ -121,9 +123,12 @@
 
 <script setup>
 import { ref, computed, nextTick, onUnmounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
+import { useFridayStore } from '@/store';
+import { resolveAssistantName } from '@/views/friday/utils/assistantIdentity';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -140,6 +145,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
+const fridayStore = useFridayStore();
+const { locale } = useI18n();
+const assistantName = computed(() => resolveAssistantName(fridayStore.assistantName, locale.value));
 
 // 顶部副标题：工作区不参与 RAG 检索，提示可执行 Agent 工作流
 const subtitleText = computed(() => {

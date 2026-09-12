@@ -6,7 +6,7 @@
           <img :src="logoImage" alt="Friday" class="logo-image" draggable="false" />
           <img :src="happyFridayTextImage" alt="Happy Friday" class="happy-friday-text-image" draggable="false" />
         </div>
-        <p class="logo-subtitle">{{ t('friday.greeting') }}</p>
+        <p class="logo-subtitle">{{ t('friday.greeting', { name: assistantName }) }}</p>
       </div>
 
       <div class="input-section">
@@ -42,10 +42,11 @@ import { useAppStore, useFridayStore, useTabStore } from '@/store';
 import { NEW_SESSION_ID, fridayChatLocation, getFridayTabId } from '@/utils/fridayNavigation';
 import FridayComposer from '@/views/friday/components/FridayComposer.vue';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
+import { resolveAssistantName } from '@/views/friday/utils/assistantIdentity';
 
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const appStore = useAppStore();
 const fridayStore = useFridayStore();
 const tabStore = useTabStore();
@@ -53,6 +54,7 @@ const inputText = ref('');
 
 const isDark = computed(() => appStore.theme === 'dark');
 const logoImage = new URL('@/assets/images/friday-w.png', import.meta.url).href;
+const assistantName = computed(() => resolveAssistantName(fridayStore.assistantName, locale.value));
 const happyFridayTextImage = computed(() => (
   isDark.value
     ? new URL('@/assets/images/HPTEXT-w.png', import.meta.url).href

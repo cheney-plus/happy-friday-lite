@@ -6,7 +6,7 @@
         class="sidebar-avatar"
         :class="{ active: showDrawer }"
         @click="toggleDrawer"
-        @mouseenter="showTooltip($event, t('common.user.name'))"
+        @mouseenter="showTooltip($event, assistantName)"
         @mouseleave="hideTooltip"
       >
         <span class="avatar-ring"></span>
@@ -56,14 +56,17 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAppStore } from '@/store';
+import { useAppStore, useFridayStore } from '@/store';
 import { useI18n } from 'vue-i18n';
 import { sidebarMenuConfig, sidebarBottomMenuConfig } from '@/config/menu';
 import AvatarDrawer from './AvatarDrawer.vue';
+import { resolveAssistantName } from '@/views/friday/utils/assistantIdentity';
 
 const appStore = useAppStore();
+const fridayStore = useFridayStore();
 const router = useRouter();
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const assistantName = computed(() => resolveAssistantName(fridayStore.assistantName, locale.value));
 
 const isModuleVisible = (item) => item.key === 'settings' || appStore.sidebarModules[item.key] !== false;
 const visibleSidebarMenuConfig = computed(() => sidebarMenuConfig.filter(isModuleVisible));
