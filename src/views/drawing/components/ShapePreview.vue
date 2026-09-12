@@ -148,6 +148,10 @@ const LINE_PREVIEWS = {
     end: 'block',
     endHead: 'M23 8.2 L29.6 12 L23 15.8 Z'
   },
+  'line-dashed-straight': {
+    d: 'M3 12 H29',
+    dashed: true
+  },
   'line-orth': {
     d: 'M4 18 H16 V7 H22.5',
     end: 'block',

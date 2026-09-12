@@ -95,6 +95,7 @@
     "arrow": "箭头",
     "doubleArrow": "双向箭头",
     "dashed": "虚线",
+    "dashedStraight": "虚直线",
     "orthogonal": "正交线",
     "manhattan": "折线",
     "curve": "曲线",

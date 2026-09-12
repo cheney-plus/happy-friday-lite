@@ -30,6 +30,7 @@ export const PALETTE_GROUPS = [
       { id: 'arrow', kind: 'edge', style: 'arrow', preview: 'line-arrow' },
       { id: 'doubleArrow', kind: 'edge', style: 'doubleArrow', preview: 'line-double' },
       { id: 'dashed', kind: 'edge', style: 'dashed', preview: 'line-dashed' },
+      { id: 'dashedStraight', kind: 'edge', style: 'dashedStraight', preview: 'line-dashed-straight' },
       { id: 'orthogonal', kind: 'edge', style: 'orthogonal', preview: 'line-orth' },
       { id: 'manhattan', kind: 'edge', style: 'manhattan', preview: 'line-manhattan' },
       { id: 'curve', kind: 'edge', style: 'curve', preview: 'line-curve' }
@@ -120,14 +121,9 @@ export const PALETTE_GROUPS = [
       {
         id: 'architecture',
         items: [
-          { id: 'archTemplate', kind: 'template', template: 'architecture', preview: 'tpl-arch' },
-          { id: 'archClient', kind: 'node', shape: 'draw-arch-client', preview: 'arch-client', width: 140, height: 64, defaultLabel: '客户端' },
-          { id: 'archServer', kind: 'node', shape: 'draw-arch-server', preview: 'arch-server', width: 140, height: 64, defaultLabel: '服务' },
-          { id: 'archDb', kind: 'node', shape: 'draw-arch-db', preview: 'arch-db', width: 140, height: 64, defaultLabel: '数据库' },
-          { id: 'archCloud', kind: 'node', shape: 'draw-arch-cloud', preview: 'arch-cloud', width: 140, height: 64, defaultLabel: '云服务' },
-          { id: 'archQueue', kind: 'node', shape: 'draw-arch-queue', preview: 'arch-queue', width: 140, height: 64, defaultLabel: '消息队列' },
-          { id: 'archCache', kind: 'node', shape: 'draw-arch-cache', preview: 'arch-cache', width: 140, height: 64, defaultLabel: '缓存' },
-          { id: 'archGateway', kind: 'node', shape: 'draw-arch-gateway', preview: 'arch-gateway', width: 140, height: 64, defaultLabel: '网关' }
+          { id: 'rect', kind: 'node', shape: 'draw-rect', preview: 'rect', width: 140, height: 56, defaultLabel: '矩形' },
+          { id: 'container', kind: 'node', shape: 'draw-container', preview: 'container', width: 280, height: 180, defaultLabel: '容器' },
+          { id: 'text', kind: 'node', shape: 'draw-text', preview: 'text', width: 140, height: 36, defaultLabel: '文本' }
         ]
       },
       {

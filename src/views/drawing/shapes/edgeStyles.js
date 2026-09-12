@@ -51,6 +51,19 @@ export const EDGE_STYLES = {
       }
     }
   },
+  dashedStraight: {
+    router: { name: 'normal' },
+    connector: { name: 'normal' },
+    attrs: {
+      line: {
+        stroke: '#64748b',
+        strokeWidth: 1.6,
+        strokeDasharray: '8 5',
+        targetMarker: null,
+        sourceMarker: null
+      }
+    }
+  },
   orthogonal: {
     router: { name: 'orth' },
     connector: { name: 'rounded', args: { radius: 8 } },
