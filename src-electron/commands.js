@@ -272,7 +272,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_with_memory', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId, folderPath, topK, attachments } = args
+    const { requestId, sessionId, model, message, enableThinking, systemPrompt, useKnowledgeBase, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
     let currentSessionId = sessionId
     let isNewSession = false
@@ -341,12 +341,13 @@ export function registerCommands(mainWindow) {
       // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
       // 工作区(agent)不参与向量化与检索，跳过 RAG 配置
       const isAgentKb = kbCategoryId === 'agent'
-      const ragConfig = (!isAgentKb && (kbName || kbCategoryId || folderPath))
+      const ragConfig = (!isAgentKb && (useKnowledgeBase || kbName || kbCategoryId || folderPath))
         ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
         : null
 
       let fullContent = ''
       let fullReasoning = ''
+      let ragSources = []
 
       try {
         const result = ragConfig
@@ -354,6 +355,7 @@ export function registerCommands(mainWindow) {
           : await streamChat(mainWindow, allMessages, effectiveModel, requestId, currentSessionId, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
+        ragSources = Array.isArray(result.sources) ? result.sources : []
       } catch (e) {
         cancelTokens.remove(requestId)
         throw e
@@ -361,12 +363,11 @@ export function registerCommands(mainWindow) {
 
       cancelTokens.remove(requestId)
 
-      const assistantMsg = db.saveMessage(
-        currentSessionId,
-        'assistant',
-        fullContent,
-        db.buildAssistantMetadata({ reasoning: fullReasoning })
-      )
+      const assistantMetadata = {
+        ...db.buildAssistantMetadata({ reasoning: fullReasoning }),
+        ...(ragSources.length > 0 ? { sources: ragSources } : {})
+      }
+      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent, assistantMetadata)
       db.updateSessionTimestamp(currentSessionId)
 
       mainWindow.webContents.send(CHAT_DONE, {
@@ -374,6 +375,7 @@ export function registerCommands(mainWindow) {
         sessionId: currentSessionId,
         fullContent,
         reasoningContent: fullReasoning,
+        sources: ragSources,
         messageId: assistantMsg.id,
         userMessageId
       })
@@ -397,7 +399,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_without_memory', async (_event, args) => {
-    const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK, attachments } = args
+    const { requestId, model, message, enableThinking, useKnowledgeBase, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
     // 校验模型配置：确保用户已配置自己的大模型
     const effectiveModel = validateModelConfig(model)
@@ -418,12 +420,13 @@ export function registerCommands(mainWindow) {
       // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
       // 工作区(agent)不参与向量化与检索，跳过 RAG 配置
       const isAgentKb = kbCategoryId === 'agent'
-      const ragConfig = (!isAgentKb && (kbName || kbCategoryId || folderPath))
+      const ragConfig = (!isAgentKb && (useKnowledgeBase || kbName || kbCategoryId || folderPath))
         ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
         : null
 
       let fullContent = ''
       let fullReasoning = ''
+      let ragSources = []
 
       try {
         const result = ragConfig
@@ -431,6 +434,7 @@ export function registerCommands(mainWindow) {
           : await streamChat(mainWindow, messages, effectiveModel, requestId, null, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
+        ragSources = Array.isArray(result.sources) ? result.sources : []
       } catch (e) {
         cancelTokens.remove(requestId)
         throw e
@@ -443,6 +447,7 @@ export function registerCommands(mainWindow) {
         sessionId: null,
         fullContent,
         reasoningContent: fullReasoning,
+        sources: ragSources,
         messageId: null,
         userMessageId: null
       })

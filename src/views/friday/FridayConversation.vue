@@ -28,6 +28,7 @@
             v-else
             :content="msg.content"
             :reasoning="msg.reasoning"
+            :sources="msg.sources"
             :display-name="t('friday.assistantName')"
             :show-divider="true"
             :show-actions="!isShareMode"
@@ -48,6 +49,7 @@
           v-else-if="isStreaming"
           :content="streamingContent"
           :reasoning-streaming-content="streamingReasoning"
+          :sources="streamingSources"
           :display-name="t('friday.assistantName')"
           :is-streaming="true"
           :show-divider="false"
@@ -155,6 +157,7 @@ const {
   streamingContent,
   streamingReasoning,
   isReasoningStreaming,
+  streamingSources,
   agentSegments,
   pendingApproval,
   isThinking,

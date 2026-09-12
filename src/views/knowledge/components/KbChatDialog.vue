@@ -45,6 +45,7 @@
                     v-else
                     :content="msg.content"
                     :reasoning="msg.reasoning"
+                    :sources="msg.sources"
                     :show-divider="true"
                     :show-rollback="false"
                   />
@@ -58,6 +59,7 @@
                   <AIMessage
                     :content="streamingContent"
                     :reasoning-streaming-content="streamingReasoning"
+                    :sources="streamingSources"
                     :is-streaming="true"
                     :show-divider="false"
                     :show-rollback="false"
@@ -154,6 +156,7 @@ const messagesContainer = ref(null);
 const isStreaming = ref(false);
 const streamingContent = ref('');
 const streamingReasoning = ref('');
+const streamingSources = ref([]);
 const isAtBottom = ref(true);
 const showScrollDownBtn = ref(false);
 const inputFocused = ref(false);
@@ -167,6 +170,7 @@ let lastScrollTop = 0;
 let unlistenChunk = null;
 let unlistenReasoning = null;
 let unlistenDone = null;
+let unlistenRagSources = null;
 let unlistenError = null;
 
 watch(() => props.visible, (val) => {
@@ -199,6 +203,7 @@ function resetState() {
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
+  streamingSources.value = [];
   activeRequestId = '';
   currentSessionId = '';
   isAtBottom.value = true;
@@ -224,6 +229,13 @@ function setupListeners() {
     scrollToBottom();
   });
 
+  unlistenRagSources = electronService.listen('chat-rag-sources', (event) => {
+    const data = event.payload;
+    if (data.requestId !== activeRequestId) return;
+    streamingSources.value = mergeSources(streamingSources.value, Array.isArray(data.sources) ? data.sources : []);
+    scrollToBottom();
+  });
+
   unlistenDone = electronService.listen('chat-done', (event) => {
     const data = event.payload;
     console.log('[KbChat] chat-done 收到, requestId=', data.requestId, 'active=', activeRequestId, 'fullContent长度=', (data.fullContent || '').length);
@@ -244,12 +256,14 @@ function setupListeners() {
 
     const hasContent = streamingContent.value || data.fullContent;
     const hasReasoning = streamingReasoning.value || data.reasoningContent;
+    const finalSources = mergeSources(streamingSources.value, Array.isArray(data.sources) ? data.sources : []);
 
     if (hasContent || hasReasoning) {
       messages.value.push({
         role: 'assistant',
         content: data.fullContent || streamingContent.value,
         reasoning: data.reasoningContent || streamingReasoning.value || undefined,
+        sources: finalSources.length ? finalSources : undefined,
         id: data.messageId
       });
     } else {
@@ -269,6 +283,7 @@ function setupListeners() {
 
     streamingContent.value = '';
     streamingReasoning.value = '';
+    streamingSources.value = [];
     // 流式结束时仅当用户停留在底部才跟随滚动，避免打断已上滑阅读的用户
     scrollToBottom();
     nextTick(() => {
@@ -282,8 +297,10 @@ function setupListeners() {
     if (data.requestId !== activeRequestId) return;
     isStreaming.value = false;
     const partialContent = streamingContent.value;
+    const partialSources = [...streamingSources.value];
     streamingContent.value = '';
     streamingReasoning.value = '';
+    streamingSources.value = [];
     showScrollDownBtn.value = false;
     console.error('Stream error:', data.error);
     // 如果已有部分内容，先保存部分内容
@@ -292,6 +309,7 @@ function setupListeners() {
         role: 'assistant',
         content: partialContent,
         reasoning: undefined,
+        sources: partialSources.length ? partialSources : undefined,
         id: null,
         error: data.error || '生成失败'
       });
@@ -315,7 +333,21 @@ function cleanupListeners() {
   if (unlistenChunk) { unlistenChunk(); unlistenChunk = null; }
   if (unlistenReasoning) { unlistenReasoning(); unlistenReasoning = null; }
   if (unlistenDone) { unlistenDone(); unlistenDone = null; }
+  if (unlistenRagSources) { unlistenRagSources(); unlistenRagSources = null; }
   if (unlistenError) { unlistenError(); unlistenError = null; }
+}
+
+function mergeSources(existing, incoming) {
+  const merged = [];
+  const seen = new Set();
+  for (const source of [...(existing || []), ...(incoming || [])]) {
+    if (!source) continue;
+    const key = source.metadata?.noteId || source.filePath || source.source || source.snippet;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(source);
+  }
+  return merged;
 }
 
 async function sendChatMessage(text) {
@@ -337,6 +369,7 @@ async function sendChatMessage(text) {
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
+  streamingSources.value = [];
   showScrollDownBtn.value = false;
   isAtBottom.value = true;
   scrollToBottom(true);
