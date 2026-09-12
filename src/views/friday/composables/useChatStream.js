@@ -161,7 +161,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     return JSON.parse(JSON.stringify(value));
   }
 
-  async function invokeChat({ mode, model, userMessage, attachments, thinkMode, kbName, kbCategoryId }) {
+  async function invokeChat({ mode, model, userMessage, attachments, thinkMode, kbName, kbCategoryId, folderPath }) {
     const enableThinking = thinkMode === 'deep';
     const sessionId = currentSessionId.value || '';
     const args = toIpcPayload({
@@ -172,7 +172,8 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       attachments: attachments || [],
       enableThinking,
       kbName: kbName || '',
-      kbCategoryId: kbCategoryId || ''
+      kbCategoryId: kbCategoryId || '',
+      folderPath: folderPath || ''
     });
     if (mode === 'agent') {
       return electronService.invoke('agent-invoke', args);
@@ -216,7 +217,8 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       attachments: data.attachments || [],
       thinkMode: data.thinkMode || fridayStore.thinkMode,
       kbName: data.kbName || '',
-      kbCategoryId: data.kbCategoryId || ''
+      kbCategoryId: data.kbCategoryId || '',
+      folderPath: data.folderPath || ''
     }).catch((err) => {
       console.error('Chat invoke error:', err);
       pushErrorMessage(`${t('friday.requestFailed')}${err?.message || t('friday.retryLater')}`);

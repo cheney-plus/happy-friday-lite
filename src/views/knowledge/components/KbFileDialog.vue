@@ -9,7 +9,7 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
-                <span>{{ t('friday.selectKbFile') }}</span>
+                <span>{{ t('friday.selectKbScope') }}</span>
               </div>
               <button class="dialog-close" @click="$emit('close')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -59,6 +59,18 @@
                     </svg>
                   </span>
                 </div>
+                <div class="scope-action-bar" v-if="selectedKb">
+                  <button class="scope-select-btn" type="button" @click="selectCurrentScope">
+                    <svg v-if="isAtKbRoot" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                    <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>{{ isAtKbRoot ? t('friday.selectCurrentKb') : t('friday.selectCurrentFolder') }}</span>
+                  </button>
+                </div>
                 <div class="file-content" v-if="kbFileList.length > 0">
                   <div
                     v-for="file in kbFileList"
@@ -66,15 +78,25 @@
                     class="file-row"
                     :class="{ folder: file.isDirectory }"
                     @click="file.isDirectory ? navigateFileTo(file.path) : selectKbFile(file)"
-                  >
-                    <svg v-if="file.isDirectory" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
-                    <span class="file-name">{{ file.name }}</span>
+                    >
+                    <div class="file-row-main">
+                      <svg v-if="file.isDirectory" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                      </svg>
+                      <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                      <span class="file-name">{{ file.name }}</span>
+                    </div>
+                    <button
+                      v-if="file.isDirectory"
+                      class="row-select-btn"
+                      type="button"
+                      @click.stop="selectFolder(file)"
+                    >
+                      {{ t('friday.select') }}
+                    </button>
                   </div>
                 </div>
                 <div v-else class="file-empty">
@@ -90,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { coverOptions } from '@/views/knowledge/constants';
 
@@ -104,13 +126,23 @@ const emit = defineEmits(['close', 'select']);
 const { t } = useI18n();
 
 const selectedKbId = ref('');
+const selectedKb = ref(null);
+const selectedCategoryId = ref('');
+const selectedKbRootPath = ref('');
 const kbFileList = ref([]);
 const fileBreadcrumb = ref([]);
+
+const isAtKbRoot = computed(() => {
+  if (!selectedKbRootPath.value || fileBreadcrumb.value.length === 0) return false;
+  return normalizePath(fileBreadcrumb.value[fileBreadcrumb.value.length - 1].path) === normalizePath(selectedKbRootPath.value);
+});
 
 const loadKbFiles = async (item, categoryId) => {
   const api = window.electronAPI;
   if (!api) return;
   selectedKbId.value = item.id;
+  selectedKb.value = item;
+  selectedCategoryId.value = categoryId;
   let dataDir = '';
   try {
     dataDir = await api.invoke('kb-get-data-dir');
@@ -119,6 +151,7 @@ const loadKbFiles = async (item, categoryId) => {
     return;
   }
   const kbDir = dataDir + '/knowledge/' + categoryId + '/' + item.name;
+  selectedKbRootPath.value = kbDir;
   await readKbDir(kbDir);
   fileBreadcrumb.value = [{ name: item.name, path: kbDir }];
 };
@@ -155,12 +188,52 @@ const navigateFileTo = async (path, idx) => {
 };
 
 const selectKbFile = (file) => {
-  emit('select', { name: file.name, path: file.path });
+  emit('select', { type: 'file', name: file.name, path: file.path });
+};
+
+const normalizePath = (value) => String(value || '').replace(/\\/g, '/').replace(/\/+$/, '');
+
+const getFolderLabel = (folderPath) => {
+  const rootPath = normalizePath(selectedKbRootPath.value);
+  const normalizedFolderPath = normalizePath(folderPath);
+  const relativePath = normalizedFolderPath.startsWith(rootPath)
+    ? normalizedFolderPath.slice(rootPath.length).replace(/^\/+/, '')
+    : normalizedFolderPath.split('/').pop();
+  return relativePath ? `${selectedKb.value.name} / ${relativePath}` : selectedKb.value.name;
+};
+
+const selectCurrentScope = () => {
+  if (!selectedKb.value) return;
+  if (isAtKbRoot.value) {
+    emit('select', {
+      type: 'kb',
+      name: selectedKb.value.name,
+      categoryId: selectedCategoryId.value
+    });
+    return;
+  }
+  const currentPath = fileBreadcrumb.value[fileBreadcrumb.value.length - 1]?.path || '';
+  selectFolder({ path: currentPath });
+};
+
+const selectFolder = (folder) => {
+  if (!selectedKb.value || !folder?.path) return;
+  emit('select', {
+    type: 'folder',
+    name: getFolderLabel(folder.path),
+    kbName: selectedKb.value.name,
+    categoryId: selectedCategoryId.value,
+    path: folder.path,
+    folderPath: folder.path
+  });
 };
 
 watch(() => props.visible, (val) => {
   if (val) {
     selectedKbId.value = '';
+    selectedKb.value = null;
+    selectedCategoryId.value = '';
+    selectedKbRootPath.value = '';
     kbFileList.value = [];
     fileBreadcrumb.value = [];
   }
@@ -346,6 +419,34 @@ watch(() => props.visible, (val) => {
   color: var(--accent-color, #1560F7);
 }
 
+.scope-action-bar {
+  display: flex;
+  align-items: center;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--border-color, #ececec);
+  flex-shrink: 0;
+}
+
+.scope-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-color, #1560F7) 28%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-color, #1560F7) 8%, transparent);
+  color: var(--accent-color, #1560F7);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scope-select-btn:hover {
+  background: color-mix(in srgb, var(--accent-color, #1560F7) 13%, transparent);
+}
+
 .file-content {
   flex: 1;
   overflow-y: auto;
@@ -367,6 +468,14 @@ watch(() => props.visible, (val) => {
   background: var(--bg-hover, #f5f5f5);
 }
 
+.file-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
 .file-row.folder {
   color: var(--text-secondary, #555);
 }
@@ -381,6 +490,30 @@ watch(() => props.visible, (val) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.row-select-btn {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 7px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-secondary, #555);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+
+.file-row:hover .row-select-btn,
+.row-select-btn:focus-visible {
+  opacity: 1;
+}
+
+.row-select-btn:hover {
+  color: var(--accent-color, #1560F7);
+  border-color: color-mix(in srgb, var(--accent-color, #1560F7) 34%, transparent);
 }
 
 .file-empty {

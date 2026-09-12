@@ -112,6 +112,10 @@ import KbFileDialog from '@/views/knowledge/components/KbFileDialog.vue';
 import { useFridayStore } from '@/store';
 import { useKnowledgeBaseList } from '@/views/friday/composables/useKnowledgeBaseList';
 import { useModelCatalog } from '@/views/friday/composables/useModelCatalog';
+import {
+  buildFridayAttachmentData,
+  resolveFridayKnowledgeScope
+} from '@/views/friday/utils/knowledgeScope';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -208,6 +212,7 @@ function openKbFileSelect() {
 }
 
 function handleSelectKb({ name, categoryId }) {
+  attachments.value = attachments.value.filter(item => item.type !== 'kb' && item.type !== 'kb-folder');
   attachments.value.push({
     id: ++attachmentIdCounter,
     type: 'kb',
@@ -233,6 +238,27 @@ function handleNoteConfirm(selectedNotes) {
 }
 
 function selectKbFile(file) {
+  if (file.type === 'kb') {
+    handleSelectKb({ name: file.name, categoryId: file.categoryId });
+    showKbFileDialog.value = false;
+    return;
+  }
+
+  if (file.type === 'folder') {
+    attachments.value = attachments.value.filter(item => item.type !== 'kb' && item.type !== 'kb-folder');
+    attachments.value.push({
+      id: ++attachmentIdCounter,
+      type: 'kb-folder',
+      typeLabel: t('friday.tagFolder'),
+      name: file.name,
+      kbName: file.kbName,
+      categoryId: file.categoryId,
+      folderPath: file.folderPath || file.path
+    });
+    showKbFileDialog.value = false;
+    return;
+  }
+
   attachments.value.push({
     id: ++attachmentIdCounter,
     type: 'kb-file',
@@ -248,35 +274,24 @@ function removeAttachment(idx) {
 }
 
 function buildAttachmentData(text) {
-  const noteAttachments = attachments.value.filter(item => item.type === 'note');
-  const kbFileAttachments = attachments.value.filter(item => item.type === 'kb-file');
-  if (!noteAttachments.length && !kbFileAttachments.length) return null;
-
-  const refLines = [
-    ...noteAttachments.map(note => `${t('friday.refNote')}${note.name}`),
-    ...kbFileAttachments.map(file => `${t('friday.refDoc')}${file.name}`)
-  ];
-
-  return {
-    userMessage: `${text}\n\n---\n${refLines.join('\n')}`,
-    attachments: [
-      ...noteAttachments.map(note => ({ kind: 'note', name: note.name, noteId: note.noteId })),
-      ...kbFileAttachments.map(file => ({ kind: 'file', name: file.name, path: file.path }))
-    ]
-  };
+  return buildFridayAttachmentData(text, attachments.value, {
+    refNote: t('friday.refNote'),
+    refDoc: t('friday.refDoc')
+  });
 }
 
 function handleSend() {
   const text = inputText.value.trim();
   if (!text || props.isStreaming) return;
   const attData = buildAttachmentData(text);
-  const kbAttachment = attachments.value.find(item => item.type === 'kb');
+  const knowledgeScope = resolveFridayKnowledgeScope(attachments.value);
   emit('send', {
     text,
     userMessage: attData?.userMessage || text,
     attachments: attData?.attachments || [],
-    kbName: kbAttachment?.name || '',
-    kbCategoryId: kbAttachment?.categoryId || '',
+    kbName: knowledgeScope.kbName,
+    kbCategoryId: knowledgeScope.kbCategoryId,
+    folderPath: knowledgeScope.folderPath,
     mode: fridayStore.mode,
     modelId: fridayStore.modelId,
     thinkMode: fridayStore.thinkMode
@@ -286,7 +301,7 @@ function handleSend() {
 
 watch(() => fridayStore.mode, (mode) => {
   if (mode === 'agent') {
-    attachments.value = attachments.value.filter(item => item.type !== 'kb');
+    attachments.value = attachments.value.filter(item => item.type !== 'kb' && item.type !== 'kb-folder');
   }
 });
 
