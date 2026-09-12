@@ -133,7 +133,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'harness-start',
       'harness-status',
       'harness-restart',
-      'harness-sync-config'
+      'harness-sync-config',
+      'obsidian-list-sources',
+      'obsidian-new-source-template',
+      'obsidian-save-source',
+      'obsidian-delete-source',
+      'obsidian-test-connection',
+      'obsidian-sync-now',
+      'obsidian-render-markdown'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -176,7 +183,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-tool-approval',
       'automation-updated',
       'kb-directory-changed',
-      'harness-status-changed'
+      'harness-status-changed',
+      'obsidian-sync-status'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)
