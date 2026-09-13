@@ -20,7 +20,9 @@
     "deleteCategoryConfirm": "Delete category \"{name}\"? Canvases in it will be moved to Uncategorized.",
     "moveToCategory": "Move to category",
     "rename": "Rename",
-    "deleteCanvas": "Delete canvas"
+    "deleteCanvas": "Delete canvas",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   },
   "groups": {
     "general": "Shapes",

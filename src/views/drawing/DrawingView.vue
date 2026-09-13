@@ -158,6 +158,26 @@
       </div>
     </Teleport>
     <input ref="importInputRef" class="hidden-input" type="file" accept="application/json,.json" @change="onImportFile" />
+    <Teleport to="body">
+      <div v-if="categoryInput.visible" class="category-input-overlay" @click.self="cancelCategoryInput">
+        <div class="category-input-card" @click.stop>
+          <strong>{{ categoryInput.mode === 'create' ? t('drawing.sidebar.newCategory') : t('drawing.sidebar.renameCategory') }}</strong>
+          <input
+            ref="categoryInputRef"
+            v-model="categoryInput.value"
+            type="text"
+            maxlength="30"
+            :placeholder="categoryInput.mode === 'create' ? t('drawing.sidebar.newCategoryPrompt') : t('drawing.sidebar.renameCategoryPrompt')"
+            @keydown.enter.prevent="confirmCategoryInput"
+            @keydown.escape="cancelCategoryInput"
+          />
+          <div class="category-input-actions">
+            <button type="button" @click="cancelCategoryInput">{{ t('drawing.sidebar.cancel') }}</button>
+            <button type="button" class="primary" @click="confirmCategoryInput">{{ t('drawing.sidebar.confirm') }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -266,6 +286,7 @@ const closeMenus = () => {
   moveCategorySubmenuVisible.value = false
   categoryMenuVisible.value = false
   categoryActionMenu.visible = false
+  categoryInput.visible = false
   cancelHideMoveCategorySubmenu()
 }
 
@@ -406,12 +427,44 @@ const selectCategory = (id) => {
   if (firstCanvas) drawingStore.selectCanvas(firstCanvas.id)
 }
 
+// Electron 不支持 window.prompt，用应用内弹窗输入分类名称
+const categoryInput = reactive({ visible: false, mode: 'create', value: '', category: null })
+const categoryInputRef = ref(null)
+
+const openCategoryInput = (mode, category = null) => {
+  categoryInput.mode = mode
+  categoryInput.category = category
+  categoryInput.value = mode === 'rename' ? (category?.name || '') : ''
+  categoryInput.visible = true
+  nextTick(() => {
+    categoryInputRef.value?.focus()
+    categoryInputRef.value?.select()
+  })
+}
+
+const cancelCategoryInput = () => {
+  categoryInput.visible = false
+  categoryInput.value = ''
+  categoryInput.category = null
+}
+
+const confirmCategoryInput = () => {
+  const name = categoryInput.value.trim()
+  if (!name) return
+  if (categoryInput.mode === 'create') {
+    const category = drawingStore.createCategory(name)
+    if (category && cardMenu.canvas) drawingStore.moveCanvas(cardMenu.canvas.id, category.id)
+    cardMenu.visible = false
+    hideMoveCategorySubmenu()
+  } else if (categoryInput.category) {
+    drawingStore.renameCategory(categoryInput.category.id, name)
+    categoryActionMenu.visible = false
+  }
+  cancelCategoryInput()
+}
+
 const createCategoryForCanvas = () => {
-  const name = window.prompt(t('drawing.sidebar.newCategoryPrompt'))
-  const category = drawingStore.createCategory(name)
-  if (category && cardMenu.canvas) drawingStore.moveCanvas(cardMenu.canvas.id, category.id)
-  cardMenu.visible = false
-  hideMoveCategorySubmenu()
+  openCategoryInput('create')
 }
 
 const openCategoryActions = (event, category) => {
@@ -426,9 +479,7 @@ const openCategoryActions = (event, category) => {
 const renameCategory = () => {
   const category = categoryActionMenu.category
   if (!category) return
-  const name = window.prompt(t('drawing.sidebar.renameCategoryPrompt'), category.name)
-  drawingStore.renameCategory(category.id, name)
-  categoryActionMenu.visible = false
+  openCategoryInput('rename', category)
 }
 
 const deleteCategory = () => {
@@ -607,5 +658,14 @@ onUnmounted(() => {
 .move-category-submenu { position: fixed; z-index: 60; min-width: 160px; max-height: calc(100vh - 16px); padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); overflow-y: auto; box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
 .move-category-submenu .submenu-item { width: 100%; }
 .hidden-input { display: none; }
+.category-input-overlay { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .25); }
+.category-input-card { display: flex; flex-direction: column; gap: 12px; width: 300px; max-width: 90vw; padding: 18px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
+.category-input-card strong { font-size: 14px; }
+.category-input-card input { height: 32px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 8px; outline: 0; color: var(--text-primary); background: var(--bg-secondary); font-size: 13px; }
+.category-input-card input:focus { border-color: var(--accent-color); }
+.category-input-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.category-input-actions button { padding: 6px 14px; border: 0; border-radius: 7px; color: var(--text-primary); background: var(--bg-hover); font-size: 12px; cursor: pointer; }
+.category-input-actions button:hover { background: var(--bg-active); }
+.category-input-actions button.primary { color: #fff; background: var(--accent-color); }
 @media (max-width: 760px) { .drawing-sidebar { width: min(272px, 72vw) !important; } .canvas-list { grid-template-columns: 1fr; } }
 </style>

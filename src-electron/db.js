@@ -740,6 +740,23 @@ export function searchNotes(query) {
 
 // ========== Drawing: 画布与分类 ==========
 
+function toEpochMs(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    // sql.js 可能把 REAL 时间戳以 "1789298754698.0" 这样的字符串返回
+    if (/^\d+(\.\d+)?$/.test(trimmed)) return Math.round(Number(trimmed))
+    const parsed = Date.parse(trimmed)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function isoTimestamp(value) {
+  const ms = toEpochMs(value)
+  return ms ? new Date(ms).toISOString() : nowISO()
+}
+
 function normalizeDrawingCanvas(row) {
   if (!row) return row
   try {
@@ -747,6 +764,8 @@ function normalizeDrawingCanvas(row) {
   } catch (_e) {
     row.graphJSON = { cells: [] }
   }
+  row.createdAt = toEpochMs(row.createdAt) || Date.now()
+  row.updatedAt = toEpochMs(row.updatedAt) || Date.now()
   return row
 }
 
@@ -764,18 +783,19 @@ export function getDrawingState() {
 }
 
 export function saveDrawingCanvas(canvas) {
-  const now = nowISO()
   const graphStr = JSON.stringify(canvas?.graphJSON || { cells: [] })
+  const createdAt = isoTimestamp(canvas?.createdAt)
+  const updatedAt = isoTimestamp(canvas?.updatedAt)
   const existing = queryOne('SELECT id FROM drawing_canvases WHERE id = ?', [canvas?.id])
   if (existing) {
     db.run(
       'UPDATE drawing_canvases SET title = ?, titleKey = ?, kind = ?, categoryId = ?, graphJSON = ?, updatedAt = ? WHERE id = ?',
-      [canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, canvas.updatedAt || now, canvas.id]
+      [canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, updatedAt, canvas.id]
     )
   } else {
     db.run(
       'INSERT INTO drawing_canvases (id, title, titleKey, kind, categoryId, graphJSON, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [canvas.id, canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, canvas.createdAt || now, canvas.updatedAt || now]
+      [canvas.id, canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, createdAt, updatedAt]
     )
   }
   saveDb()

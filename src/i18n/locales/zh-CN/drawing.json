@@ -20,7 +20,9 @@
     "deleteCategoryConfirm": "确定删除分类“{name}”吗？分类中的画布不会被删除，将移至未分类。",
     "moveToCategory": "移动到分类",
     "rename": "重命名",
-    "deleteCanvas": "删除画布"
+    "deleteCanvas": "删除画布",
+    "cancel": "取消",
+    "confirm": "确认"
   },
   "groups": {
     "general": "通用图形",

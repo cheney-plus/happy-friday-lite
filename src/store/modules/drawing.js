@@ -30,6 +30,18 @@ function templateForKind(kind) {
   return { cells: [] }
 }
 
+function toTimestamp(value) {
+  // 兼容毫秒数、数字字符串、ISO 字符串，保证 formatUpdated 不出现 Invalid Date
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (/^\d+(\.\d+)?$/.test(trimmed)) return Math.round(Number(trimmed))
+    const parsed = Date.parse(trimmed)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return Date.now()
+}
+
 function createCanvasRecord(partial = {}) {
   const kind = partial.kind || 'blank'
   return {
@@ -38,8 +50,8 @@ function createCanvasRecord(partial = {}) {
     titleKey: partial.titleKey || (partial.title ? '' : canvasTitleKey(kind)),
     kind,
     categoryId: partial.categoryId || null,
-    createdAt: partial.createdAt || partial.updatedAt || Date.now(),
-    updatedAt: partial.updatedAt || Date.now(),
+    createdAt: toTimestamp(partial.createdAt),
+    updatedAt: toTimestamp(partial.updatedAt),
     graphJSON: partial.graphJSON || templateForKind(kind)
   }
 }
@@ -91,6 +103,11 @@ function loadLocalState() {
   } catch {
     return null
   }
+}
+
+function toPlain(value) {
+  // Electron IPC 结构化克隆不支持 Vue 响应式 Proxy，需先深拷贝为纯对象
+  return JSON.parse(JSON.stringify(value))
 }
 
 export const useDrawingStore = defineStore('drawing', {
@@ -162,8 +179,8 @@ export const useDrawingStore = defineStore('drawing', {
     async syncAll() {
       if (!electronService.isElectron) return
       await Promise.all([
-        ...this.categories.map((category) => electronService.invoke('save_drawing_category', category)),
-        ...this.canvases.map((canvas) => electronService.invoke('save_drawing_canvas', canvas)),
+        ...this.categories.map((category) => electronService.invoke('save_drawing_category', toPlain(category))),
+        ...this.canvases.map((canvas) => electronService.invoke('save_drawing_canvas', toPlain(canvas))),
         electronService.invoke('save_drawing_selected_canvas', { canvasId: this.selectedCanvasId })
       ])
     },
@@ -185,7 +202,7 @@ export const useDrawingStore = defineStore('drawing', {
       const canvas = this.canvases.find((item) => item.id === id)
       if (!canvas) return
       if (electronService.isElectron) {
-        electronService.invoke('save_drawing_canvas', canvas)
+        electronService.invoke('save_drawing_canvas', toPlain(canvas))
       }
       this.persist()
     },
@@ -237,7 +254,7 @@ export const useDrawingStore = defineStore('drawing', {
       const category = { id: uid('category'), name: trimmed, createdAt: Date.now() }
       this.categories.unshift(category)
       if (electronService.isElectron) {
-        electronService.invoke('save_drawing_category', category)
+        electronService.invoke('save_drawing_category', { ...category })
       }
       this.persist()
       return category
@@ -249,7 +266,7 @@ export const useDrawingStore = defineStore('drawing', {
       if (!category || !trimmed) return
       category.name = trimmed
       if (electronService.isElectron) {
-        electronService.invoke('save_drawing_category', category)
+        electronService.invoke('save_drawing_category', toPlain(category))
       }
       this.persist()
     },
