@@ -54,7 +54,51 @@
         />
       </div>
 
-      <div class="directory-heading">{{ t('drawing.sidebar.allCanvases') }}</div>
+      <div class="directory-heading" ref="categoryTriggerRef">
+        <button type="button" class="category-trigger" @click.stop="toggleCategoryMenu">
+          <Folder :size="14" :stroke-width="1.8" />
+          <span>{{ currentCategoryName }}</span>
+          <ChevronDown :size="13" :stroke-width="2" />
+        </button>
+        <Teleport to="body">
+          <div v-if="categoryMenuVisible" class="category-dropdown" :style="categoryMenuStyle" @click.stop>
+            <button type="button" class="category-add" @click="createCategory">
+              <FolderPlus :size="14" :stroke-width="1.8" />
+              {{ t('drawing.sidebar.newCategory') }}
+            </button>
+            <div class="category-divider"></div>
+            <button
+              v-for="category in categories"
+              :key="category.id"
+              type="button"
+              class="category-item"
+              :class="{ active: currentCategoryId === category.id }"
+              @click="selectCategory(category.id)"
+            >
+              <Folder :size="14" :stroke-width="1.8" />
+              <span class="category-item-info">
+                <span class="category-item-name">{{ category.name }}</span>
+                <small>{{ t('drawing.sidebar.canvasesCount', { count: category.count }) }}</small>
+              </span>
+              <span
+                v-if="category.id !== 'all'"
+                role="button"
+                tabindex="0"
+                class="category-action"
+                :title="t('drawing.sidebar.categoryActions')"
+                @click.stop="openCategoryActions($event, category)"
+                @keydown.enter.stop="openCategoryActions($event, category)"
+              >
+                <MoreVertical :size="14" :stroke-width="2" />
+              </span>
+            </button>
+          </div>
+          <div v-if="categoryActionMenu.visible" class="category-action-menu" :style="categoryActionMenuStyle" @click.stop>
+            <button type="button" @click="renameCategory">{{ t('drawing.sidebar.renameCategory') }}</button>
+            <button type="button" class="danger" @click="deleteCategory">{{ t('drawing.sidebar.deleteCategory') }}</button>
+          </div>
+        </Teleport>
+      </div>
       <div class="canvas-list">
         <button
           v-for="canvas in filteredCanvases"
@@ -102,6 +146,18 @@
 
     <div v-if="cardMenu.visible" class="card-menu" :style="{ left: `${cardMenu.x}px`, top: `${cardMenu.y}px` }" @click.stop>
       <button type="button" @click="startRename(cardMenu.canvas)">{{ t('drawing.sidebar.rename') }}</button>
+      <div class="card-menu-divider"></div>
+      <div class="card-menu-label">{{ t('drawing.sidebar.moveToCategory') }}</div>
+      <button
+        v-for="category in categories"
+        :key="`move-${category.id}`"
+        type="button"
+        :class="{ active: (cardMenu.canvas.categoryId || 'all') === category.id }"
+        @click="moveCanvasToCategory(category.id)"
+      >
+        <Folder :size="13" :stroke-width="1.8" />
+        {{ category.name }}
+      </button>
       <button type="button" class="danger" @click="removeCanvas(cardMenu.canvas)">{{ t('drawing.sidebar.deleteCanvas') }}</button>
     </div>
     <input ref="importInputRef" class="hidden-input" type="file" accept="application/json,.json" @change="onImportFile" />
@@ -113,9 +169,12 @@ import { computed, nextTick, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ChevronDown,
+  Folder,
+  FolderPlus,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  MoreVertical,
   Search,
   Share2,
   Upload,
@@ -140,6 +199,12 @@ const importInputRef = ref(null)
 const newCanvasMenuVisible = ref(false)
 const renamingId = ref(null)
 const cardMenu = reactive({ visible: false, x: 0, y: 0, canvas: null })
+const currentCategoryId = ref('all')
+const categoryMenuVisible = ref(false)
+const categoryTriggerRef = ref(null)
+const categoryMenuStyle = reactive({ left: '0px', top: '0px' })
+const categoryActionMenu = reactive({ visible: false, x: 0, y: 0, category: null })
+const categoryActionMenuStyle = computed(() => ({ left: `${categoryActionMenu.x}px`, top: `${categoryActionMenu.y}px` }))
 
 const canvasTitle = (canvas) => canvas.title || t(`drawing.canvas.${canvas.titleKey || 'untitled'}`)
 
@@ -154,15 +219,33 @@ const formatUpdated = (ts) => {
   return date.toLocaleDateString()
 }
 
+const categories = computed(() => [
+  { id: 'all', name: t('drawing.sidebar.allCanvases'), count: drawingStore.canvases.length },
+  { id: 'uncategorized', name: t('drawing.sidebar.uncategorized'), count: drawingStore.canvases.filter((canvas) => !canvas.categoryId).length },
+  ...drawingStore.categories.map((category) => ({
+    ...category,
+    count: drawingStore.canvases.filter((canvas) => canvas.categoryId === category.id).length
+  }))
+])
+
+const currentCategoryName = computed(() => categories.value.find((category) => category.id === currentCategoryId.value)?.name || t('drawing.sidebar.allCanvases'))
+
 const filteredCanvases = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase()
-  if (!query) return drawingStore.canvases
-  return drawingStore.canvases.filter((canvas) => canvasTitle(canvas).toLocaleLowerCase().includes(query))
+  const categoryFiltered = currentCategoryId.value === 'all'
+    ? drawingStore.canvases
+    : drawingStore.canvases.filter((canvas) => currentCategoryId.value === 'uncategorized'
+      ? !canvas.categoryId
+      : canvas.categoryId === currentCategoryId.value)
+  if (!query) return categoryFiltered
+  return categoryFiltered.filter((canvas) => canvasTitle(canvas).toLocaleLowerCase().includes(query))
 })
 
 const closeMenus = () => {
   newCanvasMenuVisible.value = false
   cardMenu.visible = false
+  categoryMenuVisible.value = false
+  categoryActionMenu.visible = false
 }
 
 const collapsedByLibrary = ref(false)
@@ -189,6 +272,7 @@ const onLibraryChange = (open) => {
 
 const enterSearchMode = () => {
   searchMode.value = true
+  currentCategoryId.value = 'all'
   closeMenus()
   nextTick(() => searchInputRef.value?.focus())
 }
@@ -199,7 +283,8 @@ const exitSearchMode = () => {
 }
 
 const createCanvas = (kind) => {
-  drawingStore.createCanvas(kind)
+  const categoryId = ['all', 'uncategorized'].includes(currentCategoryId.value) ? null : currentCategoryId.value
+  drawingStore.createCanvas(kind, '', categoryId)
   closeMenus()
 }
 
@@ -216,7 +301,8 @@ const onImportFile = async (event) => {
     const payload = JSON.parse(await file.text())
     drawingStore.importCanvas({
       title: payload.title || file.name.replace(/\.json$/i, ''),
-      graphJSON: payload.graphJSON || payload
+      graphJSON: payload.graphJSON || payload,
+      categoryId: ['all', 'uncategorized'].includes(currentCategoryId.value) ? null : currentCategoryId.value
     })
   } catch {
     // ignore invalid json
@@ -224,10 +310,76 @@ const onImportFile = async (event) => {
 }
 
 const openCardMenu = (event, canvas) => {
+  categoryMenuVisible.value = false
+  categoryActionMenu.visible = false
   cardMenu.visible = true
   cardMenu.x = event.clientX
   cardMenu.y = event.clientY
   cardMenu.canvas = canvas
+}
+
+const toggleCategoryMenu = async () => {
+  if (categoryMenuVisible.value) {
+    categoryMenuVisible.value = false
+    categoryActionMenu.visible = false
+    return
+  }
+  newCanvasMenuVisible.value = false
+  cardMenu.visible = false
+  await nextTick()
+  const rect = categoryTriggerRef.value?.getBoundingClientRect()
+  if (rect) {
+    categoryMenuStyle.left = `${rect.left}px`
+    categoryMenuStyle.top = `${rect.bottom + 4}px`
+  }
+  categoryMenuVisible.value = true
+}
+
+const selectCategory = (id) => {
+  currentCategoryId.value = id
+  categoryMenuVisible.value = false
+  categoryActionMenu.visible = false
+  const firstCanvas = filteredCanvases.value[0]
+  if (firstCanvas) drawingStore.selectCanvas(firstCanvas.id)
+}
+
+const createCategory = () => {
+  const name = window.prompt(t('drawing.sidebar.newCategoryPrompt'))
+  const category = drawingStore.createCategory(name)
+  if (category) currentCategoryId.value = category.id
+  categoryMenuVisible.value = false
+}
+
+const openCategoryActions = (event, category) => {
+  const rect = event.currentTarget?.getBoundingClientRect()
+  if (!rect) return
+  categoryActionMenu.category = category
+  categoryActionMenu.x = rect.right + 4
+  categoryActionMenu.y = rect.top
+  categoryActionMenu.visible = true
+}
+
+const renameCategory = () => {
+  const category = categoryActionMenu.category
+  if (!category) return
+  const name = window.prompt(t('drawing.sidebar.renameCategoryPrompt'), category.name)
+  drawingStore.renameCategory(category.id, name)
+  categoryActionMenu.visible = false
+}
+
+const deleteCategory = () => {
+  const category = categoryActionMenu.category
+  if (!category) return
+  if (!window.confirm(t('drawing.sidebar.deleteCategoryConfirm', { name: category.name }))) return
+  drawingStore.deleteCategory(category.id)
+  if (currentCategoryId.value === category.id) currentCategoryId.value = 'all'
+  categoryActionMenu.visible = false
+}
+
+const moveCanvasToCategory = (categoryId) => {
+  if (!cardMenu.canvas) return
+  drawingStore.moveCanvas(cardMenu.canvas.id, ['all', 'uncategorized'].includes(categoryId) ? null : categoryId)
+  cardMenu.visible = false
 }
 
 const startRename = (canvas) => {
@@ -297,9 +449,27 @@ onUnmounted(stopResizing)
 .dropdown-item:hover { background: var(--bg-hover); }
 .sidebar-search { display: flex; align-items: center; gap: 6px; height: 56px; padding: 12px; box-sizing: border-box; color: var(--text-tertiary); }
 .sidebar-search input { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 14px; }
-.directory-heading { padding: 0 16px 10px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
-.canvas-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; justify-content: start; padding: 0 14px 16px; overflow-y: auto; }
-.canvas-card { display: flex; flex-direction: column; min-width: 0; aspect-ratio: .9; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
+.directory-heading { padding: 0 12px 10px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.category-trigger { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; font-size: 12px; font-weight: 600; cursor: pointer; }
+.category-trigger:hover { background: var(--bg-hover); }
+.category-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.category-dropdown, .category-action-menu { position: fixed; z-index: 100; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); box-shadow: 0 8px 20px rgba(0, 0, 0, .14); }
+.category-dropdown { min-width: 210px; max-height: min(420px, calc(100vh - 120px)); overflow-y: auto; }
+.category-add, .category-item { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
+.category-add:hover, .category-item:hover { background: var(--bg-hover); }
+.category-item.active { background: var(--bg-active); }
+.category-item-info { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 1px; }
+.category-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.category-item-info small { color: var(--text-tertiary); font-size: 10px; font-weight: 400; }
+.category-action { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; color: var(--text-tertiary); background: transparent; cursor: pointer; }
+.category-action:hover { color: var(--text-primary); background: var(--bg-hover); }
+.category-divider, .card-menu-divider { height: 1px; margin: 4px 2px; background: var(--border-color); }
+.category-action-menu { min-width: 120px; padding: 3px; }
+.category-action-menu button { display: block; width: 100%; padding: 7px 8px; border: 0; border-radius: 5px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
+.category-action-menu button:hover { background: var(--bg-hover); }
+.category-action-menu .danger { color: #e11d48; }
+.canvas-list { display: grid; flex: 1 1 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 10px; min-height: 0; justify-content: start; padding: 0 14px 16px; overflow-y: auto; }
+.canvas-card { display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; aspect-ratio: .9; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
 .canvas-card:hover { border-color: #a8a29e; }
 .canvas-card.active, .canvas-card.active:hover { border-color: #1c1917; box-shadow: none; }
 .canvas-preview { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; min-height: 0; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
@@ -326,14 +496,18 @@ onUnmounted(stopResizing)
   position: fixed;
   z-index: 50;
   min-width: 120px;
+  max-height: calc(100vh - 16px);
   padding: 4px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
+  overflow-y: auto;
   box-shadow: 0 8px 20px rgba(0, 0, 0, .12);
 }
 .card-menu button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   padding: 7px 8px;
   border: 0;
@@ -344,6 +518,8 @@ onUnmounted(stopResizing)
   text-align: left;
   cursor: pointer;
 }
+.card-menu-label { padding: 4px 8px 2px; color: var(--text-tertiary); font-size: 10px; }
+.card-menu button.active { background: var(--bg-active); }
 .card-menu button:hover { background: var(--bg-hover); }
 .card-menu .danger { color: #e11d48; }
 .hidden-input { display: none; }

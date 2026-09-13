@@ -29,6 +29,7 @@ function createCanvasRecord(partial = {}) {
     title: partial.title || '',
     titleKey: partial.titleKey || (partial.title ? '' : canvasTitleKey(kind)),
     kind,
+    categoryId: partial.categoryId || null,
     updatedAt: partial.updatedAt || Date.now(),
     graphJSON: partial.graphJSON || templateForKind(kind)
   }
@@ -50,7 +51,18 @@ function loadState() {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed?.canvases) || !parsed.canvases.length) return null
-    return parsed
+    const categories = Array.isArray(parsed.categories)
+      ? parsed.categories.filter((category) => category?.id && category?.name)
+      : []
+    const categoryIds = new Set(categories.map((category) => category.id))
+    return {
+      ...parsed,
+      categories,
+      canvases: parsed.canvases.map((canvas) => createCanvasRecord({
+        ...canvas,
+        categoryId: categoryIds.has(canvas.categoryId) ? canvas.categoryId : null
+      }))
+    }
   } catch {
     return null
   }
@@ -62,6 +74,7 @@ export const useDrawingStore = defineStore('drawing', {
     const canvases = saved?.canvases || defaultCanvases()
     return {
       canvases,
+      categories: saved?.categories || [],
       selectedCanvasId: saved?.selectedCanvasId && canvases.some((item) => item.id === saved.selectedCanvasId)
         ? saved.selectedCanvasId
         : canvases[0].id
@@ -80,6 +93,7 @@ export const useDrawingStore = defineStore('drawing', {
         STORAGE_KEY,
         JSON.stringify({
           canvases: this.canvases,
+          categories: this.categories,
           selectedCanvasId: this.selectedCanvasId
         })
       )
@@ -91,8 +105,8 @@ export const useDrawingStore = defineStore('drawing', {
       this.persist()
     },
 
-    createCanvas(kind = 'blank', title = '') {
-      const canvas = createCanvasRecord({ kind, title })
+    createCanvas(kind = 'blank', title = '', categoryId = null) {
+      const canvas = createCanvasRecord({ kind, title, categoryId })
       this.canvases.unshift(canvas)
       this.selectedCanvasId = canvas.id
       this.persist()
@@ -108,12 +122,47 @@ export const useDrawingStore = defineStore('drawing', {
         kind: payload?.kind || 'blank',
         title: payload?.title || '',
         titleKey: payload?.title ? '' : 'untitled',
+        categoryId: payload?.categoryId || null,
         graphJSON
       })
       this.canvases.unshift(canvas)
       this.selectedCanvasId = canvas.id
       this.persist()
       return canvas
+    },
+
+    createCategory(name) {
+      const trimmed = String(name || '').trim()
+      if (!trimmed) return null
+      const category = { id: uid('category'), name: trimmed, createdAt: Date.now() }
+      this.categories.unshift(category)
+      this.persist()
+      return category
+    },
+
+    renameCategory(id, name) {
+      const category = this.categories.find((item) => item.id === id)
+      const trimmed = String(name || '').trim()
+      if (!category || !trimmed) return
+      category.name = trimmed
+      this.persist()
+    },
+
+    deleteCategory(id) {
+      if (!this.categories.some((item) => item.id === id)) return
+      this.canvases.forEach((canvas) => {
+        if (canvas.categoryId === id) canvas.categoryId = null
+      })
+      this.categories = this.categories.filter((item) => item.id !== id)
+      this.persist()
+    },
+
+    moveCanvas(id, categoryId = null) {
+      const canvas = this.canvases.find((item) => item.id === id)
+      if (!canvas) return
+      if (categoryId && !this.categories.some((item) => item.id === categoryId)) return
+      canvas.categoryId = categoryId || null
+      this.persist()
     },
 
     renameCanvas(id, title) {
