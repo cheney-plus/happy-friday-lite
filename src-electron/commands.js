@@ -527,6 +527,10 @@ export function registerCommands(mainWindow) {
     return db.getDrawingState()
   })
 
+  ipcMain.handle('get_drawing_canvas', (_event, args) => {
+    return db.getDrawingCanvas(args?.canvasId)
+  })
+
   ipcMain.handle('save_drawing_canvas', (_event, args) => {
     return db.saveDrawingCanvas(args)
   })

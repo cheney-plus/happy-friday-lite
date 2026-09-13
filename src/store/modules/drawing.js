@@ -115,7 +115,9 @@ export const useDrawingStore = defineStore('drawing', {
     canvases: [],
     categories: [],
     selectedCanvasId: null,
-    initialized: false
+    initialized: false,
+    // Agent 在主进程修改画布后递增，用于强制重载当前打开的编辑器
+    agentVersion: 0
   }),
 
   getters: {
@@ -342,6 +344,26 @@ export const useDrawingStore = defineStore('drawing', {
       canvas.graphJSON = graphJSON
       canvas.updatedAt = Date.now()
       this.persistCanvas(canvas.id)
+    },
+
+    // Agent 在主进程直接写 SQLite 后，从数据库拉取最新画布并刷新本地状态。
+    // 若刷新的是当前打开的画布，递增 agentVersion 触发编辑器重载。
+    async applyAgentUpdate(canvasId) {
+      if (!electronService.isElectron || !canvasId) return
+      const canvas = await electronService.invoke('get_drawing_canvas', { canvasId })
+      if (!canvas) return
+      const record = createCanvasRecord(canvas)
+      const index = this.canvases.findIndex((item) => item.id === canvasId)
+      if (index === -1) {
+        this.canvases.unshift(record)
+        this.selectedCanvasId = canvasId
+      } else {
+        this.canvases.splice(index, 1, record)
+      }
+      if (this.selectedCanvasId === canvasId) {
+        this.agentVersion += 1
+      }
+      this.persist()
     }
   }
 })

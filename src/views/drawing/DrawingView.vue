@@ -127,7 +127,7 @@
     <main class="drawing-workspace" aria-label="Drawing workspace">
       <DrawingEditor
         v-if="drawingStore.currentCanvas"
-        :key="drawingStore.currentCanvas.id"
+        :key="`${drawingStore.currentCanvas.id}:${drawingStore.agentVersion}`"
         :canvas="drawingStore.currentCanvas"
         @change="onGraphChange"
         @library-change="onLibraryChange"
@@ -215,6 +215,16 @@ onMounted(() => {
   drawingStore.initialize()
   // 切换应用/浏览器 Tab 时窗口失焦，关闭所有弹出菜单
   window.addEventListener('blur', closeMenus)
+  // 监听 Agent 绘图工具的修改事件，从数据库拉取最新画布并刷新
+  unlistenDrawingUpdated = electronService.listen('drawing-updated', (event) => {
+    const payload = event.payload || {}
+    if (!payload.canvasId || payload.source !== 'agent') return
+    // 若刷新的是当前打开的画布，编辑器会重载并 emit 一次旧图数据，需在时间窗内拦截
+    if (drawingStore.selectedCanvasId === payload.canvasId) {
+      agentSuppressedSave = { canvasId: payload.canvasId, at: Date.now() }
+    }
+    drawingStore.applyAgentUpdate(payload.canvasId)
+  })
 })
 
 // keep-alive 切走时组件只是失活，Teleport 到 body 的下拉框仍悬浮在其他 Tab 上，需主动关闭
@@ -567,7 +577,15 @@ const removeCanvas = (canvas) => {
   cardMenu.visible = false
 }
 
+// Agent 写当前画布后编辑器重载会产生过期的 change 事件，在时间窗内拦截以免覆盖 Agent 的修改
+const AGENT_SUPPRESS_MS = 1500
+let agentSuppressedSave = null
+let unlistenDrawingUpdated = null
+
 const onGraphChange = ({ id, graphJSON }) => {
+  if (agentSuppressedSave && agentSuppressedSave.canvasId === id && Date.now() - agentSuppressedSave.at < AGENT_SUPPRESS_MS) {
+    return
+  }
   if (id && graphJSON) drawingStore.saveGraph(id, graphJSON)
 }
 
@@ -600,6 +618,10 @@ onUnmounted(() => {
   cancelHideMoveCategorySubmenu()
   if (shareToastTimer) clearTimeout(shareToastTimer)
   window.removeEventListener('blur', closeMenus)
+  if (unlistenDrawingUpdated) {
+    unlistenDrawingUpdated()
+    unlistenDrawingUpdated = null
+  }
 })
 </script>
 

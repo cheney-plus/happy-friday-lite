@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'update_schedule_event',
       'delete_schedule_event',
       'get_drawing_state',
+      'get_drawing_canvas',
       'save_drawing_canvas',
       'delete_drawing_canvas',
       'save_drawing_category',
@@ -181,6 +182,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-tool-call',
       'agent-tool-result',
       'agent-tool-approval',
+      'drawing-updated',
       'automation-updated',
       'kb-directory-changed',
       'harness-status-changed'

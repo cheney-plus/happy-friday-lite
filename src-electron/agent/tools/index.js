@@ -16,6 +16,9 @@ import './builtin/knowledgeBase.js'
 // 笔记操作工具（search/get/create/update）
 import './builtin/noteOps.js'
 
+// 绘图操作工具（list/get/create/update/layout）
+import './builtin/drawingOps.js'
+
 // 日程操作工具（list/create/update/delete）
 import './builtin/scheduleOps.js'
 
