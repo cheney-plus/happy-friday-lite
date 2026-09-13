@@ -196,6 +196,23 @@ function serveNoteShareApi(res, noteId) {
   }
 }
 
+// 画布分享数据接口：返回画布内容（只读查看）
+function serveDrawingShareApi(res, canvasId) {
+  try {
+    const canvas = db.getDrawingCanvas(canvasId)
+    if (!canvas) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ success: false, error: 'Canvas not found' }))
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ success: true, canvas }))
+  } catch (e) {
+    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ success: false, error: 'Canvas not found' }))
+  }
+}
+
 function handleRequest(req, res) {
   try {
     // 仅允许 GET 请求
@@ -218,6 +235,13 @@ function handleRequest(req, res) {
     const noteApiMatch = url.pathname.match(/^\/api\/share\/note\/(.+)$/)
     if (noteApiMatch) {
       serveNoteShareApi(res, decodeURIComponent(noteApiMatch[1]))
+      return
+    }
+
+    // 画布分享数据接口 /api/share/drawing/:canvasId（需在会话接口之前匹配）
+    const drawingApiMatch = url.pathname.match(/^\/api\/share\/drawing\/(.+)$/)
+    if (drawingApiMatch) {
+      serveDrawingShareApi(res, decodeURIComponent(drawingApiMatch[1]))
       return
     }
 
@@ -292,4 +316,11 @@ export function getNoteShareUrl(noteId) {
   if (!serverPort) return null
   const ip = getLocalIp()
   return `http://${ip}:${serverPort}/#/share/note/${encodeURIComponent(noteId)}`
+}
+
+// 生成画布分享链接（只读查看）
+export function getDrawingShareUrl(canvasId) {
+  if (!serverPort) return null
+  const ip = getLocalIp()
+  return `http://${ip}:${serverPort}/#/share/drawing/${encodeURIComponent(canvasId)}`
 }

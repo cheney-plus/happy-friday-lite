@@ -1,0 +1,1271 @@
+{
+  "title": "ER 图",
+  "graphJSON": {
+    "cells": [
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_g7255c",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "labels": [
+          {
+            "attrs": {
+              "label": {
+                "text": "1",
+                "fontSize": 11
+              }
+            }
+          }
+        ],
+        "source": {
+          "cell": "n_mtze82dz_vbjerd"
+        },
+        "target": {
+          "cell": "n_mtze82dz_cyi9hk"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_qujfm9",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "labels": [
+          {
+            "attrs": {
+              "label": {
+                "text": "N",
+                "fontSize": 11
+              }
+            }
+          }
+        ],
+        "source": {
+          "cell": "n_mtze82dz_cyi9hk"
+        },
+        "target": {
+          "cell": "n_mtze82dz_4h1ij0"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_0n4v20",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "labels": [
+          {
+            "attrs": {
+              "label": {
+                "text": "N",
+                "fontSize": 11
+              }
+            }
+          }
+        ],
+        "source": {
+          "cell": "n_mtze82dz_4h1ij0"
+        },
+        "target": {
+          "cell": "n_mtze82dz_x5t3ub"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_ea5gec",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "labels": [
+          {
+            "attrs": {
+              "label": {
+                "text": "1",
+                "fontSize": 11
+              }
+            }
+          }
+        ],
+        "source": {
+          "cell": "n_mtze82dz_x5t3ub"
+        },
+        "target": {
+          "cell": "n_mtze82dz_7333rv"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_b2ekyy",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "n_mtze82dz_vbjerd"
+        },
+        "target": {
+          "cell": "n_mtze82dz_p193lw"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_qlsupd",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "n_mtze82dz_4h1ij0"
+        },
+        "target": {
+          "cell": "n_mtze82dz_ic4ebj"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_2n4stx",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "n_mtze82dz_4h1ij0"
+        },
+        "target": {
+          "cell": "n_mtze82dz_945j6m"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_rxecx9",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "n_mtze82dz_7333rv"
+        },
+        "target": {
+          "cell": "n_mtze82dz_4ruq0w"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "targetMarker": {
+              "name": "classic",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "e_mtze82dz_xex8c7",
+        "router": {
+          "name": "er"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 6
+          }
+        },
+        "data": {
+          "edgeStyle": "er"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "n_mtze82dz_x5t3ub"
+        },
+        "target": {
+          "cell": "n_mtze82dz_pc4nx1"
+        }
+      },
+      {
+        "position": {
+          "x": 40,
+          "y": 196
+        },
+        "size": {
+          "width": 160,
+          "height": 88
+        },
+        "attrs": {
+          "text": {
+            "text": "客户"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-entity",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_vbjerd",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 260,
+          "y": 196
+        },
+        "size": {
+          "width": 140,
+          "height": 88
+        },
+        "attrs": {
+          "text": {
+            "text": "下单"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-rel",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_cyi9hk",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 480,
+          "y": 196
+        },
+        "size": {
+          "width": 160,
+          "height": 88
+        },
+        "attrs": {
+          "text": {
+            "text": "订单"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-entity",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_4h1ij0",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 690,
+          "y": 196
+        },
+        "size": {
+          "width": 140,
+          "height": 88
+        },
+        "attrs": {
+          "text": {
+            "text": "包含"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-rel",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_x5t3ub",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 910,
+          "y": 196
+        },
+        "size": {
+          "width": 160,
+          "height": 88
+        },
+        "attrs": {
+          "text": {
+            "text": "商品"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-entity",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_7333rv",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 60,
+          "y": 350
+        },
+        "size": {
+          "width": 120,
+          "height": 52
+        },
+        "attrs": {
+          "text": {
+            "text": "customer_id"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-key",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_p193lw",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 360,
+          "y": 350
+        },
+        "size": {
+          "width": 120,
+          "height": 52
+        },
+        "attrs": {
+          "text": {
+            "text": "order_id"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-key",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_ic4ebj",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 640,
+          "y": 350
+        },
+        "size": {
+          "width": 120,
+          "height": 52
+        },
+        "attrs": {
+          "text": {
+            "text": "total"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-attr",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_945j6m",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 930,
+          "y": 350
+        },
+        "size": {
+          "width": 120,
+          "height": 52
+        },
+        "attrs": {
+          "text": {
+            "text": "product_id"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-key",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_4ruq0w",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 700,
+          "y": 74
+        },
+        "size": {
+          "width": 120,
+          "height": 52
+        },
+        "attrs": {
+          "text": {
+            "text": "quantity"
+          }
+        },
+        "visible": true,
+        "shape": "draw-er-attr",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "n_mtze82dz_pc4nx1",
+        "zIndex": 1,
+        "data": {}
+      }
+    ]
+  }
+}

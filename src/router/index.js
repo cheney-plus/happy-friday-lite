@@ -27,6 +27,11 @@ export const routes = [
     component: () => import('@/views/note/NoteEdit.vue')
   },
   {
+    path: '/drawing',
+    name: 'drawing',
+    component: () => import('@/views/drawing/DrawingView.vue')
+  },
+  {
     path: '/schedule',
     name: 'schedule',
     component: () => import('@/views/schedule/ScheduleCalendar.vue')
@@ -99,6 +104,13 @@ export const routes = [
     path: '/share/note/:id',
     name: 'share-note',
     component: () => import('@/views/note/NoteEdit.vue'),
+    meta: { share: true }
+  },
+  {
+    // 画布内网分享：只读查看绘图
+    path: '/share/drawing/:id',
+    name: 'share-drawing',
+    component: () => import('@/views/drawing/DrawingShareView.vue'),
     meta: { share: true }
   },
   {

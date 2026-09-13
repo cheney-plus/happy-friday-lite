@@ -47,6 +47,7 @@
             type="text"
             :placeholder="t('note.sidebar.searchPlaceholder')"
             @keydown.escape="exitSearchMode"
+            @blur="exitSearchMode"
           />
         </div>
 
