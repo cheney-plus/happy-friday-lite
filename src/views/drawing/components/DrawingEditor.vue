@@ -71,6 +71,7 @@ import {
   createDrawingGraph,
   downloadFile,
   duplicateDrawingCells,
+  exportDrawingSVG,
   getViewportCenter,
   insertTemplate,
   loadGraphData,
@@ -463,17 +464,7 @@ const exportCanvas = (type) => {
     graph.value.exportPNG(`${name}.png`, { padding, backgroundColor, ratio: 3 })
   }
   if (type === 'svg') {
-    // toSVG ignores `padding`, so expand the viewBox manually to avoid clipping.
-    const bbox = graph.value.graphToLocal(graph.value.getContentBBox())
-    graph.value.exportSVG(`${name}.svg`, {
-      viewBox: {
-        x: bbox.x - padding,
-        y: bbox.y - padding,
-        width: bbox.width + padding * 2,
-        height: bbox.height + padding * 2
-      },
-      preserveDimensions: true
-    })
+    exportDrawingSVG(graph.value, `${name}.svg`)
   }
 }
 

@@ -388,4 +388,94 @@ export function downloadFile(content, filename, type = 'application/json') {
   if (blob) URL.revokeObjectURL(link.href)
 }
 
+function unionRect(a, b) {
+  if (!a || !Number.isFinite(a.width) || !Number.isFinite(a.height)) return b
+  if (!b || !Number.isFinite(b.width) || !Number.isFinite(b.height)) return a
+  const x = Math.min(a.x, b.x)
+  const y = Math.min(a.y, b.y)
+  return {
+    x,
+    y,
+    width: Math.max(a.x + a.width, b.x + b.width) - x,
+    height: Math.max(a.y + a.height, b.y + b.height) - y
+  }
+}
+
+function clearExportedTransform(el) {
+  if (!el) return
+  el.removeAttribute('transform')
+  el.removeAttribute('clip-path')
+  el.removeAttribute('clip')
+  if (!el.style) return
+  el.style.removeProperty('transform')
+  el.style.removeProperty('transform-origin')
+  el.style.removeProperty('overflow')
+  el.style.removeProperty('clip-path')
+  el.style.removeProperty('clip')
+  el.style.removeProperty('width')
+  el.style.removeProperty('height')
+  el.style.removeProperty('background')
+  el.style.removeProperty('background-color')
+}
+
+function paintExportedSvgBackground(svg, color = '#ffffff') {
+  svg.style.backgroundColor = color
+  const parts = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number)
+  const [x, y, width, height] = parts
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return
+  const ns = 'http://www.w3.org/2000/svg'
+  svg.querySelectorAll('[data-export-bg]').forEach((node) => node.remove())
+  const rect = svg.ownerDocument.createElementNS(ns, 'rect')
+  rect.setAttribute('data-export-bg', 'true')
+  rect.setAttribute('x', String(x))
+  rect.setAttribute('y', String(y))
+  rect.setAttribute('width', String(width))
+  rect.setAttribute('height', String(height))
+  rect.setAttribute('fill', color)
+  const defs = svg.querySelector('defs')
+  const anchor = defs?.nextSibling || svg.firstChild
+  if (anchor) svg.insertBefore(rect, anchor)
+  else svg.appendChild(rect)
+}
+
+export function getDrawingExportViewBox(graph, padding = 24) {
+  const geometry = graph.getContentArea()
+  let visual = null
+  try {
+    visual = graph.getContentArea({ useCellGeometry: false })
+  } catch {
+    visual = null
+  }
+  const bbox = unionRect(geometry, visual) || { x: 0, y: 0, width: 1, height: 1 }
+  return {
+    x: bbox.x - padding,
+    y: bbox.y - padding,
+    width: Math.max(bbox.width, 1) + padding * 2,
+    height: Math.max(bbox.height, 1) + padding * 2
+  }
+}
+
+export function sanitizeExportedDrawingSvg(svg) {
+  svg.removeAttribute('style')
+  svg.style.overflow = 'visible'
+  // Pan/zoom lives on the viewport group. X6 toSVG only drops the stage transform,
+  // then copyStyles inlines the leftover matrix and clips the bottom-right.
+  clearExportedTransform(svg.querySelector('.x6-graph-svg-viewport'))
+  clearExportedTransform(svg.querySelector('.x6-graph-svg-stage'))
+  paintExportedSvgBackground(svg, '#ffffff')
+  svg.querySelectorAll(
+    '.x6-widget-selection, .x6-widget-selection-box, .x6-widget-selection-inner, .x6-graph-svg-overlay'
+  ).forEach((node) => node.remove())
+  return svg
+}
+
+export function exportDrawingSVG(graph, filename) {
+  graph.exportSVG(filename, {
+    viewBox: getDrawingExportViewBox(graph),
+    preserveDimensions: true,
+    copyStyles: true,
+    beforeSerialize: sanitizeExportedDrawingSvg
+  })
+}
+
 export { applyEdgeStyle }
