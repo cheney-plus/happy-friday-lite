@@ -1,5 +1,5 @@
 <template>
-  <div class="drawing-page" :style="{ '--canvas-ratio': canvasRatio }" @click="closeMenus">
+  <div class="drawing-page" @click="closeMenus">
     <aside
       class="drawing-sidebar"
       :class="{ collapsed: sidebarCollapsed, 'is-resizing': isResizing }"
@@ -124,7 +124,7 @@
       <PanelLeftOpen :size="18" :stroke-width="1.8" />
     </button>
 
-    <main ref="workspaceRef" class="drawing-workspace" aria-label="Drawing workspace">
+    <main class="drawing-workspace" aria-label="Drawing workspace">
       <DrawingEditor
         v-if="drawingStore.currentCanvas"
         :key="drawingStore.currentCanvas.id"
@@ -162,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ChevronDown,
@@ -206,15 +206,6 @@ const moveCategorySubmenuRef = ref(null)
 const moveCategorySubmenuVisible = ref(false)
 const moveCategorySubmenuStyle = reactive({ left: '0px', top: '0px' })
 let moveCategorySubmenuHideTimer = null
-
-// Thumbnail aspect ratio is fixed to the workspace proportion at startup.
-const workspaceRef = ref(null)
-const canvasRatio = ref(1.5)
-
-onMounted(() => {
-  const rect = workspaceRef.value?.getBoundingClientRect()
-  if (rect?.height > 0) canvasRatio.value = Math.max(rect.width / rect.height, 0.5)
-})
 
 const canvasTitle = (canvas) => canvas.title || t(`drawing.canvas.${canvas.titleKey || 'untitled'}`)
 
@@ -544,7 +535,7 @@ onUnmounted(() => {
 .canvas-card { display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
 .canvas-card:hover { border-color: #a8a29e; }
 .canvas-card.active, .canvas-card.active:hover { border-color: #1c1917; box-shadow: none; }
-.canvas-preview { position: relative; display: flex; width: 100%; aspect-ratio: var(--canvas-ratio, 1.5); align-items: center; justify-content: center; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
+.canvas-preview { position: relative; display: flex; width: 100%; aspect-ratio: 3 / 2; align-items: center; justify-content: center; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
 .canvas-card-footer { display: flex; flex-direction: column; gap: 2px; padding: 5px 6px; flex-shrink: 0; }
 .canvas-card-footer strong { overflow: hidden; font-size: 12px; line-height: 1.2; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-card-footer small { color: var(--text-tertiary); font-size: 10px; line-height: 1.2; }
