@@ -60,7 +60,6 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDrawingStore } from '@/store'
 import { useTheme } from '@/utils/theme'
 import { applyCellAnimation } from '../shapes/animation.js'
 import { getCanvasTheme } from '../shapes/theme.js'
@@ -92,6 +91,11 @@ import {
   outdentMindNode,
   setMindCollapsed
 } from '../shapes/mindmap.js'
+import {
+  createArchitectureTemplate,
+  createErTemplate,
+  createFlowchartTemplate
+} from '../shapes/templates.js'
 import DrawingContextMenu from './DrawingContextMenu.vue'
 import EditorToolbar from './EditorToolbar.vue'
 import PropertyPanel from './PropertyPanel.vue'
@@ -104,7 +108,6 @@ const props = defineProps({
 const emit = defineEmits(['change', 'library-change'])
 const { t } = useI18n()
 const { appliedTheme } = useTheme()
-const drawingStore = useDrawingStore()
 
 function toColorInput(value, fallback) {
   if (typeof value === 'string' && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(value)) {
@@ -288,30 +291,16 @@ const onAnimationAction = (type) => {
 
 const onInsertTemplate = (name) => {
   if (!graph.value) return
-  const sourceCanvas = name === 'flowchart'
-    ? drawingStore.canvases.find((canvas) => (
-      canvas.id === 'flowchart'
-      || canvas.titleKey === 'flowchart'
-      || canvas.title === t('drawing.canvas.flowchart')
-    ))
-    : name === 'er'
-      ? drawingStore.canvases.find((canvas) => (
-        canvas.id === 'er'
-        || canvas.titleKey === 'er'
-        || canvas.title === t('drawing.groups.er')
-      ))
-      : name === 'architecture'
-        ? drawingStore.canvases.find((canvas) => (
-          canvas.id === 'architecture'
-          || canvas.titleKey === 'architecture'
-          || canvas.title === t('drawing.groups.architecture')
-        ))
-      : null
-  const rawSource = sourceCanvas
-    ? (sourceCanvas.id === props.canvas.id ? graph.value.toJSON() : sourceCanvas.graphJSON)
-    : null
-  const source = rawSource?.cells?.length ? JSON.parse(JSON.stringify(rawSource)) : null
-  insertTemplate(graph.value, name, source)
+  const builtInTemplates = {
+    flowchart: createFlowchartTemplate,
+    er: createErTemplate,
+    architecture: createArchitectureTemplate
+  }
+  if (builtInTemplates[name]) {
+    insertTemplate(graph.value, name, builtInTemplates[name]())
+    return
+  }
+  insertTemplate(graph.value, name)
 }
 
 const onImagePicked = (event) => {

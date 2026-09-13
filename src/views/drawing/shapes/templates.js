@@ -1,6 +1,9 @@
 import { uid } from './id.js'
 import { createEdgeMetadata } from './edgeStyles.js'
 import { mindTreeToCells } from './mindmap.js'
+import architectureDesign from '../../../assets/drawing_temp/系统架构图.json'
+import erDesign from '../../../assets/drawing_temp/ER 图.json'
+import flowchartDesign from '../../../assets/drawing_temp/流程图.json'
 
 function node(shape, x, y, width, height, label, extra = {}) {
   return {
@@ -83,6 +86,8 @@ export function createMindMapTemplate(ox = 80, oy = 80) {
 }
 
 export function createFlowchartTemplate(ox = 120, oy = 40) {
+  return flowchartDesign.graphJSON
+  /* legacy fallback kept for reference */
   const start = node('draw-terminator', ox + 106, oy, 128, 52, '开始')
   const intake = node('draw-process', ox + 100, oy + 92, 140, 56, '接收申请')
   const review = node('draw-decision', ox + 96, oy + 190, 148, 92, '资料完整?')
@@ -128,6 +133,8 @@ export function createKanbanTemplate(ox = 40, oy = 40) {
 }
 
 export function createErTemplate(ox = 40, oy = 80) {
+  return erDesign.graphJSON
+  /* legacy fallback kept for reference */
   const customer = node('draw-er-entity', ox, oy + 116, 160, 88, '客户')
   const places = node('draw-er-rel', ox + 220, oy + 116, 140, 88, '下单')
   const order = node('draw-er-entity', ox + 440, oy + 116, 160, 88, '订单')
@@ -215,6 +222,8 @@ export function createSequenceTemplate(ox = 80, oy = 40) {
 }
 
 export function createArchitectureTemplate(ox = 40, oy = 40) {
+  return architectureDesign.graphJSON
+  /* legacy fallback kept for reference */
   const client = node('draw-arch-client', ox + 240, oy, 140, 64, '客户端')
   const gw = node('draw-arch-gateway', ox + 240, oy + 110, 140, 64, '网关')
   const api = node('draw-arch-server', ox + 80, oy + 220, 140, 64, '业务服务')

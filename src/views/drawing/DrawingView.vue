@@ -22,14 +22,6 @@
                 <Plus :size="14" :stroke-width="2" />
                 {{ t('drawing.sidebar.newCanvas') }}
               </button>
-              <button type="button" class="dropdown-item" @click="createCanvas('mindmap')">
-                <Share2 :size="14" :stroke-width="2" />
-                {{ t('drawing.canvas.mindMap') }}
-              </button>
-              <button type="button" class="dropdown-item" @click="createCanvas('flowchart')">
-                <Workflow :size="14" :stroke-width="2" />
-                {{ t('drawing.canvas.flowchart') }}
-              </button>
               <button type="button" class="dropdown-item" @click="triggerImport">
                 <Upload :size="14" :stroke-width="2" />
                 {{ t('drawing.sidebar.importCanvas') }}
@@ -62,11 +54,6 @@
         </button>
         <Teleport to="body">
           <div v-if="categoryMenuVisible" class="category-dropdown" :style="categoryMenuStyle" @click.stop>
-            <button type="button" class="category-add" @click="createCategory">
-              <FolderPlus :size="14" :stroke-width="1.8" />
-              {{ t('drawing.sidebar.newCategory') }}
-            </button>
-            <div class="category-divider"></div>
             <button
               v-for="category in categories"
               :key="category.id"
@@ -123,7 +110,10 @@
               @blur="commitRename($event, canvas)"
             />
             <strong v-else>{{ canvasTitle(canvas) }}</strong>
-            <small>{{ formatUpdated(canvas.updatedAt) }}</small>
+            <small class="canvas-card-meta">
+              <span>{{ formatUpdated(canvas.updatedAt) }}</span>
+              <span>{{ canvasCategoryName(canvas) }}</span>
+            </small>
           </span>
         </button>
       </div>
@@ -147,19 +137,26 @@
     <div v-if="cardMenu.visible" class="card-menu" :style="{ left: `${cardMenu.x}px`, top: `${cardMenu.y}px` }" @click.stop>
       <button type="button" @click="startRename(cardMenu.canvas)">{{ t('drawing.sidebar.rename') }}</button>
       <div class="card-menu-divider"></div>
-      <div class="card-menu-label">{{ t('drawing.sidebar.moveToCategory') }}</div>
-      <button
-        v-for="category in categories"
-        :key="`move-${category.id}`"
-        type="button"
-        :class="{ active: (cardMenu.canvas.categoryId || 'all') === category.id }"
-        @click="moveCanvasToCategory(category.id)"
-      >
+      <div ref="moveCategoryItemRef" class="card-menu-item has-submenu" @mouseenter="showMoveCategorySubmenu" @mouseleave="hideMoveCategorySubmenuWithDelay">
         <Folder :size="13" :stroke-width="1.8" />
-        {{ category.name }}
-      </button>
+        <span>{{ t('drawing.sidebar.moveToCategory') }}</span>
+        <ChevronRight class="card-menu-arrow" :size="14" :stroke-width="1.8" />
+      </div>
       <button type="button" class="danger" @click="removeCanvas(cardMenu.canvas)">{{ t('drawing.sidebar.deleteCanvas') }}</button>
     </div>
+    <Teleport to="body">
+      <div v-if="moveCategorySubmenuVisible" ref="moveCategorySubmenuRef" class="move-category-submenu" :style="moveCategorySubmenuStyle" @mouseenter="cancelHideMoveCategorySubmenu" @mouseleave="hideMoveCategorySubmenu">
+        <button type="button" class="submenu-item" @click="createCategoryForCanvas">
+          <FolderPlus :size="14" :stroke-width="1.8" />
+          {{ t('drawing.sidebar.newCategory') }}
+        </button>
+        <div class="card-menu-divider"></div>
+        <button v-for="category in categories" :key="`move-${category.id}`" type="button" class="submenu-item" :class="{ active: (cardMenu.canvas?.categoryId || 'all') === category.id }" @click="moveCanvasToCategory(category.id)">
+          <Folder :size="13" :stroke-width="1.8" />
+          {{ category.name }}
+        </button>
+      </div>
+    </Teleport>
     <input ref="importInputRef" class="hidden-input" type="file" accept="application/json,.json" @change="onImportFile" />
   </div>
 </template>
@@ -169,6 +166,7 @@ import { computed, nextTick, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ChevronDown,
+  ChevronRight,
   Folder,
   FolderPlus,
   PanelLeftClose,
@@ -176,9 +174,7 @@ import {
   Plus,
   MoreVertical,
   Search,
-  Share2,
-  Upload,
-  Workflow
+  Upload
 } from 'lucide-vue-next'
 import { useDrawingStore } from '@/store'
 import DrawingEditor from './components/DrawingEditor.vue'
@@ -205,8 +201,19 @@ const categoryTriggerRef = ref(null)
 const categoryMenuStyle = reactive({ left: '0px', top: '0px' })
 const categoryActionMenu = reactive({ visible: false, x: 0, y: 0, category: null })
 const categoryActionMenuStyle = computed(() => ({ left: `${categoryActionMenu.x}px`, top: `${categoryActionMenu.y}px` }))
+const moveCategoryItemRef = ref(null)
+const moveCategorySubmenuRef = ref(null)
+const moveCategorySubmenuVisible = ref(false)
+const moveCategorySubmenuStyle = reactive({ left: '0px', top: '0px' })
+let moveCategorySubmenuHideTimer = null
 
 const canvasTitle = (canvas) => canvas.title || t(`drawing.canvas.${canvas.titleKey || 'untitled'}`)
+
+const canvasCategoryName = (canvas) => {
+  if (!canvas?.categoryId) return t('drawing.sidebar.uncategorized')
+  return drawingStore.categories.find((category) => category.id === canvas.categoryId)?.name
+    || t('drawing.sidebar.uncategorized')
+}
 
 const formatUpdated = (ts) => {
   const date = new Date(ts)
@@ -244,8 +251,10 @@ const filteredCanvases = computed(() => {
 const closeMenus = () => {
   newCanvasMenuVisible.value = false
   cardMenu.visible = false
+  moveCategorySubmenuVisible.value = false
   categoryMenuVisible.value = false
   categoryActionMenu.visible = false
+  cancelHideMoveCategorySubmenu()
 }
 
 const collapsedByLibrary = ref(false)
@@ -313,9 +322,51 @@ const openCardMenu = (event, canvas) => {
   categoryMenuVisible.value = false
   categoryActionMenu.visible = false
   cardMenu.visible = true
+  moveCategorySubmenuVisible.value = false
   cardMenu.x = event.clientX
   cardMenu.y = event.clientY
   cardMenu.canvas = canvas
+}
+
+const positionMoveCategorySubmenu = () => {
+  const itemRect = moveCategoryItemRef.value?.getBoundingClientRect()
+  const submenuRect = moveCategorySubmenuRef.value?.getBoundingClientRect()
+  if (!itemRect || !submenuRect) return
+  const gap = 6
+  const left = itemRect.right + gap + submenuRect.width <= window.innerWidth - 8
+    ? itemRect.right + gap
+    : Math.max(8, itemRect.left - submenuRect.width - gap)
+  const top = itemRect.top + submenuRect.height <= window.innerHeight - 8
+    ? itemRect.top
+    : Math.max(8, itemRect.bottom - submenuRect.height)
+  moveCategorySubmenuStyle.left = `${left}px`
+  moveCategorySubmenuStyle.top = `${top}px`
+}
+
+const showMoveCategorySubmenu = async () => {
+  cancelHideMoveCategorySubmenu()
+  moveCategorySubmenuVisible.value = true
+  await nextTick()
+  positionMoveCategorySubmenu()
+}
+
+const hideMoveCategorySubmenuWithDelay = () => {
+  moveCategorySubmenuHideTimer = setTimeout(() => {
+    moveCategorySubmenuVisible.value = false
+    moveCategorySubmenuHideTimer = null
+  }, 180)
+}
+
+const cancelHideMoveCategorySubmenu = () => {
+  if (moveCategorySubmenuHideTimer) {
+    clearTimeout(moveCategorySubmenuHideTimer)
+    moveCategorySubmenuHideTimer = null
+  }
+}
+
+const hideMoveCategorySubmenu = () => {
+  cancelHideMoveCategorySubmenu()
+  moveCategorySubmenuVisible.value = false
 }
 
 const toggleCategoryMenu = async () => {
@@ -343,11 +394,12 @@ const selectCategory = (id) => {
   if (firstCanvas) drawingStore.selectCanvas(firstCanvas.id)
 }
 
-const createCategory = () => {
+const createCategoryForCanvas = () => {
   const name = window.prompt(t('drawing.sidebar.newCategoryPrompt'))
   const category = drawingStore.createCategory(name)
-  if (category) currentCategoryId.value = category.id
-  categoryMenuVisible.value = false
+  if (category && cardMenu.canvas) drawingStore.moveCanvas(cardMenu.canvas.id, category.id)
+  cardMenu.visible = false
+  hideMoveCategorySubmenu()
 }
 
 const openCategoryActions = (event, category) => {
@@ -380,6 +432,7 @@ const moveCanvasToCategory = (categoryId) => {
   if (!cardMenu.canvas) return
   drawingStore.moveCanvas(cardMenu.canvas.id, ['all', 'uncategorized'].includes(categoryId) ? null : categoryId)
   cardMenu.visible = false
+  hideMoveCategorySubmenu()
 }
 
 const startRename = (canvas) => {
@@ -426,7 +479,10 @@ const startResizing = (event) => {
   window.addEventListener('mouseup', stopResizing)
 }
 
-onUnmounted(stopResizing)
+onUnmounted(() => {
+  stopResizing()
+  cancelHideMoveCategorySubmenu()
+})
 </script>
 
 <style scoped>
@@ -455,8 +511,8 @@ onUnmounted(stopResizing)
 .category-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .category-dropdown, .category-action-menu { position: fixed; z-index: 100; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); box-shadow: 0 8px 20px rgba(0, 0, 0, .14); }
 .category-dropdown { min-width: 210px; max-height: min(420px, calc(100vh - 120px)); overflow-y: auto; }
-.category-add, .category-item { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
-.category-add:hover, .category-item:hover { background: var(--bg-hover); }
+.category-item { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
+.category-item:hover { background: var(--bg-hover); }
 .category-item.active { background: var(--bg-active); }
 .category-item-info { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 1px; }
 .category-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -476,6 +532,8 @@ onUnmounted(stopResizing)
 .canvas-card-footer { display: flex; flex-direction: column; gap: 3px; padding: 9px; flex-shrink: 0; }
 .canvas-card-footer strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-card-footer small { color: var(--text-tertiary); font-size: 10px; }
+.canvas-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.canvas-card-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rename-input { width: 100%; height: 18px; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 12px; font-weight: 600; }
 .mindmap-preview { position: relative; width: 76px; height: 48px; }
 .mindmap-preview b, .mindmap-preview i { position: absolute; display: block; border: 1px solid var(--text-tertiary); border-radius: 2px; opacity: .65; }
@@ -522,6 +580,12 @@ onUnmounted(stopResizing)
 .card-menu button.active { background: var(--bg-active); }
 .card-menu button:hover { background: var(--bg-hover); }
 .card-menu .danger { color: #e11d48; }
+.card-menu-item, .submenu-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 8px; border: 0; border-radius: 5px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
+.card-menu-item:hover, .submenu-item:hover { background: var(--bg-hover); }
+.card-menu-item.has-submenu { cursor: default; }
+.card-menu-arrow { margin-left: auto; color: var(--text-tertiary); }
+.move-category-submenu { position: fixed; z-index: 60; min-width: 160px; max-height: calc(100vh - 16px); padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); overflow-y: auto; box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
+.move-category-submenu .submenu-item { width: 100%; }
 .hidden-input { display: none; }
 @media (max-width: 760px) { .drawing-sidebar { width: min(272px, 72vw) !important; } .canvas-list { grid-template-columns: 1fr; } }
 </style>

@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { uid } from '@/views/drawing/shapes/id.js'
 import {
+  createArchitectureTemplate,
+  createErTemplate,
   createFlowchartTemplate,
   createKanbanTemplate,
   createMindMapTemplate
@@ -11,6 +13,8 @@ const STORAGE_KEY = 'hfl-drawing-canvases-v2'
 function canvasTitleKey(kind) {
   if (kind === 'mindmap') return 'mindMap'
   if (kind === 'flowchart') return 'flowchart'
+  if (kind === 'er') return 'er'
+  if (kind === 'architecture') return 'architecture'
   if (kind === 'kanban') return 'kanban'
   return 'blankCanvas'
 }
@@ -18,6 +22,8 @@ function canvasTitleKey(kind) {
 function templateForKind(kind) {
   if (kind === 'mindmap') return createMindMapTemplate()
   if (kind === 'flowchart') return createFlowchartTemplate()
+  if (kind === 'er') return createErTemplate()
+  if (kind === 'architecture') return createArchitectureTemplate()
   if (kind === 'kanban') return createKanbanTemplate()
   return { cells: [] }
 }
@@ -41,7 +47,23 @@ function defaultCanvases() {
     createCanvasRecord({ id: 'mindmap', kind: 'mindmap', titleKey: 'mindMap', updatedAt: now }),
     createCanvasRecord({ id: 'kanban', kind: 'kanban', titleKey: 'kanban', updatedAt: now - 36e5 }),
     createCanvasRecord({ id: 'flowchart', kind: 'flowchart', titleKey: 'flowchart', updatedAt: now - 864e5 }),
+    createCanvasRecord({ id: 'er', kind: 'er', titleKey: 'er', updatedAt: now - 2 * 864e5 }),
+    createCanvasRecord({ id: 'architecture', kind: 'architecture', titleKey: 'architecture', updatedAt: now - 3 * 864e5 }),
     createCanvasRecord({ id: 'blank', kind: 'blank', titleKey: 'blankCanvas', updatedAt: now - 9e7, graphJSON: { cells: [] } })
+  ]
+}
+
+function addMissingDefaultTemplates(canvases) {
+  const existingIds = new Set(canvases.map((canvas) => canvas.id))
+  const now = Date.now()
+  const defaults = [
+    { id: 'flowchart', kind: 'flowchart', titleKey: 'flowchart', updatedAt: now - 864e5 },
+    { id: 'er', kind: 'er', titleKey: 'er', updatedAt: now - 2 * 864e5 },
+    { id: 'architecture', kind: 'architecture', titleKey: 'architecture', updatedAt: now - 3 * 864e5 }
+  ]
+  return [
+    ...canvases,
+    ...defaults.filter((item) => !existingIds.has(item.id)).map(createCanvasRecord)
   ]
 }
 
@@ -58,10 +80,10 @@ function loadState() {
     return {
       ...parsed,
       categories,
-      canvases: parsed.canvases.map((canvas) => createCanvasRecord({
+      canvases: addMissingDefaultTemplates(parsed.canvases.map((canvas) => createCanvasRecord({
         ...canvas,
         categoryId: categoryIds.has(canvas.categoryId) ? canvas.categoryId : null
-      }))
+      })))
     }
   } catch {
     return null

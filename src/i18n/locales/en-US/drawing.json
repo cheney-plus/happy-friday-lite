@@ -29,6 +29,8 @@
     "mindmap": "Mind map",
     "flowchart": "Flowchart",
     "er": "ER diagram",
+    "architecture": "System architecture",
+    "er": "ER diagram",
     "uml": "UML",
     "advanced": "Advanced",
     "timeline": "Timeline",
