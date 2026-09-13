@@ -136,6 +136,7 @@
 
     <div v-if="cardMenu.visible" class="card-menu" :style="{ left: `${cardMenu.x}px`, top: `${cardMenu.y}px` }" @click.stop>
       <button type="button" @click="duplicateCanvas(cardMenu.canvas)">{{ t('drawing.sidebar.duplicateCanvas') }}</button>
+      <button type="button" @click="copyCanvasLink(cardMenu.canvas)">{{ t('drawing.sidebar.copyLink') }}</button>
       <button type="button" @click="startRename(cardMenu.canvas)">{{ t('drawing.sidebar.rename') }}</button>
       <div class="card-menu-divider"></div>
       <div ref="moveCategoryItemRef" class="card-menu-item has-submenu" @mouseenter="showMoveCategorySubmenu" @mouseleave="hideMoveCategorySubmenuWithDelay">
@@ -159,6 +160,11 @@
       </div>
     </Teleport>
     <input ref="importInputRef" class="hidden-input" type="file" accept="application/json,.json" @change="onImportFile" />
+    <Teleport to="body">
+      <Transition name="share-toast-fade">
+        <div v-if="shareToast.visible" class="share-toast">{{ shareToast.message }}</div>
+      </Transition>
+    </Teleport>
     <Teleport to="body">
       <div v-if="categoryInput.visible" class="category-input-overlay" @click.self="cancelCategoryInput">
         <div class="category-input-card" @click.stop>
@@ -198,6 +204,7 @@ import {
   Upload
 } from 'lucide-vue-next'
 import { useDrawingStore } from '@/store'
+import { electronService } from '@/services/electron'
 import DrawingEditor from './components/DrawingEditor.vue'
 import CanvasThumbnail from './components/CanvasThumbnail.vue'
 
@@ -506,6 +513,37 @@ const duplicateCanvas = (canvas) => {
   cardMenu.visible = false
 }
 
+// 复制画布内网分享链接：其他用户在浏览器打开后可只读查看绘图
+const shareToast = reactive({ visible: false, message: '' })
+let shareToastTimer = null
+
+const showShareToast = (message) => {
+  shareToast.message = message
+  shareToast.visible = true
+  if (shareToastTimer) clearTimeout(shareToastTimer)
+  shareToastTimer = setTimeout(() => {
+    shareToast.visible = false
+    shareToastTimer = null
+  }, 2500)
+}
+
+const copyCanvasLink = async (canvas) => {
+  cardMenu.visible = false
+  if (!canvas) return
+  try {
+    const result = await electronService.invoke('get-drawing-share-link', { canvasId: canvas.id })
+    if (result?.success && result.url) {
+      await navigator.clipboard.writeText(result.url)
+      showShareToast(t('drawing.toast.shareLinkCopied'))
+    } else {
+      showShareToast(result?.error || t('drawing.toast.shareLinkFailed'))
+    }
+  } catch (err) {
+    console.error('Failed to get drawing share link:', err)
+    showShareToast(t('drawing.toast.shareLinkFailed'))
+  }
+}
+
 const startRename = (canvas) => {
   renamingId.value = canvas.id
   cardMenu.visible = false
@@ -560,6 +598,7 @@ const startResizing = (event) => {
 onUnmounted(() => {
   stopResizing()
   cancelHideMoveCategorySubmenu()
+  if (shareToastTimer) clearTimeout(shareToastTimer)
   window.removeEventListener('blur', closeMenus)
 })
 </script>
@@ -666,6 +705,9 @@ onUnmounted(() => {
 .move-category-submenu { position: fixed; z-index: 60; min-width: 160px; max-height: calc(100vh - 16px); padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); overflow-y: auto; box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
 .move-category-submenu .submenu-item { width: 100%; }
 .hidden-input { display: none; }
+.share-toast { position: fixed; z-index: 300; left: 50%; bottom: 32px; transform: translateX(-50%); padding: 8px 16px; border-radius: 8px; color: #fff; background: rgba(28, 25, 23, .88); font-size: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .2); }
+.share-toast-fade-enter-active, .share-toast-fade-leave-active { transition: opacity .2s ease; }
+.share-toast-fade-enter-from, .share-toast-fade-leave-to { opacity: 0; }
 .category-input-overlay { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .25); }
 .category-input-card { display: flex; flex-direction: column; gap: 12px; width: 300px; max-width: 90vw; padding: 18px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 .category-input-card strong { font-size: 14px; }

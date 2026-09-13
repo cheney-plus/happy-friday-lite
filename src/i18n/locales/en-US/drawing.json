@@ -22,9 +22,18 @@
     "rename": "Rename",
     "duplicateCanvas": "Duplicate",
     "copySuffix": "Copy",
+    "copyLink": "Copy link",
     "deleteCanvas": "Delete canvas",
     "cancel": "Cancel",
     "confirm": "Confirm"
+  },
+  "share": {
+    "readOnly": "Read-only",
+    "notFound": "Canvas not found or deleted"
+  },
+  "toast": {
+    "shareLinkCopied": "Share link copied, paste it for LAN colleagues",
+    "shareLinkFailed": "Failed to copy link, please retry"
   },
   "groups": {
     "general": "Shapes",

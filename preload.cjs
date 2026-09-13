@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'rollback_session',
       'get-share-link',
       'get-note-share-link',
+      'get-drawing-share-link',
       'chat_with_memory',
       'chat_without_memory',
       'stop_chat',

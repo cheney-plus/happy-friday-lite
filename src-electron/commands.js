@@ -30,7 +30,7 @@ import {
   syncHarnessConfigurationIfRunning
 } from './harness/index.js'
 import { getLogDir, setLoggingEnabled } from './logger.js'
-import { getShareUrl, getNoteShareUrl } from './shareServer.js'
+import { getShareUrl, getNoteShareUrl, getDrawingShareUrl } from './shareServer.js'
 import {
   createAutomationTask,
   getActiveAutomationRun,
@@ -246,6 +246,15 @@ export function registerCommands(mainWindow) {
   // 生成笔记内网分享链接
   ipcMain.handle('get-note-share-link', (_event, args) => {
     const url = getNoteShareUrl(args.noteId)
+    if (!url) {
+      return { success: false, error: '分享服务未启动' }
+    }
+    return { success: true, url }
+  })
+
+  // 生成画布内网分享链接（只读查看）
+  ipcMain.handle('get-drawing-share-link', (_event, args) => {
+    const url = getDrawingShareUrl(args.canvasId)
     if (!url) {
       return { success: false, error: '分享服务未启动' }
     }

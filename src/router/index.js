@@ -107,6 +107,13 @@ export const routes = [
     meta: { share: true }
   },
   {
+    // 画布内网分享：只读查看绘图
+    path: '/share/drawing/:id',
+    name: 'share-drawing',
+    component: () => import('@/views/drawing/DrawingShareView.vue'),
+    meta: { share: true }
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/knowledge'
   }

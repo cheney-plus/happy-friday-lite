@@ -22,9 +22,18 @@
     "rename": "重命名",
     "duplicateCanvas": "创建副本",
     "copySuffix": "副本",
+    "copyLink": "复制链接",
     "deleteCanvas": "删除画布",
     "cancel": "取消",
     "confirm": "确认"
+  },
+  "share": {
+    "readOnly": "只读",
+    "notFound": "画布不存在或已被删除"
+  },
+  "toast": {
+    "shareLinkCopied": "分享链接已复制，可粘贴给内网同事",
+    "shareLinkFailed": "复制链接失败，请重试"
   },
   "groups": {
     "general": "通用图形",

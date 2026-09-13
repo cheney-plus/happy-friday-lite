@@ -782,6 +782,10 @@ export function getDrawingState() {
   }
 }
 
+export function getDrawingCanvas(canvasId) {
+  return normalizeDrawingCanvas(queryOne('SELECT * FROM drawing_canvases WHERE id = ?', [canvasId]))
+}
+
 export function saveDrawingCanvas(canvas) {
   const graphStr = JSON.stringify(canvas?.graphJSON || { cells: [] })
   const createdAt = isoTimestamp(canvas?.createdAt)
