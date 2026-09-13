@@ -162,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onDeactivated, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ChevronDown,
@@ -182,6 +182,18 @@ import CanvasThumbnail from './components/CanvasThumbnail.vue'
 
 const { t } = useI18n()
 const drawingStore = useDrawingStore()
+
+onMounted(() => {
+  drawingStore.initialize()
+  // 切换应用/浏览器 Tab 时窗口失焦，关闭所有弹出菜单
+  window.addEventListener('blur', closeMenus)
+})
+
+// keep-alive 切走时组件只是失活，Teleport 到 body 的下拉框仍悬浮在其他 Tab 上，需主动关闭
+onDeactivated(() => {
+  closeMenus()
+})
+
 const SIDEBAR_MIN_WIDTH = 220
 const SIDEBAR_MAX_WIDTH = 340
 const SIDEBAR_DEFAULT_WIDTH = 272
@@ -489,6 +501,7 @@ const startResizing = (event) => {
 onUnmounted(() => {
   stopResizing()
   cancelHideMoveCategorySubmenu()
+  window.removeEventListener('blur', closeMenus)
 })
 </script>
 
@@ -507,8 +520,8 @@ onUnmounted(() => {
 .new-canvas-main-button { width: 32px; border-radius: 8px 0 0 8px; }
 .new-canvas-dropdown-button { width: 20px; border-radius: 0 8px 8px 0; }
 .new-canvas-main-button:hover, .new-canvas-dropdown-button:hover { background: var(--bg-hover); }
-.new-canvas-dropdown-menu { position: absolute; z-index: 40; top: 36px; right: 0; min-width: 148px; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); box-shadow: 0 4px 16px rgba(0, 0, 0, .12); }
-.dropdown-item { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 8px; border: 0; border-radius: 5px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
+.new-canvas-dropdown-menu { position: absolute; z-index: 40; top: 36px; right: 0; display: flex; flex-direction: column; gap: 2px; min-width: 112px; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); box-shadow: 0 4px 16px rgba(0, 0, 0, .12); }
+.dropdown-item { display: flex; align-items: center; width: 100%; gap: 8px; padding: 5px 8px; border: 0; border-radius: 5px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
 .dropdown-item:hover { background: var(--bg-hover); }
 .sidebar-search { display: flex; align-items: center; gap: 6px; height: 56px; padding: 12px; box-sizing: border-box; color: var(--text-tertiary); }
 .sidebar-search input { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 14px; }
@@ -517,8 +530,8 @@ onUnmounted(() => {
 .category-trigger:hover { background: var(--bg-hover); }
 .category-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .category-dropdown, .category-action-menu { position: fixed; z-index: 100; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); box-shadow: 0 8px 20px rgba(0, 0, 0, .14); }
-.category-dropdown { min-width: 210px; max-height: min(420px, calc(100vh - 120px)); overflow-y: auto; }
-.category-item { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
+.category-dropdown { display: flex; flex-direction: column; gap: 4px; min-width: 156px; max-height: min(420px, calc(100vh - 120px)); overflow-y: auto; }
+.category-item { display: flex; align-items: center; flex: 0 0 auto; width: 100%; gap: 8px; padding: 5px 8px; border: 0; border-radius: 6px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
 .category-item:hover { background: var(--bg-hover); }
 .category-item.active { background: var(--bg-active); }
 .category-item-info { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 1px; }

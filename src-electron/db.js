@@ -142,6 +142,36 @@ async function initDatabase() {
     );
   `)
 
+  // 绘图模块：画布与分类（参考 notes/notebooks 的持久化方式）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS drawing_canvases (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      titleKey TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'blank',
+      categoryId TEXT,
+      graphJSON TEXT NOT NULL DEFAULT '{"cells":[]}',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS drawing_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      createdAt TEXT NOT NULL
+    );
+  `)
+
+  // 绘图模块：单例状态（当前选中画布）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS drawing_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      selectedCanvasId TEXT
+    );
+  `)
+
   db.run(`
     CREATE TABLE IF NOT EXISTS schedule_events (
       id TEXT PRIMARY KEY,
@@ -312,6 +342,7 @@ async function initDatabase() {
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_knowledgeBaseId ON notes(knowledgeBaseId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_notebookId ON notes(notebookId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_notes_isDeleted ON notes(isDeleted)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_drawing_canvases_categoryId ON drawing_canvases(categoryId)')
   db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_start ON schedule_events(start)')
   db.run('CREATE INDEX IF NOT EXISTS idx_schedule_events_end ON schedule_events(end)')
   db.run('CREATE INDEX IF NOT EXISTS idx_file_status_kb_type ON file_status(kb_type)')
@@ -705,6 +736,84 @@ export function searchNotes(query) {
     "SELECT * FROM notes WHERE isDeleted = 0 AND (LOWER(title) LIKE ? OR LOWER(contentText) LIKE ?)",
     [q, q]
   ).map(normalizeNote)
+}
+
+// ========== Drawing: 画布与分类 ==========
+
+function normalizeDrawingCanvas(row) {
+  if (!row) return row
+  try {
+    row.graphJSON = JSON.parse(row.graphJSON || '{"cells":[]}')
+  } catch (_e) {
+    row.graphJSON = { cells: [] }
+  }
+  return row
+}
+
+export function getDrawingState() {
+  const canvases = queryAll(
+    'SELECT * FROM drawing_canvases ORDER BY updatedAt DESC'
+  ).map(normalizeDrawingCanvas)
+  const categories = queryAll('SELECT * FROM drawing_categories ORDER BY createdAt ASC')
+  const stateRow = queryOne('SELECT selectedCanvasId FROM drawing_state WHERE id = 1')
+  return {
+    canvases,
+    categories,
+    selectedCanvasId: stateRow?.selectedCanvasId || null
+  }
+}
+
+export function saveDrawingCanvas(canvas) {
+  const now = nowISO()
+  const graphStr = JSON.stringify(canvas?.graphJSON || { cells: [] })
+  const existing = queryOne('SELECT id FROM drawing_canvases WHERE id = ?', [canvas?.id])
+  if (existing) {
+    db.run(
+      'UPDATE drawing_canvases SET title = ?, titleKey = ?, kind = ?, categoryId = ?, graphJSON = ?, updatedAt = ? WHERE id = ?',
+      [canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, canvas.updatedAt || now, canvas.id]
+    )
+  } else {
+    db.run(
+      'INSERT INTO drawing_canvases (id, title, titleKey, kind, categoryId, graphJSON, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [canvas.id, canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, canvas.createdAt || now, canvas.updatedAt || now]
+    )
+  }
+  saveDb()
+  return normalizeDrawingCanvas(queryOne('SELECT * FROM drawing_canvases WHERE id = ?', [canvas.id]))
+}
+
+export function deleteDrawingCanvas(canvasId) {
+  db.run('DELETE FROM drawing_canvases WHERE id = ?', [canvasId])
+  const stateRow = queryOne('SELECT selectedCanvasId FROM drawing_state WHERE id = 1')
+  if (stateRow && stateRow.selectedCanvasId === canvasId) {
+    db.run('UPDATE drawing_state SET selectedCanvasId = NULL WHERE id = 1')
+  }
+  saveDb()
+  return db.getRowsModified() > 0
+}
+
+export function saveDrawingCategory(category) {
+  db.run(
+    'INSERT OR REPLACE INTO drawing_categories (id, name, createdAt) VALUES (?, ?, ?)',
+    [category.id, category.name || '', category.createdAt || nowISO()]
+  )
+  saveDb()
+  return queryOne('SELECT * FROM drawing_categories WHERE id = ?', [category.id])
+}
+
+export function deleteDrawingCategory(categoryId) {
+  db.run('DELETE FROM drawing_categories WHERE id = ?', [categoryId])
+  db.run('UPDATE drawing_canvases SET categoryId = NULL WHERE categoryId = ?', [categoryId])
+  saveDb()
+  return db.getRowsModified() > 0
+}
+
+export function saveDrawingSelectedCanvas(canvasId) {
+  db.run(
+    'INSERT INTO drawing_state (id, selectedCanvasId) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET selectedCanvasId = excluded.selectedCanvasId',
+    [canvasId || null]
+  )
+  saveDb()
 }
 
 export function getScheduleEvents() {

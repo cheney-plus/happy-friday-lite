@@ -514,6 +514,31 @@ export function registerCommands(mainWindow) {
     return true
   })
 
+  ipcMain.handle('get_drawing_state', () => {
+    return db.getDrawingState()
+  })
+
+  ipcMain.handle('save_drawing_canvas', (_event, args) => {
+    return db.saveDrawingCanvas(args)
+  })
+
+  ipcMain.handle('delete_drawing_canvas', (_event, args) => {
+    return db.deleteDrawingCanvas(args.canvasId)
+  })
+
+  ipcMain.handle('save_drawing_category', (_event, args) => {
+    return db.saveDrawingCategory(args)
+  })
+
+  ipcMain.handle('delete_drawing_category', (_event, args) => {
+    return db.deleteDrawingCategory(args.categoryId)
+  })
+
+  ipcMain.handle('save_drawing_selected_canvas', (_event, args) => {
+    db.saveDrawingSelectedCanvas(args?.canvasId)
+    return true
+  })
+
   ipcMain.handle('get_notebooks', () => {
     console.log('[Commands] get_notebooks called')
     return db.getNotebooks()
