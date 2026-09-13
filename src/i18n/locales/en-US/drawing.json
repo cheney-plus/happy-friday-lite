@@ -20,6 +20,8 @@
     "deleteCategoryConfirm": "Delete category \"{name}\"? Canvases in it will be moved to Uncategorized.",
     "moveToCategory": "Move to category",
     "rename": "Rename",
+    "duplicateCanvas": "Duplicate",
+    "copySuffix": "Copy",
     "deleteCanvas": "Delete canvas",
     "cancel": "Cancel",
     "confirm": "Confirm"

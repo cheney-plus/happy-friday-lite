@@ -227,6 +227,24 @@ export const useDrawingStore = defineStore('drawing', {
       return canvas
     },
 
+    duplicateCanvas(id, title = '') {
+      const source = this.canvases.find((item) => item.id === id)
+      if (!source) return null
+      const canvas = createCanvasRecord({
+        kind: source.kind,
+        title,
+        categoryId: source.categoryId,
+        graphJSON: toPlain(source.graphJSON || { cells: [] })
+      })
+      this.canvases.unshift(canvas)
+      this.selectedCanvasId = canvas.id
+      this.persistCanvas(canvas.id)
+      if (electronService.isElectron) {
+        electronService.invoke('save_drawing_selected_canvas', { canvasId: canvas.id })
+      }
+      return canvas
+    },
+
     importCanvas(payload) {
       const source = payload?.graphJSON || payload || {}
       const graphJSON = source.cells

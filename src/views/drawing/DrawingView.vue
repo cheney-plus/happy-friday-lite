@@ -135,6 +135,7 @@
     </main>
 
     <div v-if="cardMenu.visible" class="card-menu" :style="{ left: `${cardMenu.x}px`, top: `${cardMenu.y}px` }" @click.stop>
+      <button type="button" @click="duplicateCanvas(cardMenu.canvas)">{{ t('drawing.sidebar.duplicateCanvas') }}</button>
       <button type="button" @click="startRename(cardMenu.canvas)">{{ t('drawing.sidebar.rename') }}</button>
       <div class="card-menu-divider"></div>
       <div ref="moveCategoryItemRef" class="card-menu-item has-submenu" @mouseenter="showMoveCategorySubmenu" @mouseleave="hideMoveCategorySubmenuWithDelay">
@@ -498,6 +499,13 @@ const moveCanvasToCategory = (categoryId) => {
   hideMoveCategorySubmenu()
 }
 
+const duplicateCanvas = (canvas) => {
+  if (!canvas) return
+  const base = canvas.title || t(`drawing.canvas.${canvas.titleKey || 'untitled'}`)
+  drawingStore.duplicateCanvas(canvas.id, `${base} ${t('drawing.sidebar.copySuffix')}`)
+  cardMenu.visible = false
+}
+
 const startRename = (canvas) => {
   renamingId.value = canvas.id
   cardMenu.visible = false
@@ -601,11 +609,11 @@ onUnmounted(() => {
 .canvas-card.active, .canvas-card.active:hover { border-color: #1c1917; box-shadow: none; }
 .canvas-preview { position: relative; display: flex; width: 100%; aspect-ratio: 3 / 2; align-items: center; justify-content: center; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
 .canvas-card-footer { display: flex; flex-direction: column; gap: 2px; padding: 5px 6px; flex-shrink: 0; }
-.canvas-card-footer strong { overflow: hidden; font-size: 12px; line-height: 1.2; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.canvas-card-footer strong { height: 16px; overflow: hidden; font-size: 12px; line-height: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-card-footer small { color: var(--text-tertiary); font-size: 10px; line-height: 1.2; }
 .canvas-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .canvas-card-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rename-input { width: 100%; height: 18px; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 12px; font-weight: 600; }
+.rename-input { width: 100%; height: 16px; box-sizing: border-box; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 12px; line-height: 16px; font-weight: 600; }
 .mindmap-preview { position: relative; width: 76px; height: 48px; }
 .mindmap-preview b, .mindmap-preview i { position: absolute; display: block; border: 1px solid var(--text-tertiary); border-radius: 2px; opacity: .65; }
 .mindmap-preview b { top: 17px; left: 27px; width: 21px; height: 13px; }
