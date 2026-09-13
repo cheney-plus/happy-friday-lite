@@ -1,5 +1,5 @@
 <template>
-  <div class="drawing-page" @click="closeMenus">
+  <div class="drawing-page" :style="{ '--canvas-ratio': canvasRatio }" @click="closeMenus">
     <aside
       class="drawing-sidebar"
       :class="{ collapsed: sidebarCollapsed, 'is-resizing': isResizing }"
@@ -124,7 +124,7 @@
       <PanelLeftOpen :size="18" :stroke-width="1.8" />
     </button>
 
-    <main class="drawing-workspace" aria-label="Drawing workspace">
+    <main ref="workspaceRef" class="drawing-workspace" aria-label="Drawing workspace">
       <DrawingEditor
         v-if="drawingStore.currentCanvas"
         :key="drawingStore.currentCanvas.id"
@@ -162,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ChevronDown,
@@ -206,6 +206,15 @@ const moveCategorySubmenuRef = ref(null)
 const moveCategorySubmenuVisible = ref(false)
 const moveCategorySubmenuStyle = reactive({ left: '0px', top: '0px' })
 let moveCategorySubmenuHideTimer = null
+
+// Thumbnail aspect ratio is fixed to the workspace proportion at startup.
+const workspaceRef = ref(null)
+const canvasRatio = ref(1.5)
+
+onMounted(() => {
+  const rect = workspaceRef.value?.getBoundingClientRect()
+  if (rect?.height > 0) canvasRatio.value = Math.max(rect.width / rect.height, 0.5)
+})
 
 const canvasTitle = (canvas) => canvas.title || t(`drawing.canvas.${canvas.titleKey || 'untitled'}`)
 
@@ -438,6 +447,13 @@ const moveCanvasToCategory = (categoryId) => {
 const startRename = (canvas) => {
   renamingId.value = canvas.id
   cardMenu.visible = false
+  nextTick(() => {
+    const input = document.querySelector('.rename-input')
+    if (input) {
+      input.focus()
+      input.select()
+    }
+  })
 }
 
 const commitRename = (event, canvas) => {
@@ -525,13 +541,13 @@ onUnmounted(() => {
 .category-action-menu button:hover { background: var(--bg-hover); }
 .category-action-menu .danger { color: #e11d48; }
 .canvas-list { display: grid; flex: 1 1 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 10px; min-height: 0; justify-content: start; padding: 0 14px 16px; overflow-y: auto; }
-.canvas-card { display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; aspect-ratio: .9; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
+.canvas-card { display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 6px; color: inherit; background: var(--bg-primary); text-align: left; cursor: pointer; }
 .canvas-card:hover { border-color: #a8a29e; }
 .canvas-card.active, .canvas-card.active:hover { border-color: #1c1917; box-shadow: none; }
-.canvas-preview { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; min-height: 0; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
-.canvas-card-footer { display: flex; flex-direction: column; gap: 3px; padding: 9px; flex-shrink: 0; }
-.canvas-card-footer strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.canvas-card-footer small { color: var(--text-tertiary); font-size: 10px; }
+.canvas-preview { position: relative; display: flex; width: 100%; aspect-ratio: var(--canvas-ratio, 1.5); align-items: center; justify-content: center; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
+.canvas-card-footer { display: flex; flex-direction: column; gap: 2px; padding: 5px 6px; flex-shrink: 0; }
+.canvas-card-footer strong { overflow: hidden; font-size: 12px; line-height: 1.2; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.canvas-card-footer small { color: var(--text-tertiary); font-size: 10px; line-height: 1.2; }
 .canvas-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .canvas-card-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rename-input { width: 100%; height: 18px; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 12px; font-weight: 600; }
