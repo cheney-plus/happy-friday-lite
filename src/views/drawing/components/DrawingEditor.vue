@@ -456,9 +456,25 @@ const exportCanvas = (type) => {
     downloadFile(JSON.stringify({ title: name, graphJSON: graph.value.toJSON() }, null, 2), `${name}.json`)
     return
   }
-  const options = { padding: 24, backgroundColor: getCanvasTheme().dark ? '#1a1a1c' : '#ffffff' }
-  if (type === 'png') graph.value.exportPNG(`${name}.png`, options)
-  if (type === 'svg') graph.value.exportSVG(`${name}.svg`, options)
+  const padding = 24
+  const backgroundColor = getCanvasTheme().dark ? '#1a1a1c' : '#ffffff'
+  if (type === 'png') {
+    // X6 uses `ratio` (not `scale`) to control export resolution.
+    graph.value.exportPNG(`${name}.png`, { padding, backgroundColor, ratio: 3 })
+  }
+  if (type === 'svg') {
+    // toSVG ignores `padding`, so expand the viewBox manually to avoid clipping.
+    const bbox = graph.value.graphToLocal(graph.value.getContentBBox())
+    graph.value.exportSVG(`${name}.svg`, {
+      viewBox: {
+        x: bbox.x - padding,
+        y: bbox.y - padding,
+        width: bbox.width + padding * 2,
+        height: bbox.height + padding * 2
+      },
+      preserveDimensions: true
+    })
+  }
 }
 
 watch(() => props.canvas.id, loadCanvas)
