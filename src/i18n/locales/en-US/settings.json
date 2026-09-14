@@ -33,6 +33,7 @@
   "moduleHidden": "Hidden",
   "settingsAlwaysVisible": "Settings always stay visible",
   "noteModule": "Notes",
+  "drawingModule": "Drawing",
   "knowledgeModule": "Knowledge Base",
   "noteModuleDesc": "Write and organize notes",
   "knowledgeModuleDesc": "Manage your knowledge base",

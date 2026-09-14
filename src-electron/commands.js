@@ -31,7 +31,7 @@ import {
   syncHarnessConfigurationIfRunning
 } from './harness/index.js'
 import { getLogDir, setLoggingEnabled } from './logger.js'
-import { getShareUrl, getNoteShareUrl } from './shareServer.js'
+import { getShareUrl, getNoteShareUrl, getDrawingShareUrl } from './shareServer.js'
 import {
   createAutomationTask,
   getActiveAutomationRun,
@@ -248,6 +248,15 @@ export function registerCommands(mainWindow) {
   // 生成笔记内网分享链接
   ipcMain.handle('get-note-share-link', (_event, args) => {
     const url = getNoteShareUrl(args.noteId)
+    if (!url) {
+      return { success: false, error: '分享服务未启动' }
+    }
+    return { success: true, url }
+  })
+
+  // 生成画布内网分享链接（只读查看）
+  ipcMain.handle('get-drawing-share-link', (_event, args) => {
+    const url = getDrawingShareUrl(args.canvasId)
     if (!url) {
       return { success: false, error: '分享服务未启动' }
     }
@@ -520,6 +529,31 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('delete_schedule_event', (_event, args) => {
     db.deleteScheduleEvent(args.eventId)
+    return true
+  })
+
+  ipcMain.handle('get_drawing_state', () => {
+    return db.getDrawingState()
+  })
+
+  ipcMain.handle('save_drawing_canvas', (_event, args) => {
+    return db.saveDrawingCanvas(args)
+  })
+
+  ipcMain.handle('delete_drawing_canvas', (_event, args) => {
+    return db.deleteDrawingCanvas(args.canvasId)
+  })
+
+  ipcMain.handle('save_drawing_category', (_event, args) => {
+    return db.saveDrawingCategory(args)
+  })
+
+  ipcMain.handle('delete_drawing_category', (_event, args) => {
+    return db.deleteDrawingCategory(args.categoryId)
+  })
+
+  ipcMain.handle('save_drawing_selected_canvas', (_event, args) => {
+    db.saveDrawingSelectedCanvas(args?.canvasId)
     return true
   })
 

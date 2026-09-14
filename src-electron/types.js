@@ -11,6 +11,7 @@ export function defaultConfig() {
     noteFimCompletion: true,
     // 侧边栏可选功能模块：默认全部开启，兼容旧配置时缺失字段也视为开启
     sidebarModules: {
+      drawing: true,
       schedule: true,
       automation: true
     },

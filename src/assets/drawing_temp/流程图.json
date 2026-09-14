@@ -1,0 +1,804 @@
+{
+  "title": "流程图",
+  "graphJSON": {
+    "cells": [
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.6,
+            "targetMarker": {
+              "name": "block",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "520fbe2b-8042-4a2e-af8a-f465ab7a161c",
+        "router": {
+          "name": "manhattan"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 8
+          }
+        },
+        "data": {
+          "edgeStyle": "manhattan"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "d6e97390-3bf4-46f5-9c8f-d621ff3ffc4c",
+          "port": "port-top"
+        },
+        "target": {
+          "cell": "84b88d3c-bcbd-452c-a0e8-aceb85493ab0",
+          "port": "port-left"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.6,
+            "targetMarker": {
+              "name": "block",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "2584ce1a-c545-43ed-8069-ec24bb2c0621",
+        "router": {
+          "name": "normal"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 8
+          }
+        },
+        "data": {
+          "edgeStyle": "arrow"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "a5c8c5a5-0763-49f0-98c3-934354befbd1",
+          "port": "port-bottom"
+        },
+        "target": {
+          "cell": "84b88d3c-bcbd-452c-a0e8-aceb85493ab0",
+          "port": "port-top"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.6,
+            "targetMarker": {
+              "name": "block",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "a65d46e4-2c03-4bda-9fa0-71d2bbceaeb3",
+        "router": {
+          "name": "normal"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 8
+          }
+        },
+        "data": {
+          "edgeStyle": "arrow"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "84b88d3c-bcbd-452c-a0e8-aceb85493ab0",
+          "port": "port-bottom"
+        },
+        "target": {
+          "cell": "f62b61f9-f416-445f-b25f-069d082ef1cb",
+          "port": "port-top"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.6,
+            "targetMarker": {
+              "name": "block",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "039d6a04-aa16-4d2d-8b10-c2099246a689",
+        "router": {
+          "name": "normal"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 8
+          }
+        },
+        "data": {
+          "edgeStyle": "arrow"
+        },
+        "zIndex": 0,
+        "labels": [
+          {
+            "position": 0.5,
+            "attrs": {
+              "label": {
+                "text": "是",
+                "fontSize": 11
+              }
+            }
+          }
+        ],
+        "source": {
+          "cell": "f62b61f9-f416-445f-b25f-069d082ef1cb",
+          "port": "port-right"
+        },
+        "target": {
+          "cell": "b64c6fe8-c937-44c4-96e5-15521eca3df3",
+          "port": "port-left"
+        },
+        "vertices": []
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.6,
+            "targetMarker": {
+              "name": "block",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "bca98ea6-dada-44d2-bd59-268401518dca",
+        "router": {
+          "name": "normal"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 8
+          }
+        },
+        "data": {
+          "edgeStyle": "arrow"
+        },
+        "zIndex": 0,
+        "labels": [
+          {
+            "position": 0.5,
+            "attrs": {
+              "label": {
+                "text": "否",
+                "fontSize": 11
+              }
+            }
+          }
+        ],
+        "source": {
+          "cell": "f62b61f9-f416-445f-b25f-069d082ef1cb",
+          "port": "port-left"
+        },
+        "target": {
+          "cell": "d6e97390-3bf4-46f5-9c8f-d621ff3ffc4c",
+          "port": "port-right"
+        }
+      },
+      {
+        "shape": "edge",
+        "attrs": {
+          "line": {
+            "stroke": "#64748b",
+            "strokeWidth": 1.6,
+            "targetMarker": {
+              "name": "block",
+              "width": 10,
+              "height": 8
+            },
+            "strokeDasharray": 0,
+            "sourceMarker": null
+          }
+        },
+        "id": "b324b1d8-08a2-4814-8eaa-80a61725ddd7",
+        "router": {
+          "name": "orth"
+        },
+        "connector": {
+          "name": "rounded",
+          "args": {
+            "radius": 8
+          }
+        },
+        "data": {
+          "edgeStyle": "orthogonal"
+        },
+        "zIndex": 0,
+        "source": {
+          "cell": "f62b61f9-f416-445f-b25f-069d082ef1cb",
+          "port": "port-bottom"
+        },
+        "target": {
+          "cell": "1df60dc4-1ad2-48e6-ae79-5aa52641393d",
+          "port": "port-left"
+        },
+        "vertices": [
+          {
+            "x": 314,
+            "y": 428
+          }
+        ]
+      },
+      {
+        "position": {
+          "x": 250,
+          "y": 64
+        },
+        "size": {
+          "width": 128,
+          "height": 52
+        },
+        "attrs": {
+          "text": {
+            "text": "开始"
+          }
+        },
+        "visible": true,
+        "shape": "draw-terminator",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "a5c8c5a5-0763-49f0-98c3-934354befbd1",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 244,
+          "y": 156
+        },
+        "size": {
+          "width": 140,
+          "height": 56
+        },
+        "attrs": {
+          "text": {
+            "text": "接收申请"
+          }
+        },
+        "visible": true,
+        "shape": "draw-process",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "84b88d3c-bcbd-452c-a0e8-aceb85493ab0",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 240,
+          "y": 254
+        },
+        "size": {
+          "width": 148,
+          "height": 92
+        },
+        "attrs": {
+          "text": {
+            "text": "资料完整?"
+          }
+        },
+        "visible": true,
+        "shape": "draw-decision",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "f62b61f9-f416-445f-b25f-069d082ef1cb",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 474,
+          "y": 272
+        },
+        "size": {
+          "width": 140,
+          "height": 56
+        },
+        "attrs": {
+          "text": {
+            "text": "创建记录"
+          }
+        },
+        "visible": true,
+        "shape": "draw-process",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "b64c6fe8-c937-44c4-96e5-15521eca3df3",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 39,
+          "y": 257
+        },
+        "size": {
+          "width": 130,
+          "height": 86
+        },
+        "attrs": {
+          "text": {
+            "text": "补充材料"
+          }
+        },
+        "visible": true,
+        "shape": "draw-document",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "d6e97390-3bf4-46f5-9c8f-d621ff3ffc4c",
+        "zIndex": 1,
+        "data": {}
+      },
+      {
+        "position": {
+          "x": 480,
+          "y": 402
+        },
+        "size": {
+          "width": 128,
+          "height": 52
+        },
+        "attrs": {
+          "text": {
+            "text": "完成"
+          }
+        },
+        "visible": true,
+        "shape": "draw-terminator",
+        "ports": {
+          "groups": {
+            "top": {
+              "position": "top",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "right": {
+              "position": "right",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "bottom": {
+              "position": "bottom",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            },
+            "left": {
+              "position": "left",
+              "attrs": {
+                "circle": {
+                  "r": 4.5,
+                  "magnet": true,
+                  "stroke": "#2563eb",
+                  "strokeWidth": 1.5,
+                  "fill": "#ffffff"
+                }
+              }
+            }
+          },
+          "items": [
+            {
+              "id": "port-top",
+              "group": "top"
+            },
+            {
+              "id": "port-right",
+              "group": "right"
+            },
+            {
+              "id": "port-bottom",
+              "group": "bottom"
+            },
+            {
+              "id": "port-left",
+              "group": "left"
+            }
+          ]
+        },
+        "id": "1df60dc4-1ad2-48e6-ae79-5aa52641393d",
+        "zIndex": 1,
+        "data": {}
+      }
+    ]
+  }
+}

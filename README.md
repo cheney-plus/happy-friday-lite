@@ -31,9 +31,17 @@ An Electron + Vue 3 desktop personal knowledge assistant that combines an AI age
 - AI Fill-in-the-Middle (FIM) completion
 - Version history and diff comparison
 
+### ✏️ Drawing
+
+- Built-in shape libraries: general shapes, lines, mind maps, flowcharts, ER diagrams, UML diagrams, system architecture, sequence diagrams, timelines, and data-flow diagrams
+- One-click templates for mind maps and flowcharts, with canvas categories, search, and import
+- Customizable styles (fill, text, stroke width, font); connectors with orthogonal, polyline, and curved routing
+- Shape animations: pulse, breathe, bounce, and flow
+- Export to PNG / SVG / JSON, plus read-only share links
+
 ### 📅 Schedule
 
-- [Schedule-X](https://schedule-x.so/) calendar view with lunar calendar support
+- Custom-built calendar with month / week / year / list views and lunar calendar support
 - Create and update schedules with natural language through Friday
 
 ### 🎨 More
@@ -57,6 +65,10 @@ An Electron + Vue 3 desktop personal knowledge assistant that combines an AI age
 ### Notes
 
 ![Rich-text note editor](docs/resource/3.png)
+
+### Drawing
+
+![Drawing canvas](docs/resource/PixPin_2026-09-13_20-39-53.png)
 
 ### Schedule
 
@@ -132,7 +144,7 @@ Download the installer for your platform from [Releases](../../releases):
 | Routing | Vue Router |
 | Internationalization | Vue I18n |
 | Rich-text editor | TipTap |
-| Calendar | Schedule-X |
+| Calendar | Custom Vue calendar component |
 | AI agent | DeepAgents + LangChain |
 | Vector database | Zvec |
 | Local database | SQLite (sql.js) |
@@ -150,6 +162,7 @@ happy-friday-lite/
 │   │   ├── friday/          # Friday assistant
 │   │   ├── knowledge/       # Knowledge base
 │   │   ├── note/            # Notes
+│   │   ├── drawing/         # Drawing
 │   │   ├── schedule/        # Schedule
 │   │   ├── history/         # Version history
 │   │   └── settings/        # Settings
@@ -194,7 +207,6 @@ Read [LICENSE](./LICENSE) for details.
 - [LangChain](https://github.com/langchain-ai/langchain)
 - [DeepAgents](https://github.com/frost-beta/deepagents)
 - [TipTap](https://tiptap.dev/)
-- [Schedule-X](https://schedule-x.so/)
 - [Zvec](https://github.com/zvec/zvec)
 
 ## 📧 Contact

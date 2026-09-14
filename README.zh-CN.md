@@ -29,9 +29,17 @@
 - AI FIM（Fill-in-the-Middle）补全
 - 版本历史与差异对比
 
+### ✏️ 绘图
+
+- 内置多类型图形库：通用图形、线条、思维导图、流程图、ER 图、UML 图、系统架构图、时序图、时间线、数据流图等
+- 思维导图、流程图等模板一键插入，支持画布分类管理、搜索与导入
+- 样式自定义（填充、文字、线宽、字体），连线支持正交、折线、曲线等路由方式
+- 支持图形动画效果：脉冲、呼吸、弹跳、流动
+- 导出 PNG / SVG / JSON，支持生成只读分享链接
+
 ### 📅 日程
 
-- 基于 [Schedule-X](https://schedule-x.so/) 的日历视图
+- 自研日历组件，支持月 / 周 / 年 / 列表多视图切换
 - 农历显示支持
 - Friday 助手可自然语言创建/修改日程
 
@@ -57,6 +65,10 @@
 ### 笔记
 
 ![笔记富文本编辑](docs/resource/3.png)
+
+### 绘图
+
+![绘图画布](docs/resource/PixPin_2026-09-13_20-39-53.png)
 
 ### 日程
 
@@ -134,7 +146,7 @@ npm run electron:build:arm64
 | 路由 | Vue Router |
 | 国际化 | Vue I18n |
 | 富文本编辑 | TipTap |
-| 日历 | Schedule-X |
+| 日历 | 自研 Vue 日历组件 |
 | AI Agent | DeepAgents + LangChain |
 | 向量数据库 | Zvec |
 | 本地数据库 | SQLite (sql.js) |
@@ -152,6 +164,7 @@ happy-friday-lite/
 │   │   ├── friday/          # Friday 助手
 │   │   ├── knowledge/       # 知识库
 │   │   ├── note/            # 笔记
+│   │   ├── drawing/         # 绘图
 │   │   ├── schedule/        # 日程
 │   │   ├── history/         # 历史版本
 │   │   └── settings/        # 设置
@@ -196,7 +209,6 @@ happy-friday-lite/
 - [LangChain](https://github.com/langchain-ai/langchain)
 - [DeepAgents](https://github.com/frost-beta/deepagents)
 - [TipTap](https://tiptap.dev/)
-- [Schedule-X](https://schedule-x.so/)
 - [Zvec](https://github.com/zvec/zvec)
 
 ## 📧 联系方式
