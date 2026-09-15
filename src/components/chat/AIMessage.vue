@@ -37,6 +37,35 @@
         <span v-if="isStreaming" class="streaming-cursor"></span>
       </div>
 
+      <div v-if="normalizedSources.length" class="sources-section">
+        <button class="sources-toggle" type="button" @click="toggleSources">
+          <span>参考来源 {{ normalizedSources.length }}</span>
+          <ChevronDown :size="15" class="sources-arrow" :class="{ collapsed: sourcesCollapsed }" />
+        </button>
+        <div v-show="!sourcesCollapsed" class="sources-list">
+          <article v-for="(source, index) in normalizedSources" :key="source.key" class="source-item">
+            <div class="source-main">
+              <div class="source-title-row">
+                <span class="source-index">{{ index + 1 }}</span>
+                <span class="source-title">{{ source.title }}</span>
+                <span v-if="source.confidenceLabel" class="source-confidence">{{ source.confidenceLabel }}</span>
+              </div>
+              <div v-if="source.filePath" class="source-path">{{ source.filePath }}</div>
+              <p v-if="source.snippet" class="source-snippet">{{ source.snippet }}</p>
+            </div>
+            <div class="source-actions">
+              <button v-if="source.filePath" class="source-action-btn" type="button" title="打开原文" @click="openSource(source)">
+                <ExternalLink :size="14" />
+              </button>
+              <button class="source-action-btn" :class="{ copied: copiedSourceKey === source.key }" type="button" title="复制来源" @click="copySource(source)">
+                <Check v-if="copiedSourceKey === source.key" :size="14" />
+                <Copy v-else :size="14" />
+              </button>
+            </div>
+          </article>
+        </div>
+      </div>
+
       <div v-if="showActions && !isStreaming" class="ai-footer">
         <div class="footer-left">
           <button class="action-icon-btn" @click="$emit('action', 'add')">
@@ -76,7 +105,9 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { Check, ChevronDown, Copy, ExternalLink } from 'lucide-vue-next';
 import { handleCodeCopyClick, renderMarkdown, stripMarkdown } from '@/utils/markdown';
+import { electronService } from '@/services/electron';
 
 const props = defineProps({
   content: { type: String, default: '' },
@@ -86,13 +117,16 @@ const props = defineProps({
   showActions: { type: Boolean, default: true },
   showRollback: { type: Boolean, default: true },
   reasoning: { type: String, default: '' },
-  reasoningStreamingContent: { type: String, default: '' }
+  reasoningStreamingContent: { type: String, default: '' },
+  sources: { type: Array, default: () => [] }
 });
 
 defineEmits(['action']);
 
 const copied = ref(false);
+const copiedSourceKey = ref('');
 const thinkingCollapsed = ref(false);
+const sourcesCollapsed = ref(true);
 let cachedContent = '';
 let cachedHtml = '';
 
@@ -104,6 +138,21 @@ const effectiveReasoning = computed(() =>
   props.reasoningStreamingContent || props.reasoning || ''
 );
 
+const normalizedSources = computed(() => {
+  return (props.sources || []).filter(Boolean).map((source, index) => {
+    const filePath = source.filePath || source.source || '';
+    const confidence = typeof source.confidence === 'number' ? source.confidence : null;
+    return {
+      ...source,
+      key: source.metadata?.noteId || filePath || `${source.title || 'source'}-${index}`,
+      title: source.title || filePath.split(/[\\/]/).filter(Boolean).pop() || 'Untitled source',
+      filePath,
+      confidenceLabel: confidence == null ? '' : `${Math.round(confidence * 100)}%`,
+      snippet: source.snippet || ''
+    };
+  });
+});
+
 const renderedReasoning = computed(() => {
   const quoted = effectiveReasoning.value
     .split('\n')
@@ -114,6 +163,10 @@ const renderedReasoning = computed(() => {
 
 function toggleThinking() {
   thinkingCollapsed.value = !thinkingCollapsed.value;
+}
+
+function toggleSources() {
+  sourcesCollapsed.value = !sourcesCollapsed.value;
 }
 
 const renderedContent = computed(() => {
@@ -163,6 +216,33 @@ async function handleCopy() {
     }, 2000);
   } catch (err) {
     console.error('Failed to copy:', err);
+  }
+}
+
+async function openSource(source) {
+  if (!source.filePath) return;
+  try {
+    await electronService.invoke('kb-open-file-external', { filePath: source.filePath });
+  } catch (err) {
+    console.error('Failed to open source:', err);
+  }
+}
+
+async function copySource(source) {
+  const text = [
+    source.title,
+    source.filePath,
+    source.snippet
+  ].filter(Boolean).join('\n');
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedSourceKey.value = source.key;
+    setTimeout(() => {
+      if (copiedSourceKey.value === source.key) copiedSourceKey.value = '';
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy source:', err);
   }
 }
 
@@ -274,6 +354,153 @@ onUnmounted(() => {
   font-size: 14.5px;
   line-height: 1.7;
   color: var(--text-primary);
+}
+
+.sources-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 0;
+}
+
+.sources-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.sources-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sources-arrow {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sources-arrow.collapsed {
+  transform: rotate(-90deg);
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.source-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.02));
+}
+
+.source-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.source-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.source-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.source-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-confidence {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.source-path {
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-snippet {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.source-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.source-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.source-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.source-action-btn.copied {
+  color: #10b981;
 }
 
 .markdown-body {

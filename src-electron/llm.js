@@ -1,9 +1,10 @@
 import https from 'https'
 import http from 'http'
 import { AppError } from './error.js'
-import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_ERROR, NOTE_AI_CHUNK, NOTE_AI_ERROR } from './events.js'
+import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_RAG_SOURCES, CHAT_ERROR, NOTE_AI_CHUNK, NOTE_AI_ERROR } from './events.js'
 import { recordUsage } from './usage.js'
 import { buildChatCompletionsUrl } from './openaiUrl.js'
+import { formatRagSources } from './rag/sources.js'
 import {
   FIM_SYSTEM_PROMPT,
   SESSION_TITLE_SYSTEM_PROMPT,
@@ -666,6 +667,7 @@ export async function streamChatWithRagAgent(mainWindow, messages, model, reques
   const MAX_ITERATIONS = 5
   let fullContent = ''
   let fullReasoning = ''
+  const ragSourceResults = []
 
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     if (cancelToken && cancelToken.cancelled) {
@@ -732,6 +734,15 @@ export async function streamChatWithRagAgent(mainWindow, messages, model, reques
           ragConfig?.folderPath || ''
         )
         if (results.length > 0) {
+          ragSourceResults.push(...results)
+          const sources = formatRagSources(results)
+          if (sources.length > 0) {
+            mainWindow.webContents.send(CHAT_RAG_SOURCES, {
+              requestId,
+              sessionId: sessionId || null,
+              sources
+            })
+          }
           toolResult = results.map((r, idx) => {
             const source = r.source ? `\n[来源: ${r.source}]` : ''
             const confidence = `\n[置信度: ${(r.confidence * 100).toFixed(1)}%]`
@@ -757,7 +768,7 @@ export async function streamChatWithRagAgent(mainWindow, messages, model, reques
   }
 
   console.log(`[RAG-Agent] ====== Agent 结束 ======`)
-  return { fullContent, fullReasoning }
+  return { fullContent, fullReasoning, sources: formatRagSources(ragSourceResults) }
 }
 
 export function streamNoteAI(mainWindow, action, noteContent, selectedText, model, requestId, cancelToken, userInstruction) {

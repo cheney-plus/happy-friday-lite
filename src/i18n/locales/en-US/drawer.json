@@ -60,13 +60,15 @@
   },
   "memory": {
     "title": "Memory Management",
-    "fridayCard": "Friday Assistant",
-    "fridayName": "Friday",
+    "fridayCard": "{name} Assistant",
+    "fridayName": "{name}",
     "name": "Name",
+    "namePlaceholder": "Enter assistant name",
+    "resetName": "Reset",
     "birthDate": "Birth Date",
     "fridayBirthDate": "2026.2.7",
     "memoryFiles": "Memory Files",
-    "memoryFilesHint": "Friday reads and updates these memory files during conversations",
+    "memoryFilesHint": "{name} reads and updates these memory files during conversations",
     "edit": "Edit",
     "editTitle": "Edit Memory File",
     "editMode": "Edit",
@@ -80,13 +82,13 @@
     "updated": "updated",
     "files": {
       "SOUL": "Soul",
-      "SOUL_desc": "Defines Friday's speaking and acting style",
+      "SOUL_desc": "Defines {name}'s speaking and acting style",
       "USER": "User Profile",
       "USER_desc": "Records user habits and preferences",
       "MEMORY": "Long-term Memory",
       "MEMORY_desc": "Cross-session facts and events",
       "Agent": "Experience",
-      "Agent_desc": "Experience and tips Friday accumulates"
+      "Agent_desc": "Experience and tips {name} accumulates"
     }
   },
   "comingSoon": "Coming soon",

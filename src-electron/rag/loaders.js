@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Document } from '@langchain/core/documents'
+import { parseObsidianMarkdown } from '../obsidian/parser.js'
 
 /**
  * 文档加载器：将不同格式的文件加载为统一的 Document 对象数组
@@ -18,11 +19,38 @@ export function getFileType(filePath) {
 async function loadTextFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8')
   const stat = fs.statSync(filePath)
+  const ext = path.extname(filePath).slice(1)
+  if (['md', 'markdown', 'mdx'].includes(ext.toLowerCase())) {
+    const parsed = parseObsidianMarkdown(content, { filePath })
+    const metadataLines = []
+    if (parsed.frontmatter.title) metadataLines.push(`Title: ${parsed.frontmatter.title}`)
+    if (parsed.aliases.length) metadataLines.push(`Aliases: ${parsed.aliases.join(', ')}`)
+    if (parsed.tags.length) metadataLines.push(`Tags: ${parsed.tags.join(', ')}`)
+    if (parsed.wikilinks.length) metadataLines.push(`Links: ${parsed.wikilinks.map(link => link.alias || link.target).join(', ')}`)
+    return [new Document({
+      pageContent: [...metadataLines, parsed.body].filter(Boolean).join('\n\n'),
+      metadata: {
+        source: filePath,
+        fileType: ext,
+        fileSize: stat.size,
+        fileCreatedAt: stat.birthtime.toISOString(),
+        fileModifiedAt: stat.mtime.toISOString(),
+        title: parsed.frontmatter.title || path.basename(filePath, path.extname(filePath)),
+        obsidian: {
+          frontmatter: parsed.frontmatter,
+          tags: parsed.tags,
+          aliases: parsed.aliases,
+          wikilinks: parsed.wikilinks,
+          embeds: parsed.embeds
+        }
+      }
+    })]
+  }
   return [new Document({
     pageContent: content,
     metadata: {
       source: filePath,
-      fileType: path.extname(filePath).slice(1),
+      fileType: ext,
       fileSize: stat.size,
       fileCreatedAt: stat.birthtime.toISOString(),
       fileModifiedAt: stat.mtime.toISOString()

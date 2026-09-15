@@ -52,6 +52,7 @@
       @show-file-item-context-menu="showFileItemContextMenu"
       @open-file="openFile"
       @open-search-result="handleOpenSearchResult"
+      @open-obsidian-sync="showObsidianDialog = true"
     />
 
     <!-- 知识库右键菜单 -->
@@ -174,6 +175,12 @@
       @select-cover="selectCover"
     />
 
+    <ObsidianSyncDialog
+      :visible="showObsidianDialog"
+      @close="showObsidianDialog = false"
+      @synced="refreshCurrentDir"
+    />
+
     <!-- 删除确认对话框 -->
     <ConfirmDialog
       :visible="showDeleteConfirm"
@@ -233,6 +240,7 @@ import KbContextMenu from './components/KbContextMenu.vue';
 import NewFolderDialog from './components/NewFolderDialog.vue';
 import CreateKbDialog from './components/CreateKbDialog.vue';
 import ConfirmDialog from './components/ConfirmDialog.vue';
+import ObsidianSyncDialog from './components/ObsidianSyncDialog.vue';
 import { electronService } from '@/services/electron';
 import { useSidebar } from './composables/useSidebar';
 import { useFileSystem } from './composables/useFileSystem';
@@ -240,6 +248,7 @@ import { useKnowledgeBase } from './composables/useKnowledgeBase';
 import { useContextMenu } from './composables/useContextMenu';
 
 const showDeleteConfirm = ref(false);
+const showObsidianDialog = ref(false);
 const { t } = useI18n();
 const deleteConfirmMessage = ref('');
 const pendingDeleteItem = ref(null);

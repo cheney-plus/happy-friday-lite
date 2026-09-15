@@ -2,7 +2,7 @@
   <div class="agent-response-block">
     <div class="agent-response-header">
       <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
-      <span class="ai-name">{{ t('friday.assistantName') }}</span>
+      <span class="ai-name">{{ displayName }}</span>
     </div>
     <div class="agent-timeline">
       <div v-if="hasReasoning" class="thinking-section">
@@ -78,6 +78,7 @@ const props = defineProps({
   segments: { type: Array, default: () => [] },
   thinking: { type: Boolean, default: false },
   isStreaming: { type: Boolean, default: false },
+  displayName: { type: String, default: '周五' },
   reasoning: { type: String, default: '' },
   reasoningStreamingContent: { type: String, default: '' },
   showActions: { type: Boolean, default: false },

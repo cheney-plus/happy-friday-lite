@@ -22,13 +22,15 @@
             :reasoning="msg.reasoning"
             :show-actions="!isShareMode"
             :show-divider="true"
+            :display-name="assistantName"
             @action="(type) => handleAction(type, index)"
           />
           <AIMessage
             v-else
             :content="msg.content"
             :reasoning="msg.reasoning"
-            :display-name="t('friday.assistantName')"
+            :sources="msg.sources"
+            :display-name="assistantName"
             :show-divider="true"
             :show-actions="!isShareMode"
             :show-rollback="currentMode === 'chat'"
@@ -42,12 +44,14 @@
           :reasoning-streaming-content="streamingReasoning"
           :is-streaming="isStreaming"
           :thinking="isThinking"
+          :display-name="assistantName"
         />
         <AIMessage
           v-else-if="isStreaming"
           :content="streamingContent"
           :reasoning-streaming-content="streamingReasoning"
-          :display-name="t('friday.assistantName')"
+          :sources="streamingSources"
+          :display-name="assistantName"
           :is-streaming="true"
           :show-divider="false"
           :show-rollback="currentMode === 'chat'"
@@ -117,10 +121,11 @@ import { refreshHistorySessions } from '@/views/friday/composables/useConversati
 import { useConversationSummary } from '@/views/friday/composables/useConversationSummary';
 import { useToast } from '@/views/friday/composables/useToast';
 import { findTurnStartUserIndex, formatClock, getAssistantContent, mapHistoryMessage } from '@/views/friday/utils/messages';
+import { resolveAssistantName } from '@/views/friday/utils/assistantIdentity';
 
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const fridayStore = useFridayStore();
 const tabStore = useTabStore();
 const noteStore = useNoteStore();
@@ -136,6 +141,7 @@ const chatTime = ref(formatClock());
 const messages = ref([]);
 const currentMode = ref(fridayStore.mode || 'chat');
 const currentSessionId = ref('');
+const assistantName = computed(() => resolveAssistantName(fridayStore.assistantName, locale.value));
 const isRollingBack = ref(false);
 const rollbackDialogVisible = ref(false);
 const rollbackPreviewContent = ref('');
@@ -152,6 +158,7 @@ const {
   isStreaming,
   streamingContent,
   streamingReasoning,
+  streamingSources,
   agentSegments,
   pendingApproval,
   isThinking,
@@ -173,7 +180,7 @@ const {
   },
   t
 });
-const { handleAddToKnowledge } = useConversationSummary({ messages, showToast, t });
+const { handleAddToKnowledge } = useConversationSummary({ messages, showToast, t, assistantName });
 
 let pendingLaunch = null;
 if (!isShareMode.value) {
@@ -191,7 +198,7 @@ if (!isShareMode.value) {
 const chatTitle = computed(() => {
   if (sessionTitle.value) return sessionTitle.value;
   const session = fridayStore.historySessions.find(item => item.id === currentSessionId.value);
-  return session?.title || route.query.title || t('friday.defaultTitle');
+  return session?.title || route.query.title || t('friday.defaultTitle', { name: assistantName.value });
 });
 
 function routeSessionKey() {
@@ -248,7 +255,7 @@ async function loadShareData(sessionId) {
     const res = await fetch(`/api/share/${encodeURIComponent(sessionId)}`);
     const data = await res.json();
     if (data?.success && data.session) {
-      sessionTitle.value = data.session.title || t('friday.defaultTitle');
+      sessionTitle.value = data.session.title || t('friday.defaultTitle', { name: assistantName.value });
       currentMode.value = data.session.mode || 'chat';
       messages.value = (data.messages || []).map(mapHistoryMessage);
     }

@@ -27,6 +27,15 @@
         <h1 v-else class="page-title">{{ currentTitle }}</h1>
       </div>
       <div class="header-right">
+        <div class="tooltip-btn" data-tooltip="Obsidian WebDAV">
+          <button class="icon-btn" @click="$emit('open-obsidian-sync')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4z"></path>
+              <path d="M4 7l8 4 8-4"></path>
+              <path d="M12 11v10"></path>
+            </svg>
+          </button>
+        </div>
         <Transition name="search-expand">
           <div v-if="searchVisible" class="search-inline">
             <input
@@ -413,7 +422,8 @@ const emit = defineEmits([
   'show-file-context-menu',
   'show-file-item-context-menu',
   'open-file',
-  'open-search-result'
+  'open-search-result',
+  'open-obsidian-sync'
 ]);
 
 const fileGridRef = ref(null);

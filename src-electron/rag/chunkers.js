@@ -62,7 +62,8 @@ export async function parentChildSplit(rawDocs) {
       fileModifiedAt: parent.metadata.fileModifiedAt,
       extraMetadata: {
         title: parent.metadata.title,
-        noteId: parent.metadata.noteId
+        noteId: parent.metadata.noteId,
+        obsidian: parent.metadata.obsidian
       }
     })
 
@@ -121,7 +122,8 @@ export async function noteStructureAwareSplit(rawDocs) {
     fileModifiedAt: c.metadata.fileModifiedAt,
     extraMetadata: {
       title: c.metadata.title,
-      noteId: c.metadata.noteId
+      noteId: c.metadata.noteId,
+      obsidian: c.metadata.obsidian
     }
   }))
 

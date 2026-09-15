@@ -60,13 +60,15 @@
   },
   "memory": {
     "title": "记忆管理",
-    "fridayCard": "Friday 助手",
-    "fridayName": "Friday",
+    "fridayCard": "{name} 助手",
+    "fridayName": "{name}",
     "name": "姓名",
+    "namePlaceholder": "输入助手名称",
+    "resetName": "恢复默认",
     "birthDate": "出生日期",
     "fridayBirthDate": "2026.2.7",
     "memoryFiles": "记忆文件",
-    "memoryFilesHint": "Friday 会在对话中读取并更新这些记忆文件",
+    "memoryFilesHint": "{name} 会在对话中读取并更新这些记忆文件",
     "edit": "编辑",
     "editTitle": "编辑记忆文件",
     "editMode": "编辑",
@@ -80,13 +82,13 @@
     "updated": "更新于",
     "files": {
       "SOUL": "灵魂设定",
-      "SOUL_desc": "设定 Friday 说话做事的风格",
+      "SOUL_desc": "设定 {name} 说话做事的风格",
       "USER": "用户档案",
       "USER_desc": "记录用户的习惯与爱好",
       "MEMORY": "长期记忆",
       "MEMORY_desc": "跨会话的重要事实与事件",
       "Agent": "经验技巧",
-      "Agent_desc": "Friday 积累的经验与技巧"
+      "Agent_desc": "{name} 积累的经验与技巧"
     }
   },
   "comingSoon": "功能开发中，敬请期待",

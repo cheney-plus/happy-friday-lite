@@ -20,6 +20,9 @@
               <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
               <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
             </svg>
+            <svg v-else-if="att.type === 'kb-folder'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
             <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
@@ -54,13 +57,13 @@
 
         <div class="action-right">
           <template v-if="showReferenceButtons">
-            <button class="action-btn icon-only" @click.stop="toggleLinkDropdown($event)" :title="t('friday.referenceNoteFile')">
+            <button class="action-btn icon-only" type="button" @click.stop="toggleLinkDropdown($event)" :title="t('friday.referenceNoteFile')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
               </svg>
             </button>
 
-            <button v-if="showKbButton" class="action-btn icon-only" @click.stop="toggleKbDropdown($event)" :title="t('friday.referenceKb')">
+            <button v-if="showKbButton" class="action-btn icon-only" type="button" @click.stop="toggleKbDropdown($event)" :title="t('friday.referenceKb')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                 <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
@@ -73,6 +76,7 @@
               v-if="isStreaming"
               key="stop"
               class="stop-btn"
+              type="button"
               @click="$emit('stop')"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -83,6 +87,7 @@
               v-else
               key="send"
               class="send-btn"
+              type="button"
               :class="{ active: (modelValue || '').trim() }"
               @click="$emit('send')"
             >
@@ -344,6 +349,10 @@ onBeforeUnmount(() => {
 
 .attachment-tag.tag-kb-file {
   --tag-accent: #f59e0b;
+}
+
+.attachment-tag.tag-kb-folder {
+  --tag-accent: #0891b2;
 }
 
 .tag-icon-wrap {

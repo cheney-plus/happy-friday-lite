@@ -13,6 +13,7 @@ import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
 import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
 import { stopHarnessSidecar } from './src-electron/harness/index.js'
+import { startObsidianScheduler, stopObsidianScheduler } from './src-electron/obsidian/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -132,6 +133,7 @@ app.whenReady().then(async () => {
   }
 
   startAutomationScheduler(mainWindow)
+  startObsidianScheduler(mainWindow)
 
   // 3. 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
   try {
@@ -199,6 +201,7 @@ app.on('window-all-closed', function () {
   }
   stopShareServer()
   stopAutomationScheduler()
+  stopObsidianScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()
@@ -212,6 +215,7 @@ app.on('before-quit', (event) => {
   Promise.allSettled([
     import('./src-electron/agent/mcp.js')
       .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections()),
+    Promise.resolve(stopObsidianScheduler()),
     stopHarnessSidecar()
   ]).finally(() => {
     shutdownStarted = true

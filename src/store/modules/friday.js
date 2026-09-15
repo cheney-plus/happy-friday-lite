@@ -5,6 +5,7 @@ const THINK_KEY = 'happy-friday-think-mode'
 const SELECTED_MODEL_KEY = 'happy-friday-selected-model'
 const HISTORY_WIDTH_KEY = 'happy-friday-history-sidebar-width'
 const HISTORY_SESSIONS_KEY = 'happy-friday-history-sessions'
+const ASSISTANT_NAME_KEY = 'happy-friday-assistant-name'
 const DEFAULT_HISTORY_WIDTH = 240
 
 function readStorage(key, fallback = '') {
@@ -49,6 +50,7 @@ export const useFridayStore = defineStore('friday', {
     mode: readStorage(MODE_KEY, 'agent'),
     thinkMode: readStorage(THINK_KEY, 'fast'),
     modelId: readStorage(SELECTED_MODEL_KEY, ''),
+    assistantName: readStorage(ASSISTANT_NAME_KEY, ''),
     pendingLaunches: {},
     streamingByTab: {},
     historySessions: loadCachedHistorySessions(),
@@ -66,6 +68,13 @@ export const useFridayStore = defineStore('friday', {
     setModelId(modelId) {
       this.modelId = modelId
       writeStorage(SELECTED_MODEL_KEY, modelId)
+    },
+    setAssistantName(name) {
+      this.assistantName = name || ''
+      writeStorage(ASSISTANT_NAME_KEY, this.assistantName)
+    },
+    resetAssistantName() {
+      this.setAssistantName('')
     },
     setPendingLaunch(tabId, payload) {
       const key = tabId || '_default'

@@ -45,7 +45,7 @@
                   <div v-else-if="msg.segments && msg.segments.length > 0" class="agent-response-block">
                     <div class="agent-response-header">
                       <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
-                      <span class="ai-name">周五</span>
+                      <span class="ai-name">{{ assistantName }}</span>
                     </div>
                     <div class="agent-timeline">
                       <template v-for="(seg, si) in msg.segments" :key="`${msg.id}-seg-${si}`">
@@ -83,7 +83,7 @@
                   <div class="agent-response-block">
                     <div class="agent-response-header">
                       <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
-                      <span class="ai-name">周五</span>
+                      <span class="ai-name">{{ assistantName }}</span>
                     </div>
                     <div class="agent-timeline">
                       <template v-for="seg in agentSegments" :key="seg.id">
@@ -113,7 +113,7 @@
                   <div class="agent-response-block">
                     <div class="agent-response-header">
                       <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
-                      <span class="ai-name">周五</span>
+                      <span class="ai-name">{{ assistantName }}</span>
                     </div>
                     <div class="agent-timeline">
                       <div class="thinking-indicator">
@@ -231,6 +231,7 @@
 
 <script setup>
 import { ref, computed, nextTick, onUnmounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import { electronService } from '@/services/electron';
 import UserMessage from '@/components/chat/UserMessage.vue';
@@ -238,6 +239,8 @@ import AIMessage from '@/components/chat/AIMessage.vue';
 import ToolCallSection from '@/components/chat/ToolCallSection.vue';
 import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import AgentFileSelectDialog from './AgentFileSelectDialog.vue';
+import { useFridayStore } from '@/store';
+import { resolveAssistantName } from '@/views/friday/utils/assistantIdentity';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -252,6 +255,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
+const fridayStore = useFridayStore();
+const { locale } = useI18n();
+const assistantName = computed(() => resolveAssistantName(fridayStore.assistantName, locale.value));
 
 marked.setOptions({ breaks: true, gfm: true });
 function renderMarkdown(content) {
