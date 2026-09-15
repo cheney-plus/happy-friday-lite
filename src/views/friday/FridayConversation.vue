@@ -81,7 +81,7 @@
     />
 
     <ToolApprovalDialog
-      :visible="!!pendingApproval"
+      :visible="!!pendingApproval && isConversationVisible"
       :tool-name="pendingApproval?.toolName || ''"
       :arguments="pendingApproval?.arguments || {}"
       :risk-assessment="pendingApproval?.riskAssessment"
@@ -98,7 +98,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { NotebookPen } from 'lucide-vue-next';
 import { electronService } from '@/services/electron';
@@ -133,9 +133,6 @@ const messagesContainer = ref(null);
 const isAtBottom = ref(true);
 const showScrollDownBtn = ref(false);
 const chatTime = ref(formatClock());
-const messages = ref([]);
-const currentMode = ref(fridayStore.mode || 'chat');
-const currentSessionId = ref('');
 const isRollingBack = ref(false);
 const rollbackDialogVisible = ref(false);
 const rollbackPreviewContent = ref('');
@@ -149,6 +146,10 @@ let forceScrollPending = false;
 
 const { toastVisible, toastMessage, showToast } = useToast();
 const {
+  tabKey,
+  messages,
+  currentSessionId,
+  currentMode,
   isStreaming,
   streamingContent,
   streamingReasoning,
@@ -165,21 +166,25 @@ const {
   handleApproveAll,
   handleRejectTool
 } = useChatStream({
-  messages,
-  currentSessionId,
-  currentMode,
   onHistoryRefresh: () => {
     if (!isShareMode.value) refreshHistorySessions();
   },
   t
 });
 const { handleAddToKnowledge } = useConversationSummary({ messages, showToast, t });
+const isConversationVisible = computed(() => {
+  if (isShareMode.value) return true;
+  return tabStore.activeTabId === tabKey && (route.name === 'friday-chat' || route.name === 'share');
+});
 
 let pendingLaunch = null;
-if (!isShareMode.value) {
+if (!isShareMode.value && !isStreaming.value) {
   pendingLaunch = fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
   const launchText = (pendingLaunch?.userMessage || pendingLaunch?.text || '').trim();
   if (launchText) {
+    messages.value = [];
+    currentSessionId.value = '';
+    sessionTitle.value = '';
     if (pendingLaunch.mode) currentMode.value = pendingLaunch.mode;
     messages.value.push({ role: 'user', content: pendingLaunch.userMessage || pendingLaunch.text });
     startStreaming();
@@ -261,20 +266,61 @@ function isActiveConversationRoute() {
   return route.name === 'friday-chat' || route.name === 'share';
 }
 
+function syncSessionRoute() {
+  const param = route.params.sessionId;
+  if (
+    currentSessionId.value &&
+    !isNewSessionId(currentSessionId.value) &&
+    isNewSessionId(param) &&
+    route.name === 'friday-chat' &&
+    isConversationVisible.value
+  ) {
+    router.replace(fridayChatLocation(route, { sessionId: currentSessionId.value }, tabStore));
+  }
+}
+
 async function initConversation() {
   if (!isActiveConversationRoute()) return;
   const seq = ++initSeq;
   let launch = pendingLaunch;
   pendingLaunch = null;
-  if (!launch && !isShareMode.value) {
+  if (!launch && !isShareMode.value && !isStreaming.value) {
     launch = fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
   }
   const key = routeSessionKey();
+  if (isStreaming.value && !launch) {
+    loadedRouteKey = key;
+    scrollToBottom(true);
+    return;
+  }
   if (loadedRouteKey === key && !launch) return;
+  if (
+    !launch &&
+    messages.value.length &&
+    currentSessionId.value &&
+    currentSessionId.value === (route.params.sessionId || '')
+  ) {
+    loadedRouteKey = key;
+    return;
+  }
+  if (
+    !launch &&
+    messages.value.length &&
+    !isNewSessionId(currentSessionId.value) &&
+    isNewSessionId(route.params.sessionId)
+  ) {
+    loadedRouteKey = key;
+    syncSessionRoute();
+    return;
+  }
   loadedRouteKey = key;
 
   const launchText = (launch?.userMessage || launch?.text || '').trim();
   if (launchText) {
+    if (!isStreaming.value) {
+      messages.value = [];
+      sessionTitle.value = '';
+    }
     inputText.value = '';
     chatTime.value = formatClock();
     isAtBottom.value = true;
@@ -446,8 +492,7 @@ async function executeRollback() {
 
 function handleTabCloseRequest(event) {
   const tabId = event.detail?.tabId;
-  const currentTabId = getFridayTabId(route);
-  if (!isStreaming.value || !currentTabId || tabId !== currentTabId) return;
+  if (!isStreaming.value || !tabKey || tabId !== tabKey) return;
   if (!window.confirm(t('friday.closeStreamingConfirm'))) {
     event.preventDefault();
     return;
@@ -459,33 +504,24 @@ function handleTabCloseRequest(event) {
   });
 }
 
-onBeforeRouteLeave(async () => {
-  if (!isStreaming.value || leavingAfterStop || isShareMode.value) return true;
-  if (!window.confirm(t('friday.leaveStreamingConfirm'))) return false;
-  leavingAfterStop = true;
-  try {
-    await handleStop();
-    await new Promise(resolve => setTimeout(resolve, 120));
-  } finally {
-    leavingAfterStop = false;
-  }
-  return true;
-});
-
-watch(currentSessionId, (sessionId) => {
-  const param = route.params.sessionId;
-  if (sessionId && !isNewSessionId(sessionId) && isNewSessionId(param) && route.name === 'friday-chat') {
-    router.replace(fridayChatLocation(route, { sessionId }, tabStore));
-  }
+watch(currentSessionId, () => {
+  syncSessionRoute();
 });
 
 watch(() => routeSessionKey(), (next, prev) => {
   if (!isActiveConversationRoute() || next === prev) return;
+  if (!isConversationVisible.value) return;
   if (isStreaming.value && messages.value.length) return;
   const nextSessionId = String(next).split('::')[0];
   if (nextSessionId && nextSessionId === currentSessionId.value) return;
   if (isNewSessionId(String(prev || '').split('::')[0]) && !isNewSessionId(nextSessionId) && messages.value.length) return;
   initConversation();
+});
+
+watch(isConversationVisible, (visible) => {
+  if (!visible) return;
+  syncSessionRoute();
+  nextTick(() => scrollToBottom(true));
 });
 
 watch(
@@ -501,6 +537,7 @@ onMounted(async () => {
 });
 
 onActivated(() => {
+  syncSessionRoute();
   if (isStreaming.value) {
     scrollToBottom(true);
     return;
@@ -514,7 +551,6 @@ onActivated(() => {
 
 onDeactivated(() => {
   rollbackDialogVisible.value = false;
-  pendingApproval.value = null;
 });
 
 onUnmounted(() => {
