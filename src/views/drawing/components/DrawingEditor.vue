@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/utils/theme'
 import { applyCellAnimation } from '../shapes/animation.js'
@@ -133,6 +133,7 @@ let saveTimer = null
 let skipSave = false
 let lastDropAt = 0
 let pendingImageItem = null
+let graphResizeObserver = null
 
 const mode = ref('select')
 const edgeStyleId = ref('manhattan')
@@ -168,6 +169,29 @@ const propState = reactive({
 })
 
 const canvasName = computed(() => props.canvas.title || t(`drawing.canvas.${props.canvas.titleKey || 'untitled'}`))
+
+const resizeGraph = () => {
+  const element = containerRef.value
+  const currentGraph = graph.value
+  if (!element || !currentGraph) return
+
+  const { width, height } = element.getBoundingClientRect()
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return
+
+  currentGraph.resize(Math.round(width), Math.round(height))
+}
+
+const observeGraphResize = () => {
+  if (!containerRef.value || graphResizeObserver || typeof ResizeObserver === 'undefined') return
+  graphResizeObserver = new ResizeObserver(resizeGraph)
+  graphResizeObserver.observe(containerRef.value)
+  resizeGraph()
+}
+
+const stopObservingGraphResize = () => {
+  graphResizeObserver?.disconnect()
+  graphResizeObserver = null
+}
 
 const syncHistory = () => {
   if (!graph.value) return
@@ -511,16 +535,24 @@ onMounted(() => {
   document.addEventListener('keydown', cancelPendingEdge)
 
   loadCanvas()
+  observeGraphResize()
 })
 
-onActivated(() => graph.value?.enableKeyboard())
-onDeactivated(() => graph.value?.disableKeyboard())
+onActivated(() => {
+  graph.value?.enableKeyboard()
+  nextTick(observeGraphResize)
+})
+onDeactivated(() => {
+  graph.value?.disableKeyboard()
+  stopObservingGraphResize()
+})
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu)
   document.removeEventListener('keydown', cancelPendingEdge)
   clearTimeout(saveTimer)
   if (graph.value && !skipSave) emit('change', { id: props.canvas.id, graphJSON: graph.value.toJSON() })
+  stopObservingGraphResize()
   dnd?.dispose()
   graph.value?.dispose()
 })

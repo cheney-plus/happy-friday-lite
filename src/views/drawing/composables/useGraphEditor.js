@@ -37,7 +37,9 @@ export function createDrawingGraph(container, minimapContainer, state) {
 
   const graph = new Graph({
     container,
-    autoResize: true,
+    // DrawingEditor owns resize handling so a cached, hidden route cannot pass
+    // a zero or non-finite size from X6's internal ResizeObserver to MiniMap.
+    autoResize: false,
     preventDefaultContextMenu: true,
     background: { color: 'transparent' },
     grid: {
