@@ -7,6 +7,15 @@
  * 因此本文件直接生成/修改合法的 graphJSON 并通过 db.saveDrawingCanvas 持久化到 SQLite，
  * 再通过 drawing-updated IPC 事件通知前端刷新（前端 drawing store 拉取最新数据并重载编辑器）。
  *
+ * 标准画法（与前端 shapes/ports.js、assets/drawing_temp 模板一致）：
+ *   - 每个标准图形自带 4 个固定 ID 连接点：port-top / port-right / port-bottom / port-left
+ *   - 边的端点写 { cell, port } 挂到连接点上，而不是默认连到节点中心
+ *   - Agent 可显式指定 sourcePort/targetPort；未指定时按节点相对几何位置自动推断
+ *     （上下相邻 → bottom→top，左右相邻 → right→left）
+ *   - 时序图参与者（draw-seq-actor）之间的消息挂到生命线锚点（midSide），不用连接点
+ *   - create_drawing 的工具描述内嵌完整绘图 JSON 语法规范（DRAWING_SYNTAX_GUIDE），
+ *     包含图形目录、连接点、边样式、布局方向与各图类型规范
+ *
  * 安全约束（设计文档第 7 节）：
  *   - shape / edgeStyle 只允许来自白名单目录
  *   - 节点与边 ID 唯一，边引用的节点必须存在
@@ -248,6 +257,11 @@ const KIND_DEFAULT_EDGE = {
   uml: 'arrow'
 }
 
+// 默认布局方向：按图类型选择（其余默认 TB）
+const KIND_DEFAULT_DIRECTION = {
+  er: 'LR'
+}
+
 const KIND_TITLE_KEY = {
   mindmap: 'mindMap',
   flowchart: 'flowchart',
@@ -321,6 +335,34 @@ function cleanLabel(value, fallback = '') {
   return value.replace(/\s+/g, ' ').trim().slice(0, MAX_LABEL_LEN)
 }
 
+// X6 边的 vertices 路径点：边按顺序经过这些画布坐标点，用于精确控制走向
+const MAX_VERTICES = 10
+
+function sanitizeVertices(value) {
+  if (value == null) return undefined
+  if (!Array.isArray(value)) throw new Error('vertices 必须是 [{x, y}] 数组')
+  if (value.length > MAX_VERTICES) {
+    throw new Error(`路径点数量超出限制：最多 ${MAX_VERTICES} 个，收到 ${value.length} 个`)
+  }
+  const points = value.map((point, index) => {
+    if (!point || typeof point !== 'object') throw new Error(`vertices[${index}] 不是对象`)
+    const x = clampNumber(point.x, COORD_MIN, COORD_MAX)
+    const y = clampNumber(point.y, COORD_MIN, COORD_MAX)
+    if (x == null || y == null) throw new Error(`vertices[${index}] 缺少有效的 x/y 坐标`)
+    return { x, y }
+  })
+  return points.length ? points : undefined
+}
+
+function sanitizeLabelPosition(value) {
+  if (value == null || value === '') return null
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num)) return null
+  // X6 中 distance 为 0 时按绝对像素 0 计算（标签贴在起点上），
+  // 因此钳制到 (0, 1] 区间，保证数值始终按路径比例解释
+  return Math.min(1, Math.max(0.02, num))
+}
+
 function sanitizeId(value, prefix, used) {
   let id = typeof value === 'string' ? value.trim().replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 40) : ''
   if (!id) id = genId(prefix)
@@ -344,6 +386,66 @@ function normalizeEdgeStyle(value, fallback = 'manhattan') {
   if (EDGE_STYLE_DEFS[key]) return key
   const alias = EDGE_ALIASES[key.toLowerCase()]
   return alias && EDGE_STYLE_DEFS[alias] ? alias : fallback
+}
+
+// ========== 连接点（ports）==========
+// 与前端 shapes/ports.js 的 SIDE_PORTS 保持一致：
+// 每个标准图形自带 4 个固定 ID 的连接点 port-top / port-right / port-bottom / port-left，
+// 边的 source/target 通过 { cell, port } 挂到连接点上，这是标准画法的关键。
+
+const PORT_SIDES = ['top', 'right', 'bottom', 'left']
+
+function normalizePort(value) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const key = value.trim().toLowerCase()
+  if (PORT_SIDES.includes(key)) return key
+  const match = key.match(/^port-(top|right|bottom|left)$/)
+  return match ? match[1] : null
+}
+
+function nodeCenter(node) {
+  return {
+    x: (node.x || 0) + (node.width || 140) / 2,
+    y: (node.y || 0) + (node.height || 56) / 2
+  }
+}
+
+// 按两节点的相对几何位置推断连接点方位：
+// 垂直关系（|dy| >= |dx|）用 bottom/top，水平关系用 right/left
+function inferPortSide(node, otherNode) {
+  if (!node || !otherNode) return null
+  const nc = nodeCenter(node)
+  const oc = nodeCenter(otherNode)
+  const dx = oc.x - nc.x
+  const dy = oc.y - nc.y
+  if (Math.abs(dy) >= Math.abs(dx)) return dy >= 0 ? 'bottom' : 'top'
+  return dx >= 0 ? 'right' : 'left'
+}
+
+// 时序图两个参与者（draw-seq-actor 自带生命线）之间的消息
+// 按前端时序图模板的做法挂到生命线上（midSide 锚点），而不是连接点
+function isSeqActorPair(a, b) {
+  return a?.shape === 'draw-seq-actor' && b?.shape === 'draw-seq-actor'
+}
+
+function countSeqMessages(cells) {
+  return cells.filter(
+    (cell) =>
+      isEdgeCell(cell) &&
+      isSeqActorPair(findNodeCell(cells, cell.source?.cell), findNodeCell(cells, cell.target?.cell))
+  ).length
+}
+
+// 构造边的端点：优先显式 port，其次几何推断，最后退回纯 cell（中心连接）
+function buildTerminal(cellId, port, node, otherNode, seqPadding) {
+  if (node && otherNode && isSeqActorPair(node, otherNode)) {
+    return {
+      cell: cellId,
+      anchor: { name: 'midSide', args: { padding: seqPadding != null ? seqPadding : 80 } }
+    }
+  }
+  const side = normalizePort(port) || inferPortSide(node, otherNode)
+  return side ? { cell: cellId, port: `port-${side}` } : { cell: cellId }
 }
 
 function shouldPreserveStyle(shape) {
@@ -385,22 +487,45 @@ function buildNodeCell({ id, shape, x, y, width, height, label, data = {}, zInde
   return cell
 }
 
-function buildEdgeCell({ id, source, target, style, label }) {
+function buildEdgeCell({
+  id,
+  source,
+  target,
+  style,
+  label,
+  labelPosition,
+  vertices,
+  sourcePort,
+  targetPort,
+  sourceNode,
+  targetNode,
+  seqPadding
+}) {
   const styleId = normalizeEdgeStyle(style)
   const def = EDGE_STYLE_DEFS[styleId]
   const cell = {
     id,
     shape: 'edge',
-    source: { cell: source },
-    target: { cell: target },
+    source: buildTerminal(source, sourcePort, sourceNode, targetNode, seqPadding),
+    target: buildTerminal(target, targetPort, targetNode, sourceNode, seqPadding),
     router: def.router,
     connector: def.connector,
     attrs: { line: { ...def.line } },
     data: { edgeStyle: styleId },
     zIndex: 0
   }
+  // X6 vertices：边按顺序经过的画布坐标点，用于精确控制走向（如回退边绕行）
+  const points = sanitizeVertices(vertices)
+  if (points) cell.vertices = points
   if (label) {
-    cell.labels = [{ attrs: { label: { text: label, fontSize: 11 } } }]
+    // X6 标签位置：数值作为 distance，0.5 即边中点（默认居中）
+    const position = sanitizeLabelPosition(labelPosition) ?? 0.5
+    cell.labels = [
+      {
+        position,
+        attrs: { label: { text: label, fontSize: 11 } }
+      }
+    ]
   }
   return cell
 }
@@ -430,7 +555,9 @@ function buildMindEdgeCell({ id, source, target, treeId, side = 'right' }) {
 
 // ========== 自动布局（主进程侧，纯几何计算） ==========
 
-function layoutLayered(cells) {
+// 分层布局：direction 'TB'（默认）按层自上而下排列（流程图/架构图标准方向），
+// 'LR' 按层自左向右排列（ER 图标准方向）
+function layoutLayered(cells, direction = 'TB') {
   const nodes = cells.filter((cell) => !isEdgeCell(cell) && !isMindCell(cell))
   if (!nodes.length) return
   const nodeById = new Map(nodes.map((node) => [node.id, node]))
@@ -467,29 +594,61 @@ function layoutLayered(cells) {
   })
 
   const sortedLayers = [...byLayer.keys()].sort((a, b) => a - b)
-  const columnWidth = new Map(
+
+  if (direction === 'LR') {
+    const columnWidth = new Map(
+      sortedLayers.map((layer) => [
+        layer,
+        Math.max(...byLayer.get(layer).map((node) => node.width || 140), 100)
+      ])
+    )
+    const columnX = new Map()
+    let x = 60
+    sortedLayers.forEach((layer) => {
+      columnX.set(layer, x)
+      x += columnWidth.get(layer) + 80
+    })
+
+    const layerHeights = sortedLayers.map((layer) =>
+      byLayer.get(layer).reduce((sum, node) => sum + (node.height || 56) + 40, 0)
+    )
+    const totalHeight = Math.max(...layerHeights, 0)
+    sortedLayers.forEach((layer, index) => {
+      let y = Math.max(60, (totalHeight - layerHeights[index]) / 2)
+      byLayer.get(layer).forEach((node) => {
+        node.x = Math.round(columnX.get(layer) + (columnWidth.get(layer) - (node.width || 140)) / 2)
+        node.y = Math.round(y)
+        y += (node.height || 56) + 40
+      })
+    })
+    return
+  }
+
+  // TB：层作为行，自上而下；行内节点水平铺开并整体居中对齐
+  const rowHeight = new Map(
     sortedLayers.map((layer) => [
       layer,
-      Math.max(...byLayer.get(layer).map((node) => node.width || 140), 100)
+      Math.max(...byLayer.get(layer).map((node) => node.height || 56), 40)
     ])
   )
-  const columnX = new Map()
-  let x = 60
+  const rowY = new Map()
+  let y = 60
   sortedLayers.forEach((layer) => {
-    columnX.set(layer, x)
-    x += columnWidth.get(layer) + 80
+    rowY.set(layer, y)
+    y += rowHeight.get(layer) + 84
   })
 
-  const layerHeights = sortedLayers.map((layer) =>
-    byLayer.get(layer).reduce((sum, node) => sum + (node.height || 56) + 40, 0)
+  const GAP_X = 70
+  const rowWidths = sortedLayers.map((layer) =>
+    byLayer.get(layer).reduce((sum, node) => sum + (node.width || 140) + GAP_X, -GAP_X)
   )
-  const totalHeight = Math.max(...layerHeights, 0)
+  const maxRowWidth = Math.max(...rowWidths, 0)
   sortedLayers.forEach((layer, index) => {
-    let y = Math.max(60, (totalHeight - layerHeights[index]) / 2)
+    let x = 60 + Math.max(0, (maxRowWidth - rowWidths[index]) / 2)
     byLayer.get(layer).forEach((node) => {
-      node.x = Math.round(columnX.get(layer) + (columnWidth.get(layer) - (node.width || 140)) / 2)
-      node.y = Math.round(y)
-      y += (node.height || 56) + 40
+      node.x = Math.round(x)
+      node.y = Math.round(rowY.get(layer) + (rowHeight.get(layer) - (node.height || 56)) / 2)
+      x += (node.width || 140) + GAP_X
     })
   })
 }
@@ -654,6 +813,7 @@ function validateNodesInput(nodes, kind, usedIds) {
       y: node.y,
       width: node.width,
       height: node.height,
+      zIndex: clampNumber(node.zIndex, 0, 10, 1),
       parentId: typeof node.parentId === 'string' ? node.parentId.trim() : null,
       className: cleanLabel(node.className, ''),
       attributes: typeof node.attributes === 'string' ? node.attributes.slice(0, 1000) : null,
@@ -682,38 +842,58 @@ function validateEdgesInput(edges, nodeIds, defaultStyle, usedIds) {
       source,
       target,
       style: normalizeEdgeStyle(edge.style, defaultStyle),
-      label: cleanLabel(edge.label)
+      label: cleanLabel(edge.label),
+      labelPosition: sanitizeLabelPosition(edge.labelPosition),
+      vertices: edge.vertices,
+      sourcePort: edge.sourcePort || null,
+      targetPort: edge.targetPort || null
     }
   })
 }
 
-function applyLayout(cells, layout, kind) {
+function applyLayout(cells, layout, kind, direction) {
   if (kind === 'mindmap') return // 前端加载时会自动对 mind 树布局
   if (layout === 'grid') layoutGrid(cells)
-  else if (layout === 'layered') layoutLayered(cells)
+  else if (layout === 'layered') layoutLayered(cells, direction)
   // layout === 'none'：尊重模型提供的坐标
 }
 
-function buildGraphJSON(nodes, edges, kind, layout, usedIds) {
-  let cells
+function buildGraphJSON(nodes, edges, kind, layout, direction, usedIds) {
   if (kind === 'mindmap') {
-    cells = buildMindmapCells(nodes, edges, usedIds)
-  } else {
-    cells = [
-      ...nodes.map((node) => {
-        const data = {}
-        if (node.shape === 'draw-uml-class') {
-          data.className = node.className || node.label
-          if (node.attributes) data.attributes = node.attributes
-          if (node.methods) data.methods = node.methods
-        }
-        return buildNodeCell({ ...node, data })
-      }),
-      ...edges.map((edge) => buildEdgeCell(edge))
-    ]
-    applyLayout(cells, layout, kind)
+    return { cells: buildMindmapCells(nodes, edges, usedIds) }
   }
-  return { cells }
+
+  const nodeCells = nodes.map((node) => {
+    const data = {}
+    if (node.shape === 'draw-uml-class') {
+      data.className = node.className || node.label
+      if (node.attributes) data.attributes = node.attributes
+      if (node.methods) data.methods = node.methods
+    }
+    return buildNodeCell({ ...node, data })
+  })
+  // 分层布局需要读取边来推导层级：用轻量边桩（只含 source/target）参与布局计算
+  const layoutEdges = edges.map((edge) => ({
+    source: { cell: edge.source },
+    target: { cell: edge.target }
+  }))
+  // 先布局得到节点最终坐标，再生成边，
+  // 这样边的连接点能按节点相对位置正确推断（如上下相邻 → bottom→top）
+  applyLayout([...nodeCells, ...layoutEdges], layout, kind, direction)
+
+  const nodeById = new Map(nodeCells.map((cell) => [cell.id, cell]))
+  let seqMessages = 0
+  const edgeCells = edges.map((edge) => {
+    const sourceNode = nodeById.get(edge.source)
+    const targetNode = nodeById.get(edge.target)
+    let seqPadding
+    if (isSeqActorPair(sourceNode, targetNode)) {
+      seqPadding = 80 + seqMessages * 55
+      seqMessages++
+    }
+    return buildEdgeCell({ ...edge, sourceNode, targetNode, seqPadding })
+  })
+  return { cells: [...nodeCells, ...edgeCells] }
 }
 
 // ========== 工具：list_drawing_canvases ==========
@@ -775,7 +955,11 @@ async function getDrawingCanvasHandler(args, ctx) {
     ...edges.map((edge) => {
       const style = edge.data?.edgeStyle || 'manhattan'
       const label = edge.labels?.[0]?.attrs?.label?.text || ''
-      return `- ${edge.id}: ${edge.source?.cell} -> ${edge.target?.cell}（样式: ${style}${label ? `，标签: ${label}` : ''}）`
+      const srcPort = edge.source?.port?.replace('port-', '')
+      const tgtPort = edge.target?.port?.replace('port-', '')
+      const src = `${edge.source?.cell}${srcPort ? `(${srcPort})` : ''}`
+      const tgt = `${edge.target?.cell}${tgtPort ? `(${tgtPort})` : ''}`
+      return `- ${edge.id}: ${src} -> ${tgt}（样式: ${style}${label ? `，标签: ${label}` : ''}）`
     })
   ]
   return lines.join('\n')
@@ -791,14 +975,88 @@ registerTool({
 
 // ========== 工具：create_drawing ==========
 
+// 绘图 JSON 语法规范：作为工具描述喂给模型，确保画出标准、规范的图。
+// 内容依据 AntV X6 官方文档（https://x6.antv.antgroup.com/tutorial/about）与本项目的图形注册表整理。
+// 关键点是连接点（ports）语法——这是图形是否标准的核心。
+const DRAWING_SYNTAX_GUIDE = `绘图 JSON 语法规范（基于 AntV X6 图形引擎，必须严格遵循，否则画出的图不标准）：
+
+【一、坐标系与画布】
+- x/y 是节点"左上角"坐标（不是中心点），单位 px；y 轴向下为正
+- 画布没有固定大小，会自动缩放适配内容；网格间距 16px，坐标取 8 的倍数最整齐
+- 通用节点默认尺寸约 140x56（图形默认尺寸见下方目录），文本超宽会自动换行并增高
+
+【二、节点 nodes】每个节点对象：
+- id: 语义化唯一 ID（如 "start"、"review"），edges 通过 id 引用该节点
+- shape: 图形名（见目录，支持别名，如 process/decision/database）
+- label: 节点显示文本（建议 12 字以内，过长自动换行导致节点变高）
+- x/y: 左上角坐标（可选）；仅 layout="none" 时坐标生效
+- width/height: 可选，省略用图形默认尺寸；文字多时适当加宽（每汉字约 14px）
+- zIndex: 可选层级；普通节点默认 1，容器/分组框（container）设为 0 垫底，成员节点放在其坐标范围内
+- UML 类节点额外字段: className、attributes（每行一个，如 "+ id: string"）、methods（每行一个，如 "+ save(): void"）
+- 思维导图(kind=mindmap)不用 shape，用 parentId 表达父子层级（根主题省略 parentId）
+
+【三、连接点 ports（画标准图的关键！）】
+X6 中边与节点的连接方式：边端点写 { cell, port } 挂到"连接桩"上。每个图形自带 4 个固定连接桩，位于上/右/下/左边缘的中点。
+如果不指定 port，边的锚点默认取节点"中心"，线条会指向节点中心、穿过节点边框，图形非常不标准——所以主流程边务必指定端口。
+通过 sourcePort / targetPort 指定方位，取值只能是 top / right / bottom / left。未指定时按两节点相对位置自动推断。选择惯例：
+- 自上而下主流程（默认 direction="TB"）：sourcePort="bottom"、targetPort="top"
+- 自左向右流程（direction="LR"）：sourcePort="right"、targetPort="left"
+- 判断分支（decision）向两侧分出：sourcePort="bottom" 或 "left"/"right"
+- 回退/异常分支回到上方节点：sourcePort="left"、targetPort="left" 或 "top"，并用 vertices 让边绕行避开中间节点
+例外：时序图（draw-seq-actor 参与者之间的消息）自动挂到生命线锚点，无需也不应指定 ports。
+
+【四、边 edges】每条边对象：
+- source / target: 起点/终点节点 ID（必填，不得自环）
+- sourcePort / targetPort: 连接点方位 top/right/bottom/left（可选，推荐显式指定主流程方向）
+- style: 连线样式（见目录，省略按图类型自动选择）
+- label: 连线标签（建议 8 字以内），如判断分支的 "是"/"否"、ER 图基数 "1"/"N"
+- labelPosition: 标签在边上的位置比例，默认 0.5（边中点居中），一般无需指定。仅当标签与交叉边/节点重叠时微调（建议 0.3~0.7），不要设为 0 或 1（会贴到节点上）
+- vertices: 路径点数组 [{x, y}]（画布绝对坐标，边按顺序经过，最多 10 个）。用于精确控制走向：如回退边绕行、让长边避开中间节点。注意 router 会在此基础上加工（manhattan 自动拐直角并避开障碍节点），一般无需指定
+
+【五、shape 图形目录（按图类型选用）】
+- 通用: rect 矩形, rounded 圆角矩形, circle 圆, ellipse 椭圆, diamond 菱形, triangle 三角形, parallelogram 平行四边形, hexagon 六边形, star 星形, cloud 云, cylinder 圆柱(数据库), document 文档, sticky 便签, text 纯文本, container 容器/分组框
+- 流程图: terminator 开始/结束(圆角胶囊), process 处理步骤, decision 判断(菱形), data 输入/输出数据, preparation 准备, delay 延迟, display 显示, manual 手工输入, connector 页面连接点
+- ER 图: entity 实体, weakentity 弱实体, attribute 属性(椭圆), key 主键(下划线), relation 联系(菱形)
+- UML: class 类, interface 接口, actor 角色, usecase 用例, package 包, component 组件
+- 架构图: client 客户端, server 服务(service/api), gateway 网关, queue 消息队列, cache 缓存, database 数据库(db), cloud 云
+- 数据流图: external 外部实体, dfd-process 加工, datastore 数据存储
+- 时序图: actor 参与者（自带生命线，横向排列）
+- 时间线: event 事件, milestone 里程碑
+
+【六、边样式 style 目录】（每种样式已封装 X6 的 router 路由 + connector 连接器 + 箭头）
+- manhattan: 直角折线+箭头，智能路由自动避开路径上的节点（默认，流程图/架构图首选）
+- orthogonal: 直角折线+箭头（不自动避障，走向更规整）
+- arrow: 直线+箭头（UML 关联等）/ doubleArrow: 直线双向箭头 / dashed: 虚线+箭头（UML 依赖/实现）
+- curve: 平滑曲线（贝塞尔）/ straight: 无箭头直线 / er: Z 字折线（ER 图专用）
+- message: 时序消息（实线）/ returnMessage: 时序返回（虚线）/ dataflow: 数据流（直角折线）
+
+【七、布局参数】
+- layout: "layered" 自动分层（默认，按边的先后层级排列）/ "grid" 网格（适合无边的并列节点）/ "none" 使用节点 x/y 坐标
+- direction: "TB" 自上而下（默认，流程图/架构图标准方向）/ "LR" 自左向右（ER 图标准方向）。仅 layered 布局有效
+- layout="none" 时的间距建议：上下层行距 ≥ 140（同列节点垂直间隔 ≥ 100），左右列距 ≥ 200，保证折线有拐弯空间
+
+【八、各图类型规范】
+- 流程图: 开始/结束用 terminator，步骤用 process，判断用 decision 且两条出边分别加 label "是"/"否"；每个判断的两个分支节点左右错开
+- ER 图: 实体-relation 菱形-实体交替横向排列，边 style="er" 且两端加基数标签（"1"/"N"）；属性节点放在所挂实体的上方或下方
+- UML 类图: class 填 className/attributes/methods；继承用 arrow，实现/依赖用 dashed
+- 时序图: 参与者横向排列，消息按时间从上到下依次排列，调用 style="message"、返回 style="returnMessage"
+- 架构图: 自上而下分层（客户端→网关→服务→数据/缓存），用对应架构图形而非通用矩形；同层服务用 container 分组
+
+【九、最佳实践】
+- id 用语义化英文名（如 start/review/notify），便于 update_drawing 增量修改时引用
+- 标签文本精炼（节点 ≤ 12 字、边标签 ≤ 8 字），标签过长会互相遮挡
+- 复杂图（>15 节点）拆成主流程+子流程（用 connector 节点引用），不要一图塞满
+- 画完自检：主流程是否 TB/LR 方向一致、边是否都从边缘连接点进出、判断分支是否左右错开`
+
 const createNodeSchema = z.object({
   id: z.string().optional().describe('节点 ID（可选，省略则自动生成；后续连线时用它引用）'),
   shape: z.string().optional().describe('图形名称，如 process/decision/terminator/database/entity/class/actor 等，省略默认为 rect'),
-  label: z.string().optional().describe('节点显示文本'),
-  x: z.number().optional().describe('横坐标（可选，自动布局时省略）'),
-  y: z.number().optional().describe('纵坐标（可选，自动布局时省略）'),
+  label: z.string().optional().describe('节点显示文本（建议 12 字以内，过长会自动换行）'),
+  x: z.number().optional().describe('横坐标，即节点左上角 x（可选，自动布局时省略）'),
+  y: z.number().optional().describe('纵坐标，即节点左上角 y（可选，自动布局时省略）'),
   width: z.number().optional().describe('宽度（可选，使用默认尺寸则省略）'),
   height: z.number().optional().describe('高度（可选，使用默认尺寸则省略）'),
+  zIndex: z.number().int().min(0).max(10).optional().describe('层级（可选）：普通节点默认 1，容器/分组框设为 0 放在成员节点下方'),
   parentId: z.string().optional().describe('仅 mindmap 类型：父节点 ID，根主题省略此字段'),
   className: z.string().optional().describe('仅 UML 类图节点：类名'),
   attributes: z.string().optional().describe('仅 UML 类图节点：属性列表，每行一个，如 "+ id: string"'),
@@ -808,8 +1066,12 @@ const createNodeSchema = z.object({
 const createEdgeSchema = z.object({
   source: z.string().describe('起点节点 ID'),
   target: z.string().describe('终点节点 ID'),
-  style: z.string().optional().describe('连线样式：manhattan/arrow/dashed/curve/straight/er/dataflow/message 等，省略按图类型自动选择'),
-  label: z.string().optional().describe('连线标签')
+  sourcePort: z.enum(['top', 'right', 'bottom', 'left']).optional().describe('起点连接点方位（图形四边中点各有一个连接点；自上而下主流程用 bottom，水平流程用 right；省略则自动按节点相对位置推断）'),
+  targetPort: z.enum(['top', 'right', 'bottom', 'left']).optional().describe('终点连接点方位（自上而下主流程用 top，水平流程用 left；省略则自动推断）'),
+  style: z.string().optional().describe('连线样式：manhattan/arrow/dashed/curve/straight/er/message/returnMessage/dataflow 等，省略按图类型自动选择'),
+  label: z.string().optional().describe('连线标签（建议 8 字以内），如判断分支 "是"/"否"、ER 基数 "1"/"N"'),
+  labelPosition: z.number().min(0).max(1).optional().describe('标签在边上的位置比例：默认 0.5 即边中点，一般无需指定；仅当标签与其他元素重叠时微调（建议 0.3~0.7）'),
+  vertices: z.array(z.object({ x: z.number(), y: z.number() })).max(10).optional().describe('路径点（画布绝对坐标，边按顺序经过）：用于精确控制边走向，如回退边绕行避开中间节点；manhattan 路由会自动避障，一般无需指定')
 })
 
 const createDrawingSchema = z.object({
@@ -817,13 +1079,15 @@ const createDrawingSchema = z.object({
   kind: z.enum(KINDS).optional().describe('图类型：flowchart 流程图 / mindmap 思维导图 / er ER图 / architecture 架构图 / uml 类图 / sequence 时序图 / timeline 时间线 / dfd 数据流图 / kanban 看板 / blank 通用，默认 blank'),
   nodes: z.array(createNodeSchema).describe('节点列表'),
   edges: z.array(createEdgeSchema).optional().describe('连线列表（可选）'),
-  layout: z.enum(['layered', 'grid', 'none']).optional().describe('自动布局：layered 分层布局（默认）/ grid 网格布局 / none 使用给定坐标。mindmap 类型自动树布局，无需指定')
+  layout: z.enum(['layered', 'grid', 'none']).optional().describe('自动布局：layered 分层布局（默认）/ grid 网格布局 / none 使用给定坐标。mindmap 类型自动树布局，无需指定'),
+  direction: z.enum(['TB', 'LR']).optional().describe('布局方向：TB 自上而下（默认，流程图/架构图标准）/ LR 自左向右（ER 图标准）。仅 layered 布局有效')
 })
 
 async function createDrawingHandler(args, ctx) {
-  const { title, kind = 'blank', nodes: rawNodes, edges: rawEdges, layout = 'layered' } = args
+  const { title, kind = 'blank', nodes: rawNodes, edges: rawEdges, layout = 'layered', direction } = args
   ctx.logger.info(`[create_drawing] title="${title}", kind=${kind}`)
 
+  const finalDirection = direction || KIND_DEFAULT_DIRECTION[kind] || 'TB'
   const defaultEdgeStyle = KIND_DEFAULT_EDGE[kind] || 'manhattan'
   const usedIds = new Set()
   const nodes = validateNodesInput(rawNodes, kind, usedIds)
@@ -839,7 +1103,7 @@ async function createDrawingHandler(args, ctx) {
     })
   }
 
-  const graphJSON = buildGraphJSON(nodes, edges, kind, layout, usedIds)
+  const graphJSON = buildGraphJSON(nodes, edges, kind, layout, finalDirection, usedIds)
   const now = new Date().toISOString()
 
   const { saveDrawingCanvas } = await getDb()
@@ -861,7 +1125,9 @@ async function createDrawingHandler(args, ctx) {
 
 registerTool({
   name: 'create_drawing',
-  description: '创建一个新的绘图画布（流程图/思维导图/ER图/架构图/UML类图/时序图等）。只需提供节点和连线的语义结构（形状、标签、连接关系），坐标可省略并由自动布局计算。mindmap 类型通过 parentId 或 edges 表达父子层级。',
+  description: `创建一个新的绘图画布（流程图/思维导图/ER图/架构图/UML类图/时序图等）。只需提供节点和连线的语义结构（形状、标签、连接关系、连接点），坐标可省略并由自动布局计算。mindmap 类型通过 parentId 或 edges 表达父子层级。
+
+${DRAWING_SYNTAX_GUIDE}`,
   schema: createDrawingSchema,
   handler: createDrawingHandler,
   meta: { requireApproval: true, exposedViaMcp: false } // 写操作需审批
@@ -876,11 +1142,16 @@ const updateOpSchema = z.object({
   label: z.string().optional().describe('节点或连线的显示文本'),
   source: z.string().optional().describe('connect：起点节点 ID'),
   target: z.string().optional().describe('connect：终点节点 ID'),
+  sourcePort: z.enum(['top', 'right', 'bottom', 'left']).optional().describe('connect：起点连接点方位（图形四边中点各一个连接点；自上而下流程用 bottom，水平流程用 right；省略则按节点相对位置自动推断）'),
+  targetPort: z.enum(['top', 'right', 'bottom', 'left']).optional().describe('connect：终点连接点方位（自上而下流程用 top，水平流程用 left；省略则自动推断）'),
   style: z.string().optional().describe('connect/update_edge：连线样式'),
+  labelPosition: z.number().min(0).max(1).optional().describe('connect/update_edge：标签在边上的位置比例（默认 0.5 边中点，一般无需指定；仅重叠时微调 0.3~0.7）'),
+  vertices: z.array(z.object({ x: z.number(), y: z.number() })).max(10).optional().describe('connect/update_edge：路径点（画布绝对坐标，边按顺序经过），用于精确控制边走向如回退边绕行'),
   x: z.number().optional().describe('move_node/add_node：横坐标'),
   y: z.number().optional().describe('move_node/add_node：纵坐标'),
   width: z.number().optional().describe('resize_node/add_node：宽度'),
   height: z.number().optional().describe('resize_node/add_node：高度'),
+  zIndex: z.number().int().min(0).max(10).optional().describe('add_node：层级，普通节点默认 1，容器/分组框设为 0'),
   parentId: z.string().optional().describe('add_node（mindmap 画布）：父节点 ID')
 })
 
@@ -898,21 +1169,28 @@ function findNodeCell(cells, nodeId) {
   return cells.find((cell) => !isEdgeCell(cell) && cell.id === nodeId)
 }
 
-function setEdgeLabel(cell, label) {
-  const text = cleanLabel(label)
+function setEdgeLabel(cell, label, labelPosition) {
+  const text = label !== undefined ? cleanLabel(label) : (cell.labels?.[0]?.attrs?.label?.text || '')
   if (!text) {
     delete cell.labels
     return
   }
   const current = cell.labels?.[0] || {}
+  const position = sanitizeLabelPosition(labelPosition) ?? current.position ?? 0.5
   cell.labels = [{
     ...current,
-    position: current.position ?? 0.5,
+    position,
     attrs: {
       ...current.attrs,
       label: { ...current.attrs?.label, text, fontSize: current.attrs?.label?.fontSize || 11 }
     }
   }]
+}
+
+function setEdgeVertices(cell, vertices) {
+  const points = sanitizeVertices(vertices)
+  if (points) cell.vertices = points
+  else delete cell.vertices
 }
 
 function setEdgeStyle(cell, style) {
@@ -1053,7 +1331,7 @@ async function updateDrawingHandler(args, ctx) {
           if (op._shape === 'draw-uml-class') {
             data.className = op._label || 'Class'
           }
-          cell = buildNodeCell({ id, shape: op._shape, x: op.x, y: op.y, width: op.width, height: op.height, label: op._label, data })
+          cell = buildNodeCell({ id, shape: op._shape, x: op.x, y: op.y, width: op.width, height: op.height, label: op._label, data, zIndex: op.zIndex })
         }
         cells.push(cell)
         createdNodes.push(`${op._label || id}(${id})`)
@@ -1108,12 +1386,25 @@ async function updateDrawingHandler(args, ctx) {
             targetCell.data.mind.parentId = op._source
           }
         } else {
+          const sourceNode = findNodeCell(cells, op._source)
+          const targetNode = findNodeCell(cells, op._target)
+          let seqPadding
+          if (isSeqActorPair(sourceNode, targetNode)) {
+            seqPadding = 80 + countSeqMessages(cells) * 55
+          }
           cells.push(buildEdgeCell({
             id: genId('e'),
             source: op._source,
             target: op._target,
             style: op.style || defaultEdgeStyle,
-            label: op.label
+            label: op.label,
+            labelPosition: op.labelPosition,
+            vertices: op.vertices,
+            sourcePort: op.sourcePort,
+            targetPort: op.targetPort,
+            sourceNode,
+            targetNode,
+            seqPadding
           }))
         }
         summary.connect++
@@ -1121,7 +1412,10 @@ async function updateDrawingHandler(args, ctx) {
       }
       case 'update_edge': {
         if (op.style !== undefined) setEdgeStyle(op._cell, op.style)
-        if (op.label !== undefined) setEdgeLabel(op._cell, op.label)
+        if (op.label !== undefined || op.labelPosition !== undefined) {
+          setEdgeLabel(op._cell, op.label, op.labelPosition)
+        }
+        if (op.vertices !== undefined) setEdgeVertices(op._cell, op.vertices)
         summary.update_edge++
         break
       }
@@ -1172,7 +1466,7 @@ async function updateDrawingHandler(args, ctx) {
 
 registerTool({
   name: 'update_drawing',
-  description: '对已有画布执行增量修改操作（添加/更新/删除节点，连线，修改/删除连线，移动/调整节点）。操作列表会整体校验后一次性提交。先用 get_drawing_canvas 获取节点和连线的 ID。',
+  description: '对已有画布执行增量修改操作（添加/更新/删除节点，连线，修改/删除连线，移动/调整节点）。操作列表会整体校验后一次性提交。先用 get_drawing_canvas 获取节点和连线的 ID。connect 连线时可用 sourcePort/targetPort 指定连接点方位（每个图形有 top/right/bottom/left 四个连接点；自上而下流程 bottom→top，水平流程 right→left；省略则按节点相对位置自动推断）。',
   schema: updateDrawingSchema,
   handler: updateDrawingHandler,
   meta: { requireApproval: true, exposedViaMcp: false } // 写操作需审批
@@ -1182,12 +1476,13 @@ registerTool({
 
 const layoutDrawingSchema = z.object({
   canvasId: z.string().describe('画布 ID'),
-  algorithm: z.enum(['layered', 'grid']).optional().describe('布局算法：layered 分层布局（适合流程图/架构图/ER图，默认）/ grid 网格布局')
+  algorithm: z.enum(['layered', 'grid']).optional().describe('布局算法：layered 分层布局（适合流程图/架构图/ER图，默认）/ grid 网格布局'),
+  direction: z.enum(['TB', 'LR']).optional().describe('分层布局方向：TB 自上而下（默认，流程图/架构图标准）/ LR 自左向右（ER 图标准）')
 })
 
 async function layoutDrawingHandler(args, ctx) {
-  const { canvasId, algorithm = 'layered' } = args
-  ctx.logger.info(`[layout_drawing] canvasId=${canvasId}, algorithm=${algorithm}`)
+  const { canvasId, algorithm = 'layered', direction = 'TB' } = args
+  ctx.logger.info(`[layout_drawing] canvasId=${canvasId}, algorithm=${algorithm}, direction=${direction}`)
 
   const { getDrawingCanvas, saveDrawingCanvas } = await getDb()
   const canvas = getDrawingCanvas(canvasId)
@@ -1205,7 +1500,20 @@ async function layoutDrawingHandler(args, ctx) {
   }
 
   if (algorithm === 'grid') layoutGrid(cells)
-  else layoutLayered(cells)
+  else layoutLayered(cells, direction)
+
+  // 重新布局后，按节点新的相对位置刷新边的连接点（保持图形标准）
+  const nodeById = new Map(cells.filter((cell) => !isEdgeCell(cell)).map((cell) => [cell.id, cell]))
+  cells.filter(isEdgeCell).forEach((edge) => {
+    if (edge.shape === 'mindmap-edge') return
+    const sourceNode = nodeById.get(edge.source?.cell)
+    const targetNode = nodeById.get(edge.target?.cell)
+    if (sourceNode?.shape === 'draw-seq-actor' && targetNode?.shape === 'draw-seq-actor') return
+    if (sourceNode && targetNode) {
+      edge.source = { cell: sourceNode.id, port: `port-${inferPortSide(sourceNode, targetNode)}` }
+      edge.target = { cell: targetNode.id, port: `port-${inferPortSide(targetNode, sourceNode)}` }
+    }
+  })
 
   const updated = saveDrawingCanvas({
     id: canvas.id,
@@ -1224,7 +1532,7 @@ async function layoutDrawingHandler(args, ctx) {
 
 registerTool({
   name: 'layout_drawing',
-  description: '对画布节点重新自动布局。layered 为分层布局（按连线方向分层排列，适合流程图/架构图/ER图），grid 为网格布局。思维导图无需调用（自动树布局）。',
+  description: '对画布节点重新自动布局（并按新位置自动刷新边的连接点）。layered 为分层布局（按连线方向分层排列，适合流程图/架构图/ER图），grid 为网格布局；direction 指定分层方向 TB 自上而下（默认）/ LR 自左向右。思维导图无需调用（自动树布局）。',
   schema: layoutDrawingSchema,
   handler: layoutDrawingHandler,
   meta: { requireApproval: true, exposedViaMcp: false } // 修改画布需审批
