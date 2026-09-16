@@ -116,6 +116,7 @@ export const useDrawingStore = defineStore('drawing', {
     categories: [],
     selectedCanvasId: null,
     initialized: false,
+    initializing: null,
     // Agent 在主进程修改画布后递增，用于强制重载当前打开的编辑器
     agentVersion: 0
   }),
@@ -131,49 +132,58 @@ export const useDrawingStore = defineStore('drawing', {
     // 非 Electron 环境（浏览器开发）保持原有 localStorage 行为。
     async initialize() {
       if (this.initialized) return
-      this.initialized = true
+      if (this.initializing) return this.initializing
 
-      if (!electronService.isElectron) {
+      this.initializing = (async () => {
+
+        if (!electronService.isElectron) {
+          const saved = loadLocalState()
+          const canvases = saved?.canvases || defaultCanvases()
+          this.canvases = canvases
+          this.categories = saved?.categories || []
+          this.selectedCanvasId = saved?.selectedCanvasId && canvases.some((item) => item.id === saved.selectedCanvasId)
+            ? saved.selectedCanvasId
+            : canvases[0].id
+          this.initialized = true
+          return
+        }
+
+        const state = await electronService.invoke('get_drawing_state')
+        const dbCanvases = (state?.canvases || []).map((canvas) => createCanvasRecord(canvas))
+        const dbCategories = state?.categories || []
+
+        if (dbCanvases.length || dbCategories.length) {
+          const canvases = addMissingDefaultTemplates(dbCanvases)
+          this.canvases = canvases
+          this.categories = dbCategories
+          this.selectedCanvasId = state?.selectedCanvasId && canvases.some((item) => item.id === state.selectedCanvasId)
+            ? state.selectedCanvasId
+            : canvases[0].id
+          this.initialized = true
+          return
+        }
+
+        // 空库：优先迁移 localStorage 中的旧数据，否则播种默认画布
         const saved = loadLocalState()
-        const canvases = saved?.canvases || defaultCanvases()
-        this.canvases = canvases
-        this.categories = saved?.categories || []
-        this.selectedCanvasId = saved?.selectedCanvasId && canvases.some((item) => item.id === saved.selectedCanvasId)
-          ? saved.selectedCanvasId
-          : canvases[0].id
-        return
-      }
-
-      const state = await electronService.invoke('get_drawing_state')
-      const dbCanvases = (state?.canvases || []).map((canvas) => createCanvasRecord(canvas))
-      const dbCategories = state?.categories || []
-
-      if (dbCanvases.length || dbCategories.length) {
-        const canvases = addMissingDefaultTemplates(dbCanvases)
-        this.canvases = canvases
-        this.categories = dbCategories
-        this.selectedCanvasId = state?.selectedCanvasId && canvases.some((item) => item.id === state.selectedCanvasId)
-          ? state.selectedCanvasId
-          : canvases[0].id
+        if (saved?.canvases?.length) {
+          this.canvases = saved.canvases
+          this.categories = saved.categories
+          this.selectedCanvasId = saved.selectedCanvasId && saved.canvases.some((item) => item.id === saved.selectedCanvasId)
+            ? saved.selectedCanvasId
+            : saved.canvases[0].id
+        } else {
+          this.canvases = defaultCanvases()
+          this.selectedCanvasId = this.canvases[0].id
+        }
         await this.syncAll()
-        return
-      }
+        if (saved?.canvases?.length) localStorage.removeItem(STORAGE_KEY)
+        this.initialized = true
+      })()
 
-      // 空库：优先迁移 localStorage 中的旧数据，否则播种默认模板画布
-      const saved = loadLocalState()
-      if (saved?.canvases?.length) {
-        this.canvases = saved.canvases
-        this.categories = saved.categories
-        this.selectedCanvasId = saved.selectedCanvasId && saved.canvases.some((item) => item.id === saved.selectedCanvasId)
-          ? saved.selectedCanvasId
-          : saved.canvases[0].id
-      } else {
-        this.canvases = defaultCanvases()
-        this.selectedCanvasId = this.canvases[0].id
-      }
-      await this.syncAll()
-      if (saved?.canvases?.length) {
-        localStorage.removeItem(STORAGE_KEY)
+      try {
+        return await this.initializing
+      } finally {
+        this.initializing = null
       }
     },
 

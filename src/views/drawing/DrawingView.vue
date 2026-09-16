@@ -126,7 +126,7 @@
 
     <main class="drawing-workspace" aria-label="Drawing workspace">
       <DrawingEditor
-        v-if="drawingStore.currentCanvas"
+        v-if="drawingStore.initialized && drawingStore.currentCanvas"
         :key="`${drawingStore.currentCanvas.id}:${drawingStore.agentVersion}`"
         :canvas="drawingStore.currentCanvas"
         @change="onGraphChange"
@@ -211,8 +211,8 @@ import CanvasThumbnail from './components/CanvasThumbnail.vue'
 const { t } = useI18n()
 const drawingStore = useDrawingStore()
 
-onMounted(() => {
-  drawingStore.initialize()
+onMounted(async () => {
+  await drawingStore.initialize()
   // 切换应用/浏览器 Tab 时窗口失焦，关闭所有弹出菜单
   window.addEventListener('blur', closeMenus)
   // 监听 Agent 绘图工具的修改事件，从数据库拉取最新画布并刷新
