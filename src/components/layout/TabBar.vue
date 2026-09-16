@@ -17,6 +17,7 @@
             :style="{ width: tabWidth + 'px' }"
             role="tab"
             @click="switchTab(tab)"
+            @dblclick.stop="handleTabDoubleClick(tab)"
             @contextmenu.prevent.stop="showContextMenu($event, tab)"
             @mouseenter="hoveredTabId = tab.id"
             @mouseleave="hoveredTabId = ''"
@@ -240,6 +241,11 @@ const closeTab = async (id) => {
   if (!(await requestFridayClose(id))) return;
   tabStore.removeTab(id);
   navigateToActiveTab();
+};
+
+const handleTabDoubleClick = (tab) => {
+  if (tabStore.openedTabs.length === 1 && tab.path === '/friday') return;
+  closeTab(tab.id);
 };
 
 const navigateToActiveTab = () => {
