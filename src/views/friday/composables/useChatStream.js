@@ -21,6 +21,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
   const isStreaming = ref(false);
   const streamingContent = ref('');
   const streamingReasoning = ref('');
+  const isReasoningStreaming = ref(false);
   const agentSegments = ref([]);
   const pendingApproval = ref(null);
   const autoApproveAll = ref(false);
@@ -54,7 +55,10 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
   function setStreaming(streaming) {
     isStreaming.value = streaming;
     fridayStore.setTabStreaming(key === '_default' ? '' : key, streaming);
-    if (!streaming) autoApproveAll.value = false;
+    if (!streaming) {
+      autoApproveAll.value = false;
+      isReasoningStreaming.value = false;
+    }
   }
 
   function resetStreamState() {
@@ -62,6 +66,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     setStreaming(false);
     streamingContent.value = '';
     streamingReasoning.value = '';
+    isReasoningStreaming.value = false;
     agentSegments.value = [];
     pendingApproval.value = null;
     autoApproveAll.value = false;
@@ -75,6 +80,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     setStreaming(true);
     streamingContent.value = '';
     streamingReasoning.value = '';
+    isReasoningStreaming.value = false;
     agentSegments.value = [];
     pendingApproval.value = null;
     activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -86,6 +92,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     activeRequestId = requestId;
     isDoneReceived = false;
     setStreaming(true);
+    isReasoningStreaming.value = false;
     streamingContent.value = output || '';
     agentSegments.value = segments.map(segment => ({
       ...segment,
@@ -160,6 +167,8 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
   function queueChunk(content, reasoning = '') {
     pendingContent += content || '';
     pendingReasoning += reasoning || '';
+    if (reasoning) isReasoningStreaming.value = true;
+    if (content) isReasoningStreaming.value = false;
     if (chunkFlushFrame === null) {
       chunkFlushFrame = window.requestAnimationFrame(flushPendingChunks);
     }
@@ -371,6 +380,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     unlistenAgentToolCall = electronService.listen('agent-tool-call', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      isReasoningStreaming.value = false;
       flushPendingChunksImmediately();
       const segs = agentSegments.value;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
@@ -412,6 +422,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     unlistenAgentApproval = electronService.listen('agent-tool-approval', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      isReasoningStreaming.value = false;
       flushPendingChunksImmediately();
       const approvalArguments = data.arguments && typeof data.arguments === 'object'
         ? data.arguments
@@ -509,6 +520,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     isStreaming,
     streamingContent,
     streamingReasoning,
+    isReasoningStreaming,
     agentSegments,
     pendingApproval,
     sessionTitle,
@@ -557,6 +569,7 @@ export function useChatStream({ onHistoryRefresh, t }) {
     isStreaming: runtime.isStreaming,
     streamingContent: runtime.streamingContent,
     streamingReasoning: runtime.streamingReasoning,
+    isReasoningStreaming: runtime.isReasoningStreaming,
     agentSegments: runtime.agentSegments,
     pendingApproval: runtime.pendingApproval,
     sessionTitle: runtime.sessionTitle,

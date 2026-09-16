@@ -80,6 +80,7 @@ const props = defineProps({
   isStreaming: { type: Boolean, default: false },
   reasoning: { type: String, default: '' },
   reasoningStreamingContent: { type: String, default: '' },
+  isReasoningStreaming: { type: Boolean, default: false },
   showActions: { type: Boolean, default: false },
   showDivider: { type: Boolean, default: false }
 });
@@ -90,7 +91,10 @@ const { t } = useI18n();
 const thinkingCollapsed = ref(!props.isStreaming);
 const effectiveReasoning = computed(() => props.reasoningStreamingContent || props.reasoning || '');
 const hasReasoning = computed(() => !!effectiveReasoning.value.trim());
-const reasoningStreaming = computed(() => props.isStreaming && !!props.reasoningStreamingContent);
+const reasoningStreaming = computed(() =>
+  props.isReasoningStreaming
+  || (props.isStreaming && !!props.reasoningStreamingContent && !(props.segments || []).length)
+);
 const renderedReasoning = computed(() => renderMarkdown(effectiveReasoning.value.split('\n').map(line => `> ${line}`).join('\n')));
 
 watch(() => props.isStreaming, (streaming, wasStreaming) => {

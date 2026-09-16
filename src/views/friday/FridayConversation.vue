@@ -40,6 +40,7 @@
           v-if="currentMode === 'agent' && (isStreaming || agentSegments.length > 0)"
           :segments="agentSegments"
           :reasoning-streaming-content="streamingReasoning"
+          :is-reasoning-streaming="isReasoningStreaming"
           :is-streaming="isStreaming"
           :thinking="isThinking"
         />
@@ -153,6 +154,7 @@ const {
   isStreaming,
   streamingContent,
   streamingReasoning,
+  isReasoningStreaming,
   agentSegments,
   pendingApproval,
   isThinking,
