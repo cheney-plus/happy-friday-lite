@@ -286,7 +286,7 @@ function renderSegmentMarkdown(segment) {
 .thinking-arrow.collapsed { transform: rotate(-90deg); }
 .thinking-body {
   margin-top: 5px;
-  padding: 8px 12px;
+  padding: 8px 16px 8px 20px;
   border-left: 2px solid var(--border-color);
   color: var(--text-secondary);
   font-size: 13px;
@@ -294,6 +294,14 @@ function renderSegmentMarkdown(segment) {
 }
 .thinking-body :deep(.markdown-body) { user-select: text; }
 .thinking-body :deep(blockquote) { margin: 0; padding: 0; border: 0; background: transparent; }
+.thinking-body :deep(ul),
+.thinking-body :deep(ol) {
+  margin: 6px 0;
+  padding-left: 22px;
+}
+.thinking-body :deep(li) {
+  margin: 4px 0;
+}
 
 @keyframes blink {
   0%, 50% { opacity: 1; }

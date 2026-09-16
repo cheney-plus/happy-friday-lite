@@ -188,8 +188,11 @@ export function registerAgentCommands(mainWindow) {
 
       // 10. 记忆文件为磁盘文件，Agent 通过 edit_file 写入即持久化，无需额外同步。
 
-      // 11. 保存助手消息（含工具调用时间线段 metadata）
-      const metadata = toolSegments.length > 0 ? { segments: toolSegments } : null
+      // 11. 保存助手消息（含思考过程与工具调用时间线段 metadata）
+      const metadata = db.buildAssistantMetadata({
+        reasoning: fullReasoning,
+        segments: toolSegments
+      })
       const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent, metadata)
       db.updateSessionTimestamp(currentSessionId)
 

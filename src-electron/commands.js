@@ -360,7 +360,12 @@ export function registerCommands(mainWindow) {
 
       cancelTokens.remove(requestId)
 
-      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent)
+      const assistantMsg = db.saveMessage(
+        currentSessionId,
+        'assistant',
+        fullContent,
+        db.buildAssistantMetadata({ reasoning: fullReasoning })
+      )
       db.updateSessionTimestamp(currentSessionId)
 
       mainWindow.webContents.send(CHAT_DONE, {

@@ -570,6 +570,17 @@ export function updateSessionTimestamp(sessionId) {
   saveDb()
 }
 
+export function buildAssistantMetadata({ reasoning, segments, extra } = {}) {
+  const metadata = extra && typeof extra === 'object' ? { ...extra } : {}
+  if (typeof reasoning === 'string' && reasoning.trim()) {
+    metadata.reasoning = reasoning
+  }
+  if (Array.isArray(segments) && segments.length > 0) {
+    metadata.segments = segments
+  }
+  return Object.keys(metadata).length ? metadata : null
+}
+
 export function saveMessage(sessionId, role, content, metadata = null) {
   const now = nowISO()
   const metadataStr = metadata ? JSON.stringify(metadata) : null
