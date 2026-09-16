@@ -122,7 +122,9 @@ export function createDrawingGraph(container, minimapContainer, state) {
         rubberband: true,
         movable: false,
         showNodeSelectionBox: true,
-        showEdgeSelectionBox: true,
+        // Edge editing uses the vertices/endpoint tools. The bounding box is
+        // redundant for edges and obscures the actual path while selected.
+        showEdgeSelectionBox: false,
         pointerEvents: 'none'
       })
     )
@@ -247,9 +249,37 @@ export function duplicateDrawingCells(graph) {
 function bindTools(graph) {
   graph.on('edge:selected', ({ edge }) => {
     if (edge.shape === 'mindmap-edge') return
-    // X6's segments tool conflicts with routed edges (issues #2385/#3660).
-    // Keep vertex editing, which does not trigger the unstable segment rerouting.
-    edge.addTools({ name: 'vertices', args: { stopPropagation: true } })
+    // `vertices` makes the edge path itself editable: click the path to add a
+    // waypoint, drag a waypoint to change the route, and double-click it to
+    // remove it. Arrowhead handles let users reconnect either endpoint.
+    // `segments` is intentionally avoided because it is unstable with routed
+    // edges (X6 issues #2385/#3660).
+    edge.addTools([
+      {
+        name: 'vertices',
+        args: {
+          addable: true,
+          removable: true,
+          removeRedundancies: true,
+          stopPropagation: true,
+          attrs: {
+            r: 6,
+            fill: '#2563eb',
+            stroke: '#ffffff',
+            'stroke-width': 2,
+            cursor: 'move'
+          }
+        }
+      },
+      {
+        name: 'source-arrowhead',
+        args: { attrs: { fill: '#2563eb', stroke: '#ffffff', 'stroke-width': 2, cursor: 'move' } }
+      },
+      {
+        name: 'target-arrowhead',
+        args: { attrs: { fill: '#2563eb', stroke: '#ffffff', 'stroke-width': 2, cursor: 'move' } }
+      }
+    ])
   })
   graph.on('edge:unselected', ({ edge }) => {
     edge.removeTools()

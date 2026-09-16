@@ -594,10 +594,6 @@ onBeforeUnmount(() => {
 @keyframes draw-node-breathe {
   50% { filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.45)); }
 }
-.drawing-editor .x6-widget-selection-box {
-  border: 1.5px solid var(--accent-color);
-  box-shadow: none;
-}
 .drawing-editor .x6-widget-selection-inner {
   border: 1px dashed var(--accent-color);
 }
