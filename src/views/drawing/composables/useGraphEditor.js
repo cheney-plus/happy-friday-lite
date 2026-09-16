@@ -34,9 +34,17 @@ const drawingClipboard = { cells: [] }
 export function createDrawingGraph(container, minimapContainer, state) {
   registerDrawingShapes()
   const theme = getCanvasTheme()
+  const bounds = container?.getBoundingClientRect()
+  // MiniMap uses the source graph's configured dimensions to calculate its
+  // scale. A cached or just-mounted view can briefly measure as 0 x 0;
+  // passing that through produces NaN and makes SVGMatrix reject the scale.
+  const width = Number.isFinite(bounds?.width) && bounds.width > 0 ? bounds.width : 1
+  const height = Number.isFinite(bounds?.height) && bounds.height > 0 ? bounds.height : 1
 
   const graph = new Graph({
     container,
+    width,
+    height,
     // DrawingEditor owns resize handling so a cached, hidden route cannot pass
     // a zero or non-finite size from X6's internal ResizeObserver to MiniMap.
     autoResize: false,
