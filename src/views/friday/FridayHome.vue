@@ -38,7 +38,7 @@ const tabStore = useTabStore();
 const inputText = ref('');
 
 const isDark = computed(() => appStore.theme === 'dark');
-const logoImage = new URL('@/assets/images/friday-w.png', import.meta.url).href;
+const logoImage = new URL('@/assets/images/friday-w.webp', import.meta.url).href;
 const happyFridayTextImage = computed(() => (
   isDark.value
     ? new URL('@/assets/images/HPTEXT-w.png', import.meta.url).href

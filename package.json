@@ -15,7 +15,7 @@
     "electron:build:arm64": "node scripts/prebuild-install.mjs arm64 && node scripts/prebuild-clean.mjs arm64 && node scripts/fix-langgraph-sdk.mjs && node scripts/fix-dsh-directory-picker-electron.mjs && vite build && electron-builder --linux --arm64 --config.npmRebuild=false && node scripts/verify-packaged-native-modules.mjs arm64 && node scripts/prebuild-install.mjs",
     "electron:build:all": "npm run electron:build && npm run electron:build:arm64",
     "start": "node scripts/fix-dsh-directory-picker-electron.mjs && electron .",
-    "postinstall": "node scripts/fix-langgraph-sdk.mjs && node scripts/fix-dsh-directory-picker-electron.mjs"
+    "postinstall": "node scripts/fix-langgraph-sdk.mjs && node scripts/fix-dsh-directory-picker-electron.mjs && node scripts/dedupe-nested-deps.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.2",
@@ -118,6 +118,7 @@
     "appId": "com.happyfriday.lite",
     "productName": "Happy Friday Lite",
     "icon": "build/icons/icon.png",
+    "afterPack": "scripts/afterpack.cjs",
     "directories": {
       "output": "release"
     },
@@ -150,6 +151,12 @@
       "!node_modules/officeparser/node_modules/@napi-rs/**/*",
       "!node_modules/officeparser/node_modules/pdfjs-dist/**/*",
       "!node_modules/tesseract.js/**/*",
+      "!node_modules/tesseract.js-core/**/*",
+      "!node_modules/tesseract.js/node_modules/**/*",
+      "!node_modules/zlibjs/**/*",
+      "!node_modules/pdf-parse/lib/pdf.js/v1.9.426/**/*",
+      "!node_modules/pdf-parse/lib/pdf.js/v1.10.88/**/*",
+      "!node_modules/pdf-parse/lib/pdf.js/v2.0.550/**/*",
       "!node_modules/@napi-rs/**/*",
       "!node_modules/js-tiktoken/dist/**/*.cjs",
       "!node_modules/sql.js/dist/sql-asm*",
