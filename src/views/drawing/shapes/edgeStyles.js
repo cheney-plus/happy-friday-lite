@@ -103,6 +103,72 @@ export const EDGE_STYLES = {
       }
     }
   },
+  // UML 类图标准关系线（按 UML 规范：空心三角/菱形端点）
+  inheritance: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    attrs: {
+      line: {
+        stroke: '#64748b',
+        strokeWidth: 1.6,
+        strokeDasharray: 0,
+        targetMarker: { name: 'block', width: 14, height: 12, fill: 'transparent' },
+        sourceMarker: null
+      }
+    }
+  },
+  realization: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    attrs: {
+      line: {
+        stroke: '#64748b',
+        strokeWidth: 1.5,
+        strokeDasharray: '8 5',
+        targetMarker: { name: 'block', width: 14, height: 12, fill: 'transparent' },
+        sourceMarker: null
+      }
+    }
+  },
+  dependency: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    attrs: {
+      line: {
+        stroke: '#64748b',
+        strokeWidth: 1.5,
+        strokeDasharray: '6 4',
+        targetMarker: { name: 'block', width: 11, height: 9, open: true },
+        sourceMarker: null
+      }
+    }
+  },
+  composition: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    attrs: {
+      line: {
+        stroke: '#64748b',
+        strokeWidth: 1.6,
+        strokeDasharray: 0,
+        targetMarker: null,
+        sourceMarker: { name: 'diamond', width: 14, height: 9 }
+      }
+    }
+  },
+  aggregation: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    attrs: {
+      line: {
+        stroke: '#64748b',
+        strokeWidth: 1.6,
+        strokeDasharray: 0,
+        targetMarker: null,
+        sourceMarker: { name: 'diamond', width: 14, height: 9, fill: 'transparent' }
+      }
+    }
+  },
   er: {
     router: { name: 'er' },
     connector: { name: 'rounded', args: { radius: 6 } },

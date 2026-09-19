@@ -211,6 +211,32 @@ const EDGE_STYLE_DEFS = {
     connector: { name: 'smooth' },
     line: { stroke: '#64748b', strokeWidth: 1.6, strokeDasharray: 0, targetMarker: { name: 'classic', width: 10, height: 8 }, sourceMarker: null }
   },
+  // UML 类图标准关系线（与前端 edgeStyles.js 保持一致：空心三角/菱形端点）
+  inheritance: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    line: { stroke: '#64748b', strokeWidth: 1.6, strokeDasharray: 0, targetMarker: { name: 'block', width: 14, height: 12, fill: 'transparent' }, sourceMarker: null }
+  },
+  realization: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    line: { stroke: '#64748b', strokeWidth: 1.5, strokeDasharray: '8 5', targetMarker: { name: 'block', width: 14, height: 12, fill: 'transparent' }, sourceMarker: null }
+  },
+  dependency: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    line: { stroke: '#64748b', strokeWidth: 1.5, strokeDasharray: '6 4', targetMarker: { name: 'block', width: 11, height: 9, open: true }, sourceMarker: null }
+  },
+  composition: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    line: { stroke: '#64748b', strokeWidth: 1.6, strokeDasharray: 0, targetMarker: null, sourceMarker: { name: 'diamond', width: 14, height: 9 } }
+  },
+  aggregation: {
+    router: { name: 'normal' },
+    connector: { name: 'rounded', args: { radius: 8 } },
+    line: { stroke: '#64748b', strokeWidth: 1.6, strokeDasharray: 0, targetMarker: null, sourceMarker: { name: 'diamond', width: 14, height: 9, fill: 'transparent' } }
+  },
   er: {
     router: { name: 'er' },
     connector: { name: 'rounded', args: { radius: 6 } },
@@ -246,7 +272,22 @@ const EDGE_ALIASES = {
   bezier: 'curve',
   return: 'returnMessage',
   sequence: 'message',
-  flow: 'dataflow'
+  flow: 'dataflow',
+  // UML 关系线别名
+  inherit: 'inheritance',
+  inheritance: 'inheritance',
+  generalization: 'inheritance',
+  extends: 'inheritance',
+  implement: 'realization',
+  implements: 'realization',
+  realization: 'realization',
+  depend: 'dependency',
+  dependency: 'dependency',
+  uses: 'dependency',
+  compose: 'composition',
+  composition: 'composition',
+  aggregate: 'aggregation',
+  aggregation: 'aggregation'
 }
 
 // 默认连线风格：按图类型选择
@@ -557,6 +598,10 @@ function buildMindEdgeCell({ id, source, target, treeId, side = 'right' }) {
 
 // 分层布局：direction 'TB'（默认）按层自上而下排列（流程图/架构图标准方向），
 // 'LR' 按层自左向右排列（ER 图标准方向）
+// UML 泛化/实现边语义上指向"上层"（父类/接口），
+// 分层布局时按相反方向计算层级，保证父类/接口位于子类/实现类上方
+const UML_REVERSED_EDGE_STYLES = new Set(['inheritance', 'realization'])
+
 function layoutLayered(cells, direction = 'TB') {
   const nodes = cells.filter((cell) => !isEdgeCell(cell) && !isMindCell(cell))
   if (!nodes.length) return
@@ -565,8 +610,11 @@ function layoutLayered(cells, direction = 'TB') {
   const succs = new Map(nodes.map((node) => [node.id, []]))
   cells.forEach((cell) => {
     if (!isEdgeCell(cell)) return
-    const src = cell.source?.cell
-    const tgt = cell.target?.cell
+    let src = cell.source?.cell
+    let tgt = cell.target?.cell
+    if (UML_REVERSED_EDGE_STYLES.has(cell.data?.edgeStyle)) {
+      [src, tgt] = [tgt, src]
+    }
     if (!nodeById.has(src) || !nodeById.has(tgt) || src === tgt) return
     succs.get(src).push(tgt)
     preds.get(tgt).push(src)
@@ -872,10 +920,11 @@ function buildGraphJSON(nodes, edges, kind, layout, direction, usedIds) {
     }
     return buildNodeCell({ ...node, data })
   })
-  // 分层布局需要读取边来推导层级：用轻量边桩（只含 source/target）参与布局计算
+  // 分层布局需要读取边来推导层级：用轻量边桩（含 source/target/edgeStyle）参与布局计算
   const layoutEdges = edges.map((edge) => ({
     source: { cell: edge.source },
-    target: { cell: edge.target }
+    target: { cell: edge.target },
+    data: { edgeStyle: edge.style }
   }))
   // 先布局得到节点最终坐标，再生成边，
   // 这样边的连接点能按节点相对位置正确推断（如上下相邻 → bottom→top）
@@ -992,7 +1041,9 @@ const DRAWING_SYNTAX_GUIDE = `绘图 JSON 语法规范（基于 AntV X6 图形�
 - x/y: 左上角坐标（可选）；仅 layout="none" 时坐标生效
 - width/height: 可选，省略用图形默认尺寸；文字多时适当加宽（每汉字约 14px）
 - zIndex: 可选层级；普通节点默认 1，容器/分组框（container）设为 0 垫底，成员节点放在其坐标范围内
-- UML 类节点额外字段: className、attributes（每行一个，如 "+ id: string"）、methods（每行一个，如 "+ save(): void"）
+- UML 类节点额外字段: className（类名）、attributes（属性区文本，每行一个属性）、methods（方法区文本，每行一个方法）。
+  成员行格式为 "可见性 名称: 类型"（属性）/ "可见性 名称(参数: 类型): 返回类型"（方法），
+  可见性符号必须使用 UML 标准记号：+ 公有(public) / - 私有(private) / # 保护(protected) / ~ 包内(package)，例如 "- id: string"、"+ save(): void"
 - 思维导图(kind=mindmap)不用 shape，用 parentId 表达父子层级（根主题省略 parentId）
 
 【三、连接点 ports（画标准图的关键！）】
@@ -1026,8 +1077,9 @@ X6 中边与节点的连接方式：边端点写 { cell, port } 挂到"连接桩
 【六、边样式 style 目录】（每种样式已封装 X6 的 router 路由 + connector 连接器 + 箭头）
 - manhattan: 直角折线+箭头，智能路由自动避开路径上的节点（默认，流程图/架构图首选）
 - orthogonal: 直角折线+箭头（不自动避障，走向更规整）
-- arrow: 直线+箭头（UML 关联等）/ doubleArrow: 直线双向箭头 / dashed: 虚线+箭头（UML 依赖/实现）
+- arrow: 直线+箭头（UML 关联）/ doubleArrow: 直线双向箭头 / dashed: 虚线+箭头（通用虚线，UML 请改用下行的专用关系线）
 - curve: 平滑曲线（贝塞尔）/ straight: 无箭头直线 / er: Z 字折线（ER 图专用）
+- UML 类图关系线（按 UML 规范封装端点符号）: inheritance 实线+空心三角（继承）/ realization 虚线+空心三角（实现）/ dependency 虚线+开放箭头（依赖）/ composition 实线+实心菱形（组合，菱形在 source 端）/ aggregation 实线+空心菱形（聚合，菱形在 source 端）
 - message: 时序消息（实线）/ returnMessage: 时序返回（虚线）/ dataflow: 数据流（直角折线）
 
 【七、布局参数】
@@ -1038,7 +1090,15 @@ X6 中边与节点的连接方式：边端点写 { cell, port } 挂到"连接桩
 【八、各图类型规范】
 - 流程图: 开始/结束用 terminator，步骤用 process，判断用 decision 且两条出边分别加 label "是"/"否"；每个判断的两个分支节点左右错开
 - ER 图: 实体-relation 菱形-实体交替横向排列，边 style="er" 且两端加基数标签（"1"/"N"）；属性节点放在所挂实体的上方或下方
-- UML 类图: class 填 className/attributes/methods；继承用 arrow，实现/依赖用 dashed
+- UML 类图（必须严格按标准符号画，勿用通用 arrow/dashed 代替专用关系线）:
+  * 节点: 类用 shape="class"，className 填类名；attributes/methods 每行一个成员，必须带 UML 可见性记号（+/-/#/~），如 "- id: string"、"+ save(): void"；接口用 shape="interface"（className 写 "«interface» 名称"）
+  * 泛化/继承（"is-a" 关系）: style="inheritance"（实线+空心三角），子类作 source、父类作 target，空心三角自动指向父类
+  * 实现（类实现接口）: style="realization"（虚线+空心三角），实现类作 source、接口作 target
+  * 组合（强拥有，整体销毁则部分随之销毁，如 房间↔墙）: style="composition"（实线+实心菱形），整体作 source、部分作 target，实心菱形自动落在整体端
+  * 聚合（弱拥有，部分可独立存在，如 部门↔员工）: style="aggregation"（实线+空心菱形），整体作 source、部分作 target
+  * 依赖（临时使用关系，如方法参数引用）: style="dependency"（虚线+开放箭头），使用方作 source、被使用方作 target
+  * 关联（长期持有引用）: style="arrow"（带导航箭头）或 "straight"；如需多重性用 edge label 写 "1"/"0..1"/"*"/"1..*"，并用 labelPosition 移到对应一端（0.12 靠 source、0.88 靠 target；每条边仅支持一个标签）
+  * 布局: 父类/接口在上、子类/实现类在下呈扇形展开；成员行数多时用 height 加大类框（默认 148，每多一行约 +20px）
 - 时序图: 参与者横向排列，消息按时间从上到下依次排列，调用 style="message"、返回 style="returnMessage"
 - 架构图: 自上而下分层（客户端→网关→服务→数据/缓存），用对应架构图形而非通用矩形；同层服务用 container 分组
 
@@ -1059,8 +1119,8 @@ const createNodeSchema = z.object({
   zIndex: z.number().int().min(0).max(10).optional().describe('层级（可选）：普通节点默认 1，容器/分组框设为 0 放在成员节点下方'),
   parentId: z.string().optional().describe('仅 mindmap 类型：父节点 ID，根主题省略此字段'),
   className: z.string().optional().describe('仅 UML 类图节点：类名'),
-  attributes: z.string().optional().describe('仅 UML 类图节点：属性列表，每行一个，如 "+ id: string"'),
-  methods: z.string().optional().describe('仅 UML 类图节点：方法列表，每行一个，如 "+ save(): void"')
+  attributes: z.string().optional().describe('仅 UML 类图节点：属性列表，每行一个，格式 "可见性 名称: 类型"（+ 公有 / - 私有 / # 保护），如 "- id: string"'),
+  methods: z.string().optional().describe('仅 UML 类图节点：方法列表，每行一个，格式 "可见性 名称(参数): 返回类型"，如 "+ save(): void"')
 })
 
 const createEdgeSchema = z.object({
@@ -1068,7 +1128,7 @@ const createEdgeSchema = z.object({
   target: z.string().describe('终点节点 ID'),
   sourcePort: z.enum(['top', 'right', 'bottom', 'left']).optional().describe('起点连接点方位（图形四边中点各有一个连接点；自上而下主流程用 bottom，水平流程用 right；省略则自动按节点相对位置推断）'),
   targetPort: z.enum(['top', 'right', 'bottom', 'left']).optional().describe('终点连接点方位（自上而下主流程用 top，水平流程用 left；省略则自动推断）'),
-  style: z.string().optional().describe('连线样式：manhattan/arrow/dashed/curve/straight/er/message/returnMessage/dataflow 等，省略按图类型自动选择'),
+  style: z.string().optional().describe('连线样式：UML 类图关系线用 inheritance 继承/realization 实现/dependency 依赖/composition 组合/aggregation 聚合；通用样式有 manhattan/arrow/dashed/curve/straight/er/message/returnMessage/dataflow，省略按图类型自动选择'),
   label: z.string().optional().describe('连线标签（建议 8 字以内），如判断分支 "是"/"否"、ER 基数 "1"/"N"'),
   labelPosition: z.number().min(0).max(1).optional().describe('标签在边上的位置比例：默认 0.5 即边中点，一般无需指定；仅当标签与其他元素重叠时微调（建议 0.3~0.7）'),
   vertices: z.array(z.object({ x: z.number(), y: z.number() })).max(10).optional().describe('路径点（画布绝对坐标，边按顺序经过）：用于精确控制边走向，如回退边绕行避开中间节点；manhattan 路由会自动避障，一般无需指定')
@@ -1152,7 +1212,10 @@ const updateOpSchema = z.object({
   width: z.number().optional().describe('resize_node/add_node：宽度'),
   height: z.number().optional().describe('resize_node/add_node：高度'),
   zIndex: z.number().int().min(0).max(10).optional().describe('add_node：层级，普通节点默认 1，容器/分组框设为 0'),
-  parentId: z.string().optional().describe('add_node（mindmap 画布）：父节点 ID')
+  parentId: z.string().optional().describe('add_node（mindmap 画布）：父节点 ID'),
+  className: z.string().optional().describe('add_node/update_node（UML 类节点）：类名，省略时用 label'),
+  attributes: z.string().max(1000).optional().describe('add_node/update_node（UML 类节点）：属性列表文本，每行一个，须带可见性记号，如 "- id: string"'),
+  methods: z.string().max(1000).optional().describe('add_node/update_node（UML 类节点）：方法列表文本，每行一个，须带可见性记号，如 "+ save(): void"')
 })
 
 const updateDrawingSchema = z.object({
@@ -1329,7 +1392,9 @@ async function updateDrawingHandler(args, ctx) {
         } else {
           const data = {}
           if (op._shape === 'draw-uml-class') {
-            data.className = op._label || 'Class'
+            data.className = op.className || op._label || 'Class'
+            if (typeof op.attributes === 'string' && op.attributes.trim()) data.attributes = op.attributes.slice(0, 1000)
+            if (typeof op.methods === 'string' && op.methods.trim()) data.methods = op.methods.slice(0, 1000)
           }
           cell = buildNodeCell({ id, shape: op._shape, x: op.x, y: op.y, width: op.width, height: op.height, label: op._label, data, zIndex: op.zIndex })
         }
@@ -1343,9 +1408,22 @@ async function updateDrawingHandler(args, ctx) {
         if (op._label !== undefined) {
           cell.label = op._label
           if (cell.attrs?.label) cell.attrs.label.text = op._label
-          if (cell.shape === 'draw-uml-class') {
-            cell.data = { ...(cell.data || {}), className: op._label }
+        }
+        if (cell.shape === 'draw-uml-class') {
+          const nextData = { ...(cell.data || {}) }
+          if (op._label !== undefined) nextData.className = op._label
+          if (op.className !== undefined) nextData.className = op.className
+          if (op.attributes !== undefined) {
+            const attrs = op.attributes.slice(0, 1000)
+            if (attrs.trim()) nextData.attributes = attrs
+            else delete nextData.attributes
           }
+          if (op.methods !== undefined) {
+            const methods = op.methods.slice(0, 1000)
+            if (methods.trim()) nextData.methods = methods
+            else delete nextData.methods
+          }
+          cell.data = nextData
         }
         if (isMindCell(cell) && op.parentId !== undefined) {
           cell.data.mind.parentId = op.parentId

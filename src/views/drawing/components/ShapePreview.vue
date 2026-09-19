@@ -10,13 +10,13 @@
       <path
         v-if="linePreview.startHead"
         class="line-head"
-        :class="{ 'is-open': linePreview.start === 'classic' }"
+        :class="{ 'is-open': ['classic', 'open'].includes(linePreview.start) }"
         :d="linePreview.startHead"
       />
       <path
         v-if="linePreview.endHead"
         class="line-head"
-        :class="{ 'is-open': linePreview.end === 'classic' }"
+        :class="{ 'is-open': ['classic', 'open'].includes(linePreview.end) }"
         :d="linePreview.endHead"
       />
     </svg>
@@ -166,6 +166,33 @@ const LINE_PREVIEWS = {
     d: 'M4 18 C 12 18 12 6 22.5 6',
     end: 'classic',
     endHead: 'M21.2 2.6 L29 6 L21.2 9.4'
+  },
+  // UML 类图关系线预览
+  'line-inheritance': {
+    d: 'M3 12 H19.5',
+    end: 'open',
+    endHead: 'M19.5 7.6 L29 12 L19.5 16.4 Z'
+  },
+  'line-realization': {
+    d: 'M3 12 H19.5',
+    dashed: true,
+    end: 'open',
+    endHead: 'M19.5 7.6 L29 12 L19.5 16.4 Z'
+  },
+  'line-dependency': {
+    d: 'M3 12 H22',
+    dashed: true,
+    end: 'open',
+    endHead: 'M22.5 8.4 L29.4 12 L22.5 15.6'
+  },
+  'line-composition': {
+    d: 'M8 12 H29',
+    startHead: 'M1.5 12 L7 8.8 L12.5 12 L7 15.2 Z'
+  },
+  'line-aggregation': {
+    d: 'M8 12 H29',
+    start: 'open',
+    startHead: 'M1.5 12 L7 8.8 L12.5 12 L7 15.2 Z'
   }
 }
 
