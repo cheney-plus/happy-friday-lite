@@ -105,20 +105,42 @@ function restoreHoistedModules(srcNm, destNm, stats) {
 
 function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
   if (!fs.existsSync(nmDir)) return;
+
+  // Prune foreign platform prebuilds shipped INSIDE packages
+  // (e.g. node-pty >=1.2.0-beta.15 bundles prebuilds/{win32,darwin,linux}-*)
+  function prunePrebuilds(packageDir, relName) {
+    const prebuildsDir = path.join(packageDir, "prebuilds");
+    if (!fs.existsSync(prebuildsDir)) return;
+    for (const entry of fs.readdirSync(prebuildsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (isForeign(entry.name, targetPlatform, targetArch)) {
+        rmrf(path.join(prebuildsDir, entry.name));
+        stats.push(`${relName}/prebuilds/${entry.name}`);
+      }
+    }
+  }
+
   for (const entry of fs.readdirSync(nmDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     if (entry.name.startsWith("@")) {
       const scopeDir = path.join(nmDir, entry.name);
       for (const sub of fs.readdirSync(scopeDir, { withFileTypes: true })) {
         if (!sub.isDirectory()) continue;
-        if (isForeign(`${entry.name}/${sub.name}`, targetPlatform, targetArch)) {
+        const rel = `${entry.name}/${sub.name}`;
+        if (isForeign(rel, targetPlatform, targetArch)) {
           rmrf(path.join(scopeDir, sub.name));
-          stats.push(`${entry.name}/${sub.name}`);
+          stats.push(rel);
+        } else {
+          prunePrebuilds(path.join(scopeDir, sub.name), rel);
         }
       }
-    } else if (isForeign(entry.name, targetPlatform, targetArch)) {
-      rmrf(path.join(nmDir, entry.name));
-      stats.push(entry.name);
+    } else {
+      if (isForeign(entry.name, targetPlatform, targetArch)) {
+        rmrf(path.join(nmDir, entry.name));
+        stats.push(entry.name);
+      } else {
+        prunePrebuilds(path.join(nmDir, entry.name), entry.name);
+      }
     }
   }
 }
