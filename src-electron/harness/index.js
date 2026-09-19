@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, session } from 'electron'
 import { spawn } from 'child_process'
 import { createRequire } from 'module'
 import fs from 'fs'
@@ -110,6 +110,28 @@ function writeAtomic(filename, content, mode = 0o600) {
   if (process.platform !== 'win32') fs.chmodSync(filename, mode)
 }
 
+// DSH 0.1.5 credentials-local only admits a versioned document whose top-level
+// keys are exactly `version`, `refs` and `records` — any stray key fails the
+// whole plugin tree. Store our API key under `refs:` and normalize legacy flat
+// or previously-corrupted documents on the way through.
+function writeHarnessCredential(filename, value) {
+  const isMapping = (v) => typeof v === 'object' && v !== null && !Array.isArray(v)
+  const document = readYamlMapping(filename)
+  const refs = isMapping(document.refs) ? { ...document.refs } : {}
+  if (document.version === undefined) {
+    // Pre-release flat layout: nest every entry under refs, matching DSH's own
+    // in-place migration, so values survive without a hand edit.
+    for (const [key, entry] of Object.entries(document)) {
+      if (key === 'version' || key === 'refs' || key === 'records') continue
+      refs[key] = entry
+    }
+  }
+  refs[HARNESS_CREDENTIAL] = value
+  const next = { version: 1, refs }
+  if (isMapping(document.records)) next.records = document.records
+  writeAtomic(filename, yaml.dump(next, { noRefs: true, lineWidth: -1 }))
+}
+
 function quarantineCorruptYaml(filename, reason) {
   const backup = `${filename}.corrupt-${Date.now()}`
   try {
@@ -216,9 +238,7 @@ function syncConfiguration(model, mcpUrl) {
   }
   writeAtomic(paths.settings, yaml.dump(settings, { noRefs: true, lineWidth: 120 }))
 
-  const credentials = readYamlMapping(paths.credentials)
-  credentials[HARNESS_CREDENTIAL] = model.apiKey
-  writeAtomic(paths.credentials, yaml.dump(credentials, { noRefs: true, lineWidth: -1 }))
+  writeHarnessCredential(paths.credentials, model.apiKey)
 
   fs.copyFileSync(path.join(__dirname, 'toolApprovalPolicy.mjs'), paths.policy)
   if (process.platform !== 'win32') fs.chmodSync(paths.policy, 0o600)
@@ -310,6 +330,42 @@ function probe(url) {
   })
 }
 
+function harnessLaunchUrl() {
+  for (const line of recentOutput) {
+    if (line.startsWith('dsh web: http')) {
+      const match = line.match(/^dsh web: (https?:\/\/\S+)/)
+      if (match) return match[1]
+    }
+  }
+  return null
+}
+
+// DSH 0.1.5 exchanges the printed `?token=` URL for a `SameSite=Strict` session
+// cookie. The harness page runs inside a cross-site iframe (the app window is
+// http://localhost in dev and file:// when packaged), so Chromium's
+// site-for-cookies rule never attaches that cookie to the iframe's requests and
+// every navigation after the token exchange answers 401. Forward the cookie at
+// the network layer instead: capture the Set-Cookie the harness issues and
+// replay it as an explicit Cookie header on every request to the harness origin.
+const DSH_COOKIE_PREFIX = 'dsh-auth-'
+
+function enableHarnessCookieForwarding(port) {
+  const filter = { urls: [`http://127.0.0.1:${port}/*`, `ws://127.0.0.1:${port}/*`] }
+  const webRequest = session.defaultSession.webRequest
+  let cookie = null
+  webRequest.onHeadersReceived(filter, (details, callback) => {
+    for (const line of details.responseHeaders?.['set-cookie'] ?? []) {
+      const pair = line.split(';', 1)[0]
+      if (pair.startsWith(DSH_COOKIE_PREFIX)) cookie = pair
+    }
+    callback({})
+  })
+  webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+    if (cookie) details.requestHeaders.Cookie = cookie
+    callback({ requestHeaders: details.requestHeaders })
+  })
+}
+
 function failureDetail(fallback) {
   return startupDiagnostic
     || recentOutput.find(line => line.includes('Error: dsh:'))
@@ -321,7 +377,7 @@ function failureDetail(fallback) {
     || fallback
 }
 
-async function waitUntilReady(url, child, expectedGeneration) {
+async function waitUntilReady(child, expectedGeneration) {
   const deadline = Date.now() + START_TIMEOUT_MS
   while (Date.now() < deadline) {
     if (expectedGeneration !== generation) {
@@ -335,7 +391,11 @@ async function waitUntilReady(url, child, expectedGeneration) {
     }
     if (child.harnessSpawnError) throw child.harnessSpawnError
     if (child !== sidecar) throw new Error(failureDetail('Harness stopped before becoming ready'))
-    if (await probe(url)) return
+    // DSH 0.1.5 authenticates the web profile with a per-process launch token:
+    // the bare origin answers 401 until the iframe loads the printed `?token=`
+    // URL. Wait for that URL to be announced and answerable before reporting ready.
+    const authenticatedUrl = harnessLaunchUrl()
+    if (authenticatedUrl && await probe(authenticatedUrl)) return authenticatedUrl
     await new Promise(resolve => setTimeout(resolve, 250))
   }
   throw new Error('Harness startup timed out')
@@ -385,14 +445,13 @@ async function bootHarness() {
     clearStaleAppImageModuleLinks(paths)
     const port = await findOpenPort()
     if (expectedGeneration !== generation) throw new Error('Harness startup was superseded')
-    const url = `http://127.0.0.1:${port}`
     const cli = resolveHarnessCli()
     recentOutput = []
     startupDiagnostic = null
 
     const child = spawn(
       process.execPath,
-      ['--expose-internals', cli, 'web', '--patch', paths.patch, '--host', '127.0.0.1', '--port', String(port)],
+      ['--expose-internals', cli, 'web', '--patch', paths.patch, '--host', '127.0.0.1', '--port', String(port), '--no-open'],
       {
         cwd: paths.workspace,
         env: {
@@ -412,6 +471,7 @@ async function bootHarness() {
     sidecar = child
     captureOutput(child.stdout)
     captureOutput(child.stderr)
+    enableHarnessCookieForwarding(port)
     child.once('error', error => {
       child.harnessSpawnError = error
       recentOutput.push(error.message)
@@ -435,11 +495,11 @@ async function bootHarness() {
           })
     })
 
-    await waitUntilReady(url, child, expectedGeneration)
+    const authenticatedUrl = await waitUntilReady(child, expectedGeneration)
     activeModelSignature = harnessSignature(model, themePreference(), localePreference())
     return updateState({
       status: 'ready',
-      url,
+      url: authenticatedUrl,
       port,
       model: { providerLabel: model.providerLabel, modelName: model.modelName },
       toolCount,
