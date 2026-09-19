@@ -170,8 +170,11 @@ const propState = reactive({
 
 const canvasName = computed(() => props.canvas.title || t(`drawing.canvas.${props.canvas.titleKey || 'untitled'}`))
 
+// X6 的 graph.resize 会把内联 width/height 写到 container 上并覆盖其 100% 布局，
+// 导致 container 尺寸被钉死：侧栏折叠等工作区变化时它不再变宽，右侧留白且无法绘制。
+// 因此观察并测量父元素（纯布局驱动），再据此 resize 图。
 const resizeGraph = () => {
-  const element = containerRef.value
+  const element = containerRef.value?.parentElement
   const currentGraph = graph.value
   if (!element || !currentGraph) return
 
@@ -182,9 +185,10 @@ const resizeGraph = () => {
 }
 
 const observeGraphResize = () => {
-  if (!containerRef.value || graphResizeObserver || typeof ResizeObserver === 'undefined') return
+  const element = containerRef.value?.parentElement
+  if (!element || graphResizeObserver || typeof ResizeObserver === 'undefined') return
   graphResizeObserver = new ResizeObserver(resizeGraph)
-  graphResizeObserver.observe(containerRef.value)
+  graphResizeObserver.observe(element)
   resizeGraph()
 }
 
