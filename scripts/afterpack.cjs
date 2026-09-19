@@ -107,15 +107,30 @@ function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
   if (!fs.existsSync(nmDir)) return;
 
   // Prune foreign platform prebuilds shipped INSIDE packages
-  // (e.g. node-pty >=1.2.0-beta.15 bundles prebuilds/{win32,darwin,linux}-*)
+  // (e.g. node-pty >=1.2.0-beta.15 bundles prebuilds/{win32,darwin,linux}-*),
+  // plus *.pdb debug symbols which are never needed at runtime.
   function prunePrebuilds(packageDir, relName) {
     const prebuildsDir = path.join(packageDir, "prebuilds");
     if (!fs.existsSync(prebuildsDir)) return;
     for (const entry of fs.readdirSync(prebuildsDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.toLowerCase().endsWith(".pdb")) {
+        rmrf(path.join(prebuildsDir, entry.name));
+        stats.push(`${relName}/prebuilds/${entry.name}`);
+        continue;
+      }
       if (!entry.isDirectory()) continue;
       if (isForeign(entry.name, targetPlatform, targetArch)) {
         rmrf(path.join(prebuildsDir, entry.name));
         stats.push(`${relName}/prebuilds/${entry.name}`);
+      } else {
+        // Remove .pdb files inside platform dirs too
+        const platDir = path.join(prebuildsDir, entry.name);
+        for (const f of fs.readdirSync(platDir, { withFileTypes: true })) {
+          if (f.isFile() && f.name.toLowerCase().endsWith(".pdb")) {
+            rmrf(path.join(platDir, f.name));
+            stats.push(`${relName}/prebuilds/${entry.name}/${f.name}`);
+          }
+        }
       }
     }
   }
