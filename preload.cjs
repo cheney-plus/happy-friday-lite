@@ -148,7 +148,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-hide-all',
       'office-show',
       'office-get-state',
-      'office-set-toolbar-height',
+      'office-set-content-bounds',
+      'office-get-recents',
+      'office-toggle-starred',
+      'office-remove-recents',
+      'office-reveal-path',
+      'office-open-dialog',
       'office-is-dirty'
     ]
     if (validChannels.includes(channel)) {

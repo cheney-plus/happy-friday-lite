@@ -6,7 +6,12 @@ import {
   hideAllOfficeViews,
   showOfficeView,
   getOfficeState,
-  setOfficeToolbarHeight,
+  setOfficeContentBounds,
+  getOfficeRecents,
+  toggleOfficeStarred,
+  removeOfficeRecents,
+  revealOfficePath,
+  openOfficeFileDialog,
   queryOfficeDirty,
   isOfficeAvailable,
 } from './office-host.js'
@@ -47,10 +52,20 @@ export function registerOfficeIpc() {
 
   ipcMain.handle('office-get-state', () => getOfficeState())
 
-  ipcMain.handle('office-set-toolbar-height', (_e, { height }) => {
-    setOfficeToolbarHeight(height)
+  ipcMain.handle('office-set-content-bounds', (_e, rect) => {
+    setOfficeContentBounds(rect)
     return { success: true }
   })
+
+  ipcMain.handle('office-get-recents', () => getOfficeRecents())
+
+  ipcMain.handle('office-toggle-starred', (_e, filePath) => toggleOfficeStarred(filePath))
+
+  ipcMain.handle('office-remove-recents', (_e, filePaths) => removeOfficeRecents(filePaths))
+
+  ipcMain.handle('office-reveal-path', (_e, filePath) => revealOfficePath(filePath))
+
+  ipcMain.handle('office-open-dialog', () => openOfficeFileDialog())
 
   ipcMain.handle('office-is-dirty', (_e, { type }) => queryOfficeDirty(type))
 }

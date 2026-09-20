@@ -2,7 +2,7 @@ import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
-import { app, ipcMain } from 'electron'
+import { app, dialog, ipcMain, shell } from 'electron'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const _require = createRequire(import.meta.url)
@@ -17,13 +17,23 @@ const _require = createRequire(import.meta.url)
 
 const EDITORS = ['docs', 'sheets', 'slides', 'pdf']
 
+const EXT_TO_TYPE = {
+  '.docx': 'docs',
+  '.xlsx': 'sheets',
+  '.xlsm': 'sheets',
+  '.csv': 'sheets',
+  '.pptx': 'slides',
+  '.pdf': 'pdf',
+}
+
 const state = {
   mainWindow: null,
   bundles: null,
   // 每种编辑器至多一个活跃视图
   views: { docs: null, sheets: null, slides: null, pdf: null },
   files: { docs: null, sheets: null, slides: null, pdf: null },
-  toolbarHeight: 44,
+  // renderer 提供的编辑器视图摆放区域（窗口内容区坐标），未设置时回退全宽布局
+  contentBounds: null,
   initialized: false,
 }
 
@@ -167,12 +177,16 @@ function wireShellHooks() {
   })
   sheets.setSheetsWorkbookOpenedHook?.((_wc, filePath) => {
     state.files.sheets = filePath
+    // 最近文件统一记录在 docs bundle 的 recents 存储中
+    try { docs.recordRecentFile?.(filePath) } catch { /* ignore */ }
     emitFileSaved('sheets', filePath)
   })
   slides.setSlidesOpenedHook?.((_wc, filePath) => {
     state.files.slides = filePath
+    try { docs.recordRecentFile?.(filePath) } catch { /* ignore */ }
     emitFileSaved('slides', filePath)
   })
+  // PDF 编辑器无 opened hook，openOfficeFile 内统一补记
 }
 
 function emitFileSaved(type, filePath) {
@@ -185,12 +199,13 @@ function emitFileSaved(type, filePath) {
 // ---- 视图布局与生命周期 -------------------------------------------------------
 
 function contentBounds() {
+  if (state.contentBounds) return { ...state.contentBounds }
   const { width, height } = state.mainWindow.getContentBounds()
   return {
     x: 0,
-    y: state.toolbarHeight,
+    y: 44,
     width,
-    height: Math.max(0, height - state.toolbarHeight),
+    height: Math.max(0, height - 44),
   }
 }
 
@@ -302,6 +317,10 @@ export async function openOfficeFile(filePath) {
   }
 
   state.files[type] = filePath
+  // 最近文件统一记录在 docs bundle 的 recents 存储中（recordRecentFile 自带去重）
+  if (filePath) {
+    try { state.bundles.docs.recordRecentFile?.(filePath) } catch { /* ignore */ }
+  }
   attachView(type, view)
   showView(type)
   notifyVue('office-opened', { type, filePath })
@@ -393,11 +412,107 @@ export function getOfficeState() {
   }))
 }
 
-export function setOfficeToolbarHeight(height) {
-  if (typeof height === 'number' && height >= 0) {
-    state.toolbarHeight = height
+export function setOfficeContentBounds(rect) {
+  if (
+    rect &&
+    typeof rect.x === 'number' && Number.isFinite(rect.x) &&
+    typeof rect.y === 'number' && Number.isFinite(rect.y) &&
+    typeof rect.width === 'number' && Number.isFinite(rect.width) && rect.width >= 0 &&
+    typeof rect.height === 'number' && Number.isFinite(rect.height) && rect.height >= 0
+  ) {
+    state.contentBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
     layout()
   }
+}
+
+/** 上游首页同款最近文件条目：路径 + stat 信息 + 收藏标记（保留已删除项，dimmed 展示） */
+function recentEntries() {
+  const docs = state.bundles?.docs
+  if (!docs?.readRecentFiles) return []
+  let starred = []
+  try { starred = docs.readStarredFiles?.() || [] } catch { /* ignore */ }
+  return docs.readRecentFiles()
+    .filter(p => typeof p === 'string' && p)
+    .map((p) => {
+      let mtimeMs = null
+      let sizeBytes = null
+      let missing = true
+      try {
+        const st = fs.statSync(p)
+        mtimeMs = st.mtimeMs
+        sizeBytes = st.size
+        missing = false
+      } catch { /* transiently unavailable: keep listed, dimmed */ }
+      return {
+        path: p,
+        name: path.basename(p),
+        dir: path.dirname(p),
+        type: EXT_TO_TYPE[path.extname(p).toLowerCase()] || 'docs',
+        mtimeMs,
+        sizeBytes,
+        missing,
+        starred: starred.includes(p),
+      }
+    })
+}
+
+/** Office 首页最近文件列表（含 stat 与收藏标记） */
+export function getOfficeRecents() {
+  try {
+    return recentEntries()
+  } catch (e) {
+    console.warn('[Office] readRecentFiles failed:', e.message)
+    return []
+  }
+}
+
+/** 收藏/取消收藏（复用 docs bundle 的 starred 存储） */
+export function toggleOfficeStarred(filePath) {
+  const docs = state.bundles?.docs
+  if (!docs?.toggleStarredFile) return { success: false }
+  try {
+    docs.toggleStarredFile(String(filePath))
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}
+
+/** 从最近文件列表移除（不删除磁盘文件） */
+export function removeOfficeRecents(filePaths) {
+  const docs = state.bundles?.docs
+  if (!docs?.removeRecentFiles) return { success: false }
+  try {
+    docs.removeRecentFiles((filePaths || []).map(String))
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}
+
+/** 在系统文件管理器中显示文件 */
+export function revealOfficePath(filePath) {
+  try {
+    shell.showItemInFolder(String(filePath))
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}
+
+/** Office 首页"打开本地文件"：弹出文件选择框并交给对应编辑器 */
+export async function openOfficeFileDialog() {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) {
+    return { success: false, cancelled: true }
+  }
+  const { canceled, filePaths } = await dialog.showOpenDialog(state.mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Office Documents', extensions: ['docx', 'xlsx', 'xlsm', 'csv', 'pptx', 'pdf'] },
+    ],
+  })
+  if (canceled || !filePaths?.length) return { success: false, cancelled: true }
+  return openOfficeFile(filePaths[0])
 }
 
 export async function queryOfficeDirty(type) {
