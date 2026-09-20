@@ -141,7 +141,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'harness-start',
       'harness-status',
       'harness-restart',
-      'harness-sync-config'
+      'harness-sync-config',
+      'office-open-file',
+      'office-close',
+      'office-new',
+      'office-hide-all',
+      'office-show',
+      'office-get-state',
+      'office-set-toolbar-height',
+      'office-is-dirty'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -185,7 +193,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'drawing-updated',
       'automation-updated',
       'kb-directory-changed',
-      'harness-status-changed'
+      'harness-status-changed',
+      'office-opened',
+      'office-view-closed',
+      'office-file-saved'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

@@ -55,5 +55,8 @@ import './builtin/webpageScraper.js'
 // 文件转 Markdown 工具（PDF/Word/PPT/Excel/HTML/CSV/JSON/XML/EPub → Markdown，支持 PDF OCR）
 import './builtin/markitdown.js'
 
+// Office Bridge 工具（打开/新建/编辑/导出/检查/批量，桥接内置 happyfriday-office CLI）
+import '../../office/office-agent.js'
+
 // 用户可在下方追加自定义工具导入：
 // import './builtin/myCustomTool.js'

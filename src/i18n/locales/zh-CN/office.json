@@ -1,0 +1,13 @@
+{
+  "title": "Office",
+  "backToKnowledge": "返回知识库",
+  "docs": "文档",
+  "sheets": "表格",
+  "slides": "演示",
+  "newDoc": "新建文档",
+  "newSheet": "新建表格",
+  "newSlides": "新建演示文稿",
+  "close": "关闭",
+  "closeFile": "关闭当前文件",
+  "unavailable": "Office 编辑器资源未构建，请先运行以下命令"
+}

@@ -1,0 +1,13 @@
+{
+  "title": "Office",
+  "backToKnowledge": "Back to Knowledge",
+  "docs": "Docs",
+  "sheets": "Sheets",
+  "slides": "Slides",
+  "newDoc": "New document",
+  "newSheet": "New spreadsheet",
+  "newSlides": "New presentation",
+  "close": "Close",
+  "closeFile": "Close current file",
+  "unavailable": "Office editor bundles are not built. Run the command below first"
+}

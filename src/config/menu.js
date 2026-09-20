@@ -6,7 +6,8 @@ import {
   Workflow,
   Bot,
   Clock,
-  Settings
+  Settings,
+  FileSpreadsheet
 } from 'lucide-vue-next'
 import DeepSeekIcon from '@/components/icons/DeepSeekIcon.vue'
 
@@ -14,6 +15,7 @@ export const sidebarMenuConfig = [
   { key: 'note', path: '/note', icon: 'FileText', iconComponent: FileText, i18nKey: 'note.title' },
   { key: 'drawing', path: '/drawing', icon: 'PencilRuler', iconComponent: PencilRuler, i18nKey: 'drawing.title' },
   { key: 'knowledge', path: '/knowledge', icon: 'FolderKanban', iconComponent: FolderKanban, i18nKey: 'knowledge.title' },
+  { key: 'office', path: '/office', icon: 'FileSpreadsheet', iconComponent: FileSpreadsheet, i18nKey: 'office.title' },
   { key: 'schedule', path: '/schedule', icon: 'CalendarDays', iconComponent: CalendarDays, i18nKey: 'schedule.title' },
   { key: 'automation', path: '/automation', icon: 'Workflow', iconComponent: Workflow, i18nKey: 'automation.title' },
   { key: 'harness', path: '/harness', icon: 'DeepSeekIcon', iconComponent: DeepSeekIcon, i18nKey: 'harness.title' }
