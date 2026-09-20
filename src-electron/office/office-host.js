@@ -35,6 +35,8 @@ const state = {
   files: { docs: null, sheets: null, slides: null, pdf: null },
   // renderer 提供的编辑器视图摆放区域（窗口内容区坐标），未设置时回退全宽布局
   contentBounds: null,
+  // 当前可见的编辑器类型（Electron 42 View 无 isVisible()，需自行维护）
+  visibleType: null,
   initialized: false,
 }
 
@@ -214,8 +216,9 @@ function contentBounds() {
 
 function layout() {
   if (!state.mainWindow || state.mainWindow.isDestroyed()) return
-  const active = Object.values(state.views).find(v => v && v.isVisible())
-  if (active) active.setBounds(contentBounds())
+  // 注意：Electron 42 的 View 没有 isVisible()，可见性由 visibleType 自行维护
+  const view = state.visibleType ? state.views[state.visibleType] : null
+  if (view && !view.webContents.isDestroyed()) view.setBounds(contentBounds())
 }
 
 function attachView(type, view) {
@@ -238,6 +241,7 @@ function showView(type) {
   if (view) {
     view.setBounds(contentBounds())
     view.setVisible(true)
+    state.visibleType = type
   }
 }
 
@@ -247,6 +251,7 @@ function hideView(type, destroy = false) {
   view.setVisible(false)
   state.mainWindow?.contentView?.removeChildView(view)
   state.views[type] = null
+  if (state.visibleType === type) state.visibleType = null
   if (destroy && !view.webContents.isDestroyed()) {
     try { view.webContents.close() } catch { /* already gone */ }
   }
