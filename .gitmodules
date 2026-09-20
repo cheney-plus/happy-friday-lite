@@ -1,0 +1,5 @@
+[submodule "vendor/happyoffice"]
+	path = vendor/happyoffice
+	url = https://github.com/cheney-plus/happyoffice.git
+	branch = main
+	update = none
