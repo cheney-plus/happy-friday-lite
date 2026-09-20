@@ -154,6 +154,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-remove-recents',
       'office-reveal-path',
       'office-open-dialog',
+      'office-set-ai-model',
       'office-is-dirty'
     ]
     if (validChannels.includes(channel)) {
@@ -201,7 +202,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'harness-status-changed',
       'office-opened',
       'office-view-closed',
-      'office-file-saved'
+      'office-file-saved',
+      'office-layout-sync'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

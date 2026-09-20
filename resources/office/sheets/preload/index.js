@@ -414,7 +414,7 @@ const desktopApi = {
   async aiGskStatus(withEmail) {
     const result = await electron.ipcRenderer.invoke(IPC_CHANNELS.aiGskStatus, withEmail);
     if (!isRecord(result) || typeof result.loggedIn !== "boolean") {
-      throw new Error("Invalid Genspark account status response.");
+      throw new Error("Invalid Friday account status response.");
     }
     return result;
   },

@@ -38,14 +38,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated, nextTick, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useFridayStore } from '@/store';
+import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
 import {
   House, X, CircleDot, Loader2
 } from 'lucide-vue-next';
 import OfficeHome from './home/OfficeHome.vue';
 
 const api = window.electronAPI;
+const fridayStore = useFridayStore();
 const { t } = useI18n();
 
 // 与 .office-toolbar 的 CSS 高度保持一致：编辑器视图摆放在工具栏以下
@@ -156,7 +159,7 @@ async function openLocal() {
       currentFile.value = res.filePath;
       dirty.value = false;
     } else {
-      loadRecents();
+      refreshHome();
     }
   } finally {
     busy.value = false;
@@ -193,11 +196,41 @@ async function closeActive() {
 let unwatchSaved = null;
 let unwatchClosed = null;
 let onResize = null;
+let unwatchModel = null;
+let resizeObserver = null;
+let syncScheduled = false;
+let unwatchLayoutSync = null;
+
+// 编辑器 AI 由 Friday 接管：把主窗口配置的模型推送给主进程桥接层
+function pushAiModel() {
+  const model = loadModelConfig();
+  if (api && model) {
+    api.invoke('office-set-ai-model', model).catch(() => {});
+  }
+}
+
+// rAF 节流的边界同步：resize 拖拽 / 最大化 / 侧栏收起等高频触发时每帧最多一次
+function scheduleSyncBounds() {
+  if (syncScheduled) return;
+  syncScheduled = true;
+  requestAnimationFrame(() => {
+    syncScheduled = false;
+    syncBounds();
+  });
+}
 
 onMounted(() => {
   if (!api) { available.value = false; return; }
-  onResize = () => { syncBounds(); };
+  onResize = () => { scheduleSyncBounds(); };
   window.addEventListener('resize', onResize);
+  // 工作区元素尺寸因任何原因变化（窗口缩放、侧栏收起、布局调整）都重新同步视图边界
+  if (rootRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(scheduleSyncBounds);
+    resizeObserver.observe(rootRef.value);
+  }
+  pushAiModel();
+  unwatchModel = watch(() => fridayStore.modelId, pushAiModel);
+  unwatchLayoutSync = api.on?.('office-layout-sync', () => { syncBounds(); });
   if (api.on) {
     unwatchSaved = api.on('office-file-saved', ({ filePath }) => {
       currentFile.value = filePath;
@@ -215,6 +248,7 @@ onMounted(() => {
 
 onActivated(async () => {
   if (!api) return;
+  pushAiModel();
   await syncFromState();
   if (currentType.value && !manualHome.value) {
     // 路由回到 Office：恢复编辑器视图（先同步边界再显示）
@@ -240,8 +274,11 @@ onBeforeUnmount(() => {
     try { api.invoke('office-hide-all'); } catch { /* ignore */ }
   }
   if (onResize) window.removeEventListener('resize', onResize);
+  if (resizeObserver) resizeObserver.disconnect();
   if (unwatchSaved) unwatchSaved();
   if (unwatchClosed) unwatchClosed();
+  if (unwatchModel) unwatchModel();
+  if (unwatchLayoutSync) unwatchLayoutSync();
 });
 </script>
 

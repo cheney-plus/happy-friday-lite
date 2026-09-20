@@ -3,6 +3,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { app, dialog, ipcMain, shell } from 'electron'
+import { registerOfficeAiBridge } from './office-ai-bridge.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const _require = createRequire(import.meta.url)
@@ -157,6 +158,8 @@ function registerEditorIpc() {
   try { docs.registerDocsIpc() } catch (e) { console.warn('[Office] registerDocsIpc:', e.message) }
   try { sheets.registerSheetsIpc() } catch (e) { console.warn('[Office] registerSheetsIpc:', e.message) }
   try { slides.registerSlidesIpc() } catch (e) { console.warn('[Office] registerSlidesIpc:', e.message) }
+  // Friday 接管编辑器 ai:* 通道（须在编辑器注册之后，后注册者覆盖）
+  registerOfficeAiBridge()
 }
 
 function wireShellHooks() {
@@ -275,10 +278,18 @@ export async function initOfficeHost(mainWindow) {
   registerEditorIpc()
   wireShellHooks()
 
-  mainWindow.on('resize', () => {
-    layout()
-    setImmediate(layout)
-  })
+  // 窗口尺寸变化时让 renderer 重推最新边界（不套用陈旧 contentBounds，避免抖动）；
+  // 覆盖 resize / 最大化 / 还原 / 全屏切换
+  const requestSync = () => {
+    try {
+      if (!state.mainWindow.isDestroyed()) {
+        state.mainWindow.webContents.send('office-layout-sync')
+      }
+    } catch { /* ignore */ }
+  }
+  for (const ev of ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen']) {
+    mainWindow.on(ev, requestSync)
+  }
 
   state.initialized = true
   console.log('[Office] Office Host initialized with editors:', Object.keys(state.bundles).join(', '))
