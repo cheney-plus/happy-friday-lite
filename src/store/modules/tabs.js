@@ -4,9 +4,7 @@ export const useTabStore = defineStore('tabs', {
   state: () => ({
     openedTabs: [],
     activeTabId: '',
-    fridayCounter: 0,
-    // Office 首页 → 编辑器 Tab 的待办动作：{ type, filePath }，由编辑器 Tab 激活时消费
-    pendingOfficeAction: null
+    fridayCounter: 0
   }),
   actions: {
     addTab(tab) {
@@ -97,6 +95,13 @@ export const useTabStore = defineStore('tabs', {
       const tab = this.openedTabs.find(t => t.id === id)
       if (tab) {
         tab.title = title
+      }
+    },
+    // Office 编辑器 Tab 当前文件路径（用于视图丢失后按原文件恢复）
+    updateTabFilePath(id, filePath) {
+      const tab = this.openedTabs.find(t => t.id === id)
+      if (tab) {
+        tab.officeFilePath = filePath
       }
     }
   }

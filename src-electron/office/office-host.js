@@ -12,8 +12,10 @@ const _require = createRequire(import.meta.url)
  * Office Host（主进程适配层）。
  *
  * 复用上游 happyoffice 各编辑器的主进程模块（docs/sheets/slides/pdf-main），
- * 以 WebContentsView 形式挂载到当前唯一 BrowserWindow 上。每种编辑器至多
- * 一个活跃视图；文件内容由上游模块自带的 IPC 与 renderer 自行管理。
+ * 以 WebContentsView 形式挂载到当前唯一 BrowserWindow 上。同一种编辑器可并存
+ * 多个视图（多 Tab），每个视图以 viewId（如 'docs-1'）唯一标识，与前端
+ * /office/<type>/<instId> 路由 Tab 一一对应；文件内容由上游模块自带的 IPC 与
+ * renderer 自行管理。
  */
 
 const EDITORS = ['docs', 'sheets', 'slides', 'pdf']
@@ -30,13 +32,14 @@ const EXT_TO_TYPE = {
 const state = {
   mainWindow: null,
   bundles: null,
-  // 每种编辑器至多一个活跃视图
-  views: { docs: null, sheets: null, slides: null, pdf: null },
-  files: { docs: null, sheets: null, slides: null, pdf: null },
+  // 打开的编辑器视图：viewId（'docs-1'）→ { viewId, type, view, filePath }
+  views: new Map(),
+  // viewId 自增序号（跨类型全局，保证唯一）
+  seq: 0,
   // renderer 提供的编辑器视图摆放区域（窗口内容区坐标），未设置时回退全宽布局
   contentBounds: null,
-  // 当前可见的编辑器类型（Electron 42 View 无 isVisible()，需自行维护）
-  visibleType: null,
+  // 当前可见的 viewId（Electron 42 View 无 isVisible()，需自行维护）
+  visibleId: null,
   // 编辑器内 HTML5 全屏（如 Slides 放映）状态：整个应用窗口进入系统全屏
   htmlFullScreen: false,
   wasWindowFullScreen: false,
@@ -130,8 +133,9 @@ function configureRuntimes() {
     rendererFile: editorPaths('sheets').rendererFile,
     sidecarPath: fs.existsSync(sidecarPath) ? sidecarPath : undefined,
     // 上游"在生成的文件所在 tab 打开"的回调：在我们这里始终打开对应编辑器
+    // （新视图 + 通知前端创建/跳转对应 Tab）
     openGeneratedPath: (p) => {
-      openOfficeFile(p)
+      openOfficeFile(p, { notifyOpened: true })
       return true
     },
   })
@@ -140,7 +144,7 @@ function configureRuntimes() {
     preloadPath: editorPaths('slides').preloadPath,
     rendererFilePath: editorPaths('slides').rendererFile,
     openGeneratedPath: (p) => {
-      openOfficeFile(p)
+      openOfficeFile(p, { notifyOpened: true })
       return true
     },
   })
@@ -149,7 +153,7 @@ function configureRuntimes() {
     preloadPath: editorPaths('pdf').preloadPath,
     rendererFile: editorPaths('pdf').rendererFile,
     openGeneratedPath: (p) => {
-      openOfficeFile(p)
+      openOfficeFile(p, { notifyOpened: true })
       return true
     },
   })
@@ -175,32 +179,36 @@ function wireShellHooks() {
   sheets.setSheetsShellWindow?.(win)
   slides.setSlidesShellWindow?.(win)
 
-  // 保存/另存为/首次保存 → 同步内部状态并通知知识库与 RAG
-  docs.setDocsFileSavedHook?.((_wc, filePath) => {
-    if (state.files.docs && state.files.docs !== filePath) state.files.docs = filePath
-    emitFileSaved('docs', filePath)
+  // 保存/另存为/首次保存 → 同步视图条目状态并通知知识库与 RAG
+  docs.setDocsFileSavedHook?.((wc, filePath) => {
+    const entry = entryByWebContents(wc)
+    if (entry) entry.filePath = filePath
+    emitFileSaved('docs', filePath, entry?.viewId)
   })
-  docs.setDocsFileOpenedHook?.((_wcId, filePath) => {
-    state.files.docs = filePath
+  docs.setDocsFileOpenedHook?.((wcArg, filePath) => {
+    const entry = entryByWebContents(wcArg)
+    if (entry) entry.filePath = filePath
   })
-  sheets.setSheetsWorkbookOpenedHook?.((_wc, filePath) => {
-    state.files.sheets = filePath
+  sheets.setSheetsWorkbookOpenedHook?.((wc, filePath) => {
+    const entry = entryByWebContents(wc)
+    if (entry) entry.filePath = filePath
     // 最近文件统一记录在 docs bundle 的 recents 存储中
     try { docs.recordRecentFile?.(filePath) } catch { /* ignore */ }
-    emitFileSaved('sheets', filePath)
+    emitFileSaved('sheets', filePath, entry?.viewId)
   })
-  slides.setSlidesOpenedHook?.((_wc, filePath) => {
-    state.files.slides = filePath
+  slides.setSlidesOpenedHook?.((wc, filePath) => {
+    const entry = entryByWebContents(wc)
+    if (entry) entry.filePath = filePath
     try { docs.recordRecentFile?.(filePath) } catch { /* ignore */ }
-    emitFileSaved('slides', filePath)
+    emitFileSaved('slides', filePath, entry?.viewId)
   })
   // PDF 编辑器无 opened hook，openOfficeFile 内统一补记
 }
 
-function emitFileSaved(type, filePath) {
+function emitFileSaved(type, filePath, viewId) {
   if (!filePath) return
   for (const fn of savedEventSubscribers) {
-    try { fn(type, filePath) } catch (e) { console.warn('[Office] file-saved hook error:', e) }
+    try { fn(type, filePath, viewId) } catch (e) { console.warn('[Office] file-saved hook error:', e) }
   }
 }
 
@@ -225,10 +233,10 @@ function fullContentBounds() {
 
 function layout() {
   if (!state.mainWindow || state.mainWindow.isDestroyed()) return
-  // 注意：Electron 42 的 View 没有 isVisible()，可见性由 visibleType 自行维护
-  const view = state.visibleType ? state.views[state.visibleType] : null
-  if (view && !view.webContents.isDestroyed()) {
-    view.setBounds(state.htmlFullScreen ? fullContentBounds() : contentBounds())
+  // 注意：Electron 42 的 View 没有 isVisible()，可见性由 visibleId 自行维护
+  const entry = state.visibleId ? state.views.get(state.visibleId) : null
+  if (entry && !entry.view.webContents.isDestroyed()) {
+    entry.view.setBounds(state.htmlFullScreen ? fullContentBounds() : contentBounds())
   }
 }
 
@@ -270,45 +278,76 @@ function leaveHtmlFullScreen() {
   layout()
 }
 
-function attachView(type, view) {
+function attachView(entry) {
+  const { viewId, type, view } = entry
   state.mainWindow.contentView.addChildView(view)
   view.setVisible(false)
   view.setBounds(contentBounds())
-  state.views[type] = view
+  state.views.set(viewId, entry)
   // 编辑器内全屏（如 Slides 放映）：从"窗口内全屏"升级为整个屏幕的系统全屏
   view.webContents.on('enter-html-full-screen', enterHtmlFullScreen)
   view.webContents.on('leave-html-full-screen', leaveHtmlFullScreen)
   view.webContents.once('render-process-gone', () => {
-    console.error(`[Office] ${type} renderer crashed`)
-    // 保留崩溃现场供上层提示恢复；关闭视图
-    hideView(type, true)
+    console.error(`[Office] ${viewId} renderer crashed`)
+    // 保留崩溃现场供上层提示恢复；关闭视图并通知前端（对应 Tab 激活时会重建）
+    hideView(viewId, true)
+    notifyVue('office-view-closed', { type, viewId })
   })
 }
 
-function showView(type) {
-  for (const [t, v] of Object.entries(state.views)) {
-    if (v && !v.webContents.isDestroyed()) v.setVisible(t === type)
+function showView(viewId) {
+  for (const [id, entry] of state.views) {
+    if (id !== viewId && !entry.view.webContents.isDestroyed()) entry.view.setVisible(false)
   }
-  const view = state.views[type]
-  if (view) {
-    view.setBounds(state.htmlFullScreen ? fullContentBounds() : contentBounds())
-    view.setVisible(true)
-    state.visibleType = type
+  const entry = state.views.get(viewId)
+  if (entry) {
+    entry.view.setBounds(state.htmlFullScreen ? fullContentBounds() : contentBounds())
+    entry.view.setVisible(true)
+    state.visibleId = viewId
   }
 }
 
-function hideView(type, destroy = false) {
-  const view = state.views[type]
-  if (!view) return
-  view.setVisible(false)
-  state.mainWindow?.contentView?.removeChildView(view)
-  state.views[type] = null
-  if (state.visibleType === type) state.visibleType = null
-  // 视图关闭时若正处于 HTML5 全屏放映，恢复窗口状态
-  if (state.htmlFullScreen) leaveHtmlFullScreen()
-  if (destroy && !view.webContents.isDestroyed()) {
-    try { view.webContents.close() } catch { /* already gone */ }
+function hideView(viewId, destroy = false) {
+  const entry = state.views.get(viewId)
+  if (!entry) return
+  entry.view.setVisible(false)
+  state.mainWindow?.contentView?.removeChildView(entry.view)
+  state.views.delete(viewId)
+  if (state.visibleId === viewId) {
+    state.visibleId = null
+    // 视图关闭时若正处于 HTML5 全屏放映，恢复窗口状态
+    if (state.htmlFullScreen) leaveHtmlFullScreen()
   }
+  if (destroy && !entry.view.webContents.isDestroyed()) {
+    try { entry.view.webContents.close() } catch { /* already gone */ }
+  }
+}
+
+// ---- viewId 与视图查找 -------------------------------------------------------
+
+function nextViewId(type) {
+  return `${type}-${++state.seq}`
+}
+
+/** 分配 viewId：优先复用调用方指定的（且未被占用）id，否则自增 */
+function allocViewId(type, requested) {
+  if (
+    typeof requested === 'string' &&
+    requested.startsWith(`${type}-`) &&
+    !state.views.has(requested)
+  ) {
+    return requested
+  }
+  return nextViewId(type)
+}
+
+/** 按 webContents（对象或 id）反查视图条目 */
+function entryByWebContents(arg) {
+  for (const entry of state.views.values()) {
+    const wc = entry.view.webContents
+    if (wc === arg || wc.id === arg) return entry
+  }
+  return null
 }
 
 // ---- 对外 API ---------------------------------------------------------------
@@ -391,46 +430,55 @@ function wireSlidesShowFullscreen() {
   state.slidesShowWrapped = true
 }
 
-/** 在对应可视化编辑器中打开文件；重复打开同一文件时仅激活已有视图 */
-export async function openOfficeFile(filePath) {
+/** 按类型创建上游编辑器视图（filePath 为空表示新建空白文档） */
+function createTypeView(type, filePath) {
+  const b = state.bundles
+  if (type === 'docs') {
+    return b.docs.createDocsView(filePath || undefined)
+  }
+  if (type === 'sheets') {
+    if (!filePath) b.sheets.setSheetsNewBlank()
+    const view = b.sheets.createSheetsView({ includeAiHandlers: false })
+    if (filePath) b.sheets.queueWorkbookForView(view.webContents, filePath)
+    return view
+  }
+  if (type === 'slides') {
+    return b.slides.createSlidesView(filePath || null)
+  }
+  return b.pdf.createPdfView(filePath || null)
+}
+
+/**
+ * 在对应可视化编辑器中打开文件（每个文件一个独立视图/Tab）。
+ * - 同一文件已在某个视图中打开 → 直接激活该视图（reused）；
+ * - 否则创建新视图；opts.viewId 可指定复用的视图 id（Tab 恢复场景）；
+ * - opts.notifyOpened：主进程内部发起的打开（如生成文件）需通知前端创建/跳转 Tab。
+ */
+export async function openOfficeFile(filePath, opts = {}) {
   const { resolveEditorType } = await import('./office-files.js')
   const type = resolveEditorType(filePath)
   if (!type || !state.bundles?.[type]) {
     return { success: false, error: `unsupported file type: ${filePath}` }
   }
-  // 同一文件已在编辑器中打开 → 直接激活
-  if (state.files[type] === filePath && state.views[type] && !state.views[type].webContents.isDestroyed()) {
-    showView(type)
-    return { success: true, type, filePath, reused: true }
-  }
-  // 换文件前先走关闭确认
-  if (state.views[type]) {
-    const closed = await closeOfficeFile(type)
-    if (!closed) return { success: false, cancelled: true }
+  // 同一文件已在某个视图打开 → 直接激活
+  for (const [id, entry] of state.views) {
+    if (entry.type === type && entry.filePath === filePath && !entry.view.webContents.isDestroyed()) {
+      showView(id)
+      if (opts.notifyOpened) notifyVue('office-opened', { type, viewId: id, filePath })
+      return { success: true, type, viewId: id, filePath, reused: true }
+    }
   }
 
-  const bundles = state.bundles
-  let view
-  if (type === 'docs') {
-    view = bundles.docs.createDocsView(filePath)
-  } else if (type === 'sheets') {
-    view = bundles.sheets.createSheetsView({ includeAiHandlers: false })
-    bundles.sheets.queueWorkbookForView(view.webContents, filePath)
-  } else if (type === 'slides') {
-    view = bundles.slides.createSlidesView(filePath)
-  } else {
-    view = bundles.pdf.createPdfView(filePath)
-  }
-
-  state.files[type] = filePath
+  const viewId = allocViewId(type, opts.viewId)
+  const view = createTypeView(type, filePath)
+  attachView({ viewId, type, view, filePath })
   // 最近文件统一记录在 docs bundle 的 recents 存储中（recordRecentFile 自带去重）
   if (filePath) {
     try { state.bundles.docs.recordRecentFile?.(filePath) } catch { /* ignore */ }
   }
-  attachView(type, view)
-  showView(type)
-  notifyVue('office-opened', { type, filePath })
-  return { success: true, type, filePath }
+  showView(viewId)
+  if (opts.notifyOpened) notifyVue('office-opened', { type, viewId, filePath })
+  return { success: true, type, viewId, filePath }
 }
 
 /**
@@ -438,10 +486,13 @@ export async function openOfficeFile(filePath) {
  * 已有路径的文件静默保存；未保存过的新文档由 renderer 弹出另存为对话框。
  * 上限 120s，与上游 requestRendererSave 一致（覆盖另存为对话框的等待时间）。
  */
-export async function autoSaveOfficeFile(type) {
+export async function autoSaveOfficeFile(viewId) {
   const b = state.bundles
-  const view = state.views[type]
-  if (!b?.[type] || !view || view.webContents.isDestroyed()) return { success: true, saved: false }
+  const entry = state.views.get(viewId)
+  if (!b || !entry) return { success: true, saved: false }
+  const type = entry.type
+  const view = entry.view
+  if (!view || view.webContents.isDestroyed()) return { success: true, saved: false }
   const wc = view.webContents
   const waitClean = async (isDirty, timeoutMs = 120000) => {
     const deadline = Date.now() + timeoutMs
@@ -486,12 +537,14 @@ export async function autoSaveOfficeFile(type) {
 }
 
 /** 关闭前查询脏状态并弹出保存/放弃/取消确认；返回是否可以安全关闭 */
-export async function closeOfficeFile(type) {
+export async function closeOfficeFile(viewId) {
   const bundles = state.bundles
-  const view = state.views[type]
-  if (!view) return true
+  const entry = state.views.get(viewId)
+  if (!entry) return true
+  const type = entry.type
+  const view = entry.view
   const wc = view.webContents
-  if (wc.isDestroyed()) { hideView(type); return true }
+  if (wc.isDestroyed()) { hideView(viewId); return true }
 
   let proceed = true
   if (type === 'docs') {
@@ -506,67 +559,48 @@ export async function closeOfficeFile(type) {
   if (!proceed) return false
 
   if (type === 'docs') bundles.docs.teardownDocsRenderer?.(wc)
-  hideView(type, type !== 'docs') // docs 的 webContents.close() 会卡死 UI 线程（上游已知问题），仅分离
-  state.files[type] = null
-  notifyVue('office-view-closed', { type })
+  hideView(viewId, type !== 'docs') // docs 的 webContents.close() 会卡死 UI 线程（上游已知问题），仅分离
+  notifyVue('office-view-closed', { type, viewId })
   return true
 }
 
-/** 新建空白文档（对应编辑器的无参 createXxxView） */
-export function newOfficeDocument(type) {
+/**
+ * 新建空白文档（对应编辑器的无参 createXxxView）。每个新建文档都是独立视图/Tab；
+ * requestedViewId 用于 Tab 恢复场景（在原 Tab 的 viewId 下重建）。
+ */
+export function newOfficeDocument(type, requestedViewId) {
   if (!state.bundles?.[type]) return { success: false, error: 'editor unavailable' }
-  if (state.views[type]) {
-    // 已有打开的文件时先走关闭确认
-    return closeOfficeFile(type).then(closed => {
-      if (!closed) return { success: false, cancelled: true }
-      return createBlank(type)
-    })
-  }
-  return createBlank(type)
-}
-
-async function createBlank(type) {
-  const b = state.bundles
-  let view
-  if (type === 'docs') {
-    view = b.docs.createDocsView()
-  } else if (type === 'sheets') {
-    b.sheets.setSheetsNewBlank()
-    view = b.sheets.createSheetsView({ includeAiHandlers: false })
-  } else if (type === 'slides') {
-    view = b.slides.createSlidesView(null)
-  } else {
-    view = b.pdf.createPdfView(null)
-  }
-  state.files[type] = null
-  attachView(type, view)
-  showView(type)
-  notifyVue('office-opened', { type, filePath: null })
-  return { success: true, type, blank: true }
+  const viewId = allocViewId(type, requestedViewId)
+  const view = createTypeView(type, null)
+  attachView({ viewId, type, view, filePath: null })
+  showView(viewId)
+  return { success: true, type, viewId, blank: true }
 }
 
 /** 隐藏所有 Office 视图（路由离开 Office 工作区时调用，不销毁） */
 export function hideAllOfficeViews() {
-  for (const t of EDITORS) {
-    const v = state.views[t]
-    if (v && !v.webContents.isDestroyed()) v.setVisible(false)
+  for (const entry of state.views.values()) {
+    if (!entry.view.webContents.isDestroyed()) entry.view.setVisible(false)
   }
+  state.visibleId = null
 }
 
-/** 路由回到 Office 工作区时恢复该编辑器视图 */
-export function showOfficeView(type) {
-  if (state.views[type] && !state.views[type].webContents.isDestroyed()) {
-    showView(type)
+/** 路由回到 Office 工作区时恢复该 Tab 的编辑器视图 */
+export function showOfficeView(viewId) {
+  const entry = state.views.get(viewId)
+  if (entry && !entry.view.webContents.isDestroyed()) {
+    showView(viewId)
     return true
   }
   return false
 }
 
 export function getOfficeState() {
-  return EDITORS.map(t => ({
-    type: t,
-    filePath: state.files[t],
-    open: !!(state.views[t] && !state.views[t].webContents.isDestroyed()),
+  return [...state.views.values()].map(e => ({
+    type: e.type,
+    viewId: e.viewId,
+    filePath: e.filePath,
+    open: !e.view.webContents.isDestroyed(),
   }))
 }
 
@@ -677,15 +711,16 @@ export async function openOfficeFileDialog() {
   return openOfficeFile(filePaths[0])
 }
 
-export async function queryOfficeDirty(type) {
-  const view = state.views[type]
-  if (!view || view.webContents.isDestroyed()) return false
+export async function queryOfficeDirty(viewId) {
+  const entry = state.views.get(viewId)
+  if (!entry || entry.view.webContents.isDestroyed()) return false
   const b = state.bundles
-  switch (type) {
-    case 'docs': return b.docs.docsQueryDirty(view.webContents)
-    case 'sheets': return b.sheets.sheetsPendingEditCount(view.webContents.id) > 0
-    case 'slides': return b.slides.slidesIsDirty(view.webContents.id)
-    case 'pdf': return b.pdf.pdfIsDirty(view.webContents.id)
+  const wc = entry.view.webContents
+  switch (entry.type) {
+    case 'docs': return b.docs.docsQueryDirty(wc)
+    case 'sheets': return b.sheets.sheetsPendingEditCount(wc.id) > 0
+    case 'slides': return b.slides.slidesIsDirty(wc.id)
+    case 'pdf': return b.pdf.pdfIsDirty(wc.id)
     default: return false
   }
 }
@@ -693,24 +728,24 @@ export async function queryOfficeDirty(type) {
 /** 应用退出前释放资源（停止 sidecar、关闭视图） */
 export function shutdownOfficeHost() {
   try { state.bundles?.sheets?.stopSheetsSidecar?.() } catch { /* ignore */ }
-  for (const t of EDITORS) hideView(t, t !== 'docs')
+  for (const [viewId, entry] of [...state.views]) hideView(viewId, entry.type !== 'docs')
   savedEventSubscribers = []
 }
 
 /** 调试/诊断：将指定编辑器视图当前画面截图保存为 PNG */
-export async function captureOfficeView(type, outPath) {
-  const view = state.views[type]
-  if (!view || view.webContents.isDestroyed()) return false
-  const image = await view.webContents.capturePage()
+export async function captureOfficeView(viewId, outPath) {
+  const entry = state.views.get(viewId)
+  if (!entry || entry.view.webContents.isDestroyed()) return false
+  const image = await entry.view.webContents.capturePage()
   fs.writeFileSync(outPath, image.toPNG())
   return true
 }
 
 /** 调试/诊断：探测指定编辑器 renderer 的加载状态 */
-export async function probeOfficeView(type) {
-  const view = state.views[type]
-  if (!view || view.webContents.isDestroyed()) return { ok: false, reason: 'no view' }
-  const wc = view.webContents
+export async function probeOfficeView(viewId) {
+  const entry = state.views.get(viewId)
+  if (!entry || entry.view.webContents.isDestroyed()) return { ok: false, reason: 'no view' }
+  const wc = entry.view.webContents
   try {
     const probe = await Promise.race([
       wc.executeJavaScript(

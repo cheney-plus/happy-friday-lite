@@ -27,9 +27,16 @@ export const routes = [
     component: () => import('@/views/note/NoteEdit.vue')
   },
   {
-    // /office 为 Office 首页 Tab；/office/:editor 为对应编辑器独立 Tab
-    path: '/office/:editor(docs|sheets|slides|pdf)?',
+    // /office 为 Office 首页 Tab
+    path: '/office',
     name: 'office',
+    component: () => import('@/views/office/OfficeWorkspace.vue')
+  },
+  {
+    // /office/:editor/:instId 为编辑器独立 Tab（每个文件/新建文档一个 Tab，
+    // instId 与主进程 office-host 的 viewId <type>-<instId> 一一对应）
+    path: '/office/:editor(docs|sheets|slides|pdf)/:instId(\\d+)',
+    name: 'office-editor',
     component: () => import('@/views/office/OfficeWorkspace.vue')
   },
   {

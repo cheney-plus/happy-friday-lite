@@ -48,6 +48,7 @@ const routerViewKey = computed(() => {
 });
 
 let unlistenConfig = null;
+let unlistenOfficeOpened = null;
 
 watch(
   () => route.name,
@@ -82,13 +83,13 @@ watch(
       return;
     }
 
-    // Office 工作区：/office 为首页 Tab；/office/<type> 为对应编辑器独立 Tab
-    // （每类编辑器在主进程中至多一个活跃视图，故每类至多一个编辑器 Tab）
+    // Office 工作区：/office 为首页 Tab；/office/<type>/<instId> 为编辑器独立 Tab
+    // （每个打开的文件/新建文档对应主进程一个视图实例，Tab id 与其 viewId 一一对应）
     if (rootPath === '/office') {
-      const seg = newPath.split('/')[2] || '';
-      const editorType = ['docs', 'sheets', 'slides', 'pdf'].includes(seg) ? seg : null;
-      if (editorType) {
-        const id = `office-${editorType}`;
+      const segs = newPath.split('/');
+      const editorType = ['docs', 'sheets', 'slides', 'pdf'].includes(segs[2]) ? segs[2] : null;
+      if (editorType && segs[3]) {
+        const id = `office-${editorType}-${segs[3]}`;
         const existing = tabStore.openedTabs.find(t => t.id === id);
         if (existing) {
           tabStore.setActiveTab(id);
@@ -182,6 +183,15 @@ onMounted(async () => {
       console.error('Failed to load config:', error);
     }
 
+    // 主进程内部发起的 Office 打开（如编辑器导出/转换生成的文件）：
+    // 视图已在主进程创建，这里跳转到对应编辑器 Tab（Tab 由上方 office 分支自动创建）
+    unlistenOfficeOpened = electronService.listen('office-opened', (event) => {
+      const viewId = event.payload?.viewId;
+      if (typeof viewId === 'string' && viewId.includes('-')) {
+        router.push(`/office/${viewId.replace('-', '/')}`);
+      }
+    });
+
     unlistenConfig = electronService.listen('config-changed', (event) => {
       const data = event.payload;
       if (data.language) {
@@ -211,6 +221,10 @@ onUnmounted(() => {
   if (unlistenConfig) {
     unlistenConfig();
     unlistenConfig = null;
+  }
+  if (unlistenOfficeOpened) {
+    unlistenOfficeOpened();
+    unlistenOfficeOpened = null;
   }
 });
 </script>
