@@ -82,6 +82,43 @@ watch(
       return;
     }
 
+    // Office 工作区：/office 为首页 Tab；/office/<type> 为对应编辑器独立 Tab
+    // （每类编辑器在主进程中至多一个活跃视图，故每类至多一个编辑器 Tab）
+    if (rootPath === '/office') {
+      const seg = newPath.split('/')[2] || '';
+      const editorType = ['docs', 'sheets', 'slides', 'pdf'].includes(seg) ? seg : null;
+      if (editorType) {
+        const id = `office-${editorType}`;
+        const existing = tabStore.openedTabs.find(t => t.id === id);
+        if (existing) {
+          tabStore.setActiveTab(id);
+          if (existing.fullPath !== newPath) tabStore.updateTabFullPath(id, newPath);
+        } else {
+          tabStore.addTab({
+            id,
+            path: `/office/${editorType}`,
+            fullPath: newPath,
+            i18nKey: `office.${editorType}`,
+            icon: 'FileSpreadsheet'
+          });
+        }
+        return;
+      }
+      const homeTab = tabStore.openedTabs.find(t => t.id === '/office');
+      if (homeTab) {
+        tabStore.setActiveTab('/office');
+      } else {
+        tabStore.addTab({
+          id: '/office',
+          path: '/office',
+          fullPath: '/office',
+          i18nKey: menu.i18nKey,
+          icon: menu.icon
+        });
+      }
+      return;
+    }
+
     const activeTab = tabStore.openedTabs.find(t => t.id === tabStore.activeTabId);
     if (activeTab) {
       const activeRootPath = '/' + activeTab.path.split('/')[1];

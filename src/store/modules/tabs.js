@@ -4,7 +4,9 @@ export const useTabStore = defineStore('tabs', {
   state: () => ({
     openedTabs: [],
     activeTabId: '',
-    fridayCounter: 0
+    fridayCounter: 0,
+    // Office 首页 → 编辑器 Tab 的待办动作：{ type, filePath }，由编辑器 Tab 激活时消费
+    pendingOfficeAction: null
   }),
   actions: {
     addTab(tab) {
@@ -89,6 +91,12 @@ export const useTabStore = defineStore('tabs', {
       const tab = this.openedTabs.find(t => t.id === id)
       if (tab) {
         tab.fullPath = fullPath
+      }
+    },
+    updateTabTitle(id, title) {
+      const tab = this.openedTabs.find(t => t.id === id)
+      if (tab) {
+        tab.title = title
       }
     }
   }

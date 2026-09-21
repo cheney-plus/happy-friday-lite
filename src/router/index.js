@@ -27,7 +27,8 @@ export const routes = [
     component: () => import('@/views/note/NoteEdit.vue')
   },
   {
-    path: '/office',
+    // /office 为 Office 首页 Tab；/office/:editor 为对应编辑器独立 Tab
+    path: '/office/:editor(docs|sheets|slides|pdf)?',
     name: 'office',
     component: () => import('@/views/office/OfficeWorkspace.vue')
   },

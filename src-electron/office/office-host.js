@@ -37,6 +37,9 @@ const state = {
   contentBounds: null,
   // 当前可见的编辑器类型（Electron 42 View 无 isVisible()，需自行维护）
   visibleType: null,
+  // 编辑器内 HTML5 全屏（如 Slides 放映）状态：整个应用窗口进入系统全屏
+  htmlFullScreen: false,
+  wasWindowFullScreen: false,
   initialized: false,
 }
 
@@ -214,11 +217,40 @@ function contentBounds() {
   }
 }
 
+/** HTML5 全屏（如 Slides 放映）时编辑器视图占满整个窗口内容区（盖住 TabBar/侧栏） */
+function fullContentBounds() {
+  const { width, height } = state.mainWindow.getContentBounds()
+  return { x: 0, y: 0, width, height }
+}
+
 function layout() {
   if (!state.mainWindow || state.mainWindow.isDestroyed()) return
   // 注意：Electron 42 的 View 没有 isVisible()，可见性由 visibleType 自行维护
   const view = state.visibleType ? state.views[state.visibleType] : null
-  if (view && !view.webContents.isDestroyed()) view.setBounds(contentBounds())
+  if (view && !view.webContents.isDestroyed()) {
+    view.setBounds(state.htmlFullScreen ? fullContentBounds() : contentBounds())
+  }
+}
+
+/** 进入编辑器 HTML5 全屏：应用窗口切换为系统全屏（整屏放映） */
+function enterHtmlFullScreen() {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) return
+  state.wasWindowFullScreen = state.mainWindow.isFullScreen()
+  state.htmlFullScreen = true
+  try {
+    if (!state.wasWindowFullScreen) state.mainWindow.setFullScreen(true)
+  } catch { /* ignore */ }
+  layout()
+}
+
+/** 退出编辑器 HTML5 全屏：恢复窗口状态与视图边界 */
+function leaveHtmlFullScreen() {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) return
+  state.htmlFullScreen = false
+  try {
+    if (!state.wasWindowFullScreen) state.mainWindow.setFullScreen(false)
+  } catch { /* ignore */ }
+  layout()
 }
 
 function attachView(type, view) {
@@ -226,6 +258,9 @@ function attachView(type, view) {
   view.setVisible(false)
   view.setBounds(contentBounds())
   state.views[type] = view
+  // 编辑器内全屏（如 Slides 放映）：从"窗口内全屏"升级为整个屏幕的系统全屏
+  view.webContents.on('enter-html-full-screen', enterHtmlFullScreen)
+  view.webContents.on('leave-html-full-screen', leaveHtmlFullScreen)
   view.webContents.once('render-process-gone', () => {
     console.error(`[Office] ${type} renderer crashed`)
     // 保留崩溃现场供上层提示恢复；关闭视图
@@ -239,7 +274,7 @@ function showView(type) {
   }
   const view = state.views[type]
   if (view) {
-    view.setBounds(contentBounds())
+    view.setBounds(state.htmlFullScreen ? fullContentBounds() : contentBounds())
     view.setVisible(true)
     state.visibleType = type
   }
@@ -252,6 +287,8 @@ function hideView(type, destroy = false) {
   state.mainWindow?.contentView?.removeChildView(view)
   state.views[type] = null
   if (state.visibleType === type) state.visibleType = null
+  // 视图关闭时若正处于 HTML5 全屏放映，恢复窗口状态
+  if (state.htmlFullScreen) leaveHtmlFullScreen()
   if (destroy && !view.webContents.isDestroyed()) {
     try { view.webContents.close() } catch { /* already gone */ }
   }
@@ -343,6 +380,58 @@ export async function openOfficeFile(filePath) {
   return { success: true, type, filePath }
 }
 
+/**
+ * 关闭 Tab 前自动保存：向编辑器 renderer 触发保存（等价 Ctrl+S 菜单命令）并等待落盘。
+ * 已有路径的文件静默保存；未保存过的新文档由 renderer 弹出另存为对话框。
+ * 上限 120s，与上游 requestRendererSave 一致（覆盖另存为对话框的等待时间）。
+ */
+export async function autoSaveOfficeFile(type) {
+  const b = state.bundles
+  const view = state.views[type]
+  if (!b?.[type] || !view || view.webContents.isDestroyed()) return { success: true, saved: false }
+  const wc = view.webContents
+  const waitClean = async (isDirty, timeoutMs = 120000) => {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      if (wc.isDestroyed()) return false
+      try {
+        if (!(await isDirty())) return true
+      } catch {
+        return false
+      }
+      await new Promise((r) => setTimeout(r, 400))
+    }
+    return false
+  }
+  try {
+    if (type === 'docs') {
+      if (!(await b.docs.docsQueryDirty(wc))) return { success: true, saved: false }
+      wc.send('menu:command', 'save')
+      return { success: await waitClean(() => b.docs.docsQueryDirty(wc)), saved: true }
+    }
+    if (type === 'sheets') {
+      if (b.sheets.sheetsPendingEditCount(wc.id) <= 0) return { success: true, saved: false }
+      wc.send('menu:action', 'save')
+      return {
+        success: await waitClean(() => Promise.resolve(b.sheets.sheetsPendingEditCount(wc.id) > 0)),
+        saved: true,
+      }
+    }
+    if (type === 'slides') {
+      if (!(await b.slides.slidesIsDirty(wc.id))) return { success: true, saved: false }
+      wc.send('slides:menu', 'save')
+      return { success: await waitClean(() => b.slides.slidesIsDirty(wc.id)), saved: true }
+    }
+    if (type === 'pdf') {
+      const ok = await b.pdf.flushPdfSave(wc)
+      return { success: ok !== false, saved: true }
+    }
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) }
+  }
+  return { success: false, error: 'unsupported editor type' }
+}
+
 /** 关闭前查询脏状态并弹出保存/放弃/取消确认；返回是否可以安全关闭 */
 export async function closeOfficeFile(type) {
   const bundles = state.bundles
@@ -429,6 +518,8 @@ export function getOfficeState() {
 }
 
 export function setOfficeContentBounds(rect) {
+  // HTML5 全屏放映期间忽略 renderer 推送的工作区边界，保持整屏视图
+  if (state.htmlFullScreen) return
   if (
     rect &&
     typeof rect.x === 'number' && Number.isFinite(rect.x) &&

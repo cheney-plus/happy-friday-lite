@@ -110,6 +110,7 @@ import {
   Layers,
   FolderKanban,
   FileText,
+  FileSpreadsheet,
   PencilRuler,
   CalendarDays,
   Workflow,
@@ -134,6 +135,7 @@ const isLinux = /Linux/.test(userAgent) && !/Android/.test(userAgent);
 const iconMap = {
   FolderKanban,
   FileText,
+  FileSpreadsheet,
   PencilRuler,
   CalendarDays,
   Workflow,
@@ -237,8 +239,21 @@ const requestFridayClose = async (id) => {
   return allowed;
 };
 
+const OFFICE_EDITOR_TYPES = ['docs', 'sheets', 'slides', 'pdf'];
+
+// Office 编辑器 Tab：关闭前自动保存并释放编辑器视图（脏文件不再弹确认框）
+const requestOfficeAutoSave = async (id) => {
+  const type = id.startsWith('office-') ? id.slice('office-'.length) : null;
+  if (!type || !OFFICE_EDITOR_TYPES.includes(type)) return;
+  try {
+    await electronService.invoke('office-auto-save', { type });
+    await electronService.invoke('office-close', { type });
+  } catch { /* ignore */ }
+};
+
 const closeTab = async (id) => {
   if (!(await requestFridayClose(id))) return;
+  await requestOfficeAutoSave(id);
   tabStore.removeTab(id);
   navigateToActiveTab();
 };
@@ -268,16 +283,21 @@ const hideContextMenu = () => {
   contextMenu.value.visible = false;
 };
 
-const closeOtherTabs = () => {
+const closeOtherTabs = async () => {
   if (!canCloseOthers.value) return;
-  tabStore.closeOtherTabs(contextMenu.value.tabId);
+  const keepId = contextMenu.value.tabId;
+  const closingIds = tabStore.openedTabs.filter(t => t.id !== keepId).map(t => t.id);
   hideContextMenu();
+  for (const id of closingIds) await requestOfficeAutoSave(id);
+  tabStore.closeOtherTabs(keepId);
   navigateToActiveTab();
 };
 
-const closeAllTabs = () => {
-  tabStore.closeAllTabs();
+const closeAllTabs = async () => {
+  const closingIds = tabStore.openedTabs.map(t => t.id);
   hideContextMenu();
+  for (const id of closingIds) await requestOfficeAutoSave(id);
+  tabStore.closeAllTabs();
   navigateToActiveTab();
 };
 

@@ -144,6 +144,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'harness-sync-config',
       'office-open-file',
       'office-close',
+      'office-auto-save',
       'office-new',
       'office-hide-all',
       'office-show',

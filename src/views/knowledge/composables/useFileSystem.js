@@ -146,12 +146,12 @@ export function useFileSystem() {
       await navigateTo(file.path);
       return;
     }
-    // Office 文件（DOCX/XLSX/CSV/PPTX/PDF）在可视化编辑器中打开
+    // Office 文件（DOCX/XLSX/CSV/PPTX/PDF）在可视化编辑器中打开（独立编辑器 Tab）
     if (OFFICE_TYPES.includes(file.type) && api) {
       try {
         const res = await api.invoke('office-open-file', { filePath: file.path });
         if (res && res.success) {
-          router.push('/office');
+          router.push(`/office/${res.type}`);
           return;
         }
       } catch (e) {

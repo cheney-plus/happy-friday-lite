@@ -239355,7 +239355,8 @@ function createSlidesView(openPath) {
       preload: runtime.preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      backgroundThrottling: false
     }
   });
   registerSlidesIpc();

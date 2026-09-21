@@ -1,80 +1,100 @@
 <template>
   <div ref="rootRef" class="office-workspace">
-    <!-- 首页模式：Office 入口（复刻上游 happyoffice 首页布局） -->
-    <div v-if="mode === 'home'" class="office-home-wrap">
-      <div v-if="!available" class="office-unavailable">
-        <p>{{ t('office.unavailable') }}</p>
-        <code>npm run office:build</code>
-      </div>
+    <div v-if="!available" class="office-unavailable">
+      <p>{{ t('office.unavailable') }}</p>
+      <code>npm run office:build</code>
+    </div>
+
+    <!-- 首页 Tab（/office）：Office 入口（复刻上游 happyoffice 首页布局） -->
+    <div v-else-if="isHomeRoute" class="office-home-wrap">
       <OfficeHome
-        v-else
         ref="homeRef"
-        @new-doc="newDoc"
-        @open-local="openLocal"
-        @open-recent="entry => openRecent(entry.path)"
+        @new-doc="handleNewDoc"
+        @open-local="handleOpenLocal"
+        @open-recent="handleOpenRecent"
       />
     </div>
 
-    <!-- 编辑器模式：精简工具栏 + 编辑器视图占位区 -->
-    <template v-else>
-      <header class="office-toolbar">
-        <button class="tb-btn" @click="goHome" :title="t('office.backHome')">
-          <House :size="16" />
-        </button>
-        <span class="divider" />
-        <span class="file-name" :title="currentFile || ''">
-          <Loader2 v-if="busy" :size="14" class="spin" />
-          <CircleDot v-else-if="dirty" :size="14" class="dirty-dot" />
-          {{ fileDisplay }}
-        </span>
-        <span class="flex-1" />
-        <button class="tb-btn danger" @click="closeActive" :title="t('office.closeFile')">
-          <X :size="16" /><span>{{ t('office.close') }}</span>
-        </button>
-      </header>
-      <div class="office-canvas" />
-    </template>
+    <!-- 编辑器 Tab（/office/:editor）：原生编辑器视图占位区（由主进程全区域摆放，关闭 Tab 时自动保存） -->
+    <div v-else class="office-canvas" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated, nextTick, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, onActivated, onDeactivated, nextTick, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useFridayStore } from '@/store';
+import { useRoute, useRouter } from 'vue-router';
+import { useFridayStore, useTabStore } from '@/store';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
-import {
-  House, X, CircleDot, Loader2
-} from 'lucide-vue-next';
 import OfficeHome from './home/OfficeHome.vue';
+
+const EDITOR_TYPES = ['docs', 'sheets', 'slides', 'pdf'];
 
 const api = window.electronAPI;
 const fridayStore = useFridayStore();
+const tabStore = useTabStore();
+const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
 
-// 与 .office-toolbar 的 CSS 高度保持一致：编辑器视图摆放在工具栏以下
-const TOOLBAR_HEIGHT = 44;
+// 实例角色由路由决定且在实例生命周期内恒定（不同路由是不同 keep-alive 实例）：
+// /office 为首页 Tab；/office/<type> 为对应编辑器独立 Tab
+const routeEditor = EDITOR_TYPES.includes(route.params.editor) ? route.params.editor : null;
+const isHomeRoute = !routeEditor;
+const editorTabId = routeEditor ? `office-${routeEditor}` : null;
 
 const rootRef = ref(null);
 const homeRef = ref(null);
 const available = ref(true);
+// 防止打开/新建动作重入（编辑器 Tab 无内置工具栏 UI）
 const busy = ref(false);
-const dirty = ref(false);
-const mode = ref('home');
 const currentFile = ref(null);
-const currentType = ref(null);
-// 用户主动回到首页时不自动恢复编辑器视图
-const manualHome = ref(false);
 
-const fileDisplay = computed(() => {
-  if (!currentFile.value) return currentType.value ? t(`office.${currentType.value}`) : '';
-  return currentFile.value.split('/').pop().split('\\').pop();
-});
+function baseName(p) {
+  return p.split('/').pop().split('\\').pop();
+}
 
 function refreshHome() {
   homeRef.value?.refresh();
 }
 
-/** 同步编辑器视图边界：内容区内、工具栏以下（TabBar/Sidebar 保持可交互） */
+function setTabTitle(title) {
+  if (editorTabId) tabStore.updateTabTitle(editorTabId, title || '');
+}
+
+// ---- 首页 Tab：跳转到独立编辑器 Tab ---------------------------------------
+
+function openEditorTab(type, filePath = null) {
+  if (!api || !EDITOR_TYPES.includes(type)) return;
+  tabStore.pendingOfficeAction = { type, filePath };
+  router.push(`/office/${type}`);
+}
+
+function handleNewDoc(type) {
+  openEditorTab(type);
+}
+
+function handleOpenRecent(entry) {
+  if (entry?.path) openEditorTab(entry.type, entry.path);
+}
+
+async function handleOpenLocal() {
+  if (!api) return;
+  try {
+    const res = await api.invoke('office-open-dialog');
+    if (res && res.success) {
+      openEditorTab(res.type, res.filePath);
+    } else {
+      refreshHome();
+    }
+  } catch {
+    refreshHome();
+  }
+}
+
+// ---- 编辑器 Tab：视图边界同步 ---------------------------------------------
+
+/** 同步编辑器视图边界：占满整个工作区（TabBar/Sidebar 保持可交互） */
 async function syncBounds() {
   if (!api) return;
   await nextTick();
@@ -84,122 +104,91 @@ async function syncBounds() {
   try {
     await api.invoke('office-set-content-bounds', {
       x: rect.left,
-      y: rect.top + TOOLBAR_HEIGHT,
+      y: rect.top,
       width: rect.width,
-      height: Math.max(0, rect.height - TOOLBAR_HEIGHT),
+      height: rect.height,
     });
   } catch { /* ignore */ }
 }
 
-async function syncFromState() {
-  if (!api) { available.value = false; return; }
+// rAF 节流的边界同步：resize 拖拽 / 最大化 / 侧栏收起等高频触发时每帧最多一次
+let syncScheduled = false;
+function scheduleSyncBounds() {
+  if (syncScheduled) return;
+  syncScheduled = true;
+  requestAnimationFrame(() => {
+    syncScheduled = false;
+    syncBounds();
+  });
+}
+
+// ---- 编辑器 Tab：打开/新建/恢复 -------------------------------------------
+
+async function fetchEditorState() {
   try {
     const list = await api.invoke('office-get-state');
-    const open = (list || []).find(s => s.open);
-    if (open) {
-      currentType.value = open.type;
-      currentFile.value = open.filePath;
-      dirty.value = await api.invoke('office-is-dirty', { type: open.type });
-    } else {
-      currentType.value = null;
-      currentFile.value = null;
-      dirty.value = false;
-    }
-  } catch (e) {
-    available.value = false;
+    return (list || []).find(s => s.type === routeEditor) || null;
+  } catch {
+    return null;
   }
 }
 
-async function newDoc(type) {
-  if (!api || busy.value) return;
-  busy.value = true;
-  try {
-    await syncBounds();
-    const res = await api.invoke('office-new', { type });
-    if (res && res.success) {
-      manualHome.value = false;
-      mode.value = 'editor';
-      currentType.value = type;
-      currentFile.value = null;
-      dirty.value = false;
-    }
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function openRecent(filePath) {
-  if (!api || busy.value) return;
+async function openFileInEditor(filePath) {
   busy.value = true;
   try {
     await syncBounds();
     const res = await api.invoke('office-open-file', { filePath });
     if (res && res.success) {
-      manualHome.value = false;
-      mode.value = 'editor';
-      currentType.value = res.type;
       currentFile.value = res.filePath;
-      dirty.value = false;
+      setTabTitle(baseName(res.filePath));
     }
   } finally {
     busy.value = false;
   }
 }
 
-async function openLocal() {
-  if (!api || busy.value) return;
+async function createBlankDoc() {
   busy.value = true;
   try {
     await syncBounds();
-    const res = await api.invoke('office-open-dialog');
+    const res = await api.invoke('office-new', { type: routeEditor });
     if (res && res.success) {
-      manualHome.value = false;
-      mode.value = 'editor';
-      currentType.value = res.type;
-      currentFile.value = res.filePath;
-      dirty.value = false;
-    } else {
-      refreshHome();
-    }
-  } finally {
-    busy.value = false;
-  }
-}
-
-function goHome() {
-  manualHome.value = true;
-  mode.value = 'home';
-  if (api) {
-    try { api.invoke('office-hide-all'); } catch { /* ignore */ }
-  }
-  refreshHome();
-}
-
-async function closeActive() {
-  if (!api || !currentType.value || busy.value) return;
-  busy.value = true;
-  try {
-    const proceed = await api.invoke('office-close', { type: currentType.value });
-    if (proceed) {
-      manualHome.value = false;
-      mode.value = 'home';
-      currentType.value = null;
       currentFile.value = null;
-      dirty.value = false;
-      refreshHome();
+      setTabTitle('');
     }
   } finally {
     busy.value = false;
   }
 }
 
-let unwatchSaved = null;
-let unwatchClosed = null;
-let onResize = null;
-let unwatchModel = null;
-let resizeObserver = null;
-let syncScheduled = false;
-let unwatchLayoutSync = null;
+/** 恢复显示该类型的编辑器视图（Tab 切回时视图仍在） */
+async function showOpenEditor() {
+  const st = await fetchEditorState();
+  if (!st || !st.open) return false;
+  currentFile.value = st.filePath;
+  await syncBounds();
+  try { await api.invoke('office-show', { type: routeEditor }); } catch { /* ignore */ }
+  return true;
+}
+
+/** 编辑器 Tab 激活入口：消费首页待办动作，或恢复显示/新建空白 */
+async function activateEditor() {
+  if (!api || busy.value) return;
+  const pending = tabStore.pendingOfficeAction;
+  if (pending && pending.type === routeEditor) {
+    tabStore.pendingOfficeAction = null;
+    if (pending.filePath) {
+      await openFileInEditor(pending.filePath);
+    } else {
+      await createBlankDoc();
+    }
+    return;
+  }
+  const shown = await showOpenEditor();
+  if (!shown) await createBlankDoc();
+}
+
+// ---- AI 模型与生命周期 -----------------------------------------------------
 
 // 编辑器 AI 由 Friday 接管：把主窗口配置的模型推送给主进程桥接层
 function pushAiModel() {
@@ -209,15 +198,13 @@ function pushAiModel() {
   }
 }
 
-// rAF 节流的边界同步：resize 拖拽 / 最大化 / 侧栏收起等高频触发时每帧最多一次
-function scheduleSyncBounds() {
-  if (syncScheduled) return;
-  syncScheduled = true;
-  requestAnimationFrame(() => {
-    syncScheduled = false;
-    syncBounds();
-  });
-}
+let initialActivated = false;
+let unwatchSaved = null;
+let unwatchClosed = null;
+let unwatchModel = null;
+let onResize = null;
+let resizeObserver = null;
+let unwatchLayoutSync = null;
 
 onMounted(() => {
   if (!api) { available.value = false; return; }
@@ -232,33 +219,33 @@ onMounted(() => {
   unwatchModel = watch(() => fridayStore.modelId, pushAiModel);
   unwatchLayoutSync = api.on?.('office-layout-sync', () => { syncBounds(); });
   if (api.on) {
-    unwatchSaved = api.on('office-file-saved', ({ filePath }) => {
+    unwatchSaved = api.on('office-file-saved', ({ type, filePath }) => {
+      if (type !== routeEditor || !filePath) return;
       currentFile.value = filePath;
-      dirty.value = false;
+      setTabTitle(baseName(filePath));
     });
-    unwatchClosed = api.on('office-view-closed', () => {
-      currentType.value = null;
+    unwatchClosed = api.on('office-view-closed', ({ type }) => {
+      if (type !== routeEditor) return;
+      // 视图被主进程关闭（如切换文件的中途状态）；随后由 opened/激活流程刷新
       currentFile.value = null;
-      dirty.value = false;
-      mode.value = 'home';
-      refreshHome();
+      setTabTitle('');
     });
+  }
+  if (routeEditor) {
+    // 首次进入编辑器 Tab：消费待办动作或恢复/新建
+    activateEditor().finally(() => { initialActivated = true; });
   }
 });
 
-onActivated(async () => {
+onActivated(() => {
   if (!api) return;
   pushAiModel();
-  await syncFromState();
-  if (currentType.value && !manualHome.value) {
-    // 路由回到 Office：恢复编辑器视图（先同步边界再显示）
-    mode.value = 'editor';
-    await syncBounds();
-    try { await api.invoke('office-show', { type: currentType.value }); } catch { /* ignore */ }
-  } else {
-    mode.value = 'home';
+  if (isHomeRoute) {
+    refreshHome();
+    return;
   }
-  refreshHome();
+  // 首次挂载由 onMounted 处理，避免重复触发打开/新建
+  if (initialActivated) activateEditor();
 });
 
 onDeactivated(() => {
@@ -299,66 +286,12 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
-.office-home-wrap > :deep(.office-home),
-.office-home-wrap > .office-unavailable {
+.office-home-wrap > :deep(.office-home) {
   flex: 1;
   min-height: 0;
 }
 
-.divider {
-  width: 1px;
-  height: 18px;
-  background: var(--border-color, #e5e7eb);
-  margin: 0 4px;
-}
-
 // ---- 编辑器模式 ----
-
-.office-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 44px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
-  background: var(--bg-secondary, #f9fafb);
-  flex-shrink: 0;
-}
-
-.tb-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-primary, #374151);
-  cursor: pointer;
-  font-size: 12px;
-
-  &:hover { background: var(--bg-tertiary, #eceff3); }
-  &.danger:hover { background: #fee2e2; color: #dc2626; }
-}
-
-.flex-1 { flex: 1; }
-
-.file-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 40vw;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-secondary, #6b7280);
-}
-
-.dirty-dot { color: #f59e0b; }
-
-.spin { animation: office-spin 1s linear infinite; }
-@keyframes office-spin { to { transform: rotate(360deg); } }
 
 .office-canvas {
   flex: 1;

@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import {
   openOfficeFile,
   closeOfficeFile,
+  autoSaveOfficeFile,
   newOfficeDocument,
   hideAllOfficeViews,
   showOfficeView,
@@ -35,6 +36,14 @@ export function registerOfficeIpc() {
   })
 
   ipcMain.handle('office-close', (_e, { type }) => closeOfficeFile(type))
+
+  // 关闭编辑器 Tab 前自动保存：触发编辑器保存并等待落盘（不再弹确认框）
+  ipcMain.handle('office-auto-save', (_e, { type }) => {
+    if (!['docs', 'sheets', 'slides', 'pdf'].includes(type)) {
+      return { success: false, error: 'unsupported editor type' }
+    }
+    return autoSaveOfficeFile(type)
+  })
 
   ipcMain.handle('office-new', (_e, { type }) => {
     if (!['docs', 'sheets', 'slides', 'pdf'].includes(type)) {

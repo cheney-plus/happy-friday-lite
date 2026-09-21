@@ -34,8 +34,11 @@ if (process.platform === 'darwin') {
 
 if (isDev) {
   app.commandLine.appendSwitch('disable-gpu-sandbox')
-  app.commandLine.appendSwitch('no-sandbox')
-  app.commandLine.appendSwitch('disable-setuid-sandbox')
+  // 注意：不能追加 no-sandbox / disable-setuid-sandbox。
+  // office 编辑器视图（resources/office/*/main）以 webPreferences.sandbox:true 创建，
+  // 全局禁用沙箱会导致沙箱化 zygote 未建立，此类 renderer 启动时在
+  // platform_shared_memory_region_posix.cc 处 FATAL（/dev/shm 共享内存分配失败，ESRCH）。
+  // Linux 上 Chromium 会自动改用 userns 沙箱，无需禁用沙箱即可正常启动。
   app.setPath('userData', path.join(__dirname, 'app-data', 'electron-user-data'))
 }
 
