@@ -232,23 +232,40 @@ function layout() {
   }
 }
 
-/** 进入编辑器 HTML5 全屏：应用窗口切换为系统全屏（整屏放映） */
+/** 进入编辑器全屏放映：应用窗口切换为系统全屏（整屏放映，视图盖住 TabBar/侧栏）。
+ *  macOS 用 setSimpleFullScreen（与上游 slides 一致，瞬时全屏，无 Space 动画）；
+ *  Windows/Linux 走常规 setFullScreen。 */
 function enterHtmlFullScreen() {
   if (!state.mainWindow || state.mainWindow.isDestroyed()) return
-  state.wasWindowFullScreen = state.mainWindow.isFullScreen()
+  state.wasWindowFullScreen =
+    state.mainWindow.isFullScreen() || (state.mainWindow.isSimpleFullScreen?.() ?? false)
   state.htmlFullScreen = true
   try {
-    if (!state.wasWindowFullScreen) state.mainWindow.setFullScreen(true)
+    if (!state.wasWindowFullScreen) {
+      if (process.platform === 'darwin' && !state.mainWindow.isFullScreen()) {
+        state.mainWindow.setFullScreenable(false)
+        state.mainWindow.setSimpleFullScreen(true)
+      } else {
+        state.mainWindow.setFullScreen(true)
+      }
+    }
   } catch { /* ignore */ }
   layout()
 }
 
-/** 退出编辑器 HTML5 全屏：恢复窗口状态与视图边界 */
+/** 退出编辑器全屏放映：恢复窗口状态与视图边界 */
 function leaveHtmlFullScreen() {
   if (!state.mainWindow || state.mainWindow.isDestroyed()) return
   state.htmlFullScreen = false
   try {
-    if (!state.wasWindowFullScreen) state.mainWindow.setFullScreen(false)
+    if (!state.wasWindowFullScreen) {
+      if (process.platform === 'darwin') {
+        if (state.mainWindow.isSimpleFullScreen?.()) state.mainWindow.setSimpleFullScreen(false)
+        state.mainWindow.setFullScreenable(true)
+      } else {
+        state.mainWindow.setFullScreen(false)
+      }
+    }
   } catch { /* ignore */ }
   layout()
 }
@@ -319,13 +336,16 @@ export async function initOfficeHost(mainWindow) {
   configureRuntimes()
   registerEditorIpc()
   wireShellHooks()
+  wireSlidesShowFullscreen()
 
   // 窗口尺寸变化时让 renderer 重推最新边界（不套用陈旧 contentBounds，避免抖动）；
-  // 覆盖 resize / 最大化 / 还原 / 全屏切换
+  // 覆盖 resize / 最大化 / 还原 / 全屏切换。放映全屏期间 renderer 推送被忽略，
+  // 但视图需要跟随新窗口尺寸重排（整屏布局），因此直接调 layout()。
   const requestSync = () => {
     try {
       if (!state.mainWindow.isDestroyed()) {
-        state.mainWindow.webContents.send('office-layout-sync')
+        if (state.htmlFullScreen) layout()
+        else state.mainWindow.webContents.send('office-layout-sync')
       }
     } catch { /* ignore */ }
   }
@@ -336,6 +356,39 @@ export async function initOfficeHost(mainWindow) {
   state.initialized = true
   console.log('[Office] Office Host initialized with editors:', Object.keys(state.bundles).join(', '))
   return true
+}
+
+/**
+ * Slides 放映全屏接管。
+ * 上游 macOS 放映不走 HTML5 Fullscreen API（渲染层 if (!IS_MAC) 跳过 requestFullscreen，
+ * enter-html-full-screen 永远不触发），而是经 slides:show-fullscreen IPC 由主进程对
+ * 宿主窗口做 simpleFullScreen 快照。嵌入模式下该处理器内 BrowserWindow.fromWebContents
+ * （WebContentsView 的 wc 无属主窗口）与 windowRefs.shellWindow 均为空，上游逻辑直接
+ * return，导致窗口不进入全屏。这里在其注册之后重新注册（tolerateDuplicateIpcHandlers
+ * 的"后注册者替换"）为驱动 office-host 整屏布局的包装器；上游处理器在嵌入下为空操作，
+ * 不再调用。
+ */
+function wireSlidesShowFullscreen() {
+  const channel = 'slides:show-fullscreen'
+  if (state.slidesShowWrapped) return
+  if (!state.bundles?.slides || !ipcMain._invokeHandlers?.get(channel)) {
+    console.warn('[Office] slides:show-fullscreen 未注册，放映全屏不可用')
+    return
+  }
+  ipcMain.handle(channel, (e, on) => {
+    if (on) {
+      // simpleFullScreen 可能把 first responder 留在主窗口 renderer，主动聚焦放映视图
+      // （与上游一致：响应者变更异步落地，下一 tick 再聚焦一次）
+      try {
+        e.sender.focus()
+        setTimeout(() => { if (!e.sender.isDestroyed()) e.sender.focus() }, 50)
+      } catch { /* ignore */ }
+      enterHtmlFullScreen()
+    } else {
+      leaveHtmlFullScreen()
+    }
+  })
+  state.slidesShowWrapped = true
 }
 
 /** 在对应可视化编辑器中打开文件；重复打开同一文件时仅激活已有视图 */
