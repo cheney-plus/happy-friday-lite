@@ -49,6 +49,11 @@ const available = ref(true);
 // 防止打开/新建动作重入（编辑器 Tab 无内置工具栏 UI）
 const busy = ref(false);
 const currentFile = ref(null);
+// 本实例对应的路由路径（实例生命周期内恒定）。keep-alive 失活实例的 DOM 会被移入
+// 分离容器（尺寸变为 0），其 ResizeObserver/resize/layout-sync 触发的边界推送会以
+// 0×0 覆盖主进程布局、把正在显示的编辑器视图打没（表现为 Tab 切换后页面空白），
+// 因此只有当前路由匹配的活跃实例才允许推送边界。
+const ownPath = route.path;
 
 function baseName(p) {
   return p.split('/').pop().split('\\').pop();
@@ -97,10 +102,14 @@ async function handleOpenLocal() {
 /** 同步编辑器视图边界：占满整个工作区（TabBar/Sidebar 保持可交互） */
 async function syncBounds() {
   if (!api) return;
+  // 失活实例不推送（其 DOM 已移入 keep-alive 分离容器，测得 0×0）
+  if (route.path !== ownPath) return;
   await nextTick();
   const el = rootRef.value;
   if (!el) return;
   const rect = el.getBoundingClientRect();
+  // 零尺寸（尚未布局/被隐藏）不推送，避免覆盖主进程的有效边界
+  if (rect.width <= 0 || rect.height <= 0) return;
   try {
     await api.invoke('office-set-content-bounds', {
       x: rect.left,
@@ -248,16 +257,24 @@ onActivated(() => {
   if (initialActivated) activateEditor();
 });
 
+/** 切换目标是否为另一个编辑器 Tab（/office/<type>，由其 office-show 自行管理视图可见性） */
+function targetIsEditorTab() {
+  return EDITOR_TYPES.includes(route.path.split('/')[2]);
+}
+
 onDeactivated(() => {
-  // 切换到其他 Tab：隐藏编辑器视图（不销毁），让出 TabBar/Sidebar 交互
-  if (api) {
+  // 切换到其他 Tab：隐藏编辑器视图（不销毁），让出 TabBar/Sidebar 交互。
+  // 注意：keep-alive 切换时旧实例 deactivated 晚于新实例 activated，
+  // 若目标是另一个编辑器 Tab，新实例刚通过 office-show 显示了视图，
+  // 此处不能再 hide-all，否则会把新 Tab 的视图藏掉导致页面空白。
+  if (api && !targetIsEditorTab()) {
     try { api.invoke('office-hide-all'); } catch { /* ignore */ }
   }
 });
 
 onBeforeUnmount(() => {
-  // 被 keep-alive 逐出时兜底隐藏
-  if (api) {
+  // 被 keep-alive 逐出时兜底隐藏（同样避免干扰仍活跃的编辑器 Tab）
+  if (api && !targetIsEditorTab()) {
     try { api.invoke('office-hide-all'); } catch { /* ignore */ }
   }
   if (onResize) window.removeEventListener('resize', onResize);

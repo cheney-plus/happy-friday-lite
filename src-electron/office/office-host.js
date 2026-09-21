@@ -520,12 +520,14 @@ export function getOfficeState() {
 export function setOfficeContentBounds(rect) {
   // HTML5 全屏放映期间忽略 renderer 推送的工作区边界，保持整屏视图
   if (state.htmlFullScreen) return
+  // 零面积矩形是 keep-alive 失活实例对分离 DOM 的错误测量，拒绝之，
+  // 避免把正在显示的编辑器视图布局打成 0 尺寸（Tab 切换后页面空白）
   if (
     rect &&
     typeof rect.x === 'number' && Number.isFinite(rect.x) &&
     typeof rect.y === 'number' && Number.isFinite(rect.y) &&
-    typeof rect.width === 'number' && Number.isFinite(rect.width) && rect.width >= 0 &&
-    typeof rect.height === 'number' && Number.isFinite(rect.height) && rect.height >= 0
+    typeof rect.width === 'number' && Number.isFinite(rect.width) && rect.width > 0 &&
+    typeof rect.height === 'number' && Number.isFinite(rect.height) && rect.height > 0
   ) {
     state.contentBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
     layout()
