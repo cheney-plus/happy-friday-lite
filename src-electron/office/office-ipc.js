@@ -28,28 +28,28 @@ export function registerOfficeIpc() {
     return
   }
 
-  ipcMain.handle('office-open-file', (_e, { filePath }) => {
+  ipcMain.handle('office-open-file', (_e, { filePath, viewId } = {}) => {
     if (typeof filePath !== 'string' || !resolveEditorType(filePath)) {
       return { success: false, error: 'unsupported file type' }
     }
-    return openOfficeFile(filePath)
+    return openOfficeFile(filePath, { viewId })
   })
 
-  ipcMain.handle('office-close', (_e, { type }) => closeOfficeFile(type))
+  ipcMain.handle('office-close', (_e, { viewId } = {}) => closeOfficeFile(viewId))
 
   // 关闭编辑器 Tab 前自动保存：触发编辑器保存并等待落盘（不再弹确认框）
-  ipcMain.handle('office-auto-save', (_e, { type }) => {
-    if (!['docs', 'sheets', 'slides', 'pdf'].includes(type)) {
+  ipcMain.handle('office-auto-save', (_e, { viewId } = {}) => {
+    if (typeof viewId !== 'string') {
       return { success: false, error: 'unsupported editor type' }
     }
-    return autoSaveOfficeFile(type)
+    return autoSaveOfficeFile(viewId)
   })
 
-  ipcMain.handle('office-new', (_e, { type }) => {
+  ipcMain.handle('office-new', (_e, { type, viewId } = {}) => {
     if (!['docs', 'sheets', 'slides', 'pdf'].includes(type)) {
       return { success: false, error: 'unsupported editor type' }
     }
-    return newOfficeDocument(type)
+    return newOfficeDocument(type, viewId)
   })
 
   ipcMain.handle('office-hide-all', () => {
@@ -57,7 +57,7 @@ export function registerOfficeIpc() {
     return { success: true }
   })
 
-  ipcMain.handle('office-show', (_e, { type }) => showOfficeView(type))
+  ipcMain.handle('office-show', (_e, { viewId } = {}) => showOfficeView(viewId))
 
   ipcMain.handle('office-get-state', () => getOfficeState())
 
@@ -76,5 +76,5 @@ export function registerOfficeIpc() {
 
   ipcMain.handle('office-open-dialog', () => openOfficeFileDialog())
 
-  ipcMain.handle('office-is-dirty', (_e, { type }) => queryOfficeDirty(type))
+  ipcMain.handle('office-is-dirty', (_e, { viewId } = {}) => queryOfficeDirty(viewId))
 }

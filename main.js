@@ -162,7 +162,7 @@ app.whenReady().then(async () => {
           console.log('[Office][smoke] open result:', JSON.stringify(r))
           if (r && r.success) {
             return new Promise(res => setTimeout(res, 6000))
-              .then(() => probeOfficeView(r.type))
+              .then(() => probeOfficeView(r.viewId))
               .then(p => console.log('[Office][smoke] probe:', JSON.stringify(p)))
           }
           return undefined

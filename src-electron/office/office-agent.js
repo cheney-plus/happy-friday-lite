@@ -151,8 +151,9 @@ registerTool({
     } catch (e) {
       return `错误：${e.message}`
     }
-    return openOfficeFile(args.filePath).then((r) =>
-      JSON.stringify({ success: !!r?.success, type: r?.type || null, error: r?.error || null })
+    // notifyOpened：前端监听 office-opened 后创建/跳转对应编辑器 Tab
+    return openOfficeFile(args.filePath, { notifyOpened: true }).then((r) =>
+      JSON.stringify({ success: !!r?.success, type: r?.type || null, viewId: r?.viewId || null, error: r?.error || null })
     )
   },
   meta: { requireApproval: false },

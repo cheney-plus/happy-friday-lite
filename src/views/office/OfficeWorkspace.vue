@@ -15,7 +15,7 @@
       />
     </div>
 
-    <!-- 编辑器 Tab（/office/:editor）：原生编辑器视图占位区（由主进程全区域摆放，关闭 Tab 时自动保存） -->
+    <!-- 编辑器 Tab（/office/:editor/:instId）：原生编辑器视图占位区（由主进程全区域摆放，关闭 Tab 时自动保存） -->
     <div v-else class="office-canvas" />
   </div>
 </template>
@@ -38,10 +38,12 @@ const router = useRouter();
 const { t } = useI18n();
 
 // 实例角色由路由决定且在实例生命周期内恒定（不同路由是不同 keep-alive 实例）：
-// /office 为首页 Tab；/office/<type> 为对应编辑器独立 Tab
+// /office 为首页 Tab；/office/<type>/<instId> 为对应编辑器视图的独立 Tab，
+// instId 与主进程 office-host 的 viewId（<type>-<instId>）一一对应
 const routeEditor = EDITOR_TYPES.includes(route.params.editor) ? route.params.editor : null;
 const isHomeRoute = !routeEditor;
-const editorTabId = routeEditor ? `office-${routeEditor}` : null;
+const viewId = routeEditor ? `${routeEditor}-${route.params.instId}` : null;
+const editorTabId = viewId ? `office-${viewId}` : null;
 
 const rootRef = ref(null);
 const homeRef = ref(null);
@@ -59,6 +61,11 @@ function baseName(p) {
   return p.split('/').pop().split('\\').pop();
 }
 
+/** viewId（docs-3）→ 编辑器路由（/office/docs/3） */
+function officeEditorPath(vid) {
+  return `/office/${String(vid).replace('-', '/')}`;
+}
+
 function refreshHome() {
   homeRef.value?.refresh();
 }
@@ -67,12 +74,29 @@ function setTabTitle(title) {
   if (editorTabId) tabStore.updateTabTitle(editorTabId, title || '');
 }
 
-// ---- 首页 Tab：跳转到独立编辑器 Tab ---------------------------------------
+function setTabFile(filePath) {
+  if (editorTabId) tabStore.updateTabFilePath(editorTabId, filePath);
+}
 
-function openEditorTab(type, filePath = null) {
-  if (!api || !EDITOR_TYPES.includes(type)) return;
-  tabStore.pendingOfficeAction = { type, filePath };
-  router.push(`/office/${type}`);
+// ---- 首页 Tab：打开/新建（先建视图拿到 viewId，再跳转对应编辑器 Tab） -------
+
+async function openEditorTab(type, filePath = null) {
+  if (!api || busy.value || !EDITOR_TYPES.includes(type)) return;
+  busy.value = true;
+  try {
+    const res = filePath
+      ? await api.invoke('office-open-file', { filePath })
+      : await api.invoke('office-new', { type });
+    if (res && res.success && res.viewId) {
+      await router.push(officeEditorPath(res.viewId));
+    } else {
+      refreshHome();
+    }
+  } catch {
+    refreshHome();
+  } finally {
+    busy.value = false;
+  }
 }
 
 function handleNewDoc(type) {
@@ -86,9 +110,10 @@ function handleOpenRecent(entry) {
 async function handleOpenLocal() {
   if (!api) return;
   try {
+    // 对话框选择后在主进程直接建视图，结果携带 viewId
     const res = await api.invoke('office-open-dialog');
-    if (res && res.success) {
-      openEditorTab(res.type, res.filePath);
+    if (res && res.success && res.viewId) {
+      await router.push(officeEditorPath(res.viewId));
     } else {
       refreshHome();
     }
@@ -136,7 +161,7 @@ function scheduleSyncBounds() {
 async function fetchEditorState() {
   try {
     const list = await api.invoke('office-get-state');
-    return (list || []).find(s => s.type === routeEditor) || null;
+    return (list || []).find(s => s.viewId === viewId) || null;
   } catch {
     return null;
   }
@@ -146,10 +171,16 @@ async function openFileInEditor(filePath) {
   busy.value = true;
   try {
     await syncBounds();
-    const res = await api.invoke('office-open-file', { filePath });
+    const res = await api.invoke('office-open-file', { filePath, viewId });
     if (res && res.success) {
+      if (res.viewId && res.viewId !== viewId) {
+        // 主进程去重后复用了已有视图：跳转到其实际所属 Tab
+        await router.replace(officeEditorPath(res.viewId));
+        return;
+      }
       currentFile.value = res.filePath;
       setTabTitle(baseName(res.filePath));
+      setTabFile(res.filePath);
     }
   } finally {
     busy.value = false;
@@ -160,8 +191,12 @@ async function createBlankDoc() {
   busy.value = true;
   try {
     await syncBounds();
-    const res = await api.invoke('office-new', { type: routeEditor });
+    const res = await api.invoke('office-new', { type: routeEditor, viewId });
     if (res && res.success) {
+      if (res.viewId && res.viewId !== viewId) {
+        await router.replace(officeEditorPath(res.viewId));
+        return;
+      }
       currentFile.value = null;
       setTabTitle('');
     }
@@ -170,31 +205,26 @@ async function createBlankDoc() {
   }
 }
 
-/** 恢复显示该类型的编辑器视图（Tab 切回时视图仍在） */
+/** 恢复显示本 Tab 对应的编辑器视图（Tab 切回时视图仍在） */
 async function showOpenEditor() {
   const st = await fetchEditorState();
   if (!st || !st.open) return false;
   currentFile.value = st.filePath;
   await syncBounds();
-  try { await api.invoke('office-show', { type: routeEditor }); } catch { /* ignore */ }
+  try { await api.invoke('office-show', { viewId }); } catch { /* ignore */ }
   return true;
 }
 
-/** 编辑器 Tab 激活入口：消费首页待办动作，或恢复显示/新建空白 */
+/** 编辑器 Tab 激活入口：恢复显示视图；视图丢失（重启/崩溃）则按原文件重开或新建空白 */
 async function activateEditor() {
   if (!api || busy.value) return;
-  const pending = tabStore.pendingOfficeAction;
-  if (pending && pending.type === routeEditor) {
-    tabStore.pendingOfficeAction = null;
-    if (pending.filePath) {
-      await openFileInEditor(pending.filePath);
-    } else {
-      await createBlankDoc();
-    }
+  if (await showOpenEditor()) return;
+  const tab = tabStore.openedTabs.find(tb => tb.id === editorTabId);
+  if (tab?.officeFilePath) {
+    await openFileInEditor(tab.officeFilePath);
     return;
   }
-  const shown = await showOpenEditor();
-  if (!shown) await createBlankDoc();
+  await createBlankDoc();
 }
 
 // ---- AI 模型与生命周期 -----------------------------------------------------
@@ -228,20 +258,21 @@ onMounted(() => {
   unwatchModel = watch(() => fridayStore.modelId, pushAiModel);
   unwatchLayoutSync = api.on?.('office-layout-sync', () => { syncBounds(); });
   if (api.on) {
-    unwatchSaved = api.on('office-file-saved', ({ type, filePath }) => {
-      if (type !== routeEditor || !filePath) return;
+    unwatchSaved = api.on('office-file-saved', ({ viewId: savedViewId, filePath }) => {
+      if (!viewId || savedViewId !== viewId || !filePath) return;
       currentFile.value = filePath;
       setTabTitle(baseName(filePath));
+      setTabFile(filePath);
     });
-    unwatchClosed = api.on('office-view-closed', ({ type }) => {
-      if (type !== routeEditor) return;
-      // 视图被主进程关闭（如切换文件的中途状态）；随后由 opened/激活流程刷新
+    unwatchClosed = api.on('office-view-closed', ({ viewId: closedViewId }) => {
+      if (!viewId || closedViewId !== viewId) return;
+      // 视图被主进程关闭（崩溃等）；Tab 激活时会按原文件恢复或新建空白
       currentFile.value = null;
       setTabTitle('');
     });
   }
   if (routeEditor) {
-    // 首次进入编辑器 Tab：消费待办动作或恢复/新建
+    // 首次进入编辑器 Tab：恢复显示/按原文件重开/新建空白
     activateEditor().finally(() => { initialActivated = true; });
   }
 });
@@ -257,7 +288,7 @@ onActivated(() => {
   if (initialActivated) activateEditor();
 });
 
-/** 切换目标是否为另一个编辑器 Tab（/office/<type>，由其 office-show 自行管理视图可见性） */
+/** 切换目标是否为另一个编辑器 Tab（/office/<type>/<instId>，由其 office-show 自行管理视图可见性） */
 function targetIsEditorTab() {
   return EDITOR_TYPES.includes(route.path.split('/')[2]);
 }

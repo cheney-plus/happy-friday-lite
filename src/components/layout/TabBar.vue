@@ -239,15 +239,17 @@ const requestFridayClose = async (id) => {
   return allowed;
 };
 
-const OFFICE_EDITOR_TYPES = ['docs', 'sheets', 'slides', 'pdf'];
+// Office 编辑器 Tab（id: office-<type>-<instId>）：关闭前自动保存并释放对应编辑器视图
+// （脏文件不再弹确认框）
+const OFFICE_TAB_RE = /^office-(docs|sheets|slides|pdf)-(\d+)$/;
 
-// Office 编辑器 Tab：关闭前自动保存并释放编辑器视图（脏文件不再弹确认框）
 const requestOfficeAutoSave = async (id) => {
-  const type = id.startsWith('office-') ? id.slice('office-'.length) : null;
-  if (!type || !OFFICE_EDITOR_TYPES.includes(type)) return;
+  const match = id.match(OFFICE_TAB_RE);
+  if (!match) return;
+  const viewId = `${match[1]}-${match[2]}`;
   try {
-    await electronService.invoke('office-auto-save', { type });
-    await electronService.invoke('office-close', { type });
+    await electronService.invoke('office-auto-save', { viewId });
+    await electronService.invoke('office-close', { viewId });
   } catch { /* ignore */ }
 };
 
