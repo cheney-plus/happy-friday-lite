@@ -1,6 +1,8 @@
 import http from 'http'
 import https from 'https'
-import { ipcMain } from 'electron'
+import fs from 'fs'
+import path from 'path'
+import { app, ipcMain, webContents } from 'electron'
 import { buildChatCompletionsUrl } from '../openaiUrl.js'
 
 /**
@@ -296,5 +298,76 @@ export function registerOfficeAiBridge() {
   }
   handle('ai:analyze-media', () => ({ error: MEDIA_UNSUPPORTED }))
 
+  // —— AI 面板偏好（左侧/右侧等）：上游由 shell 主进程注册，这里由 Friday 接管 ——
+  registerAiPanelPrefsIpc()
+
   console.log('[Office] AI bridge registered: Friday takes over ai:* channels')
+}
+
+// ---- AI 面板偏好（镜像 vendor packages/ui ai-panel-prefs 归一化规则） ----
+
+const AI_PANEL_PREFS_FILE = () => path.join(app.getPath('userData'), 'office-ai-panel-prefs.json')
+
+let cachedAiPanelPrefs = null
+
+function normalizeAiPanelPrefs(raw) {
+  const obj = raw !== null && typeof raw === 'object' ? raw : {}
+  const clampPx = (v) => {
+    const n = typeof v === 'string' ? Number(v) : v
+    if (typeof n !== 'number' || !Number.isFinite(n)) return null
+    return Math.min(32, Math.max(10, Math.round(n)))
+  }
+  return {
+    side: obj.side === 'right' ? 'right' : 'left',
+    fontSize: ['default', 'large', 'xlarge', 'custom'].includes(obj.fontSize)
+      ? obj.fontSize
+      : 'default',
+    customFontSize: clampPx(obj.customFontSize) ?? 14,
+    spellcheck: typeof obj.spellcheck === 'boolean' ? obj.spellcheck : true,
+  }
+}
+
+function currentAiPanelPrefs() {
+  if (cachedAiPanelPrefs) return cachedAiPanelPrefs
+  try {
+    cachedAiPanelPrefs = normalizeAiPanelPrefs(JSON.parse(fs.readFileSync(AI_PANEL_PREFS_FILE(), 'utf8')))
+  } catch {
+    cachedAiPanelPrefs = normalizeAiPanelPrefs({})
+  }
+  return cachedAiPanelPrefs
+}
+
+function registerAiPanelPrefsIpc() {
+  handle('app:get-ai-panel-prefs', () => currentAiPanelPrefs())
+
+  handle('app:set-ai-panel-prefs', (_e, patch) => {
+    const prev = currentAiPanelPrefs()
+    const raw = patch !== null && typeof patch === 'object' ? patch : {}
+    // 未知/非法字段回退为当前值而非默认值（与上游 shell 一致）
+    const next = normalizeAiPanelPrefs({
+      side: raw.side === 'left' || raw.side === 'right' ? raw.side : prev.side,
+      fontSize: 'fontSize' in raw ? raw.fontSize : prev.fontSize,
+      customFontSize: 'customFontSize' in raw ? raw.customFontSize : prev.customFontSize,
+      spellcheck: 'spellcheck' in raw ? raw.spellcheck : prev.spellcheck,
+    })
+    if (
+      next.side === prev.side &&
+      next.fontSize === prev.fontSize &&
+      next.customFontSize === prev.customFontSize &&
+      next.spellcheck === prev.spellcheck
+    ) {
+      return prev
+    }
+    cachedAiPanelPrefs = next
+    try {
+      fs.writeFileSync(AI_PANEL_PREFS_FILE(), JSON.stringify(next, null, 2))
+    } catch (e) {
+      console.warn('[Office] save ai panel prefs failed:', e.message)
+    }
+    // 同步所有打开的编辑器视图
+    for (const wc of webContents.getAllWebContents()) {
+      try { wc.send('app:ai-panel-prefs-changed', next) } catch { /* ignore */ }
+    }
+    return next
+  })
 }
