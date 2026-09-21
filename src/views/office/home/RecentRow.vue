@@ -113,11 +113,19 @@ async function copyPath() {
   align-items: center;
 }
 
+/* 与 QuickCards.vue 的 .file-badge 基础样式保持一致（scoped 隔离，需各自声明） */
 .file-badge.small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 24px;
   height: 24px;
   border-radius: 6px;
+  color: #fff;
   font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 .recent-name {
