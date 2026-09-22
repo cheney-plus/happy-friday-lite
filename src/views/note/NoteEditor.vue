@@ -558,6 +558,11 @@
               </div>
               <span class="sidebar-empty-text">{{ t('note.aiSidebar.askFriday') }}</span>
               <span class="sidebar-empty-hint">{{ t('note.aiSidebar.emptyHint') }}</span>
+              <div class="sidebar-quick-prompts">
+                <button class="quick-prompt-btn" @click="fillQuickPrompt(t('note.aiSidebar.quickPromptSummarize'))">{{ t('note.aiSidebar.quickPromptSummarize') }}</button>
+                <button class="quick-prompt-btn" @click="fillQuickPrompt(t('note.aiSidebar.quickPromptTranslate'))">{{ t('note.aiSidebar.quickPromptTranslate') }}</button>
+                <button class="quick-prompt-btn" @click="fillQuickPrompt(t('note.aiSidebar.quickPromptPolish'))">{{ t('note.aiSidebar.quickPromptPolish') }}</button>
+              </div>
             </div>
 
             <template v-for="(msg, index) in chatMessages" :key="index">
@@ -1774,6 +1779,12 @@ const streamingReasoning = ref('');
 const chatMessages = ref([]);
 const currentSessionId = ref('');
 const chatInputBoxRef = ref(null);
+
+// 点击常用对话按钮，填充指令到输入框
+const fillQuickPrompt = (text) => {
+  chatInputText.value = text;
+  chatInputBoxRef.value?.focus();
+};
 
 // 引用笔记/文件、引用知识库相关
 const showNoteDialog = ref(false);
@@ -4635,6 +4646,35 @@ const fixEmptyTableCells = (html) => {
   color: var(--text-tertiary);
   display: block;
   text-align: center;
+}
+
+.sidebar-quick-prompts {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+  max-width: 240px;
+}
+
+.quick-prompt-btn {
+  width: 100%;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.quick-prompt-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
 }
 
 .sidebar-slide-enter-active {
