@@ -32,7 +32,7 @@
   "confirm": "Confirm",
   "clear": "Clear",
   "share": "Share",
-  "saveAsNote": "Save as Note",
+  "saveAsNote": "Extract as note",
   "saveAsNoteToast": "Organizing into a note, please check Notes later",
   "saveAsNoteSuccess": "Saved as note",
   "saveAsNoteFailed": "Failed to save",

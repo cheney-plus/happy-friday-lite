@@ -7,7 +7,7 @@
       </div>
 
       <button v-if="!isShareMode" class="header-btn knowledge-btn" type="button" @click="handleAddToKnowledge(isStreaming)">
-        <NotebookPen :size="18" :stroke-width="2" />
+        <SaveNoteIcon :size="18" />
         <span class="btn-tooltip hover-tooltip">{{ t('friday.saveAsNote') }}</span>
       </button>
     </header>
@@ -101,7 +101,7 @@
 import { computed, inject, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { NotebookPen } from 'lucide-vue-next';
+import SaveNoteIcon from '@/components/icons/SaveNoteIcon.vue';
 import { electronService } from '@/services/electron';
 import { useFridayStore, useTabStore } from '@/store';
 import { useNoteStore } from '@/store/modules/note';
@@ -622,6 +622,8 @@ onUnmounted(() => {
   position: absolute;
   top: 12px;
   right: 16px;
+  /* 图标使用主文字色（黑色），避免跟随次要色显得发灰 */
+  color: var(--text-primary);
 }
 
 /* Reserve the far-right slot for the history expander while the panel is collapsed. */
