@@ -49,16 +49,24 @@ An Electron + Vue 3 desktop personal knowledge assistant that combines an AI age
 
 ### 📅 Schedule
 
-- Custom-built calendar with month / week / year / list views and lunar calendar support
+- Custom-built calendar with month / week / year / list views
+- Lunar calendar support
 - Create and update schedules with natural language through Friday
 
 ### 🎨 More
 
 - Light, dark, and system themes
 - Simplified Chinese and English localization
-- Automatic data backups and a multi-tab interface
+- Automatic data backups
+- Multi-tab interface
 
 ## 🖼️ Screenshots
+
+### Friday AI Assistant
+
+![Friday assistant home](docs/resource/PixPin_2026-08-15_16-51-10.png)
+
+![Friday chat and code execution](docs/resource/PixPin_2026-09-22_23-43-29.png)
 
 ### Office
 
@@ -70,19 +78,13 @@ An Electron + Vue 3 desktop personal knowledge assistant that combines an AI age
 
 ![AI Sheets editor with Friday sidebar](docs/resource/PixPin_2026-09-22_23-15-21.png)
 
-### Friday AI Assistant
-
-![Friday assistant home](docs/resource/1.png)
-
-![Friday chat and code execution](docs/resource/1.1.png)
-
 ### Knowledge Base
 
 ![Knowledge base file cards](docs/resource/4.png)
 
 ### Notes
 
-![Rich-text note editor](docs/resource/3.png)
+![Rich-text note editor](docs/resource/PixPin_2026-09-22_23-45-35.png)
 
 ### Drawing
 
@@ -140,7 +142,9 @@ npm run electron:build:arm64
 
 Build artifacts are written to `release/`.
 
-> Configure Python under **Settings -> General -> Python Environment**. Use **Auto Detect** to find an installed interpreter, or select its executable manually. The AI assistant can install missing dependencies from `python/requirements.txt` using pip/pip3.
+> Configure Python under **Settings -> General -> Python Environment**:
+> 1. Use **Auto Detect** to find an installed interpreter, or select its executable manually.
+> 2. Missing dependencies can be installed automatically by the AI assistant from `python/requirements.txt` using pip/pip3.
 
 ## 📦 Download
 
