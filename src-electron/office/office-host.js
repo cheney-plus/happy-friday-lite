@@ -729,6 +729,41 @@ export function removeOfficeRecents(filePaths) {
   }
 }
 
+/** 首页重命名文档：磁盘改名 + 最近列表/收藏同步（docs bundle replaceRecentFile）。
+ *  已打开的文件拒绝改名（编辑器会话仍指向旧路径，保存会写回旧文件）。 */
+export function renameOfficeFile(filePath, newName) {
+  const docs = state.bundles?.docs
+  if (!docs?.replaceRecentFile) return { success: false, error: 'unavailable' }
+  const oldPath = String(filePath || '')
+  const ext = path.extname(oldPath)
+  const dir = path.dirname(oldPath)
+  let stat
+  try { stat = fs.statSync(oldPath) } catch {
+    return { success: false, error: 'missing' }
+  }
+  if (!stat.isFile()) return { success: false, error: 'missing' }
+  for (const entry of state.views.values()) {
+    if (entry.filePath === oldPath) return { success: false, error: 'in-use' }
+  }
+  const base = String(newName || '').trim()
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\.+$/, '')
+    .trim()
+  if (!base) return { success: false, error: 'invalid' }
+  // 统一沿用原扩展名：重命名不改变文档类型（避免打开器按扩展名误判）
+  const newPath = path.join(dir, `${base}${ext}`)
+  if (newPath === oldPath) return { success: false, error: 'unchanged' }
+  if (fs.existsSync(newPath)) return { success: false, error: 'exists' }
+  try {
+    fs.renameSync(oldPath, newPath)
+  } catch (e) {
+    return { success: false, error: e.code === 'EACCES' ? 'denied' : 'failed' }
+  }
+  try { docs.replaceRecentFile(oldPath, newPath) } catch { /* recents 同步失败不影响改名 */ }
+  return { success: true, filePath: newPath, name: path.basename(newPath) }
+}
+
 /** 在系统文件管理器中显示文件 */
 export function revealOfficePath(filePath) {
   try {

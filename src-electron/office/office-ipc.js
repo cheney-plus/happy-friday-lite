@@ -11,6 +11,7 @@ import {
   getOfficeRecents,
   toggleOfficeStarred,
   removeOfficeRecents,
+  renameOfficeFile,
   revealOfficePath,
   openOfficeFileDialog,
   queryOfficeDirty,
@@ -71,6 +72,13 @@ export function registerOfficeIpc() {
   ipcMain.handle('office-toggle-starred', (_e, filePath) => toggleOfficeStarred(filePath))
 
   ipcMain.handle('office-remove-recents', (_e, filePaths) => removeOfficeRecents(filePaths))
+
+  ipcMain.handle('office-rename-file', (_e, { filePath, newName } = {}) => {
+    if (typeof filePath !== 'string' || typeof newName !== 'string') {
+      return { success: false, error: 'invalid' }
+    }
+    return renameOfficeFile(filePath, newName)
+  })
 
   ipcMain.handle('office-reveal-path', (_e, filePath) => revealOfficePath(filePath))
 

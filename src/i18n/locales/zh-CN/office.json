@@ -38,6 +38,8 @@
   "unstar": "取消收藏",
   "moreActions": "更多操作",
   "menuOpen": "打开",
+  "menuRename": "重命名",
+  "renamePlaceholder": "输入新名称",
   "menuReveal": "在文件夹中显示",
   "menuCopyPath": "复制路径",
   "menuRemove": "从列表中移除",

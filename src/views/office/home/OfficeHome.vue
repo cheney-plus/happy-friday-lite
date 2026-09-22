@@ -9,6 +9,7 @@
       @toggle-star="toggleStar"
       @remove="removeRecent"
       @reveal="reveal"
+      @rename="renameRecent"
     />
   </div>
 </template>
@@ -29,6 +30,7 @@ const {
   toggleStar,
   removeRecent,
   reveal,
+  renameRecent,
 } = useOfficeHome();
 
 onMounted(loadRecents);

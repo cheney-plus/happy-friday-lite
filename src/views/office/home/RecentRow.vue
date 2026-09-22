@@ -4,7 +4,18 @@
       <span class="recent-icon">
         <span class="file-badge small" :style="{ background: badge.color }">{{ badge.ext }}</span>
       </span>
-      <span class="recent-name" :title="entry.name">{{ entry.name }}</span>
+      <span v-if="renaming" class="recent-name rename-box" @click.stop>
+        <input
+          ref="renameInput"
+          v-model="renameValue"
+          class="rename-input"
+          :placeholder="t('office.renamePlaceholder')"
+          @keydown.enter.prevent="commitRename"
+          @keydown.esc.prevent="cancelRename"
+          @blur="commitRename"
+        />
+      </span>
+      <span v-else class="recent-name" :title="entry.name">{{ entry.name }}</span>
       <span class="recent-path" :title="entry.dir">{{ entry.dir }}</span>
       <span class="recent-time">{{ formatModified(entry.mtimeMs) }}</span>
       <span class="recent-size">{{ formatSize(entry.sizeBytes) }}</span>
@@ -37,6 +48,7 @@
         </teleport>
         <div v-if="menuOpen" class="row-menu" role="menu">
           <button role="menuitem" @click="act('open')">{{ t('office.menuOpen') }}</button>
+          <button role="menuitem" @click="act('rename')">{{ t('office.menuRename') }}</button>
           <button role="menuitem" @click="act('reveal')">{{ t('office.menuReveal') }}</button>
           <button role="menuitem" @click="copyPath">{{ t('office.menuCopyPath') }}</button>
           <div class="row-menu-divider" />
@@ -48,17 +60,20 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { badgeMeta, formatModified, formatSize } from './fileMeta';
 
 const props = defineProps({
   entry: { type: Object, required: true },
 });
-const emit = defineEmits(['open', 'toggle-star', 'remove', 'reveal']);
+const emit = defineEmits(['open', 'toggle-star', 'remove', 'reveal', 'rename']);
 
 const { t } = useI18n();
 const menuOpen = ref(false);
+const renaming = ref(false);
+const renameValue = ref('');
+const renameInput = ref(null);
 
 const badge = computed(() => {
   const meta = badgeMeta(props.entry.type);
@@ -69,8 +84,34 @@ const badge = computed(() => {
 function act(kind) {
   menuOpen.value = false;
   if (kind === 'open') emit('open', props.entry);
+  else if (kind === 'rename') startRename();
   else if (kind === 'reveal') emit('reveal', props.entry);
   else if (kind === 'remove') emit('remove', props.entry);
+}
+
+function startRename() {
+  // 预填去掉扩展名的基名，便于直接输入新名字
+  const dot = props.entry.name.lastIndexOf('.');
+  renameValue.value = dot > 0 ? props.entry.name.slice(0, dot) : props.entry.name;
+  renaming.value = true;
+  nextTick(() => {
+    renameInput.value?.focus();
+    renameInput.value?.select();
+  });
+}
+
+function cancelRename() {
+  renaming.value = false;
+  renameValue.value = '';
+}
+
+async function commitRename() {
+  if (!renaming.value) return;
+  const name = renameValue.value.trim();
+  renaming.value = false;
+  renameValue.value = '';
+  if (!name || name === props.entry.name) return;
+  emit('rename', { entry: props.entry, newName: name });
 }
 
 async function copyPath() {
@@ -135,6 +176,23 @@ async function copyPath() {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--of-text-primary);
+}
+
+.rename-box {
+  min-width: 0;
+}
+
+.rename-input {
+  width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--of-accent);
+  border-radius: 6px;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--of-text-primary);
+  background: var(--of-surface);
 }
 
 .recent-path {

@@ -38,6 +38,8 @@
   "unstar": "Unstar",
   "moreActions": "More actions",
   "menuOpen": "Open",
+  "menuRename": "Rename",
+  "renamePlaceholder": "Enter new name",
   "menuReveal": "Reveal in Folder",
   "menuCopyPath": "Copy Path",
   "menuRemove": "Remove from List",

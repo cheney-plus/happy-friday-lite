@@ -46,6 +46,25 @@ export function useOfficeHome() {
     if (api) api.invoke('office-reveal-path', entry.path).catch(() => {});
   }
 
+  async function renameRecent({ entry, newName }) {
+    if (!api) return;
+    try {
+      const res = await api.invoke('office-rename-file', { filePath: entry.path, newName });
+      if (res && res.success) {
+        await loadRecents();
+      } else if (res && !res.success) {
+        const reason = {
+          exists: '已存在同名文件',
+          'in-use': '文档正在编辑器中打开，请先关闭后再重命名',
+          missing: '文件不存在或已被移动',
+          denied: '没有修改权限',
+          invalid: '名称无效',
+        }[res.error] || '重命名失败';
+        window.alert(reason);
+      }
+    } catch { /* ignore */ }
+  }
+
   return {
     recents,
     filter,
@@ -54,5 +73,6 @@ export function useOfficeHome() {
     toggleStar,
     removeRecent,
     reveal,
+    renameRecent,
   };
 }
