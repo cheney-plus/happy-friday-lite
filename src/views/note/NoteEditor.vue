@@ -3302,7 +3302,7 @@ const fixEmptyTableCells = (html) => {
 .table-picker-info {
   text-align: center;
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 8px;
 }
 
@@ -3419,7 +3419,7 @@ const fixEmptyTableCells = (html) => {
 
 .text-color-header {
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 8px;
   font-weight: 500;
 }

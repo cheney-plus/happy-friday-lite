@@ -270,7 +270,7 @@ function handleReject() {
 
 .title-sub {
   font-size: 12.5px;
-  color: var(--text-secondary, #78716c);
+  color: var(--text-secondary, #44403c);
   line-height: 1.3;
 }
 
@@ -448,7 +448,7 @@ function handleReject() {
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary, #78716c);
+  color: var(--text-secondary, #44403c);
 }
 
 .reason-optional {
@@ -523,7 +523,7 @@ function handleReject() {
 
 .btn-reject {
   background: transparent;
-  color: var(--text-secondary, #78716c);
+  color: var(--text-secondary, #44403c);
   border: 1px solid var(--border-color, #e7e5e4);
 }
 
