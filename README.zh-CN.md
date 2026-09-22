@@ -47,25 +47,16 @@
 
 ### 📅 日程
 
-- 自研日历组件，支持月 / 周 / 年 / 列表多视图切换
-- 农历显示支持
+- 自研日历组件，支持月 / 周 / 年 / 列表视图与农历显示
 - Friday 助手可自然语言创建/修改日程
 
 ### 🎨 其他特性
 
 - 主题：浅色 / 深色 / 跟随系统
 - 国际化：简体中文 / English
-- 数据自动备份
-- 多标签页界面
+- 自动数据备份与多标签页界面
 
 ## 🖼️ 截图
-
-### Friday 智能助手
-
-![Friday 智能助手首页](docs/resource/PixPin_2026-08-15_16-51-10.png)
-
-![Friday 对话与代码执行](docs/resource/PixPin_2026-09-22_23-43-29.png)
-
 
 ### Office
 
@@ -77,6 +68,11 @@
 
 ![AI 表格编辑](docs/resource/PixPin_2026-09-22_23-15-21.png)
 
+### Friday 智能助手
+
+![Friday 智能助手首页](docs/resource/1.png)
+
+![Friday 对话与代码执行](docs/resource/1.1.png)
 
 ### 知识库
 
@@ -84,7 +80,7 @@
 
 ### 笔记
 
-![笔记富文本编辑](docs/resource/PixPin_2026-09-22_23-45-35.png)
+![笔记富文本编辑](docs/resource/3.png)
 
 ### 绘图
 
@@ -142,9 +138,7 @@ npm run electron:build:arm64
 
 构建产物输出至 `release/` 目录。
 
-> 说明：请在「设置 -> 通用 -> Python 环境」中配置 Python 环境：
-> 1. 点击「自动检测」自动发现系统已安装的 Python；或手动选择 Python 可执行文件路径；
-> 2. 缺失的依赖库可由 AI 助手通过对话自动安装（基于 `python/requirements.txt`，通过 pip/pip3 安装）。
+> 说明：请在「设置 -> 通用 -> Python 环境」中配置 Python 环境。点击「自动检测」自动发现系统已安装的解释器，或手动选择 Python 可执行文件路径。缺失的依赖库可由 AI 助手通过对话自动安装（基于 `python/requirements.txt`，通过 pip/pip3 安装）。
 
 ## 📦 下载安装
 
