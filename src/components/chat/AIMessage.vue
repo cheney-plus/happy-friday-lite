@@ -98,7 +98,9 @@ let cachedHtml = '';
 
 const hasReasoning = computed(() => !!(props.reasoning || props.reasoningStreamingContent));
 
-const reasoningStreaming = computed(() => props.isStreaming && !!props.reasoningStreamingContent);
+const reasoningStreaming = computed(() =>
+  props.isStreaming && !!props.reasoningStreamingContent && !(props.content || '').trim()
+);
 
 const effectiveReasoning = computed(() =>
   props.reasoningStreamingContent || props.reasoning || ''

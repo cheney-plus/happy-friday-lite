@@ -13,6 +13,9 @@ import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
 import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
 import { stopHarnessSidecar } from './src-electron/harness/index.js'
+import { initOfficeSession, shutdownOfficeHost } from './src-electron/office/office-session.js'
+import { registerOfficeIpc } from './src-electron/office/office-ipc.js'
+import { isHeadlessExportRun, runHeadlessExportEntry } from './src-electron/office/office-headless.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -31,8 +34,11 @@ if (process.platform === 'darwin') {
 
 if (isDev) {
   app.commandLine.appendSwitch('disable-gpu-sandbox')
-  app.commandLine.appendSwitch('no-sandbox')
-  app.commandLine.appendSwitch('disable-setuid-sandbox')
+  // 注意：不能追加 no-sandbox / disable-setuid-sandbox。
+  // office 编辑器视图（resources/office/*/main）以 webPreferences.sandbox:true 创建，
+  // 全局禁用沙箱会导致沙箱化 zygote 未建立，此类 renderer 启动时在
+  // platform_shared_memory_region_posix.cc 处 FATAL（/dev/shm 共享内存分配失败，ESRCH）。
+  // Linux 上 Chromium 会自动改用 userns 沙箱，无需禁用沙箱即可正常启动。
   app.setPath('userData', path.join(__dirname, 'app-data', 'electron-user-data'))
 }
 
@@ -102,6 +108,18 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // happyfriday-office CLI 的 headless 导出请求：跳过全部常规初始化，
+  // 隐藏窗口渲染一次导出后退出（office-headless.js 内部负责 app.exit）
+  if (isHeadlessExportRun()) {
+    try {
+      await runHeadlessExportEntry()
+    } catch (error) {
+      console.error('[Office] headless export failed:', error)
+      app.exit(3)
+    }
+    return
+  }
+
   // 1. 先创建窗口，让 splash 立即显示（窗口加载 index.html 与主进程初始化并行）
   createWindow()
 
@@ -132,6 +150,28 @@ app.whenReady().then(async () => {
   }
 
   startAutomationScheduler(mainWindow)
+
+  // Office 工作区（happyoffice 编辑器以 WebContentsView 挂载到主窗口）
+  try {
+    const ok = await initOfficeSession(mainWindow)
+    if (ok) registerOfficeIpc()
+    // 冒烟测试钩子：OFFICE_SMOKE=<file> 启动时自动打开并输出结果
+    if (ok && process.env.OFFICE_SMOKE) {
+      import('./src-electron/office/office-host.js').then(({ openOfficeFile, probeOfficeView }) =>
+        openOfficeFile(process.env.OFFICE_SMOKE).then(r => {
+          console.log('[Office][smoke] open result:', JSON.stringify(r))
+          if (r && r.success) {
+            return new Promise(res => setTimeout(res, 6000))
+              .then(() => probeOfficeView(r.viewId))
+              .then(p => console.log('[Office][smoke] probe:', JSON.stringify(p)))
+          }
+          return undefined
+        }).catch(e => console.error('[Office][smoke] open failed:', e))
+      )
+    }
+  } catch (error) {
+    console.error('[Main] ❌ Failed to initialize Office host:', error)
+  }
 
   // 3. 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）
   try {
@@ -212,7 +252,8 @@ app.on('before-quit', (event) => {
   Promise.allSettled([
     import('./src-electron/agent/mcp.js')
       .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections()),
-    stopHarnessSidecar()
+    stopHarnessSidecar(),
+    Promise.resolve(shutdownOfficeHost())
   ]).finally(() => {
     shutdownStarted = true
     app.quit()

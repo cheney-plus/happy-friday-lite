@@ -1344,7 +1344,7 @@ const appVersion = packageJson.version;
 const aboutLogo = computed(() => {
   return appliedTheme.value === 'dark'
     ? new URL('@/assets/images/friday-b.png', import.meta.url).href
-    : new URL('@/assets/images/friday-w.png', import.meta.url).href;
+    : new URL('@/assets/images/friday-w.webp', import.meta.url).href;
 });
 
 const features = computed(() => [

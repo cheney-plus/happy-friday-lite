@@ -87,17 +87,57 @@
           </div>
         </div>
       </section>
+
+      <section class="behavior-panel">
+        <div class="setting-row">
+          <div class="setting-text">
+            <span class="setting-label">{{ t('settings.homePageSetting') }}</span>
+            <span class="setting-hint">{{ t('settings.homePageSettingDesc') }}</span>
+          </div>
+          <div class="home-select-wrapper" ref="homeSelectRef">
+            <button type="button" class="home-select-trigger" @click="showHomeDropdown = !showHomeDropdown">
+              <span>{{ currentHomePageLabel }}</span>
+              <svg class="select-arrow" :class="{ expanded: showHomeDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div v-if="showHomeDropdown" class="home-dropdown-menu">
+              <button
+                v-for="option in homeOptions"
+                :key="option.value"
+                type="button"
+                class="home-dropdown-item"
+                :class="{ active: homePage === option.value }"
+                @click="selectHomePage(option.value)"
+              >
+                <span>{{ option.label }}</span>
+                <Check v-if="homePage === option.value" :size="18" :stroke-width="2.5" stroke="#10b981" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text">
+            <span class="setting-label">{{ t('settings.collapseSidebarOnLaunch') }}</span>
+            <span class="setting-hint">{{ t('settings.collapseSidebarOnLaunchDesc') }}</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" :checked="collapseOnLaunch" @change="toggleCollapseOnLaunch($event)" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { Check, Settings } from 'lucide-vue-next';
 import { useAppStore } from '@/store';
-import { sidebarMenuConfig, sidebarBottomMenuConfig, sidebarModuleConfig } from '@/config/menu';
+import { fridayMenuConfig, sidebarMenuConfig, sidebarBottomMenuConfig, sidebarModuleConfig } from '@/config/menu';
 import { electronService } from '@/services/electron';
 
 const router = useRouter();
@@ -112,6 +152,72 @@ const sidebarModuleCount = sidebarModuleConfig.length;
 const enabledModuleCount = computed(() => Object.values(appStore.sidebarModules).filter(Boolean).length);
 const hasHiddenModules = computed(() => Object.values(appStore.sidebarModules).some((enabled) => !enabled));
 const isEnabled = (key) => appStore.sidebarModules[key] !== false;
+
+// ========== 启动行为设置：首页 + 启动时收起侧边栏 ==========
+const homeSelectRef = ref(null);
+const showHomeDropdown = ref(false);
+const homePage = ref('/friday');
+const collapseOnLaunch = ref(false);
+
+const homeOptions = computed(() =>
+  [fridayMenuConfig, ...sidebarModuleConfig].map((item) => ({ value: item.path, label: t(item.i18nKey) }))
+);
+const currentHomePageLabel = computed(
+  () => homeOptions.value.find((option) => option.value === homePage.value)?.label || t('friday.title')
+);
+
+const saveConfigPatch = async (patch) => {
+  const config = await electronService.invoke('get-config');
+  if (!config) throw new Error('Failed to load config');
+  Object.assign(config, patch);
+  const result = await electronService.invoke('save-config', config);
+  if (result?.success === false) throw new Error(result.error || 'Failed to save configuration');
+};
+
+const selectHomePage = async (value) => {
+  showHomeDropdown.value = false;
+  if (value === homePage.value) return;
+  const previous = homePage.value;
+  homePage.value = value;
+  try {
+    await saveConfigPatch({ homePage: value });
+  } catch (_error) {
+    homePage.value = previous;
+  }
+};
+
+const toggleCollapseOnLaunch = async (event) => {
+  const next = event.target.checked;
+  const previous = collapseOnLaunch.value;
+  collapseOnLaunch.value = next;
+  try {
+    await saveConfigPatch({ collapseSidebarOnLaunch: next });
+  } catch (_error) {
+    collapseOnLaunch.value = previous;
+    event.target.checked = previous;
+  }
+};
+
+const handleHomeClickOutside = (event) => {
+  if (homeSelectRef.value && !homeSelectRef.value.contains(event.target)) {
+    showHomeDropdown.value = false;
+  }
+};
+
+onMounted(async () => {
+  document.addEventListener('click', handleHomeClickOutside);
+  try {
+    const config = await electronService.invoke('get-config');
+    if (config) {
+      if (typeof config.homePage === 'string' && config.homePage) homePage.value = config.homePage;
+      collapseOnLaunch.value = config.collapseSidebarOnLaunch === true;
+    }
+  } catch (_error) {}
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleHomeClickOutside);
+});
 
 const persistModules = async (nextModules, previousModules) => {
   appStore.setSidebarModules(nextModules);
@@ -207,6 +313,166 @@ const goBack = () => router.push('/settings');
   border-radius: 10px;
 }
 
+.behavior-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 16px;
+  background: var(--bg-secondary);
+  border-radius: 10px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.setting-row + .setting-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setting-label {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.setting-hint {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.home-select-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.home-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  padding: 7px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.home-select-trigger:hover {
+  background: var(--bg-hover);
+}
+
+.select-arrow {
+  color: var(--text-tertiary);
+  transition: transform 0.15s;
+}
+
+.select-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.home-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 180px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s;
+}
+
+.home-dropdown-item:hover {
+  background: var(--bg-hover);
+}
+
+.home-dropdown-item.active {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--text-tertiary);
+  border-radius: 24px;
+  transition: background-color 0.25s ease;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--bg-primary);
+  border-radius: 50%;
+  transition: transform 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #10b981;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
 .preview-rail {
   width: 52px;
   flex: 0 0 52px;
@@ -289,6 +555,8 @@ const goBack = () => router.push('/settings');
 .module-chip-note { color: #2563eb; }
 .preview-item-knowledge,
 .module-chip-knowledge { color: #0d9488; }
+.preview-item-office,
+.module-chip-office { color: #d83b01; }
 .preview-item-schedule,
 .module-chip-schedule { color: #d97706; }
 .preview-item-automation,

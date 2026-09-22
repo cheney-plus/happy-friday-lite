@@ -27,16 +27,17 @@
     ></div>
 
     <button
-      v-if="sidebarCollapsed"
-      class="sidebar-expand-btn"
+      class="sidebar-toggle-btn"
       @click="toggleSidebar"
-      title="展开侧边栏"
+      :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
     >
-      <SidebarIcon />
+      <PanelLeftClose v-if="!sidebarCollapsed" :size="18" :stroke-width="1.8" />
+      <PanelLeftOpen v-else :size="18" :stroke-width="1.8" />
     </button>
 
     <KbMainContent
       :selected-k-b="selectedKB"
+      :sidebar-collapsed="sidebarCollapsed"
       :current-title="currentTitle"
       :current-category-id="currentCategoryId"
       :can-go-back="canGoBack"
@@ -226,7 +227,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { SidebarIcon } from './components/icons';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next';
 import KbSidebar from './components/KbSidebar.vue';
 import KbMainContent from './components/KbMainContent.vue';
 import KbContextMenu from './components/KbContextMenu.vue';
@@ -640,18 +641,22 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
-.sidebar-expand-btn {
+/* 常驻切换按钮：元素永不卸载，仅切换内部图标，避免按钮重建导致的抖动；
+   位置 (12,12) 与侧栏顶栏原收起按钮槽位完全重合 */
+.sidebar-toggle-btn {
   position: absolute;
-  left: 8px;
+  left: 12px;
   top: 12px;
   z-index: 10;
-  padding: 6px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  transition: background 0.15s, color 0.15s, transform 0.15s;
+  border-radius: 8px;
+  color: var(--text-primary);
+  transition: background 0.15s, color 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -659,10 +664,6 @@ onBeforeUnmount(() => {
   &:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
-  }
-
-  &:active {
-    transform: scale(0.92);
   }
 }
 

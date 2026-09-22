@@ -81,7 +81,12 @@ const ACTION_LABELS = {
   read_agent_file: '读取文件',
   write_agent_file: '写入文件',
   execute_command: '执行命令',
-  get_current_time: '获取当前时间'
+  get_current_time: '获取当前时间',
+  list_drawing_canvases: '查询绘图列表',
+  get_drawing_canvas: '查看绘图内容',
+  create_drawing: '创建绘图',
+  update_drawing: '修改绘图',
+  layout_drawing: '自动布局绘图'
 }
 
 const STATUS_PREFIX = {

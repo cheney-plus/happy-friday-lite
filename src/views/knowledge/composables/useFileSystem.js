@@ -8,6 +8,9 @@ import { getFileType } from '../utils';
 // 其余格式（图片、Word/Excel/PPT 等）均使用系统默认应用打开
 const IN_APP_VIEWABLE_TYPES = ['pdf', 'epub', 'markdown', 'note', 'html', 'txt', 'json', 'xml'];
 
+// Office 文件类型：交给主进程 Office Host 在可视化编辑器（happyoffice）中打开
+const OFFICE_TYPES = ['docx', 'xlsx', 'xlsm', 'csv', 'pptx', 'pdf'];
+
 export function useFileSystem() {
   const api = window.electronAPI;
   const router = useRouter();
@@ -142,6 +145,19 @@ export function useFileSystem() {
     if (file.isDirectory) {
       await navigateTo(file.path);
       return;
+    }
+    // Office 文件（DOCX/XLSX/CSV/PPTX/PDF）在可视化编辑器中打开（每个文件一个独立编辑器 Tab）
+    if (OFFICE_TYPES.includes(file.type) && api) {
+      try {
+        const res = await api.invoke('office-open-file', { filePath: file.path });
+        if (res && res.success && res.viewId) {
+          // viewId（如 docs-3）对应编辑器路由 /office/docs/3
+          router.push(`/office/${String(res.viewId).replace('-', '/')}`);
+          return;
+        }
+      } catch (e) {
+        console.warn('Office editor open failed, fallback to external:', e);
+      }
     }
     // 可在应用内查看的文件类型在新标签页中打开
     if (IN_APP_VIEWABLE_TYPES.includes(file.type)) {

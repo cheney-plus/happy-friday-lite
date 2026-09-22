@@ -6,9 +6,7 @@
       :style="{ width: `${sidebarCollapsed ? 0 : sidebarWidth}px` }"
     >
       <div v-if="!searchMode" class="drawing-sidebar-topbar">
-        <button class="topbar-button" type="button" :title="t('drawing.sidebar.collapse')" @click="toggleSidebar">
-          <PanelLeftClose :size="18" :stroke-width="1.8" />
-        </button>
+        <span class="topbar-spacer" aria-hidden="true"></span>
         <div class="topbar-actions">
           <div class="new-canvas-button-group">
             <button class="new-canvas-main-button" type="button" :title="t('drawing.sidebar.newCanvas')" @click="createCanvas('blank')">
@@ -120,14 +118,20 @@
       <div class="resize-handle" @mousedown.prevent="startResizing"></div>
     </aside>
 
-    <button v-if="sidebarCollapsed" class="sidebar-expand-button" type="button" :title="t('drawing.sidebar.expand')" @click="toggleSidebar">
-      <PanelLeftOpen :size="18" :stroke-width="1.8" />
+    <button
+      class="sidebar-toggle-button"
+      type="button"
+      :title="sidebarCollapsed ? t('drawing.sidebar.expand') : t('drawing.sidebar.collapse')"
+      @click="toggleSidebar"
+    >
+      <PanelLeftClose v-if="!sidebarCollapsed" :size="18" :stroke-width="1.8" />
+      <PanelLeftOpen v-else :size="18" :stroke-width="1.8" />
     </button>
 
     <main class="drawing-workspace" aria-label="Drawing workspace">
       <DrawingEditor
-        v-if="drawingStore.currentCanvas"
-        :key="drawingStore.currentCanvas.id"
+        v-if="drawingStore.initialized && drawingStore.currentCanvas"
+        :key="`${drawingStore.currentCanvas.id}:${drawingStore.agentVersion}`"
         :canvas="drawingStore.currentCanvas"
         @change="onGraphChange"
         @library-change="onLibraryChange"
@@ -211,10 +215,20 @@ import CanvasThumbnail from './components/CanvasThumbnail.vue'
 const { t } = useI18n()
 const drawingStore = useDrawingStore()
 
-onMounted(() => {
-  drawingStore.initialize()
+onMounted(async () => {
+  await drawingStore.initialize()
   // 切换应用/浏览器 Tab 时窗口失焦，关闭所有弹出菜单
   window.addEventListener('blur', closeMenus)
+  // 监听 Agent 绘图工具的修改事件，从数据库拉取最新画布并刷新
+  unlistenDrawingUpdated = electronService.listen('drawing-updated', (event) => {
+    const payload = event.payload || {}
+    if (!payload.canvasId || payload.source !== 'agent') return
+    // 若刷新的是当前打开的画布，编辑器会重载并 emit 一次旧图数据，需在时间窗内拦截
+    if (drawingStore.selectedCanvasId === payload.canvasId) {
+      agentSuppressedSave = { canvasId: payload.canvasId, at: Date.now() }
+    }
+    drawingStore.applyAgentUpdate(payload.canvasId)
+  })
 })
 
 // keep-alive 切走时组件只是失活，Teleport 到 body 的下拉框仍悬浮在其他 Tab 上，需主动关闭
@@ -567,7 +581,15 @@ const removeCanvas = (canvas) => {
   cardMenu.visible = false
 }
 
+// Agent 写当前画布后编辑器重载会产生过期的 change 事件，在时间窗内拦截以免覆盖 Agent 的修改
+const AGENT_SUPPRESS_MS = 1500
+let agentSuppressedSave = null
+let unlistenDrawingUpdated = null
+
 const onGraphChange = ({ id, graphJSON }) => {
+  if (agentSuppressedSave && agentSuppressedSave.canvasId === id && Date.now() - agentSuppressedSave.at < AGENT_SUPPRESS_MS) {
+    return
+  }
   if (id && graphJSON) drawingStore.saveGraph(id, graphJSON)
 }
 
@@ -600,6 +622,10 @@ onUnmounted(() => {
   cancelHideMoveCategorySubmenu()
   if (shareToastTimer) clearTimeout(shareToastTimer)
   window.removeEventListener('blur', closeMenus)
+  if (unlistenDrawingUpdated) {
+    unlistenDrawingUpdated()
+    unlistenDrawingUpdated = null
+  }
 })
 </script>
 
@@ -608,6 +634,12 @@ onUnmounted(() => {
 .drawing-sidebar { position: relative; display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; overflow: hidden; border-right: 1px solid var(--border-color); background: var(--bg-primary); transition: width .2s ease; }
 .drawing-sidebar.is-resizing { transition: none; }
 .drawing-sidebar.collapsed { border-right-color: transparent; }
+/* 收起时内容立即隐藏，避免顶栏图标随宽度过渡在裁切边沿滑动；展开时延迟淡入，等宽度过渡完成 */
+.drawing-sidebar-topbar, .sidebar-search, .directory-heading, .canvas-list { transition: opacity .12s ease .12s; }
+.drawing-sidebar.collapsed .drawing-sidebar-topbar,
+.drawing-sidebar.collapsed .sidebar-search,
+.drawing-sidebar.collapsed .directory-heading,
+.drawing-sidebar.collapsed .canvas-list { opacity: 0; pointer-events: none; transition: opacity 0s ease; }
 .drawing-sidebar-topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 12px; box-sizing: border-box; }
 .topbar-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; cursor: pointer; }
 .topbar-button:hover { background: var(--bg-hover); }
@@ -621,7 +653,7 @@ onUnmounted(() => {
 .new-canvas-dropdown-menu { position: absolute; z-index: 40; top: 36px; right: 0; display: flex; flex-direction: column; gap: 2px; min-width: 112px; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); box-shadow: 0 4px 16px rgba(0, 0, 0, .12); }
 .dropdown-item { display: flex; align-items: center; width: 100%; gap: 8px; padding: 5px 8px; border: 0; border-radius: 5px; color: var(--text-primary); background: transparent; font-size: 12px; text-align: left; cursor: pointer; }
 .dropdown-item:hover { background: var(--bg-hover); }
-.sidebar-search { display: flex; align-items: center; gap: 6px; height: 56px; padding: 12px; box-sizing: border-box; color: var(--text-tertiary); }
+.sidebar-search { display: flex; align-items: center; gap: 6px; height: 56px; padding: 12px 12px 12px 48px; box-sizing: border-box; color: var(--text-tertiary); }
 .sidebar-search input { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; outline: 0; color: var(--text-primary); background: transparent; font-size: 14px; }
 .directory-heading { padding: 0 12px 10px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
 .category-trigger { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -665,8 +697,10 @@ onUnmounted(() => {
 .flowchart-preview i { display: block; width: 29px; height: 10px; border: 1px solid var(--text-tertiary); border-radius: 2px; opacity: .65; }
 .resize-handle { position: absolute; z-index: 3; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; }
 .resize-handle:hover { background: var(--accent-color); opacity: .45; }
-.sidebar-expand-button { position: absolute; z-index: 30; top: 12px; left: 12px; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; cursor: pointer; }
-.sidebar-expand-button:hover { background: var(--bg-hover); }
+.topbar-spacer { flex: 0 0 auto; width: 32px; height: 32px; }
+/* 常驻切换按钮：元素永不卸载，仅切换内部图标，避免按钮重建导致的抖动 */
+.sidebar-toggle-button { position: absolute; z-index: 30; top: 12px; left: 12px; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; cursor: pointer; }
+.sidebar-toggle-button:hover { background: var(--bg-hover); }
 .drawing-workspace { position: relative; flex: 1; min-width: 0; overflow: hidden; background: var(--bg-primary); }
 .card-menu {
   position: fixed;

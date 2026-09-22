@@ -24,7 +24,7 @@
           @mouseenter="showTooltip($event, t(item.i18nKey))"
           @mouseleave="hideTooltip"
         >
-          <component :is="item.iconComponent" :size="20" :stroke-width="1.6" />
+          <component :is="item.iconComponent" :size="22" :stroke-width="1.6" />
         </router-link>
       </nav>
 
@@ -38,7 +38,7 @@
           @mouseenter="showTooltip($event, t(item.i18nKey))"
           @mouseleave="hideTooltip"
         >
-          <component :is="item.iconComponent" :size="20" :stroke-width="1.6" />
+          <component :is="item.iconComponent" :size="24" :stroke-width="1.6" />
         </router-link>
       </div>
     </div>

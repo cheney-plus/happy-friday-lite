@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/utils/theme'
 import { applyCellAnimation } from '../shapes/animation.js'
@@ -133,6 +133,7 @@ let saveTimer = null
 let skipSave = false
 let lastDropAt = 0
 let pendingImageItem = null
+let graphResizeObserver = null
 
 const mode = ref('select')
 const edgeStyleId = ref('manhattan')
@@ -168,6 +169,33 @@ const propState = reactive({
 })
 
 const canvasName = computed(() => props.canvas.title || t(`drawing.canvas.${props.canvas.titleKey || 'untitled'}`))
+
+// X6 的 graph.resize 会把内联 width/height 写到 container 上并覆盖其 100% 布局，
+// 导致 container 尺寸被钉死：侧栏折叠等工作区变化时它不再变宽，右侧留白且无法绘制。
+// 因此观察并测量父元素（纯布局驱动），再据此 resize 图。
+const resizeGraph = () => {
+  const element = containerRef.value?.parentElement
+  const currentGraph = graph.value
+  if (!element || !currentGraph) return
+
+  const { width, height } = element.getBoundingClientRect()
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return
+
+  currentGraph.resize(Math.round(width), Math.round(height))
+}
+
+const observeGraphResize = () => {
+  const element = containerRef.value?.parentElement
+  if (!element || graphResizeObserver || typeof ResizeObserver === 'undefined') return
+  graphResizeObserver = new ResizeObserver(resizeGraph)
+  graphResizeObserver.observe(element)
+  resizeGraph()
+}
+
+const stopObservingGraphResize = () => {
+  graphResizeObserver?.disconnect()
+  graphResizeObserver = null
+}
 
 const syncHistory = () => {
   if (!graph.value) return
@@ -511,16 +539,24 @@ onMounted(() => {
   document.addEventListener('keydown', cancelPendingEdge)
 
   loadCanvas()
+  observeGraphResize()
 })
 
-onActivated(() => graph.value?.enableKeyboard())
-onDeactivated(() => graph.value?.disableKeyboard())
+onActivated(() => {
+  graph.value?.enableKeyboard()
+  nextTick(observeGraphResize)
+})
+onDeactivated(() => {
+  graph.value?.disableKeyboard()
+  stopObservingGraphResize()
+})
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu)
   document.removeEventListener('keydown', cancelPendingEdge)
   clearTimeout(saveTimer)
   if (graph.value && !skipSave) emit('change', { id: props.canvas.id, graphJSON: graph.value.toJSON() })
+  stopObservingGraphResize()
   dnd?.dispose()
   graph.value?.dispose()
 })
@@ -561,10 +597,6 @@ onBeforeUnmount(() => {
 }
 @keyframes draw-node-breathe {
   50% { filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.45)); }
-}
-.drawing-editor .x6-widget-selection-box {
-  border: 1.5px solid var(--accent-color);
-  box-shadow: none;
 }
 .drawing-editor .x6-widget-selection-inner {
   border: 1px dashed var(--accent-color);

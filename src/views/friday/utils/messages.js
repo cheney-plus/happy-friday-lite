@@ -10,15 +10,35 @@ export function getAssistantContent(msg) {
   return '';
 }
 
+function parseMetadata(raw) {
+  const metadata = raw?.metadata;
+  if (!metadata) return null;
+  if (typeof metadata === 'object') return metadata;
+  if (typeof metadata === 'string') {
+    try {
+      return JSON.parse(metadata);
+    } catch (_e) {
+      return null;
+    }
+  }
+  return null;
+}
+
 export function mapHistoryMessage(raw) {
+  const metadata = parseMetadata(raw);
+  const reasoning = raw?.reasoning
+    || raw?.reasoningContent
+    || metadata?.reasoning
+    || metadata?.reasoningContent
+    || '';
   const msg = {
     role: raw.role,
     content: raw.content,
     id: raw.id,
-    reasoning: raw.reasoning || raw.metadata?.reasoning
+    reasoning
   };
-  if (raw.metadata?.segments && Array.isArray(raw.metadata.segments)) {
-    msg.segments = raw.metadata.segments;
+  if (metadata?.segments && Array.isArray(metadata.segments)) {
+    msg.segments = metadata.segments;
   }
   return msg;
 }

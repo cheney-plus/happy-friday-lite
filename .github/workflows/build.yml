@@ -166,11 +166,14 @@ jobs:
           node scripts/fix-dsh-directory-picker-electron.mjs --check
 
       - name: Verify Windows node-pty prebuilds
+        # node-pty 1.2.0-beta.15: pty.node is the Unix-only native module and is
+        # NOT shipped for win32. Windows loads conpty.node +
+        # conpty_console_list.node plus the conpty/ helpers (dll + OpenConsole.exe).
         run: |
-          node -e "const fs=require('fs'); for (const file of ['pty.node','conpty.node','conpty_console_list.node']) { const filename='node_modules/node-pty/prebuilds/win32-x64/'+file; if (!fs.existsSync(filename)) throw new Error('Missing '+filename); }"
+          node -e "const fs=require('fs'); for (const file of ['conpty.node','conpty_console_list.node','conpty/conpty.dll','conpty/OpenConsole.exe']) { const filename='node_modules/node-pty/prebuilds/win32-x64/'+file; if (!fs.existsSync(filename)) throw new Error('Missing '+filename); }"
 
       - name: Build Electron app (Windows x64)
-        # node-pty 1.1.0 ships Electron-compatible Node-API prebuilds for
+        # node-pty 1.2.0-beta.15 ships Electron-compatible Node-API prebuilds for
         # Windows x64. Rebuilding it invokes node-gyp unnecessarily and fails
         # on newer GitHub Windows images when detecting Visual Studio.
         run: npx electron-builder --win --x64 --config.npmRebuild=false

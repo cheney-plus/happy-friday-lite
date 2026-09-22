@@ -8,6 +8,14 @@ An Electron + Vue 3 desktop personal knowledge assistant that combines an AI age
 
 ## ✨ Key Features
 
+### 📑 Office
+
+- Integrated office suite with AI Docs, AI Sheets, AI Slides, and AI PDF
+- Rich document editing: headings, lists, links, tables, images, and formulas
+- Friday sidebar for AI writing, polishing, translation, and one-click slide generation
+- Create new files or open local `.docx` / `.xlsx` / `.csv` / `.pptx` / `.pdf` files
+- Recent files with filtering by type (documents / sheets / slides / PDF)
+
 ### 🤖 Friday AI Assistant
 
 - Built with [DeepAgent SDK](https://github.com/frost-beta/deepagents) and LangChain
@@ -51,6 +59,16 @@ An Electron + Vue 3 desktop personal knowledge assistant that combines an AI age
 - Automatic data backups and a multi-tab interface
 
 ## 🖼️ Screenshots
+
+### Office
+
+![Office home with AI Docs, Sheets, Slides, and PDF entries](docs/resource/PixPin_2026-09-22_23-11-03.png)
+
+![AI Docs editor with Friday sidebar](docs/resource/PixPin_2026-09-22_23-13-35.png)
+
+![AI Slides editor with Friday sidebar](docs/resource/PixPin_2026-09-22_23-14-07.png)
+
+![AI Sheets editor with Friday sidebar](docs/resource/PixPin_2026-09-22_23-15-21.png)
 
 ### Friday AI Assistant
 
@@ -160,6 +178,7 @@ happy-friday-lite/
 │   ├── components/          # Shared components (chat / layout)
 │   ├── views/               # Page views
 │   │   ├── friday/          # Friday assistant
+│   │   ├── office/          # Office suite (Docs / Sheets / Slides / PDF)
 │   │   ├── knowledge/       # Knowledge base
 │   │   ├── note/            # Notes
 │   │   ├── drawing/         # Drawing

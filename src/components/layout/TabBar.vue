@@ -17,6 +17,7 @@
             :style="{ width: tabWidth + 'px' }"
             role="tab"
             @click="switchTab(tab)"
+            @dblclick.stop="handleTabDoubleClick(tab)"
             @contextmenu.prevent.stop="showContextMenu($event, tab)"
             @mouseenter="hoveredTabId = tab.id"
             @mouseleave="hoveredTabId = ''"
@@ -107,19 +108,20 @@ import {
   ArrowLeft,
   ArrowRight,
   Layers,
-  FolderKanban,
   FileText,
-  PencilRuler,
-  CalendarDays,
-  Workflow,
-  BrainCircuit,
-  Bot,
-  Clock,
-  Settings
+  Bot
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { electronService } from '@/services/electron';
-import DeepSeekIcon from '@/components/icons/DeepSeekIcon.vue';
+import OfficeIcon from '@/components/icons/OfficeIcon.vue';
+import CalendarIcon from '@/components/icons/CalendarIcon.vue';
+import KnowledgeIcon from '@/components/icons/KnowledgeIcon.vue';
+import NoteIcon from '@/components/icons/NoteIcon.vue';
+import DrawingIcon from '@/components/icons/DrawingIcon.vue';
+import HarnessIcon from '@/components/icons/HarnessIcon.vue';
+import AutomationIcon from '@/components/icons/AutomationIcon.vue';
+import HistoryIcon from '@/components/icons/HistoryIcon.vue';
+import SettingsIcon from '@/components/icons/SettingsIcon.vue';
 
 const tabStore = useTabStore();
 const appStore = useAppStore();
@@ -131,16 +133,17 @@ const isMac = /Macintosh/.test(userAgent);
 const isLinux = /Linux/.test(userAgent) && !/Android/.test(userAgent);
 
 const iconMap = {
-  FolderKanban,
+  NoteIcon,
+  KnowledgeIcon,
   FileText,
-  PencilRuler,
-  CalendarDays,
-  Workflow,
-  BrainCircuit,
-  DeepSeekIcon,
+  DrawingIcon,
+  AutomationIcon,
+  HarnessIcon,
+  OfficeIcon,
+  CalendarIcon,
   Bot,
-  Clock,
-  Settings
+  HistoryIcon,
+  SettingsIcon
 };
 
 const tabsAreaRef = ref(null);
@@ -236,10 +239,30 @@ const requestFridayClose = async (id) => {
   return allowed;
 };
 
+// Office 编辑器 Tab（id: office-<type>-<instId>）：关闭前自动保存并释放对应编辑器视图
+// （脏文件不再弹确认框）
+const OFFICE_TAB_RE = /^office-(docs|sheets|slides|pdf)-(\d+)$/;
+
+const requestOfficeAutoSave = async (id) => {
+  const match = id.match(OFFICE_TAB_RE);
+  if (!match) return;
+  const viewId = `${match[1]}-${match[2]}`;
+  try {
+    await electronService.invoke('office-auto-save', { viewId });
+    await electronService.invoke('office-close', { viewId });
+  } catch { /* ignore */ }
+};
+
 const closeTab = async (id) => {
   if (!(await requestFridayClose(id))) return;
+  await requestOfficeAutoSave(id);
   tabStore.removeTab(id);
   navigateToActiveTab();
+};
+
+const handleTabDoubleClick = (tab) => {
+  if (tabStore.openedTabs.length === 1 && tab.path === '/friday') return;
+  closeTab(tab.id);
 };
 
 const navigateToActiveTab = () => {
@@ -262,16 +285,21 @@ const hideContextMenu = () => {
   contextMenu.value.visible = false;
 };
 
-const closeOtherTabs = () => {
+const closeOtherTabs = async () => {
   if (!canCloseOthers.value) return;
-  tabStore.closeOtherTabs(contextMenu.value.tabId);
+  const keepId = contextMenu.value.tabId;
+  const closingIds = tabStore.openedTabs.filter(t => t.id !== keepId).map(t => t.id);
   hideContextMenu();
+  for (const id of closingIds) await requestOfficeAutoSave(id);
+  tabStore.closeOtherTabs(keepId);
   navigateToActiveTab();
 };
 
-const closeAllTabs = () => {
-  tabStore.closeAllTabs();
+const closeAllTabs = async () => {
+  const closingIds = tabStore.openedTabs.map(t => t.id);
   hideContextMenu();
+  for (const id of closingIds) await requestOfficeAutoSave(id);
+  tabStore.closeAllTabs();
   navigateToActiveTab();
 };
 
@@ -442,7 +470,7 @@ const handleClose = () => {
   overflow: hidden;
   white-space: nowrap;
   font-size: 12.5px;
-  line-height: 1;
+  line-height: 1.3;
   font-weight: inherit;
   -webkit-mask-image: linear-gradient(to right, #000 70%, transparent 100%);
   mask-image: linear-gradient(to right, #000 70%, transparent 100%);

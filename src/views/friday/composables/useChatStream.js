@@ -1,19 +1,27 @@
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { electronService } from '@/services/electron';
 import { useFridayStore, useTabStore } from '@/store';
 import { getFridayTabId, isNewSessionId } from '@/utils/fridayNavigation';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
 
-export function useChatStream({ messages, currentSessionId, currentMode, onHistoryRefresh, t }) {
-  const route = useRoute();
-  const router = useRouter();
-  const fridayStore = useFridayStore();
-  const tabStore = useTabStore();
+const streamRuntimes = new Map();
 
+function getStreamKey(route, tabStore) {
+  if (route?.meta?.share) return `share:${route.params.sessionId || ''}`;
+  return getFridayTabId(route, tabStore) || '_default';
+}
+
+function createChatStreamRuntime({ key, router, fridayStore, t }) {
+  const hooks = { onHistoryRefresh: null, t };
+
+  const messages = ref([]);
+  const currentSessionId = ref('');
+  const currentMode = ref(fridayStore.mode || 'chat');
   const isStreaming = ref(false);
   const streamingContent = ref('');
   const streamingReasoning = ref('');
+  const isReasoningStreaming = ref(false);
   const agentSegments = ref([]);
   const pendingApproval = ref(null);
   const autoApproveAll = ref(false);
@@ -32,6 +40,8 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   let pendingContent = '';
   let pendingReasoning = '';
   let chunkFlushFrame = null;
+  let viewCount = 0;
+  let disposed = false;
 
   const isThinking = computed(() => {
     if (!isStreaming.value || currentMode.value !== 'agent') return false;
@@ -42,16 +52,21 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     return true;
   });
 
-  watch(isStreaming, (streaming) => {
-    fridayStore.setTabStreaming(getFridayTabId(route, tabStore), streaming);
-    if (!streaming) autoApproveAll.value = false;
-  });
+  function setStreaming(streaming) {
+    isStreaming.value = streaming;
+    fridayStore.setTabStreaming(key === '_default' ? '' : key, streaming);
+    if (!streaming) {
+      autoApproveAll.value = false;
+      isReasoningStreaming.value = false;
+    }
+  }
 
   function resetStreamState() {
     clearPendingChunks();
-    isStreaming.value = false;
+    setStreaming(false);
     streamingContent.value = '';
     streamingReasoning.value = '';
+    isReasoningStreaming.value = false;
     agentSegments.value = [];
     pendingApproval.value = null;
     autoApproveAll.value = false;
@@ -62,9 +77,10 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
 
   function startStreaming() {
     clearPendingChunks();
-    isStreaming.value = true;
+    setStreaming(true);
     streamingContent.value = '';
     streamingReasoning.value = '';
+    isReasoningStreaming.value = false;
     agentSegments.value = [];
     pendingApproval.value = null;
     activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -75,7 +91,8 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     clearPendingChunks();
     activeRequestId = requestId;
     isDoneReceived = false;
-    isStreaming.value = true;
+    setStreaming(true);
+    isReasoningStreaming.value = false;
     streamingContent.value = output || '';
     agentSegments.value = segments.map(segment => ({
       ...segment,
@@ -98,7 +115,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     streamingContent.value = '';
     streamingReasoning.value = '';
     agentSegments.value = [];
-    isStreaming.value = false;
+    setStreaming(false);
   }
 
   function clearPendingChunks() {
@@ -150,6 +167,8 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   function queueChunk(content, reasoning = '') {
     pendingContent += content || '';
     pendingReasoning += reasoning || '';
+    if (reasoning) isReasoningStreaming.value = true;
+    if (content) isReasoningStreaming.value = false;
     if (chunkFlushFrame === null) {
       chunkFlushFrame = window.requestAnimationFrame(flushPendingChunks);
     }
@@ -193,7 +212,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     const modelId = data.modelId || fridayStore.modelId;
     const model = loadModelConfig(modelId);
     if (!model) {
-      window.alert(t('friday.modelRequired'));
+      window.alert(hooks.t('friday.modelRequired'));
       router.push('/settings/model');
       return false;
     }
@@ -219,7 +238,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       kbCategoryId: data.kbCategoryId || ''
     }).catch((err) => {
       console.error('Chat invoke error:', err);
-      pushErrorMessage(`${t('friday.requestFailed')}${err?.message || t('friday.retryLater')}`);
+      pushErrorMessage(`${hooks.t('friday.requestFailed')}${err?.message || hooks.t('friday.retryLater')}`);
     });
     return true;
   }
@@ -227,7 +246,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
   async function handleStop() {
     if (!isStreaming.value || !activeRequestId) return;
     try {
-      const mode = currentMode.value || route.query.mode || 'chat';
+      const mode = currentMode.value || 'chat';
       const channel = mode === 'agent' ? 'agent-stop' : 'stop_chat';
       await electronService.invoke(channel, { requestId: activeRequestId });
     } catch (err) {
@@ -270,13 +289,13 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     const seg = agentSegments.value.find(s => s.type === 'tool' && s.toolCallId === toolCallId);
     if (seg) {
       seg.status = 'rejected';
-      seg.output = decision.reason || t('friday.userRejected');
+      seg.output = decision.reason || hooks.t('friday.userRejected');
     }
     pendingApproval.value = null;
     try {
       await electronService.invoke('agent-tool-approval-resume', {
         requestId,
-        decision: { type: 'reject', reason: decision.reason || t('friday.userRejected') }
+        decision: { type: 'reject', reason: decision.reason || hooks.t('friday.userRejected') }
       });
     } catch (err) {
       console.error('[Agent] approval resume failed:', err);
@@ -302,7 +321,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       if (isDoneReceived) return;
       isDoneReceived = true;
       flushPendingChunksImmediately();
-      isStreaming.value = false;
+      setStreaming(false);
 
       if (data.userMessageId) {
         for (let i = messages.value.length - 1; i >= 0; i--) {
@@ -335,7 +354,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
         currentSessionId.value = data.sessionId;
       }
 
-      onHistoryRefresh?.();
+      hooks.onHistoryRefresh?.();
       streamingContent.value = '';
       streamingReasoning.value = '';
       agentSegments.value = [];
@@ -346,7 +365,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
       if (data.requestId !== activeRequestId) return;
       if (isDoneReceived) return;
       isDoneReceived = true;
-      pushErrorMessage(`${t('friday.requestFailed')}${data.error || t('friday.modelUnavailable')}`);
+      pushErrorMessage(`${hooks.t('friday.requestFailed')}${data.error || hooks.t('friday.modelUnavailable')}`);
       console.error('Stream error:', data.error);
     });
 
@@ -361,6 +380,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     unlistenAgentToolCall = electronService.listen('agent-tool-call', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      isReasoningStreaming.value = false;
       flushPendingChunksImmediately();
       const segs = agentSegments.value;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
@@ -402,6 +422,7 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     unlistenAgentApproval = electronService.listen('agent-tool-approval', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      isReasoningStreaming.value = false;
       flushPendingChunksImmediately();
       const approvalArguments = data.arguments && typeof data.arguments === 'object'
         ? data.arguments
@@ -463,17 +484,43 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     if (unlistenAgentToolCall) unlistenAgentToolCall();
     if (unlistenAgentToolResult) unlistenAgentToolResult();
     if (unlistenAgentApproval) unlistenAgentApproval();
+    unlistenChunk = null;
+    unlistenReasoning = null;
+    unlistenDone = null;
+    unlistenError = null;
+    unlistenTitle = null;
+    unlistenAgentToolCall = null;
+    unlistenAgentToolResult = null;
+    unlistenAgentApproval = null;
     clearPendingChunks();
-    fridayStore.setTabStreaming(getFridayTabId(route, tabStore), false);
+  }
+
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    unbindListeners();
+    setStreaming(false);
+    streamRuntimes.delete(key);
   }
 
   bindListeners();
-  onUnmounted(unbindListeners);
 
   return {
+    key,
+    hooks,
+    get viewCount() {
+      return viewCount;
+    },
+    set viewCount(value) {
+      viewCount = value;
+    },
+    messages,
+    currentSessionId,
+    currentMode,
     isStreaming,
     streamingContent,
     streamingReasoning,
+    isReasoningStreaming,
     agentSegments,
     pendingApproval,
     sessionTitle,
@@ -485,6 +532,55 @@ export function useChatStream({ messages, currentSessionId, currentMode, onHisto
     handleStop,
     handleApproveTool,
     handleApproveAll,
-    handleRejectTool
+    handleRejectTool,
+    dispose
+  };
+}
+
+export function useChatStream({ onHistoryRefresh, t }) {
+  const route = useRoute();
+  const router = useRouter();
+  const fridayStore = useFridayStore();
+  const tabStore = useTabStore();
+  const key = getStreamKey(route, tabStore);
+
+  let runtime = streamRuntimes.get(key);
+  if (!runtime) {
+    runtime = createChatStreamRuntime({ key, router, fridayStore, t });
+    streamRuntimes.set(key, runtime);
+  }
+
+  runtime.hooks.onHistoryRefresh = onHistoryRefresh;
+  runtime.hooks.t = t;
+  runtime.viewCount += 1;
+
+  onUnmounted(() => {
+    runtime.viewCount -= 1;
+    if (runtime.viewCount <= 0 && !runtime.isStreaming.value) {
+      runtime.dispose();
+    }
+  });
+
+  return {
+    tabKey: runtime.key,
+    messages: runtime.messages,
+    currentSessionId: runtime.currentSessionId,
+    currentMode: runtime.currentMode,
+    isStreaming: runtime.isStreaming,
+    streamingContent: runtime.streamingContent,
+    streamingReasoning: runtime.streamingReasoning,
+    isReasoningStreaming: runtime.isReasoningStreaming,
+    agentSegments: runtime.agentSegments,
+    pendingApproval: runtime.pendingApproval,
+    sessionTitle: runtime.sessionTitle,
+    isThinking: runtime.isThinking,
+    resetStreamState: runtime.resetStreamState,
+    startStreaming: runtime.startStreaming,
+    attachRequest: runtime.attachRequest,
+    sendChatMessage: runtime.sendChatMessage,
+    handleStop: runtime.handleStop,
+    handleApproveTool: runtime.handleApproveTool,
+    handleApproveAll: runtime.handleApproveAll,
+    handleRejectTool: runtime.handleRejectTool
   };
 }

@@ -8,9 +8,7 @@
     >
       <div class="sidebar-inner">
         <div class="sidebar-topbar" v-if="!searchMode">
-          <button class="topbar-btn" @click="toggleSidebar" :title="sidebarCollapsed ? '' : t('note.sidebar.collapse')">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
-          </button>
+          <span class="topbar-spacer" aria-hidden="true"></span>
           <div class="topbar-actions">
             <div class="new-note-btn-group" ref="newNoteBtnRef">
               <button class="new-note-main-btn" @click="createNewNote" :title="t('note.newNote')">
@@ -219,12 +217,13 @@
     ></div>
 
     <button
-      v-if="sidebarCollapsed"
-      class="sidebar-expand-btn"
+      v-show="!tocVisible"
+      class="sidebar-toggle-btn"
       @click="toggleSidebar"
-      :title="t('note.sidebar.expand')"
+      :title="sidebarCollapsed ? t('note.sidebar.expand') : t('note.sidebar.collapse')"
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+      <PanelLeftClose v-if="!sidebarCollapsed" :size="18" :stroke-width="1.8" />
+      <PanelLeftOpen v-else :size="18" :stroke-width="1.8" />
     </button>
 
     <div class="note-editor-area">
@@ -374,6 +373,7 @@
 <script setup>
 import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, onDeactivated, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next';
 import NoteEditor from './NoteEditor.vue';
 import { useNoteStore } from '@/store/modules/note';
 import { useNotebookStore } from '@/store/modules/notebook';
@@ -1111,6 +1111,14 @@ onDeactivated(() => {
   height: 100%;
   overflow: hidden;
   position: relative;
+  /* 功能性系统图标与字体统一为纯黑，避免灰色发虚 */
+  --text-secondary: #000000;
+  --text-tertiary: #000000;
+}
+
+[data-theme='dark'] .note-page {
+  --text-secondary: #99999e;
+  --text-tertiary: #6b6b70;
 }
 
 .note-sidebar {
@@ -1148,7 +1156,18 @@ onDeactivated(() => {
   height: 100%;
 }
 
-.sidebar-expand-btn {
+/* 收起时内容立即隐藏，避免图标随宽度过渡在裁切边沿滑动；展开时延迟淡入，等宽度过渡完成 */
+.sidebar-inner { transition: opacity 0.12s ease 0.12s; }
+.note-sidebar.collapsed .sidebar-inner { opacity: 0; pointer-events: none; transition: opacity 0s ease; }
+
+.topbar-spacer {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+
+/* 常驻切换按钮：元素永不卸载，仅切换内部图标，避免按钮重建导致的抖动 */
+.sidebar-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1166,7 +1185,7 @@ onDeactivated(() => {
   z-index: 30;
 }
 
-.sidebar-expand-btn:hover {
+.sidebar-toggle-btn:hover {
   background-color: var(--bg-hover);
 }
 
@@ -1192,14 +1211,14 @@ onDeactivated(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 12px;
+  padding: 12px 12px 12px 48px;
   height: 56px;
   box-sizing: border-box;
+  color: var(--text-tertiary);
 }
 
 .search-icon {
   flex-shrink: 0;
-  color: var(--text-tertiary);
 }
 
 .search-input {
@@ -1211,10 +1230,7 @@ onDeactivated(() => {
   color: var(--text-primary);
   min-width: 0;
   height: 32px;
-}
-
-.search-input::placeholder {
-  color: var(--text-tertiary);
+  padding: 0;
 }
 
 .topbar-btn {
@@ -1454,7 +1470,7 @@ onDeactivated(() => {
 }
 
 .empty-hint svg {
-  opacity: 0.4;
+  opacity: 1;
 }
 
 .empty-hint p {
@@ -1610,7 +1626,7 @@ onDeactivated(() => {
 }
 
 .toc-empty svg {
-  opacity: 0.35;
+  opacity: 1;
 }
 
 .toc-empty p {
@@ -1621,11 +1637,30 @@ onDeactivated(() => {
 .toc-empty-hint {
   font-size: 12px !important;
   color: var(--text-tertiary);
-  opacity: 0.7;
+  opacity: 1;
 }
 </style>
 
 <style>
+/* Teleport 到 body 的弹层不继承 .note-page 变量，需单独覆盖为纯黑 */
+.new-note-dropdown-menu,
+.folder-dropdown,
+.folder-item-menu,
+.context-menu,
+.notebook-submenu {
+  --text-secondary: #000000;
+  --text-tertiary: #000000;
+}
+
+[data-theme='dark'] .new-note-dropdown-menu,
+[data-theme='dark'] .folder-dropdown,
+[data-theme='dark'] .folder-item-menu,
+[data-theme='dark'] .context-menu,
+[data-theme='dark'] .notebook-submenu {
+  --text-secondary: #99999e;
+  --text-tertiary: #6b6b70;
+}
+
 .folder-dropdown {
   position: fixed;
   z-index: 100001;
@@ -1858,7 +1893,7 @@ onDeactivated(() => {
 
 .context-item .arrow-right {
   margin-left: auto;
-  opacity: 0.4;
+  opacity: 1;
 }
 
 .context-divider {

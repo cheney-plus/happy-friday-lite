@@ -22,6 +22,9 @@ export const useAppStore = defineStore('app', {
     toggleSidebar() {
       this.sidebarVisible = !this.sidebarVisible
     },
+    setSidebarVisible(visible) {
+      this.sidebarVisible = visible
+    },
     setLanguage(lang) {
       this.language = lang
     },

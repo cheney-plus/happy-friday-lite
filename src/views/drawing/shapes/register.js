@@ -112,7 +112,7 @@ export function registerDrawingShapes() {
     rx: 14,
     ry: 14,
     body: { fill: 'rgba(148,163,184,0.08)', strokeDasharray: '6 4' },
-    label: { textVerticalAnchor: 'top', refY: 12, fontSize: 12, fill: '#78716c' }
+    label: { textVerticalAnchor: 'top', refY: 12, fontSize: 12, fill: '#44403c' }
   })
   registerRect('draw-sticky', {
     width: 140,

@@ -92,7 +92,12 @@ export const PALETTE_GROUPS = [
       { id: 'umlUsecase', kind: 'node', shape: 'draw-uml-usecase', preview: 'ellipse', width: 150, height: 70, defaultLabel: '用例' },
       { id: 'umlPackage', kind: 'node', shape: 'draw-uml-package', preview: 'package', width: 180, height: 110, defaultLabel: 'Package' },
       { id: 'umlComponent', kind: 'node', shape: 'draw-uml-component', preview: 'component', width: 160, height: 72, defaultLabel: 'Component' },
-      { id: 'umlNote', kind: 'node', shape: 'draw-note', preview: 'note', width: 130, height: 90, defaultLabel: '注释' }
+      { id: 'umlNote', kind: 'node', shape: 'draw-note', preview: 'note', width: 130, height: 90, defaultLabel: '注释' },
+      { id: 'umlInheritance', kind: 'edge', style: 'inheritance', preview: 'line-inheritance' },
+      { id: 'umlRealization', kind: 'edge', style: 'realization', preview: 'line-realization' },
+      { id: 'umlDependency', kind: 'edge', style: 'dependency', preview: 'line-dependency' },
+      { id: 'umlComposition', kind: 'edge', style: 'composition', preview: 'line-composition' },
+      { id: 'umlAggregation', kind: 'edge', style: 'aggregation', preview: 'line-aggregation' }
     ]
   },
   {

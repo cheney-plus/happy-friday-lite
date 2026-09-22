@@ -360,7 +360,12 @@ export function registerCommands(mainWindow) {
 
       cancelTokens.remove(requestId)
 
-      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent)
+      const assistantMsg = db.saveMessage(
+        currentSessionId,
+        'assistant',
+        fullContent,
+        db.buildAssistantMetadata({ reasoning: fullReasoning })
+      )
       db.updateSessionTimestamp(currentSessionId)
 
       mainWindow.webContents.send(CHAT_DONE, {
@@ -525,6 +530,10 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('get_drawing_state', () => {
     return db.getDrawingState()
+  })
+
+  ipcMain.handle('get_drawing_canvas', (_event, args) => {
+    return db.getDrawingCanvas(args?.canvasId)
   })
 
   ipcMain.handle('save_drawing_canvas', (_event, args) => {

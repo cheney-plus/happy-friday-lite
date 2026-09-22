@@ -1,5 +1,5 @@
 <template>
-  <div class="kb-main">
+  <div class="kb-main" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <div class="main-header">
       <div class="header-left">
         <button class="nav-btn" @click="$emit('go-back')" :disabled="!canGoBack">
@@ -402,7 +402,8 @@ const props = defineProps({
   canGoForward: Boolean,
   pathSegments: Array,
   files: Array,
-  currentPath: String
+  currentPath: String,
+  sidebarCollapsed: Boolean
 });
 
 const emit = defineEmits([
@@ -1052,6 +1053,11 @@ onBeforeUnmount(() => {
   overflow: hidden;
   min-height: 0;
 
+  /* 侧栏收起时让出常驻切换按钮的空间，padding 过渡与侧栏宽度动画同步 */
+  &.sidebar-collapsed .main-header {
+    padding-left: 68px;
+  }
+
   .main-header {
     flex-shrink: 0;
     display: flex;
@@ -1059,6 +1065,7 @@ onBeforeUnmount(() => {
     justify-content: space-between;
     padding: 12px 24px;
     background: var(--bg-primary);
+    transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
     .header-left {
       display: flex;

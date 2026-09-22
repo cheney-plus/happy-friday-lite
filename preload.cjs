@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'update_schedule_event',
       'delete_schedule_event',
       'get_drawing_state',
+      'get_drawing_canvas',
       'save_drawing_canvas',
       'delete_drawing_canvas',
       'save_drawing_category',
@@ -140,7 +141,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'harness-start',
       'harness-status',
       'harness-restart',
-      'harness-sync-config'
+      'harness-sync-config',
+      'office-open-file',
+      'office-close',
+      'office-auto-save',
+      'office-new',
+      'office-hide-all',
+      'office-show',
+      'office-get-state',
+      'office-set-content-bounds',
+      'office-get-recents',
+      'office-toggle-starred',
+      'office-remove-recents',
+      'office-reveal-path',
+      'office-open-dialog',
+      'office-set-ai-model',
+      'office-is-dirty'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -181,9 +197,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-tool-call',
       'agent-tool-result',
       'agent-tool-approval',
+      'drawing-updated',
       'automation-updated',
       'kb-directory-changed',
-      'harness-status-changed'
+      'harness-status-changed',
+      'office-opened',
+      'office-view-closed',
+      'office-file-saved',
+      'office-layout-sync'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

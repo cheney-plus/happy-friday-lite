@@ -90,6 +90,19 @@ export const useTabStore = defineStore('tabs', {
       if (tab) {
         tab.fullPath = fullPath
       }
+    },
+    updateTabTitle(id, title) {
+      const tab = this.openedTabs.find(t => t.id === id)
+      if (tab) {
+        tab.title = title
+      }
+    },
+    // Office 编辑器 Tab 当前文件路径（用于视图丢失后按原文件恢复）
+    updateTabFilePath(id, filePath) {
+      const tab = this.openedTabs.find(t => t.id === id)
+      if (tab) {
+        tab.officeFilePath = filePath
+      }
     }
   }
 })

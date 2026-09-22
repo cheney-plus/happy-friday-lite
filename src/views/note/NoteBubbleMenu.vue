@@ -835,6 +835,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .note-bubble-menu {
   z-index: 1000;
+  /* tippy 挂载到 body，不继承笔记页变量；功能性图标与字体统一为纯黑 */
+  --text-secondary: #000000;
+  --text-tertiary: #000000;
+}
+
+[data-theme='dark'] .note-bubble-menu {
+  --text-secondary: #99999e;
+  --text-tertiary: #6b6b70;
 }
 
 .bubble-menu-container {
@@ -899,7 +907,7 @@ onBeforeUnmount(() => {
 
 .bubble-btn svg {
   flex-shrink: 0;
-  opacity: 0.8;
+  opacity: 1;
 }
 
 .bubble-btn:hover svg {

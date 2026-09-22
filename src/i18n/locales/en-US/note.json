@@ -178,12 +178,16 @@
     "emptyText": "Ask Friday for writing help",
     "askFriday": "Ask Friday for writing help",
     "emptyHint": "Master, I can use the writing Agent to help you modify this note",
+    "quickPromptSummarize": "Summarize this note for me",
+    "quickPromptTranslate": "Translate this note into English",
+    "quickPromptPolish": "Polish this note for me",
     "inputPlaceholder": "Type a message...",
     "noModelConfigured": "No model configured, please add your model in settings",
     "referenceContent": "Referenced note content:",
     "referenceItem": "[Reference {index}]\n{content}",
     "emptyContent": "Message is empty, cannot save",
     "appendedToNote": "Appended to end of note",
+    "agentNoteContext": "The note the user is currently editing has ID {noteId}. To read or modify this note, call the get_note tool to read its content, and after making changes call the update_note tool (passing this noteId) to save.",
     "systemPrompt": "You are Friday, a customized personal knowledge intelligent assistant. You are friendly, professional, and good at helping users answer questions and complete tasks.\n\nThe user is currently editing a note. Below is the full content of the note:\n\n{noteContent}\n\nPlease answer the user's question based on the note content. The user may quote parts of the note when asking questions. Please focus on the quoted content while combining the full context of the note to provide accurate and valuable answers."
   },
   "bubbleMenu": {

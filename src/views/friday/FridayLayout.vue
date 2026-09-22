@@ -15,7 +15,9 @@
     <div class="friday-main">
       <div class="friday-outlet">
         <router-view v-slot="{ Component, route: childRoute }">
-          <component :is="Component" :key="String(childRoute.name)" />
+          <keep-alive>
+            <component :is="Component" :key="String(childRoute.name)" />
+          </keep-alive>
         </router-view>
       </div>
 

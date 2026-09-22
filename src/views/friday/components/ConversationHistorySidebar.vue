@@ -81,7 +81,7 @@
           <span>{{ t('history.rename') }}</span>
         </button>
         <button type="button" class="history-menu-item" @click="saveHistorySessionAsNote">
-          <NotebookPen :size="14" :stroke-width="1.8" />
+          <SaveNoteIcon :size="14" :stroke-width="1.8" />
           <span>{{ t('history.saveAsNote') }}</span>
         </button>
         <button type="button" class="history-menu-item" @click="shareHistorySession">
@@ -133,7 +133,8 @@
 import { computed, nextTick, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
-import { NotebookPen, Pencil, Share2, Trash2 } from 'lucide-vue-next';
+import { Pencil, Share2, Trash2 } from 'lucide-vue-next';
+import SaveNoteIcon from '@/components/icons/SaveNoteIcon.vue';
 import { useFridayStore } from '@/store';
 import ShareSessionModal from '@/views/history/ShareSessionModal.vue';
 import { useConversationSummary } from '@/views/friday/composables/useConversationSummary';

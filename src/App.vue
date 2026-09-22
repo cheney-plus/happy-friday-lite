@@ -48,6 +48,7 @@ const routerViewKey = computed(() => {
 });
 
 let unlistenConfig = null;
+let unlistenOfficeOpened = null;
 
 watch(
   () => route.name,
@@ -78,6 +79,43 @@ watch(
           tabStore.setActiveTab(existingTab.id);
           tabStore.updateTabFullPath(existingTab.id, newPath);
         }
+      }
+      return;
+    }
+
+    // Office 工作区：/office 为首页 Tab；/office/<type>/<instId> 为编辑器独立 Tab
+    // （每个打开的文件/新建文档对应主进程一个视图实例，Tab id 与其 viewId 一一对应）
+    if (rootPath === '/office') {
+      const segs = newPath.split('/');
+      const editorType = ['docs', 'sheets', 'slides', 'pdf'].includes(segs[2]) ? segs[2] : null;
+      if (editorType && segs[3]) {
+        const id = `office-${editorType}-${segs[3]}`;
+        const existing = tabStore.openedTabs.find(t => t.id === id);
+        if (existing) {
+          tabStore.setActiveTab(id);
+          if (existing.fullPath !== newPath) tabStore.updateTabFullPath(id, newPath);
+        } else {
+          tabStore.addTab({
+            id,
+            path: `/office/${editorType}`,
+            fullPath: newPath,
+            i18nKey: `office.${editorType}`,
+            icon: 'OfficeIcon'
+          });
+        }
+        return;
+      }
+      const homeTab = tabStore.openedTabs.find(t => t.id === '/office');
+      if (homeTab) {
+        tabStore.setActiveTab('/office');
+      } else {
+        tabStore.addTab({
+          id: '/office',
+          path: '/office',
+          fullPath: '/office',
+          i18nKey: menu.i18nKey,
+          icon: menu.icon
+        });
       }
       return;
     }
@@ -140,10 +178,39 @@ onMounted(async () => {
           appStore.setScheduleDefaultView(config.scheduleDefaultView);
         }
         appStore.setSidebarModules(config.sidebarModules);
+        // 启动时默认收起侧边栏
+        if (config.collapseSidebarOnLaunch) {
+          appStore.setSidebarVisible(false);
+        }
+        // 启动首页：仅在仍停留在初始 Friday 页面时跳转，避免打断用户已开始的导航
+        await router.isReady();
+        const homePage = typeof config.homePage === 'string' && config.homePage ? config.homePage : '/friday';
+        if (homePage !== '/friday' && route.path.startsWith('/friday')) {
+          const homeKey = homePage.split('/')[1];
+          const moduleEnabled = homeKey === 'friday' || appStore.sidebarModules[homeKey] !== false;
+          const initialFridayTab = tabStore.openedTabs.find(t => t.path === '/friday');
+          if (moduleEnabled && initialFridayTab) {
+            try {
+              await router.replace(homePage);
+              if (tabStore.activeTabId !== initialFridayTab.id) {
+                tabStore.openedTabs = tabStore.openedTabs.filter(t => t.id !== initialFridayTab.id);
+              }
+            } catch (_e) {}
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load config:', error);
     }
+
+    // 主进程内部发起的 Office 打开（如编辑器导出/转换生成的文件）：
+    // 视图已在主进程创建，这里跳转到对应编辑器 Tab（Tab 由上方 office 分支自动创建）
+    unlistenOfficeOpened = electronService.listen('office-opened', (event) => {
+      const viewId = event.payload?.viewId;
+      if (typeof viewId === 'string' && viewId.includes('-')) {
+        router.push(`/office/${viewId.replace('-', '/')}`);
+      }
+    });
 
     unlistenConfig = electronService.listen('config-changed', (event) => {
       const data = event.payload;
@@ -174,6 +241,10 @@ onUnmounted(() => {
   if (unlistenConfig) {
     unlistenConfig();
     unlistenConfig = null;
+  }
+  if (unlistenOfficeOpened) {
+    unlistenOfficeOpened();
+    unlistenOfficeOpened = null;
   }
 });
 </script>

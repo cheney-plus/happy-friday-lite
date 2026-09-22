@@ -1,6 +1,11 @@
 // Verify that native modules inside an unpacked Electron app match the target
 // Linux architecture. electron-builder can otherwise package an existing host
 // binary when a cross-architecture build is attempted.
+//
+// node-pty >= 1.2.0-beta.15 ships platform prebuilds, so a source-built
+// build/Release/pty.node is no longer guaranteed — accept the shipped
+// prebuilds/linux-<arch>/pty.node as well (runtime checks build first,
+// then prebuilds).
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -8,20 +13,14 @@ const targetArch = process.argv[2] || process.arch
 const unpackedDir = targetArch === 'x64' ? 'linux-unpacked' : `linux-${targetArch}-unpacked`
 const targetMachine = targetArch === 'arm64' ? 183 : 62 // ELF: AArch64 / x86-64
 const targetLabel = targetArch === 'arm64' ? 'ARM64' : 'x64'
-const nativeModule = join(
-  'release',
-  unpackedDir,
-  'resources',
-  'app',
-  'node_modules',
-  'node-pty',
-  'build',
-  'Release',
-  'pty.node'
-)
+const candidates = [
+  join('release', unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'build', 'Release', 'pty.node'),
+  join('release', unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'prebuilds', `linux-${targetArch}`, 'pty.node'),
+]
+const nativeModule = candidates.find((file) => existsSync(file))
 
-if (!existsSync(nativeModule)) {
-  console.error(`[verify-packaged-native-modules] ERROR: Missing ${nativeModule}`)
+if (!nativeModule) {
+  console.error(`[verify-packaged-native-modules] ERROR: Missing node-pty binary (checked: ${candidates.join(', ')})`)
   process.exit(1)
 }
 

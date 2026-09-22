@@ -38,15 +38,26 @@ function verifyDependencies() {
 
 verifyDependencies()
 
-// node-pty does not publish a Linux ARM64 prebuild. electron-builder cannot
-// turn an x64 .node file into ARM64, so fail before producing a broken package.
+// node-pty binary check. Since 1.2.0-beta.15 node-pty ships prebuilds for
+// linux-x64/linux-arm64, so there are two valid layouts:
+//   1. build/Release/pty.node — source-built via node-gyp (e.g. the ARM64
+//      docker --build-from-source step that caps glibc at 2.31)
+//   2. prebuilds/linux-<arch>/pty.node — shipped prebuild, used when
+//      build/Release is absent (runtime checks build first, then prebuilds)
 function verifyNodePtyArchitecture() {
   const targetMachine = targetArch === 'arm64' ? 183 : 62 // ELF: AArch64 / x86-64
   const targetLabel = targetArch === 'arm64' ? 'ARM64' : 'x64'
-  const nativeModule = join(nodeModules, 'node-pty', 'build', 'Release', 'pty.node')
+  const candidates = [
+    join(nodeModules, 'node-pty', 'build', 'Release', 'pty.node'),
+    join(nodeModules, 'node-pty', 'prebuilds', `linux-${targetArch}`, 'pty.node'),
+  ]
+  const nativeModule = candidates.find((file) => existsSync(file))
 
-  if (!existsSync(nativeModule)) {
-    console.error(`[prebuild-clean] ERROR: Missing ${nativeModule}. Run npm install on the target architecture first.`)
+  if (!nativeModule) {
+    console.error(
+      `[prebuild-clean] ERROR: Missing node-pty binary (checked: ${candidates.join(', ')}). ` +
+        'Run `npm install` on the target architecture first.'
+    )
     process.exit(1)
   }
 
@@ -61,7 +72,7 @@ function verifyNodePtyArchitecture() {
     process.exit(1)
   }
 
-  console.log(`[prebuild-clean] Verified node-pty is a Linux ${targetLabel} binary`)
+  console.log(`[prebuild-clean] Verified node-pty is a Linux ${targetLabel} binary (${nativeModule})`)
 }
 
 verifyNodePtyArchitecture()
