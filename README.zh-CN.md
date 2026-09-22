@@ -84,7 +84,7 @@
 
 ### 笔记
 
-![笔记富文本编辑](docs/resource/3.png)
+![笔记富文本编辑](docs/resource/PixPin_2026-09-22_23-45-35.png)
 
 ### 绘图
 
