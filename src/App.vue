@@ -100,7 +100,7 @@ watch(
             path: `/office/${editorType}`,
             fullPath: newPath,
             i18nKey: `office.${editorType}`,
-            icon: 'FileSpreadsheet'
+            icon: 'OfficeIcon'
           });
         }
         return;

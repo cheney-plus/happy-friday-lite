@@ -39,6 +39,7 @@
   "noteModule": "笔记",
   "drawingModule": "绘图",
   "knowledgeModule": "知识库",
+  "officeModule": "Office",
   "noteModuleDesc": "记录与整理笔记",
   "knowledgeModuleDesc": "管理个人知识库",
   "scheduleModuleDesc": "安排日程与待办",

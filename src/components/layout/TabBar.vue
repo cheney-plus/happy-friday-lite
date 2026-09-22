@@ -108,20 +108,20 @@ import {
   ArrowLeft,
   ArrowRight,
   Layers,
-  FolderKanban,
   FileText,
-  FileSpreadsheet,
-  PencilRuler,
-  CalendarDays,
-  Workflow,
-  BrainCircuit,
-  Bot,
-  Clock,
-  Settings
+  Bot
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { electronService } from '@/services/electron';
-import DeepSeekIcon from '@/components/icons/DeepSeekIcon.vue';
+import OfficeIcon from '@/components/icons/OfficeIcon.vue';
+import CalendarIcon from '@/components/icons/CalendarIcon.vue';
+import KnowledgeIcon from '@/components/icons/KnowledgeIcon.vue';
+import NoteIcon from '@/components/icons/NoteIcon.vue';
+import DrawingIcon from '@/components/icons/DrawingIcon.vue';
+import HarnessIcon from '@/components/icons/HarnessIcon.vue';
+import AutomationIcon from '@/components/icons/AutomationIcon.vue';
+import HistoryIcon from '@/components/icons/HistoryIcon.vue';
+import SettingsIcon from '@/components/icons/SettingsIcon.vue';
 
 const tabStore = useTabStore();
 const appStore = useAppStore();
@@ -133,17 +133,17 @@ const isMac = /Macintosh/.test(userAgent);
 const isLinux = /Linux/.test(userAgent) && !/Android/.test(userAgent);
 
 const iconMap = {
-  FolderKanban,
+  NoteIcon,
+  KnowledgeIcon,
   FileText,
-  FileSpreadsheet,
-  PencilRuler,
-  CalendarDays,
-  Workflow,
-  BrainCircuit,
-  DeepSeekIcon,
+  DrawingIcon,
+  AutomationIcon,
+  HarnessIcon,
+  OfficeIcon,
+  CalendarIcon,
   Bot,
-  Clock,
-  Settings
+  HistoryIcon,
+  SettingsIcon
 };
 
 const tabsAreaRef = ref(null);

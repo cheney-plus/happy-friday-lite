@@ -555,6 +555,8 @@ const goBack = () => router.push('/settings');
 .module-chip-note { color: #2563eb; }
 .preview-item-knowledge,
 .module-chip-knowledge { color: #0d9488; }
+.preview-item-office,
+.module-chip-office { color: #d83b01; }
 .preview-item-schedule,
 .module-chip-schedule { color: #d97706; }
 .preview-item-automation,

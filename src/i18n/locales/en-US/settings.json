@@ -39,6 +39,7 @@
   "noteModule": "Notes",
   "drawingModule": "Drawing",
   "knowledgeModule": "Knowledge Base",
+  "officeModule": "Office",
   "noteModuleDesc": "Write and organize notes",
   "knowledgeModuleDesc": "Manage your knowledge base",
   "scheduleModuleDesc": "Plan your schedule and tasks",
