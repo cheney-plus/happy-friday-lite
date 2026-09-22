@@ -217,6 +217,7 @@
     ></div>
 
     <button
+      v-show="!tocVisible"
       class="sidebar-toggle-btn"
       @click="toggleSidebar"
       :title="sidebarCollapsed ? t('note.sidebar.expand') : t('note.sidebar.collapse')"
