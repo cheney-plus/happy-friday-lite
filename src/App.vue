@@ -178,6 +178,26 @@ onMounted(async () => {
           appStore.setScheduleDefaultView(config.scheduleDefaultView);
         }
         appStore.setSidebarModules(config.sidebarModules);
+        // 启动时默认收起侧边栏
+        if (config.collapseSidebarOnLaunch) {
+          appStore.setSidebarVisible(false);
+        }
+        // 启动首页：仅在仍停留在初始 Friday 页面时跳转，避免打断用户已开始的导航
+        await router.isReady();
+        const homePage = typeof config.homePage === 'string' && config.homePage ? config.homePage : '/friday';
+        if (homePage !== '/friday' && route.path.startsWith('/friday')) {
+          const homeKey = homePage.split('/')[1];
+          const moduleEnabled = homeKey === 'friday' || appStore.sidebarModules[homeKey] !== false;
+          const initialFridayTab = tabStore.openedTabs.find(t => t.path === '/friday');
+          if (moduleEnabled && initialFridayTab) {
+            try {
+              await router.replace(homePage);
+              if (tabStore.activeTabId !== initialFridayTab.id) {
+                tabStore.openedTabs = tabStore.openedTabs.filter(t => t.id !== initialFridayTab.id);
+              }
+            } catch (_e) {}
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load config:', error);
