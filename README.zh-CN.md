@@ -6,6 +6,14 @@
 
 ## ✨ 核心功能
 
+### 📑 Office
+
+- 内置 Office 办公套件：AI 文档、AI 表格、AI 演示、AI PDF
+- 富文本文档编辑：标题、列表、链接、表格、图片、公式等
+- Friday 侧边栏辅助写作：润色、翻译、扩写，一键生成幻灯片
+- 支持新建文件或打开本地 `.docx` / `.xlsx` / `.csv` / `.pptx` / `.pdf` 文件
+- 最近文件列表，支持按类型（文档 / 表格 / 演示 / PDF）筛选
+
 ### 🤖 Friday 智能助手
 
 - 基于 [DeepAgent SDK](https://github.com/frost-beta/deepagents) + LangChain 构建的智能体
@@ -51,6 +59,16 @@
 - 多标签页界面
 
 ## 🖼️ 截图
+
+### Office
+
+![Office 首页（AI 文档 / 表格 / 演示 / PDF 入口）](docs/resource/PixPin_2026-09-22_23-11-03.png)
+
+![AI 文档编辑与 Friday 侧边栏](docs/resource/PixPin_2026-09-22_23-13-35.png)
+
+![AI 演示编辑与 Friday 侧边栏](docs/resource/PixPin_2026-09-22_23-14-07.png)
+
+![AI 表格编辑与 Friday 侧边栏](docs/resource/PixPin_2026-09-22_23-15-21.png)
 
 ### Friday 智能助手
 
@@ -162,6 +180,7 @@ happy-friday-lite/
 │   ├── components/          # 通用组件（chat / layout）
 │   ├── views/               # 页面视图
 │   │   ├── friday/          # Friday 助手
+│   │   ├── office/          # Office 办公套件（文档 / 表格 / 演示 / PDF）
 │   │   ├── knowledge/       # 知识库
 │   │   ├── note/            # 笔记
 │   │   ├── drawing/         # 绘图
