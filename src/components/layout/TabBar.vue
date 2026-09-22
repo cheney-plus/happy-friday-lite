@@ -470,7 +470,7 @@ const handleClose = () => {
   overflow: hidden;
   white-space: nowrap;
   font-size: 12.5px;
-  line-height: 1;
+  line-height: 1.3;
   font-weight: inherit;
   -webkit-mask-image: linear-gradient(to right, #000 70%, transparent 100%);
   mask-image: linear-gradient(to right, #000 70%, transparent 100%);

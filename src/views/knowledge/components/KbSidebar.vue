@@ -3,9 +3,7 @@
     <div class="sidebar-inner">
       <div class="sidebar-top-area">
         <div class="sidebar-topbar" v-show="!searchMode">
-          <button class="topbar-btn" @click="$emit('toggle-sidebar')" title="收起侧边栏">
-            <SidebarIcon />
-          </button>
+          <span class="topbar-spacer" aria-hidden="true"></span>
           <div class="topbar-actions">
             <button class="topbar-btn" @click="$emit('enter-search')" title="搜索">
               <SearchIcon />
@@ -23,6 +21,7 @@
             placeholder="搜索(按ESC退出)..."
             @input="$emit('update:searchQuery', $event.target.value)"
             @keydown.escape="$emit('exit-search')"
+            @blur="$emit('exit-search')"
           />
         </div>
       </div>
@@ -71,7 +70,7 @@
 </template>
 
 <script setup>
-import { SidebarIcon, SearchIcon, ChevronIcon, PlusIcon, BookIcon, FolderOpenIcon } from './icons';
+import { SearchIcon, ChevronIcon, PlusIcon, BookIcon, FolderOpenIcon } from './icons';
 import { coverOptions } from '../constants';
 
 defineProps({
@@ -164,6 +163,12 @@ defineEmits([
       }
     }
 
+    .topbar-spacer {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+    }
+
     .topbar-actions {
       display: flex;
       align-items: center;
@@ -180,7 +185,7 @@ defineEmits([
   .sidebar-search {
     display: flex;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 12px 0 48px;
     gap: 6px;
 
     .search-icon {

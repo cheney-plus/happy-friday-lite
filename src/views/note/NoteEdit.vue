@@ -223,6 +223,14 @@ onDeactivated(() => {
   height: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
+  /* 功能性系统图标与字体统一为纯黑，避免灰色发虚 */
+  --text-secondary: #000000;
+  --text-tertiary: #000000;
+}
+
+[data-theme='dark'] .note-edit {
+  --text-secondary: #99999e;
+  --text-tertiary: #6b6b70;
 }
 
 .note-edit-header {
@@ -332,10 +340,15 @@ onDeactivated(() => {
   padding: 6px 0;
   min-width: 180px;
   animation: menu-in 0.12s ease-out;
+  /* Teleport 到 body，不继承 .note-edit 变量 */
+  --text-secondary: #000000;
+  --text-tertiary: #000000;
 }
 
 [data-theme='dark'] .note-more-menu {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.2);
+  --text-secondary: #99999e;
+  --text-tertiary: #6b6b70;
 }
 
 @keyframes menu-in {
