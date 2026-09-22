@@ -18,7 +18,7 @@
             :value="searchQuery"
             class="search-input"
             type="text"
-            placeholder="搜索(按ESC退出)..."
+            placeholder="输入知识库名称..."
             @input="$emit('update:searchQuery', $event.target.value)"
             @keydown.escape="$emit('exit-search')"
             @blur="$emit('exit-search')"

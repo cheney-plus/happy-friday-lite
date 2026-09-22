@@ -1213,11 +1213,11 @@ onDeactivated(() => {
   padding: 12px 12px 12px 48px;
   height: 56px;
   box-sizing: border-box;
+  color: var(--text-tertiary);
 }
 
 .search-icon {
   flex-shrink: 0;
-  color: var(--text-tertiary);
 }
 
 .search-input {
@@ -1229,10 +1229,7 @@ onDeactivated(() => {
   color: var(--text-primary);
   min-width: 0;
   height: 32px;
-}
-
-.search-input::placeholder {
-  color: var(--text-tertiary);
+  padding: 0;
 }
 
 .topbar-btn {
