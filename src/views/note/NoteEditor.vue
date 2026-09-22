@@ -567,6 +567,13 @@
 
             <template v-for="(msg, index) in chatMessages" :key="index">
               <UserMessage v-if="msg.role === 'user'" :content="msg.content" :references="msg.references" />
+              <AgentMessageBlock
+                v-else-if="msg.segments && msg.segments.length > 0"
+                :segments="msg.segments"
+                :reasoning="msg.reasoning"
+                :show-actions="false"
+                @action="(type) => handleChatAction(type, index)"
+              />
               <AIMessage
                 v-else
                 :content="msg.content"
@@ -578,12 +585,10 @@
             </template>
 
             <template v-if="isStreaming">
-              <AIMessage
-                :content="streamingContent"
+              <AgentMessageBlock
+                :segments="agentSegments"
                 :reasoning-streaming-content="streamingReasoning"
                 :is-streaming="true"
-                :show-divider="false"
-                :show-rollback="false"
               />
             </template>
           </div>
@@ -668,6 +673,7 @@ import {
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
+import AgentMessageBlock from '@/views/friday/components/AgentMessageBlock.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import { electronService } from '@/services/electron';
 import { getChatSession, setChatSession } from '@/utils/chatSessionCache';
@@ -1775,6 +1781,8 @@ const noteReferences = ref([]);
 const isStreaming = ref(false);
 const streamingContent = ref('');
 const streamingReasoning = ref('');
+// Agent 模式的时间线段（text / tool），用于渲染工具调用过程
+const agentSegments = ref([]);
 
 const chatMessages = ref([]);
 const currentSessionId = ref('');
@@ -1828,6 +1836,7 @@ function resetChatSession() {
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
+  agentSegments.value = [];
   closeAISidebar();
 }
 
@@ -1839,6 +1848,9 @@ let unlistenChunk = null;
 let unlistenReasoning = null;
 let unlistenDone = null;
 let unlistenError = null;
+let unlistenAgentToolCall = null;
+let unlistenAgentToolResult = null;
+let unlistenAgentApproval = null;
 
 function loadModelConfig(modelId) {
   const selectedId = modelId || localStorage.getItem('happy-friday-selected-model');
@@ -1891,8 +1903,6 @@ async function sendChatMessage(text) {
   // - 同时构造后端 attachments 元数据（kind: 'note'|'file'）用于注入 LLM 上下文
   // - 知识库附件（type === 'kb'）单独提取 kbName / kbCategoryId 供后端 RAG 检索
   const backendAttachments = [];
-  let kbName = '';
-  let kbCategoryId = '';
 
   if (attachments.value.length > 0) {
     const refLines = [];
@@ -1905,11 +1915,6 @@ async function sendChatMessage(text) {
         backendAttachments.push({ kind: 'file', name: att.name, path: att.path });
       } else if (att.type === 'kb') {
         refLines.push(`${t('friday.tagKb')}${att.name}`);
-        // 仅取第一个知识库作为 RAG 检索源（与 FridayChat 行为一致）
-        if (!kbName) {
-          kbName = att.name;
-          kbCategoryId = att.categoryId || '';
-        }
       }
     }
     if (refLines.length > 0) {
@@ -1919,6 +1924,7 @@ async function sendChatMessage(text) {
     }
   }
 
+  // 知识库附件由 Agent 通过知识库检索工具自主决定是否查询，无需额外参数
   chatMessages.value.push({
     role: 'user',
     content: displayContent,
@@ -1931,33 +1937,32 @@ async function sendChatMessage(text) {
   isStreaming.value = true;
   streamingContent.value = '';
   streamingReasoning.value = '';
+  agentSegments.value = [];
   isSidebarAtBottom.value = true;
   scrollSidebarToBottom();
 
   activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   isDoneReceived = false;
 
-  const noteContent = editor.value ? editor.value.getText() : '';
-  const systemPrompt = t('note.aiSidebar.systemPrompt', { noteContent });
+  // Agent 模式：告知当前笔记 ID，由 Agent 通过 get_note / update_note 工具读写这篇笔记
+  if (props.noteId) {
+    fullMessage += '\n\n---\n' + t('note.aiSidebar.agentNoteContext', { noteId: props.noteId });
+  }
 
   try {
-    await electronService.invoke('chat_with_memory', {
+    await electronService.invoke('agent-invoke', {
       requestId: activeRequestId,
       sessionId: currentSessionId.value || '',
       model: model,
       message: fullMessage,
-      enableThinking: false,
-      systemPrompt,
-      // 附件元数据：后端读取笔记/文件内容并注入 LLM 上下文（≤ 2,500 字符/条）
       attachments: backendAttachments,
-      // 知识库 RAG：后端通过 Function Calling 自主决定是否检索
-      kbName,
-      kbCategoryId
+      enableThinking: false
     });
   } catch (err) {
     console.error('Chat invoke error:', err);
     isStreaming.value = false;
     streamingContent.value = '';
+    agentSegments.value = [];
   }
 
   nextTick(() => {
@@ -1972,7 +1977,7 @@ function handleChatSend() {
 async function handleChatStop() {
   if (!isStreaming.value || !activeRequestId) return;
   try {
-    await electronService.invoke('stop_chat', { requestId: activeRequestId });
+    await electronService.invoke('agent-stop', { requestId: activeRequestId });
   } catch (err) {
     console.error('Stop chat error:', err);
   }
@@ -2142,12 +2147,42 @@ function startResize(e) {
   document.addEventListener('mouseup', onMouseUp);
 }
 
+// 追加 Agent 正文到时间线的 text 段（无 text 段时新建）
+function appendAgentText(content) {
+  if (!content) return;
+  const segs = agentSegments.value;
+  const last = segs.length > 0 ? segs[segs.length - 1] : null;
+  if (last && last.type === 'text') {
+    last.content += content;
+    return;
+  }
+  segs.push({
+    type: 'text',
+    id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    content,
+    isStreaming: true
+  });
+}
+
+// Agent 通过写笔记工具修改当前笔记后，从数据库重新加载内容同步到编辑器
+async function reloadNoteFromDb(noteId) {
+  if (!noteId || !editor.value) return;
+  try {
+    const note = await electronService.invoke('get_note', { noteId });
+    if (!note || typeof note.content !== 'string') return;
+    emit('update:modelValue', note.content);
+  } catch (e) {
+    console.error('Failed to reload note after agent update:', e);
+  }
+}
+
 async function setupChatListeners() {
   unlistenChunk = electronService.listen(
     'chat-chunk',
     (event) => {
       if (event.payload.requestId !== activeRequestId) return;
       streamingContent.value += event.payload.content;
+      appendAgentText(event.payload.content);
       scrollSidebarToBottom();
     }
   );
@@ -2158,6 +2193,72 @@ async function setupChatListeners() {
       if (event.payload.requestId !== activeRequestId) return;
       streamingReasoning.value += event.payload.content;
       scrollSidebarToBottom();
+    }
+  );
+
+  unlistenAgentToolCall = electronService.listen(
+    'agent-tool-call',
+    (event) => {
+      const data = event.payload;
+      if (data.requestId !== activeRequestId) return;
+      const segs = agentSegments.value;
+      const last = segs.length > 0 ? segs[segs.length - 1] : null;
+      if (last && last.type === 'text') last.isStreaming = false;
+      const existing = segs.find(s =>
+        s.type === 'tool' && s.toolName === data.toolName && s.status === 'pending_approval'
+      );
+      if (existing) {
+        existing.toolCallId = data.toolCallId;
+        existing.id = data.toolCallId;
+        existing.arguments = data.arguments;
+        existing.status = 'running';
+        existing.requireApproval = !!data.requireApproval;
+      } else {
+        segs.push({
+          type: 'tool',
+          id: data.toolCallId,
+          toolCallId: data.toolCallId,
+          toolName: data.toolName,
+          arguments: data.arguments,
+          status: data.requireApproval ? 'pending_approval' : 'running',
+          output: '',
+          requireApproval: !!data.requireApproval
+        });
+      }
+      scrollSidebarToBottom();
+    }
+  );
+
+  unlistenAgentToolResult = electronService.listen(
+    'agent-tool-result',
+    (event) => {
+      const data = event.payload;
+      if (data.requestId !== activeRequestId) return;
+      const seg = agentSegments.value.find(s => s.type === 'tool' && s.toolCallId === data.toolCallId);
+      if (seg && seg.status !== 'rejected') {
+        seg.status = data.status || 'success';
+        seg.output = data.output || '';
+      }
+      // Agent 更新当前笔记成功后，将数据库最新内容同步回编辑器
+      // （tool-result 事件不含参数，noteId 从 agent-tool-call 阶段记录的段中取）
+      const toolNoteId = seg?.arguments?.noteId;
+      if (data.toolName === 'update_note' && data.status === 'success' && (!toolNoteId || toolNoteId === props.noteId)) {
+        reloadNoteFromDb(props.noteId);
+      }
+      scrollSidebarToBottom();
+    }
+  );
+
+  // 写操作工具需要审批；侧边栏场景与 Friday 日程助理保持一致，默认自动批准
+  unlistenAgentApproval = electronService.listen(
+    'agent-tool-approval',
+    (event) => {
+      const data = event.payload;
+      if (data.requestId !== activeRequestId) return;
+      electronService.invoke('agent-tool-approval-resume', {
+        requestId: data.requestId,
+        decision: { type: 'approve' }
+      });
     }
   );
 
@@ -2172,15 +2273,21 @@ async function setupChatListeners() {
         currentSessionId.value = event.payload.sessionId;
       }
 
+      const segs = agentSegments.value;
+      const last = segs.length > 0 ? segs[segs.length - 1] : null;
+      if (last && last.type === 'text') last.isStreaming = false;
+
       chatMessages.value.push({
         role: 'assistant',
         content: event.payload.fullContent,
-        reasoning: event.payload.reasoningContent || ''
+        reasoning: event.payload.reasoningContent || '',
+        segments: segs.length > 0 ? JSON.parse(JSON.stringify(segs)) : undefined
       });
 
       isStreaming.value = false;
       streamingContent.value = '';
       streamingReasoning.value = '';
+      agentSegments.value = [];
       scrollSidebarToBottom();
 
       nextTick(() => {
@@ -2196,6 +2303,7 @@ async function setupChatListeners() {
       isStreaming.value = false;
       streamingContent.value = '';
       streamingReasoning.value = '';
+      agentSegments.value = [];
       console.error('Chat error:', event.payload.error);
     }
   );
@@ -2206,6 +2314,12 @@ function cleanupChatListeners() {
   unlistenReasoning?.();
   unlistenDone?.();
   unlistenError?.();
+  unlistenAgentToolCall?.();
+  unlistenAgentToolResult?.();
+  unlistenAgentApproval?.();
+  unlistenAgentToolCall = null;
+  unlistenAgentToolResult = null;
+  unlistenAgentApproval = null;
 }
 
 const highlightColorPalette = [

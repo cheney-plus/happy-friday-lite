@@ -187,6 +187,7 @@
     "referenceItem": "【引用{index}】\n{content}",
     "emptyContent": "消息内容为空，无法保存",
     "appendedToNote": "已追加到笔记末尾",
+    "agentNoteContext": "当前用户正在编辑的笔记 ID 为 {noteId}。如需读取或修改这篇笔记，请调用 get_note 工具读取内容，修改完成后调用 update_note 工具（传入该 noteId）保存。",
     "systemPrompt": "你是 Friday，一个定制化个人知识智能服务助手。你友好、专业，善于帮助用户解答问题和完成任务。\n\n当前用户正在编辑一篇笔记，以下是笔记的完整内容：\n\n{noteContent}\n\n请基于笔记内容来回答用户的问题。用户可能会引用笔记中的部分内容进行提问，请重点关注引用的内容，同时结合笔记全文上下文来给出准确、有价值的回答。"
   },
   "bubbleMenu": {
