@@ -197,8 +197,15 @@ async function createBlankDoc() {
         await router.replace(officeEditorPath(res.viewId));
         return;
       }
-      currentFile.value = null;
-      setTabTitle('');
+      // sheets 新建会由主进程落盘空白工作簿文件并排队打开，
+      // 随后 office-file-saved 事件会再以最终路径刷新一次
+      currentFile.value = res.filePath ?? null;
+      if (res.filePath) {
+        setTabTitle(baseName(res.filePath));
+        setTabFile(res.filePath);
+      } else {
+        setTabTitle('');
+      }
     }
   } finally {
     busy.value = false;

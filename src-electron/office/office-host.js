@@ -3,6 +3,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { app, dialog, ipcMain, shell } from 'electron'
+import XLSX from 'xlsx'
 import { registerOfficeAiBridge } from './office-ai-bridge.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -430,22 +431,63 @@ function wireSlidesShowFullscreen() {
   state.slidesShowWrapped = true
 }
 
-/** 按类型创建上游编辑器视图（filePath 为空表示新建空白文档） */
+/** 按类型创建上游编辑器视图（filePath 为空表示新建空白文档）。
+ *  返回 { view, filePath }：sheets 新建时会生成空白工作簿文件，filePath 为其实际路径。 */
 function createTypeView(type, filePath) {
   const b = state.bundles
   if (type === 'docs') {
-    return b.docs.createDocsView(filePath || undefined)
+    return { view: b.docs.createDocsView(filePath || undefined), filePath }
   }
   if (type === 'sheets') {
-    if (!filePath) b.sheets.setSheetsNewBlank()
+    // 上游 sheets renderer 的无会话空白视图是"演示模式"：编辑只留在内存，
+    // 保存被拒绝（appDemoNoSave），pendingEdits 恒为 0，自动保存随之失效。
+    // 因此新建表格时先落盘一个空白 xlsx，再按普通文件排队打开，让
+    // Ctrl+S / 关闭前自动保存 / 脏跟踪全部走真实会话链路。
+    let target = filePath
+    if (!target) {
+      try {
+        target = createBlankWorkbookFile()
+      } catch (e) {
+        console.warn('[Office] create blank workbook failed, fallback to demo view:', e?.message || e)
+        b.sheets.setSheetsNewBlank()
+      }
+    }
     const view = b.sheets.createSheetsView({ includeAiHandlers: false })
-    if (filePath) b.sheets.queueWorkbookForView(view.webContents, filePath)
-    return view
+    if (target) b.sheets.queueWorkbookForView(view.webContents, target)
+    return { view, filePath: target }
   }
   if (type === 'slides') {
-    return b.slides.createSlidesView(filePath || null)
+    return { view: b.slides.createSlidesView(filePath || null), filePath }
   }
-  return b.pdf.createPdfView(filePath || null)
+  return { view: b.pdf.createPdfView(filePath || null), filePath }
+}
+
+/** 新建空白表格的默认保存目录（与上游 sheets configuredDefaultSaveDir 一致：
+ *  优先 app-settings.json 的 defaultSaveDir，回退 ~/Documents/GenOffice） */
+function sheetsDefaultSaveDir() {
+  try {
+    const settingsPath = path.join(app.getPath('userData'), 'app-settings.json')
+    const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const dir = raw.defaultSaveDir
+      if (typeof dir === 'string' && path.isAbsolute(dir)) return dir
+    }
+  } catch { /* ignore */ }
+  return path.join(app.getPath('documents'), 'GenOffice')
+}
+
+/** 生成空白 xlsx 工作簿文件并返回路径（单空 Sheet1，复用上游 uniquePathIn 去重命名） */
+function createBlankWorkbookFile() {
+  const dir = sheetsDefaultSaveDir()
+  fs.mkdirSync(dir, { recursive: true })
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([]), 'Sheet1')
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+  const filePath = state.bundles.sheets.uniquePathIn(dir, '未命名.xlsx')
+  fs.writeFileSync(filePath, buffer)
+  // 标记为"未命名"文件：沿用上游 autoRenameWorkbook 按内容自动改名的能力
+  try { state.bundles.sheets.markSheetsUntitledPath(filePath) } catch { /* ignore */ }
+  return filePath
 }
 
 /**
@@ -470,7 +512,7 @@ export async function openOfficeFile(filePath, opts = {}) {
   }
 
   const viewId = allocViewId(type, opts.viewId)
-  const view = createTypeView(type, filePath)
+  const { view } = createTypeView(type, filePath)
   attachView({ viewId, type, view, filePath })
   // 最近文件统一记录在 docs bundle 的 recents 存储中（recordRecentFile 自带去重）
   if (filePath) {
@@ -567,14 +609,15 @@ export async function closeOfficeFile(viewId) {
 /**
  * 新建空白文档（对应编辑器的无参 createXxxView）。每个新建文档都是独立视图/Tab；
  * requestedViewId 用于 Tab 恢复场景（在原 Tab 的 viewId 下重建）。
+ * sheets 新建会落盘空白工作簿文件，返回值携带其 filePath。
  */
 export function newOfficeDocument(type, requestedViewId) {
   if (!state.bundles?.[type]) return { success: false, error: 'editor unavailable' }
   const viewId = allocViewId(type, requestedViewId)
-  const view = createTypeView(type, null)
-  attachView({ viewId, type, view, filePath: null })
+  const { view, filePath } = createTypeView(type, null)
+  attachView({ viewId, type, view, filePath })
   showView(viewId)
-  return { success: true, type, viewId, blank: true }
+  return { success: true, type, viewId, blank: true, filePath }
 }
 
 /** 隐藏所有 Office 视图（路由离开 Office 工作区时调用，不销毁） */
