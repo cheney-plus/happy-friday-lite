@@ -60,21 +60,23 @@
 
 ## 🖼️ 截图
 
+### Friday 智能助手
+
+![Friday 智能助手首页](docs/resource/PixPin_2026-08-15_16-51-10.png)
+
+![Friday 对话与代码执行](docs/resource/PixPin_2026-09-22_23-43-29.png)
+
+
 ### Office
 
 ![Office 首页（AI 文档 / 表格 / 演示 / PDF 入口）](docs/resource/PixPin_2026-09-22_23-11-03.png)
 
-![AI 文档编辑与 Friday 侧边栏](docs/resource/PixPin_2026-09-22_23-13-35.png)
+![AI 文档编辑](docs/resource/PixPin_2026-09-22_23-13-35.png)
 
-![AI 演示编辑与 Friday 侧边栏](docs/resource/PixPin_2026-09-22_23-14-07.png)
+![AI 演示编辑](docs/resource/PixPin_2026-09-22_23-14-07.png)
 
-![AI 表格编辑与 Friday 侧边栏](docs/resource/PixPin_2026-09-22_23-15-21.png)
+![AI 表格编辑](docs/resource/PixPin_2026-09-22_23-15-21.png)
 
-### Friday 智能助手
-
-![Friday 智能助手首页](docs/resource/1.png)
-
-![Friday 对话与代码执行](docs/resource/1.1.png)
 
 ### 知识库
 
