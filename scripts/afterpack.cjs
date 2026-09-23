@@ -270,9 +270,10 @@ function resolveDeepseekPackage(importer, name, nmDir) {
 // Read-only verification for packaged/extracted artifacts on any host arch.
 function verifyDeepseekImports(nmDir) {
   nmDir = path.resolve(nmDir);
-  if (!fs.existsSync(path.join(nmDir, DEEPSEEK_SCOPE, "dsh", "package.json"))) {
-    throw new Error(`[verify-harness] Missing packaged DSH in ${nmDir}`);
-  }
+  // electron-builder may create a second node_modules directory under
+  // app.asar.unpacked for native modules only. It is not a DSH dependency
+  // tree and must not fail the DeepSeek import check.
+  if (!fs.existsSync(path.join(nmDir, DEEPSEEK_SCOPE, "dsh", "package.json"))) return;
   const missing = [];
   for (const pkgDir of collectDeepseekPackages(nmDir, 0)) {
     const imports = [];
