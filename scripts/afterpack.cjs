@@ -17,6 +17,7 @@
 // the asar-contained parts must be handled differently.
 const fs = require("node:fs");
 const path = require("node:path");
+const { verifyKoffiNative } = require("./koffi-native.cjs");
 
 // electron-builder <25 exports numeric Arch enum, >=25 may use strings.
 function archName(arch) {
@@ -176,8 +177,7 @@ function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
 const DEEPSEEK_SCOPE = "@deepseek-ai";
 const REPAIR_JS_EXTS = new Set([".js", ".mjs", ".cjs"]);
 const REPAIR_MAX_FILE_BYTES = 1 << 20; // skip frontend bundles; only real node code matters
-const REPAIR_MAX_PASSES = 5;
-const REPAIR_IMPORT_RE = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](@deepseek-ai\/[a-z0-9][a-z0-9._-]*)/g;
+const REPAIR_IMPORT_RE = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)["'](@deepseek-ai\/[a-z0-9][a-z0-9._-]*)/g;
 
 // Yield every "@deepseek-ai/<pkg>" directory holding a package.json, reachable
 // through node_modules nesting up to `depth` levels (electron-builder can lay
@@ -214,6 +214,12 @@ function* collectDeepseekPackages(dir, depth) {
 
 // Collect bare "@deepseek-ai/<pkg>" import specifiers from the package's JS.
 function scanDeepseekImports(pkgDir, found) {
+  // Browser plugins are bundled by DSH's frontend build. Their development
+  // imports are not Node runtime dependencies (React is excluded as well).
+  const manifest = JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"));
+  const clientExport = manifest.exports?.["./client"];
+  const clientPath = typeof clientExport === "string" ? clientExport : clientExport?.default;
+  const browserEntry = clientPath ? path.resolve(pkgDir, clientPath) : null;
   const stack = [pkgDir];
   while (stack.length) {
     const dir = stack.pop();
@@ -226,11 +232,11 @@ function scanDeepseekImports(pkgDir, found) {
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === "node_modules") continue; // nested copies are scanned on their own
+        if (["node_modules", "types"].includes(entry.name)) continue; // nested packages and declaration-build artifacts
         stack.push(full);
         continue;
       }
-      if (!entry.isFile()) continue;
+      if (!entry.isFile() || full === browserEntry) continue;
       if (!REPAIR_JS_EXTS.has(path.extname(entry.name))) continue;
       let content;
       try {
@@ -239,67 +245,78 @@ function scanDeepseekImports(pkgDir, found) {
       } catch {
         continue;
       }
-      for (const match of content.matchAll(REPAIR_IMPORT_RE)) found.add(match[1]);
+      for (const match of content.matchAll(REPAIR_IMPORT_RE)) {
+        found.push({ name: match[1], importer: full });
+      }
     }
   }
 }
 
-// True when Node's walk-up resolution from pkgDir can find `name`
-// ("@deepseek-ai/<pkg>") in some ancestor node_modules.
-function deepseekResolvable(pkgDir, name) {
-  let dir = pkgDir;
-  for (;;) {
-    const parent = path.dirname(dir);
-    if (parent === dir) return false;
-    if (fs.existsSync(path.join(dir, "node_modules", name)) || fs.existsSync(path.join(dir, name))) {
-      // second check fires when dir itself is a node_modules dir; for scoped
-      // ancestors it covers the "scope/node_modules/<pkg>" hoisted layout
-      return true;
+// Confine resolution to the app: the project's node_modules must never hide
+// missing packaged dependencies when the output lives inside the project.
+function resolveDeepseekPackage(importer, name, nmDir) {
+  const boundary = path.dirname(path.resolve(nmDir));
+  let dir = path.dirname(importer);
+  while (dir === boundary || dir.startsWith(boundary + path.sep)) {
+    if (path.basename(dir) !== "node_modules") {
+      const candidate = path.join(dir, "node_modules", name);
+      if (fs.existsSync(path.join(candidate, "package.json"))) return candidate;
     }
-    dir = parent;
+    dir = path.dirname(dir);
   }
+  return null;
 }
 
-// Copy a missing package from the build machine's node_modules into the
-// packaged top-level node_modules (resolvable from every walk-up path).
-function copyDeepseekPackage(nmDir, srcNm, name, stats) {
-  const src = path.join(srcNm, name);
-  if (!fs.existsSync(path.join(src, "package.json"))) {
-    console.error(`[afterpack] WARNING: ${name} is imported by the packaged tree but missing from ${srcNm} too — not repairable`);
-    return false;
+// Read-only verification for packaged/extracted artifacts on any host arch.
+function verifyDeepseekImports(nmDir) {
+  nmDir = path.resolve(nmDir);
+  if (!fs.existsSync(path.join(nmDir, DEEPSEEK_SCOPE, "dsh", "package.json"))) {
+    throw new Error(`[verify-harness] Missing packaged DSH in ${nmDir}`);
   }
-  const dest = path.join(nmDir, name);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.rmSync(dest, { recursive: true, force: true });
-  fs.cpSync(src, dest, { recursive: true });
-  stats.push(`+ ${name} (restored missing package)`);
-  return true;
+  const missing = [];
+  for (const pkgDir of collectDeepseekPackages(nmDir, 0)) {
+    const imports = [];
+    scanDeepseekImports(pkgDir, imports);
+    for (const { name, importer } of imports) {
+      if (!resolveDeepseekPackage(importer, name, nmDir)) missing.push(`${name} from ${importer}`);
+    }
+  }
+  if (missing.length) throw new Error(`[verify-harness] Unresolved packaged imports:\n${missing.join("\n")}`);
 }
 
 function repairDeepseekImports(nmDir, srcNm, stats) {
   if (!fs.existsSync(nmDir)) return;
-  for (let pass = 0; pass < REPAIR_MAX_PASSES; pass += 1) {
-    const imported = new Set();
-    let present = false;
+  nmDir = path.resolve(nmDir);
+  srcNm = path.resolve(srcNm);
+  const restored = new Set();
+  // Each pass must restore a new package; there is no arbitrary depth limit
+  // on the transitive peer dependency chain.
+  for (;;) {
+    const missing = new Map();
     for (const pkgDir of collectDeepseekPackages(nmDir, 0)) {
-      present = true;
-      scanDeepseekImports(pkgDir, imported);
-    }
-    if (!present || imported.size === 0) return;
-    let repaired = 0;
-    for (const name of imported) {
-      let missing = true;
-      for (const pkgDir of collectDeepseekPackages(nmDir, 0)) {
-        if (deepseekResolvable(pkgDir, name)) {
-          missing = false;
-          break;
+      const imports = [];
+      scanDeepseekImports(pkgDir, imports);
+      for (const { name, importer } of imports) {
+        if (!resolveDeepseekPackage(importer, name, nmDir) && !missing.has(name)) {
+          missing.set(name, importer);
         }
       }
-      if (missing && copyDeepseekPackage(nmDir, srcNm, name, stats)) repaired += 1;
     }
-    if (repaired === 0) return;
+    if (!missing.size) return;
+    for (const [name, importer] of missing) {
+      // Prefer the equivalent source importer, preserving npm's nested layout.
+      const sourceImporter = path.join(srcNm, path.relative(nmDir, importer));
+      const src = resolveDeepseekPackage(sourceImporter, name, srcNm);
+      if (!src || restored.has(name)) {
+        throw new Error(`[afterpack] Cannot restore ${name} imported by ${importer}; reinstall dependencies before packaging`);
+      }
+      const dest = path.join(nmDir, name);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.cpSync(src, dest, { recursive: true });
+      restored.add(name);
+      stats.push(`+ ${name} (restored missing package)`);
+    }
   }
-  console.error("[afterpack] WARNING: @deepseek-ai import repair did not converge within the pass limit");
 }
 
 exports.default = async function afterPack(context) {
@@ -334,7 +351,14 @@ exports.default = async function afterPack(context) {
     restoreHoistedModules(srcNm, nmDir, stats);
     // Heal peer-only @deepseek-ai imports the dependency collector dropped
     repairDeepseekImports(nmDir, srcNm, stats);
+    // Never publish an artifact whose loader tree still contains an unresolved
+    // bare DeepSeek import. This catches platform-specific builder layouts
+    // before an installer is produced.
+    verifyDeepseekImports(nmDir);
   }
+
+  // Fail before producing installers if Koffi JS and native packages disagree.
+  verifyKoffiNative(path.join(resourcesDir, "app", "node_modules"), platform, arch);
 
   // 2. Chromium license file at app root (linux/win) — mac keeps it inside
   //    the framework, which we do not touch.
@@ -354,3 +378,5 @@ exports.default = async function afterPack(context) {
 
 // Test hook (not used by electron-builder).
 exports._repairDeepseekImports = repairDeepseekImports;
+
+exports.verifyDeepseekImports = verifyDeepseekImports;

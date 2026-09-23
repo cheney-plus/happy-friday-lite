@@ -10,12 +10,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const targetArch = process.argv[2] || process.arch
+const outputDir = process.argv[3] || 'release'
 const unpackedDir = targetArch === 'x64' ? 'linux-unpacked' : `linux-${targetArch}-unpacked`
 const targetMachine = targetArch === 'arm64' ? 183 : 62 // ELF: AArch64 / x86-64
 const targetLabel = targetArch === 'arm64' ? 'ARM64' : 'x64'
 const candidates = [
-  join('release', unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'build', 'Release', 'pty.node'),
-  join('release', unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'prebuilds', `linux-${targetArch}`, 'pty.node'),
+  join(outputDir, unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'build', 'Release', 'pty.node'),
+  join(outputDir, unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'prebuilds', `linux-${targetArch}`, 'pty.node'),
 ]
 const nativeModule = candidates.find((file) => existsSync(file))
 
@@ -36,3 +37,24 @@ if (machine !== targetMachine) {
 }
 
 console.log(`[verify-packaged-native-modules] Verified packaged node-pty is a Linux ${targetLabel} binary`)
+
+const { verifyKoffiNative } = await import('./koffi-native.cjs')
+const { spawnSync } = await import('node:child_process')
+const { resolve } = await import('node:path')
+const appDir = resolve(outputDir, unpackedDir)
+const packagedModules = join(appDir, 'resources/app/node_modules')
+const { verifyDeepseekImports } = await import('./afterpack.cjs')
+verifyDeepseekImports(packagedModules)
+console.log('[verify-packaged-native-modules] Verified packaged Harness imports')
+const spec = verifyKoffiNative(packagedModules, 'linux', targetArch)
+console.log(`[verify-packaged-native-modules] Verified ${spec.name}@${spec.version}`)
+if (process.platform === 'linux' && process.arch === targetArch) {
+  const probe = spawnSync(join(appDir, 'happy-friday-lite'), ['-e',
+    `const koffi = require(${JSON.stringify(join(packagedModules, 'koffi'))}); console.log('Loaded Koffi ' + koffi.version)`], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8', timeout: 30000,
+  })
+  if (probe.error || probe.status !== 0) {
+    throw new Error(`Packaged Electron failed to load Koffi: ${probe.error || probe.stderr || probe.stdout}`)
+  }
+  console.log(probe.stdout.trim())
+}
