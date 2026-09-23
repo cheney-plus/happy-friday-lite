@@ -40,8 +40,8 @@ verifyDependencies()
 
 // node-pty binary check. Since 1.2.0-beta.15 node-pty ships prebuilds for
 // linux-x64/linux-arm64, so there are two valid layouts:
-//   1. build/Release/pty.node — source-built via node-gyp (e.g. the ARM64
-//      docker --build-from-source step that caps glibc at 2.31)
+//   1. build/Release/pty.node — source-built via node-gyp in Ubuntu 18.04,
+//      which caps the startup requirement at glibc 2.27
 //   2. prebuilds/linux-<arch>/pty.node — shipped prebuild, used when
 //      build/Release is absent (runtime checks build first, then prebuilds)
 function verifyNodePtyArchitecture() {

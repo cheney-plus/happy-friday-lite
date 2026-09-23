@@ -1,72 +1,43 @@
-// Verify that native modules inside an unpacked Electron app match the target
-// Linux architecture. electron-builder can otherwise package an existing host
-// binary when a cross-architecture build is attempted.
-//
-// node-pty >= 1.2.0-beta.15 ships platform prebuilds, so a source-built
-// build/Release/pty.node is no longer guaranteed — accept the shipped
-// prebuilds/linux-<arch>/pty.node as well (runtime checks build first,
-// then prebuilds).
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+// Audit every native binary and every platform package in an unpacked Linux
+// Electron app. This runs after afterPack and before release artifact upload.
+import { existsSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { auditNativeArtifact } from './native-artifact-audit.cjs'
+import { verifyDeepseekImports } from './afterpack.cjs'
 
 const targetArch = process.argv[2] || process.arch
 const outputDir = process.argv[3] || 'release'
 const unpackedDir = targetArch === 'x64' ? 'linux-unpacked' : `linux-${targetArch}-unpacked`
-const targetMachine = targetArch === 'arm64' ? 183 : 62 // ELF: AArch64 / x86-64
-const targetLabel = targetArch === 'arm64' ? 'ARM64' : 'x64'
-const candidates = [
-  join(outputDir, unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'build', 'Release', 'pty.node'),
-  join(outputDir, unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'prebuilds', `linux-${targetArch}`, 'pty.node'),
-]
-const nativeModule = candidates.find((file) => existsSync(file))
-
-if (!nativeModule) {
-  console.error(`[verify-packaged-native-modules] ERROR: Missing node-pty binary (checked: ${candidates.join(', ')})`)
-  process.exit(1)
-}
-
-const header = readFileSync(nativeModule).subarray(0, 20)
-const machine = header.length >= 20 && header[0] === 0x7f && header.toString('ascii', 1, 4) === 'ELF'
-  ? header.readUInt16LE(18)
-  : null
-
-if (machine !== targetMachine) {
-  console.error(`[verify-packaged-native-modules] ERROR: Packaged node-pty is not a Linux ${targetLabel} binary.`)
-  console.error(`[verify-packaged-native-modules] Rebuild on a Linux ${targetLabel} machine before publishing this artifact.`)
-  process.exit(1)
-}
-
-console.log(`[verify-packaged-native-modules] Verified packaged node-pty is a Linux ${targetLabel} binary`)
-
-const { verifyKoffiNative } = await import('./koffi-native.cjs')
-const { verifySharpNative } = await import('./sharp-native.cjs')
-const { spawnSync } = await import('node:child_process')
-const { resolve } = await import('node:path')
 const appDir = resolve(outputDir, unpackedDir)
-const packagedModules = join(appDir, 'resources/app/node_modules')
-const { verifyDeepseekImports } = await import('./afterpack.cjs')
+const packagedModules = join(appDir, 'resources', 'app', 'node_modules')
+
+if (!existsSync(packagedModules)) {
+  throw new Error(`Unpacked app not found: ${packagedModules}`)
+}
+
 verifyDeepseekImports(packagedModules)
 console.log('[verify-packaged-native-modules] Verified packaged Harness imports')
-const spec = verifyKoffiNative(packagedModules, 'linux', targetArch)
-console.log(`[verify-packaged-native-modules] Verified ${spec.name}@${spec.version}`)
-const sharpSpecs = verifySharpNative(packagedModules, 'linux', targetArch)
-console.log(`[verify-packaged-native-modules] Verified ${sharpSpecs.map(item => `${item.name}@${item.version}`).join(' and ')}`)
+
+const audit = auditNativeArtifact(appDir, targetArch)
+console.log(`[verify-packaged-native-modules] Verified ${audit.binaries.length} native binaries are Linux ${targetArch}`)
+console.log(`[verify-packaged-native-modules] Verified ${audit.specs.length} target runtime packages`)
+console.log(`[verify-packaged-native-modules] Verified ${audit.platformOptionals.length} platform-specific optional dependency edges`)
+for (const warning of audit.warnings) {
+  console.warn(`[verify-packaged-native-modules] WARNING: ${warning}`)
+}
+
 if (process.platform === 'linux' && process.arch === targetArch) {
-  const probe = spawnSync(join(appDir, 'happy-friday-lite'), ['-e',
-    `const koffi = require(${JSON.stringify(join(packagedModules, 'koffi'))}); console.log('Loaded Koffi ' + koffi.version)`], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8', timeout: 30000,
+  const executable = join(appDir, 'happy-friday-lite')
+  const probeScript = fileURLToPath(new URL('./probe-packaged-native-modules.cjs', import.meta.url))
+  const probe = spawnSync(executable, [probeScript, packagedModules, '--include-lazy'], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    encoding: 'utf8',
+    timeout: 60000,
   })
   if (probe.error || probe.status !== 0) {
-    throw new Error(`Packaged Electron failed to load Koffi: ${probe.error || probe.stderr || probe.stdout}`)
+    throw new Error(`Packaged Electron native probe failed: ${probe.error || probe.stderr || probe.stdout}`)
   }
-  console.log(probe.stdout.trim())
-
-  const sharpProbe = spawnSync(join(appDir, 'happy-friday-lite'), ['-e',
-    `const sharp = require(${JSON.stringify(join(packagedModules, 'sharp'))}); sharp({ create: { width: 1, height: 1, channels: 4, background: '#000' } }).png().toBuffer().then(buffer => { if (!buffer.length) throw new Error('empty output'); console.log('Loaded Sharp ' + sharp.versions.sharp); }).catch(error => { console.error(error); process.exitCode = 1; });`], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8', timeout: 30000,
-  })
-  if (sharpProbe.error || sharpProbe.status !== 0) {
-    throw new Error(`Packaged Electron failed to load Sharp: ${sharpProbe.error || sharpProbe.stderr || sharpProbe.stdout}`)
-  }
-  console.log(sharpProbe.stdout.trim())
+  process.stdout.write(probe.stdout)
 }

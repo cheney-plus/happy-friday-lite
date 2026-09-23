@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { koffiNativeSpec, nativePackageInstalled } from './koffi-native.cjs'
 import { sharpNativePackageInstalled, sharpNativeSpecs } from './sharp-native.cjs'
+import { runtimePackageInstalled, targetRuntimeSpecs } from './native-runtime.cjs'
 
 const a1 = process.argv[2]
 const a2 = process.argv[3]
@@ -45,6 +46,12 @@ const nativePackages = [
     ...spec,
     isInstalled: sharpNativePackageInstalled,
   })),
+  ...targetRuntimeSpecs('node_modules', platform, arch)
+    .filter(spec => ![
+      `@zvec/bindings-${platform}-${arch}`,
+      `@koromix/koffi-${platform}-${arch}`,
+    ].includes(spec.name))
+    .map(spec => ({ ...spec, isInstalled: runtimePackageInstalled })),
 ]
 
 function installNativePackage(spec) {

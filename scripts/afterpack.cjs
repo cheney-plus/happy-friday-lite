@@ -19,6 +19,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { verifyKoffiNative } = require("./koffi-native.cjs");
 const { restoreSharpNative, verifySharpNative } = require("./sharp-native.cjs");
+const {
+  restoreTargetRuntimePackages,
+  verifyTargetRuntimePackages,
+} = require("./native-runtime.cjs");
 
 // electron-builder <25 exports numeric Arch enum, >=25 may use strings.
 function archName(arch) {
@@ -137,6 +141,17 @@ function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
         }
       }
     }
+
+    // node-pty loads build/Release before prebuilds. When CI has produced the
+    // glibc-2.27 build, remove the upstream manylinux_2_28 fallback so it can
+    // never be selected later after a partial installation or file move.
+    if (relName === "node-pty" && fs.existsSync(path.join(packageDir, "build", "Release", "pty.node"))) {
+      const targetPrebuild = path.join(prebuildsDir, `${targetPlatform}-${targetArch}`);
+      if (fs.existsSync(targetPrebuild)) {
+        rmrf(targetPrebuild);
+        stats.push(`${relName}/prebuilds/${targetPlatform}-${targetArch} (replaced by source build)`);
+      }
+    }
   }
 
   for (const entry of fs.readdirSync(nmDir, { withFileTypes: true })) {
@@ -150,7 +165,9 @@ function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
           rmrf(path.join(scopeDir, sub.name));
           stats.push(rel);
         } else {
-          prunePrebuilds(path.join(scopeDir, sub.name), rel);
+          const packageDir = path.join(scopeDir, sub.name);
+          prunePrebuilds(packageDir, rel);
+          pruneNodeModules(path.join(packageDir, "node_modules"), targetPlatform, targetArch, stats);
         }
       }
     } else {
@@ -158,7 +175,9 @@ function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
         rmrf(path.join(nmDir, entry.name));
         stats.push(entry.name);
       } else {
-        prunePrebuilds(path.join(nmDir, entry.name), entry.name);
+        const packageDir = path.join(nmDir, entry.name);
+        prunePrebuilds(packageDir, entry.name);
+        pruneNodeModules(path.join(packageDir, "node_modules"), targetPlatform, targetArch, stats);
       }
     }
   }
@@ -369,6 +388,13 @@ exports.default = async function afterPack(context) {
   restoreSharpNative(srcNm, packagedNodeModules, platform, arch, stats);
   verifySharpNative(packagedNodeModules, platform, arch);
 
+  // Restore every other platform package used by a runtime loader. This
+  // covers nested optional packages that electron-builder can silently bind
+  // to the build host (system addon, require-builtin and ripgrep), plus the
+  // Sharp WASM fallback required on glibc 2.27 systems.
+  restoreTargetRuntimePackages(srcNm, packagedNodeModules, platform, arch, stats);
+  verifyTargetRuntimePackages(packagedNodeModules, platform, arch);
+
   // Fail before producing installers if Koffi JS and native packages disagree.
   verifyKoffiNative(packagedNodeModules, platform, arch);
 
@@ -390,5 +416,7 @@ exports.default = async function afterPack(context) {
 
 // Test hook (not used by electron-builder).
 exports._repairDeepseekImports = repairDeepseekImports;
+exports._pruneNodeModules = pruneNodeModules;
+exports._restoreTargetRuntimePackages = restoreTargetRuntimePackages;
 
 exports.verifyDeepseekImports = verifyDeepseekImports;
