@@ -29,7 +29,7 @@ jobs:
     name: Build Linux (${{ matrix.arch }})
     if: ${{ inputs.platform == 'all' || inputs.platform == 'linux' }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -52,6 +52,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # vendor/happyoffice provides the Office editor sources; the office
+          # build stage compiles them into resources/office.
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -84,6 +88,18 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Setup Rust toolchain (office xlsx-sidecar)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build office bundles (editors + CLI + xlsx-sidecar)
+        # build-office.mjs compiles the vendor/happyoffice editors, the
+        # happyfriday-office CLI and the native xlsx-sidecar. The sidecar is
+        # an arch-specific binary, so each runner builds it natively and
+        # stages everything into resources/office before electron-builder.
+        run: npm run office:build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
@@ -135,11 +151,15 @@ jobs:
     name: Build Windows (x64)
     if: ${{ inputs.platform == 'all' || inputs.platform == 'windows' }}
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # vendor/happyoffice provides the Office editor sources; the office
+          # build stage compiles them into resources/office.
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -156,6 +176,14 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Setup Rust toolchain (office xlsx-sidecar)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build office bundles (editors + CLI + xlsx-sidecar)
+        run: npm run office:build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
@@ -201,7 +229,7 @@ jobs:
     name: Build macOS (${{ matrix.arch }})
     if: ${{ inputs.platform == 'all' || inputs.platform == 'macos' }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -214,6 +242,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # vendor/happyoffice provides the Office editor sources; the office
+          # build stage compiles them into resources/office.
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -238,6 +270,14 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Setup Rust toolchain (office xlsx-sidecar)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build office bundles (editors + CLI + xlsx-sidecar)
+        run: npm run office:build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
