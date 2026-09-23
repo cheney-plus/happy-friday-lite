@@ -57,6 +57,12 @@ jobs:
           # build stage compiles them into resources/office.
           submodules: recursive
 
+      - name: Init vendor/happyoffice submodule
+        # .gitmodules pins `update = none`, which makes checkout's
+        # `git submodule update` skip cloning the submodule entirely.
+        # Override the update mode so CI actually populates it.
+        run: git -c submodule.vendor/happyoffice.update=checkout submodule update --init --depth 1 vendor/happyoffice
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -161,6 +167,12 @@ jobs:
           # build stage compiles them into resources/office.
           submodules: recursive
 
+      - name: Init vendor/happyoffice submodule
+        # .gitmodules pins `update = none`, which makes checkout's
+        # `git submodule update` skip cloning the submodule entirely.
+        # Override the update mode so CI actually populates it.
+        run: git -c submodule.vendor/happyoffice.update=checkout submodule update --init --depth 1 vendor/happyoffice
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -246,6 +258,12 @@ jobs:
           # vendor/happyoffice provides the Office editor sources; the office
           # build stage compiles them into resources/office.
           submodules: recursive
+
+      - name: Init vendor/happyoffice submodule
+        # .gitmodules pins `update = none`, which makes checkout's
+        # `git submodule update` skip cloning the submodule entirely.
+        # Override the update mode so CI actually populates it.
+        run: git -c submodule.vendor/happyoffice.update=checkout submodule update --init --depth 1 vendor/happyoffice
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
