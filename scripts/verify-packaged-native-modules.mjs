@@ -39,6 +39,7 @@ if (machine !== targetMachine) {
 console.log(`[verify-packaged-native-modules] Verified packaged node-pty is a Linux ${targetLabel} binary`)
 
 const { verifyKoffiNative } = await import('./koffi-native.cjs')
+const { verifySharpNative } = await import('./sharp-native.cjs')
 const { spawnSync } = await import('node:child_process')
 const { resolve } = await import('node:path')
 const appDir = resolve(outputDir, unpackedDir)
@@ -48,6 +49,8 @@ verifyDeepseekImports(packagedModules)
 console.log('[verify-packaged-native-modules] Verified packaged Harness imports')
 const spec = verifyKoffiNative(packagedModules, 'linux', targetArch)
 console.log(`[verify-packaged-native-modules] Verified ${spec.name}@${spec.version}`)
+const sharpSpecs = verifySharpNative(packagedModules, 'linux', targetArch)
+console.log(`[verify-packaged-native-modules] Verified ${sharpSpecs.map(item => `${item.name}@${item.version}`).join(' and ')}`)
 if (process.platform === 'linux' && process.arch === targetArch) {
   const probe = spawnSync(join(appDir, 'happy-friday-lite'), ['-e',
     `const koffi = require(${JSON.stringify(join(packagedModules, 'koffi'))}); console.log('Loaded Koffi ' + koffi.version)`], {
@@ -57,4 +60,13 @@ if (process.platform === 'linux' && process.arch === targetArch) {
     throw new Error(`Packaged Electron failed to load Koffi: ${probe.error || probe.stderr || probe.stdout}`)
   }
   console.log(probe.stdout.trim())
+
+  const sharpProbe = spawnSync(join(appDir, 'happy-friday-lite'), ['-e',
+    `const sharp = require(${JSON.stringify(join(packagedModules, 'sharp'))}); sharp({ create: { width: 1, height: 1, channels: 4, background: '#000' } }).png().toBuffer().then(buffer => { if (!buffer.length) throw new Error('empty output'); console.log('Loaded Sharp ' + sharp.versions.sharp); }).catch(error => { console.error(error); process.exitCode = 1; });`], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8', timeout: 30000,
+  })
+  if (sharpProbe.error || sharpProbe.status !== 0) {
+    throw new Error(`Packaged Electron failed to load Sharp: ${sharpProbe.error || sharpProbe.stderr || sharpProbe.stdout}`)
+  }
+  console.log(sharpProbe.stdout.trim())
 }

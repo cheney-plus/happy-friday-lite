@@ -18,6 +18,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { verifyKoffiNative } = require("./koffi-native.cjs");
+const { restoreSharpNative, verifySharpNative } = require("./sharp-native.cjs");
 
 // electron-builder <25 exports numeric Arch enum, >=25 may use strings.
 function archName(arch) {
@@ -45,10 +46,12 @@ function parsePlatformArch(name) {
 }
 
 function isForeign(name, targetPlatform, targetArch) {
+  // AppImage targets glibc. `linuxmusl-arm64` contains the substrings
+  // `linux` and `arm64`, but it is ABI-incompatible with linux-arm64.
+  if (targetPlatform === "linux" && name.includes("linuxmusl")) return true;
   const parsed = parsePlatformArch(name);
   if (!parsed) return false;
-  // "musl" variants never match a glibc target, but keep it simple: match
-  // exact platform+arch, treat "universal" as matching any arch.
+  // Match exact platform+arch, treating "universal" as matching any arch.
   if (parsed.platform !== targetPlatform) return true;
   if (parsed.arch === targetArch || parsed.arch === "universal" || targetArch === "universal") return false;
   return true;
@@ -340,11 +343,12 @@ exports.default = async function afterPack(context) {
   const srcNm = path.join(__dirname, "..", "node_modules");
 
   const stats = [];
+  const packagedNodeModules = path.join(resourcesDir, "app", "node_modules");
 
   // 1. Foreign native bindings (works for asar:false "app" dir and for
   //    app.asar.unpacked native modules)
   for (const nmDir of [
-    path.join(resourcesDir, "app", "node_modules"),
+    packagedNodeModules,
     path.join(resourcesDir, "app.asar.unpacked", "node_modules"),
   ]) {
     pruneNodeModules(nmDir, platform, arch, stats);
@@ -358,8 +362,15 @@ exports.default = async function afterPack(context) {
     verifyDeepseekImports(nmDir);
   }
 
+  // electron-builder's dependency collector can omit Sharp's platform
+  // packages because they are transitive optional dependencies. Copy the
+  // exact target runtime after collection and verify the actual ELF
+  // architecture before any installer is produced.
+  restoreSharpNative(srcNm, packagedNodeModules, platform, arch, stats);
+  verifySharpNative(packagedNodeModules, platform, arch);
+
   // Fail before producing installers if Koffi JS and native packages disagree.
-  verifyKoffiNative(path.join(resourcesDir, "app", "node_modules"), platform, arch);
+  verifyKoffiNative(packagedNodeModules, platform, arch);
 
   // 2. Chromium license file at app root (linux/win) — mac keeps it inside
   //    the framework, which we do not touch.
