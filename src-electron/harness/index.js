@@ -32,7 +32,6 @@ let startPromise = null
 let generation = 0
 let activeModelSignature = null
 let recentOutput = []
-let startupDiagnostic = null
 let state = {
   status: 'idle',
   url: null,
@@ -377,15 +376,26 @@ function outputTail(limit = 10) {
   return `\n\nLast DSH output:\n${lines.map(line => `  ${line}`).join('\n')}`
 }
 
+// DSH fatal boot errors are multi-line: the `Error: dsh: ...` headline is
+// followed by the concrete per-entry failures (e.g. the individual reasons
+// inside a "loader entries failed to apply" AggregateError). Keep enough
+// history and surface the whole block from the first diagnostic line, so a
+// failing plugin and its real cause are visible in the UI alone.
+const DETAIL_MAX_LINES = 25
+
+function isDiagnosticLine(line) {
+  return line.includes('Error: dsh:')
+    || /^error(?:\s+\[[^\]]+\])?:/i.test(line)
+    || /cannot find package/i.test(line)
+}
+
 function failureDetail(fallback) {
-  const detail = startupDiagnostic
-    || recentOutput.find(line => line.includes('Error: dsh:'))
-    || recentOutput.find(line => /^error(?:\s+\[[^\]]+\])?:/i.test(line))
-    || recentOutput.find(line => /cannot find package/i.test(line))
-  if (detail) return detail
+  const index = recentOutput.findIndex(isDiagnosticLine)
+  if (index !== -1) {
+    return recentOutput.slice(index, index + DETAIL_MAX_LINES).join('\n')
+  }
   // No recognizable error line (timeout, or a silent exit). The output tail
-  // includes the last meaningful line, so slow/failed boots on machines we
-  // cannot inspect directly stay diagnosable from the UI alone.
+  // includes the last meaningful line.
   return fallback + outputTail()
 }
 
@@ -419,15 +429,8 @@ function captureOutput(stream) {
     for (const line of chunk.split(/\r?\n/)) {
       const value = line.trim()
       if (!value) continue
-      if (!startupDiagnostic && (
-        value.includes('Error: dsh:')
-        || /^error(?:\s+\[[^\]]+\])?:/i.test(value)
-        || /cannot find package/i.test(value)
-      )) {
-        startupDiagnostic = value
-      }
       recentOutput.push(value)
-      if (recentOutput.length > 30) recentOutput.shift()
+      if (recentOutput.length > 100) recentOutput.shift()
     }
   })
 }
@@ -459,7 +462,6 @@ async function bootHarness() {
     if (expectedGeneration !== generation) throw new Error('Harness startup was superseded')
     const cli = resolveHarnessCli()
     recentOutput = []
-    startupDiagnostic = null
 
     const child = spawn(
       process.execPath,
