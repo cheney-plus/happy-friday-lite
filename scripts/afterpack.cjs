@@ -160,6 +160,148 @@ function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
   }
 }
 
+// electron-builder computes the packaged node_modules tree from the lockfile
+// and does not follow peerDependencies. A @deepseek-ai package that only
+// declares a sibling as a peer (e.g. dsh-session-log-export ->
+// dsh-session-persistence) can therefore be missing entirely from the packaged
+// tree, or be placed where Node's walk-up never looks — DSH's plugin loader
+// then fails at boot ("loader entries failed to apply", ERR_MODULE_NOT_FOUND).
+//
+// Scan every @deepseek-ai package present anywhere in the packaged tree for
+// bare imports of sibling @deepseek-ai packages, verify each resolves through
+// Node's walk-up rules, and repair by copying the missing package from the
+// build machine's node_modules into the packaged top-level node_modules.
+// Repeat until a full pass finds nothing (a repaired package can itself
+// import further missing ones).
+const DEEPSEEK_SCOPE = "@deepseek-ai";
+const REPAIR_JS_EXTS = new Set([".js", ".mjs", ".cjs"]);
+const REPAIR_MAX_FILE_BYTES = 1 << 20; // skip frontend bundles; only real node code matters
+const REPAIR_MAX_PASSES = 5;
+const REPAIR_IMPORT_RE = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](@deepseek-ai\/[a-z0-9][a-z0-9._-]*)/g;
+
+// Yield every "@deepseek-ai/<pkg>" directory holding a package.json, reachable
+// through node_modules nesting up to `depth` levels (electron-builder can lay
+// packages out nested, e.g. <nm>/@deepseek-ai/dsh/node_modules/@deepseek-ai/x).
+function* collectDeepseekPackages(dir, depth) {
+  if (depth > 6 || !fs.existsSync(dir)) return;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.name === DEEPSEEK_SCOPE) {
+      let subs;
+      try {
+        subs = fs.readdirSync(full, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const sub of subs) {
+        if (!sub.isDirectory()) continue;
+        const pkgDir = path.join(full, sub.name);
+        if (fs.existsSync(path.join(pkgDir, "package.json"))) yield pkgDir;
+        yield* collectDeepseekPackages(pkgDir, depth + 1);
+      }
+    } else if (entry.name === "node_modules") {
+      yield* collectDeepseekPackages(full, depth + 1);
+    }
+  }
+}
+
+// Collect bare "@deepseek-ai/<pkg>" import specifiers from the package's JS.
+function scanDeepseekImports(pkgDir, found) {
+  const stack = [pkgDir];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules") continue; // nested copies are scanned on their own
+        stack.push(full);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (!REPAIR_JS_EXTS.has(path.extname(entry.name))) continue;
+      let content;
+      try {
+        if (fs.statSync(full).size > REPAIR_MAX_FILE_BYTES) continue;
+        content = fs.readFileSync(full, "utf8");
+      } catch {
+        continue;
+      }
+      for (const match of content.matchAll(REPAIR_IMPORT_RE)) found.add(match[1]);
+    }
+  }
+}
+
+// True when Node's walk-up resolution from pkgDir can find `name`
+// ("@deepseek-ai/<pkg>") in some ancestor node_modules.
+function deepseekResolvable(pkgDir, name) {
+  let dir = pkgDir;
+  for (;;) {
+    const parent = path.dirname(dir);
+    if (parent === dir) return false;
+    if (fs.existsSync(path.join(dir, "node_modules", name)) || fs.existsSync(path.join(dir, name))) {
+      // second check fires when dir itself is a node_modules dir; for scoped
+      // ancestors it covers the "scope/node_modules/<pkg>" hoisted layout
+      return true;
+    }
+    dir = parent;
+  }
+}
+
+// Copy a missing package from the build machine's node_modules into the
+// packaged top-level node_modules (resolvable from every walk-up path).
+function copyDeepseekPackage(nmDir, srcNm, name, stats) {
+  const src = path.join(srcNm, name);
+  if (!fs.existsSync(path.join(src, "package.json"))) {
+    console.error(`[afterpack] WARNING: ${name} is imported by the packaged tree but missing from ${srcNm} too — not repairable`);
+    return false;
+  }
+  const dest = path.join(nmDir, name);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.rmSync(dest, { recursive: true, force: true });
+  fs.cpSync(src, dest, { recursive: true });
+  stats.push(`+ ${name} (restored missing package)`);
+  return true;
+}
+
+function repairDeepseekImports(nmDir, srcNm, stats) {
+  if (!fs.existsSync(nmDir)) return;
+  for (let pass = 0; pass < REPAIR_MAX_PASSES; pass += 1) {
+    const imported = new Set();
+    let present = false;
+    for (const pkgDir of collectDeepseekPackages(nmDir, 0)) {
+      present = true;
+      scanDeepseekImports(pkgDir, imported);
+    }
+    if (!present || imported.size === 0) return;
+    let repaired = 0;
+    for (const name of imported) {
+      let missing = true;
+      for (const pkgDir of collectDeepseekPackages(nmDir, 0)) {
+        if (deepseekResolvable(pkgDir, name)) {
+          missing = false;
+          break;
+        }
+      }
+      if (missing && copyDeepseekPackage(nmDir, srcNm, name, stats)) repaired += 1;
+    }
+    if (repaired === 0) return;
+  }
+  console.error("[afterpack] WARNING: @deepseek-ai import repair did not converge within the pass limit");
+}
+
 exports.default = async function afterPack(context) {
   const platform = context.electronPlatformName; // darwin | linux | win32
   const arch = archName(context.arch);
@@ -190,6 +332,8 @@ exports.default = async function afterPack(context) {
     pruneNodeModules(nmDir, platform, arch, stats);
     // Restore hoisted nested modules that electron-builder skipped
     restoreHoistedModules(srcNm, nmDir, stats);
+    // Heal peer-only @deepseek-ai imports the dependency collector dropped
+    repairDeepseekImports(nmDir, srcNm, stats);
   }
 
   // 2. Chromium license file at app root (linux/win) — mac keeps it inside
@@ -207,3 +351,6 @@ exports.default = async function afterPack(context) {
     console.log(`[afterpack] nothing to prune/restore for ${platform}-${arch}`);
   }
 };
+
+// Test hook (not used by electron-builder).
+exports._repairDeepseekImports = repairDeepseekImports;
