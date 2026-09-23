@@ -14,6 +14,7 @@ import { execSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, rmSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { koffiNativeSpec, nativePackageInstalled } from './koffi-native.cjs'
 
 const a1 = process.argv[2]
 const a2 = process.argv[3]
@@ -32,18 +33,14 @@ const nativePackages = [
     version: '0.5.0',
     marker: 'zvec_node_binding.node',
   },
-  {
-    name: `@koromix/koffi-${platform}-${arch}`,
-    version: '3.1.5',
-    marker: `${platform}_${arch}/koffi.node`,
-  },
+  koffiNativeSpec('node_modules', platform, arch),
 ]
 
 function installNativePackage({ name, version, marker }) {
   const pkg = `${name}@${version}`
   const target = `node_modules/${name}`
 
-  if (existsSync(join(target, marker))) {
+  if (nativePackageInstalled('node_modules', { name, version, marker })) {
     console.log(`[prebuild-install] ${pkg} already installed, skipping`)
     return
   }
@@ -64,6 +61,10 @@ function installNativePackage({ name, version, marker }) {
     const extracted = join(staging, 'package')
     if (!existsSync(extracted)) {
       throw new Error(`tar extraction did not produce expected 'package' dir`)
+    }
+
+    if (!nativePackageInstalled(staging, { name: 'package', version, marker })) {
+      throw new Error(`Downloaded ${pkg} has an invalid version or missing binary`)
     }
 
     mkdirSync(join('node_modules', name.substring(0, name.lastIndexOf('/'))), { recursive: true })

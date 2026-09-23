@@ -22,7 +22,9 @@ const HARNESS_CONSUMER = 'deepseek-harness'
 const HARNESS_PROVIDER = 'happy-friday'
 const HARNESS_CREDENTIAL = 'HAPPY_FRIDAY_HARNESS_API_KEY'
 const MCP_SERVER_NAME = 'happy-friday'
-const START_TIMEOUT_MS = 45_000
+// Generous enough for a first boot on slow hardware (e.g. ARM boards): the
+// initial boot also initializes the DSH profile before the web URL is printed.
+const START_TIMEOUT_MS = 90_000
 
 let mainWindow = null
 let sidecar = null
@@ -30,7 +32,6 @@ let startPromise = null
 let generation = 0
 let activeModelSignature = null
 let recentOutput = []
-let startupDiagnostic = null
 let state = {
   status: 'idle',
   url: null,
@@ -366,15 +367,36 @@ function enableHarnessCookieForwarding(port) {
   })
 }
 
+// When only the fallback is available (timeout, or a silent exit with no
+// recognizable error line), append the captured output so slow/failed boots on
+// machines we cannot inspect directly stay diagnosable from the UI alone.
+function outputTail(limit = 10) {
+  const lines = recentOutput.slice(-limit)
+  if (lines.length === 0) return ''
+  return `\n\nLast DSH output:\n${lines.map(line => `  ${line}`).join('\n')}`
+}
+
+// DSH fatal boot errors are multi-line: the `Error: dsh: ...` headline is
+// followed by the concrete per-entry failures (e.g. the individual reasons
+// inside a "loader entries failed to apply" AggregateError). Keep enough
+// history and surface the whole block from the first diagnostic line, so a
+// failing plugin and its real cause are visible in the UI alone.
+const DETAIL_MAX_LINES = 25
+
+function isDiagnosticLine(line) {
+  return line.includes('Error: dsh:')
+    || /^error(?:\s+\[[^\]]+\])?:/i.test(line)
+    || /cannot find package/i.test(line)
+}
+
 function failureDetail(fallback) {
-  return startupDiagnostic
-    || recentOutput.find(line => line.includes('Error: dsh:'))
-    || recentOutput.find(line => /^error(?:\s+\[[^\]]+\])?:/i.test(line))
-    || recentOutput.find(line => /cannot find package/i.test(line))
-    // Node appends this footer after an unhandled exception. It contains no
-    // diagnostic information and used to hide the real startup failure.
-    || [...recentOutput].reverse().find(line => !/^Node\.js v\d+(?:\.\d+){1,2}$/i.test(line))
-    || fallback
+  const index = recentOutput.findIndex(isDiagnosticLine)
+  if (index !== -1) {
+    return recentOutput.slice(index, index + DETAIL_MAX_LINES).join('\n')
+  }
+  // No recognizable error line (timeout, or a silent exit). The output tail
+  // includes the last meaningful line.
+  return fallback + outputTail()
 }
 
 async function waitUntilReady(child, expectedGeneration) {
@@ -398,7 +420,7 @@ async function waitUntilReady(child, expectedGeneration) {
     if (authenticatedUrl && await probe(authenticatedUrl)) return authenticatedUrl
     await new Promise(resolve => setTimeout(resolve, 250))
   }
-  throw new Error('Harness startup timed out')
+  throw new Error(failureDetail(`Harness startup timed out after ${Math.round(START_TIMEOUT_MS / 1000)}s`))
 }
 
 function captureOutput(stream) {
@@ -407,15 +429,8 @@ function captureOutput(stream) {
     for (const line of chunk.split(/\r?\n/)) {
       const value = line.trim()
       if (!value) continue
-      if (!startupDiagnostic && (
-        value.includes('Error: dsh:')
-        || /^error(?:\s+\[[^\]]+\])?:/i.test(value)
-        || /cannot find package/i.test(value)
-      )) {
-        startupDiagnostic = value
-      }
       recentOutput.push(value)
-      if (recentOutput.length > 30) recentOutput.shift()
+      if (recentOutput.length > 100) recentOutput.shift()
     }
   })
 }
@@ -447,7 +462,6 @@ async function bootHarness() {
     if (expectedGeneration !== generation) throw new Error('Harness startup was superseded')
     const cli = resolveHarnessCli()
     recentOutput = []
-    startupDiagnostic = null
 
     const child = spawn(
       process.execPath,
