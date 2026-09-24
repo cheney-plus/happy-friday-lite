@@ -26,7 +26,9 @@ async function main() {
   // Node environment on Ubuntu 18.04, even after it has loaded successfully.
   // The regular Node probe in verify-packaged-native-modules.mjs still checks
   // that the packaged binding can load outside this Electron lifecycle.
-  if (process.versions.electron && process.env.ELECTRON_RUN_AS_NODE === '1') {
+  // Linux Electron run-as-node does not reliably expose
+  // process.versions.electron. The workflow sets this variable explicitly.
+  if (process.env.ELECTRON_RUN_AS_NODE === '1') {
     console.log('[native-probe] Skipped node-addon-require-builtin in Electron run-as-node mode');
   } else {
     const requireBuiltin = require(path.join(nodeModules, 'node-addon-require-builtin'));
