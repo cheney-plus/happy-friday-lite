@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'url'
 import yaml from 'js-yaml'
 import { getDataDir, loadConfig } from '../config.js'
 import { normalizeOpenAIBaseUrl } from '../openaiUrl.js'
+import { clearHarnessCredentialLock } from './lockRecovery.js'
 import {
   acquireLocalMcpServer,
   getLocalMcpStatus,
@@ -462,6 +463,9 @@ async function bootHarness() {
     if (expectedGeneration !== generation) throw new Error('Harness startup was superseded')
     const cli = resolveHarnessCli()
     recentOutput = []
+    if (clearHarnessCredentialLock(paths.credentials)) {
+      console.warn(`[Harness] Removed stale writer lock at ${paths.credentials}.lock`)
+    }
 
     const child = spawn(
       process.execPath,

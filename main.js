@@ -42,17 +42,34 @@ if (isDev) {
   app.setPath('userData', path.join(__dirname, 'app-data', 'electron-user-data'))
 }
 
+// The GUI and its DSH sidecar share one data directory. Multiple AppImage
+// instances would therefore contend for DSH's credentials writer lock.
+const headlessExportRun = isHeadlessExportRun()
+const hasSingleInstanceLock = headlessExportRun || app.requestSingleInstanceLock()
+if (!hasSingleInstanceLock) app.quit()
+
 // 尽早初始化文件日志器，接管 console.* 与未捕获异常，
 // 将运行日志落盘到数据目录，便于安装后排查异常。
 // 必须在 app.whenReady 之前同步执行，以捕获后续所有模块的输出。
-initLogger(
-  isDev ? path.join(__dirname, 'app-data') : app.getPath('userData')
-)
+if (hasSingleInstanceLock) {
+  initLogger(
+    isDev ? path.join(__dirname, 'app-data') : app.getPath('userData')
+  )
+}
 
 let mainWindow = null
 let kbWatcherHandle = null
 let powerBlockerId = null
 let shutdownStarted = false
+
+if (!headlessExportRun) {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  })
+}
 
 async function ensureDataDir() {
   const dataDir = isDev
@@ -108,9 +125,10 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (!hasSingleInstanceLock) return
   // happyfriday-office CLI 的 headless 导出请求：跳过全部常规初始化，
   // 隐藏窗口渲染一次导出后退出（office-headless.js 内部负责 app.exit）
-  if (isHeadlessExportRun()) {
+  if (headlessExportRun) {
     try {
       await runHeadlessExportEntry()
     } catch (error) {
