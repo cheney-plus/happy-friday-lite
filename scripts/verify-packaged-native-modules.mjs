@@ -28,6 +28,19 @@ for (const warning of audit.warnings) {
   console.warn(`[verify-packaged-native-modules] WARNING: ${warning}`)
 }
 
+const requireBuiltinProbe = spawnSync(process.execPath, ['-e', `
+  const requireBuiltin = require(process.argv[1]);
+  const info = requireBuiltin.getBindingInfo();
+  if (!info.bindingPath || info.product !== 'require-builtin') process.exit(1);
+`, join(packagedModules, 'node-addon-require-builtin')], {
+  encoding: 'utf8',
+  timeout: 30000,
+})
+if (requireBuiltinProbe.error || requireBuiltinProbe.status !== 0) {
+  throw new Error(`Packaged Node addon probe failed: ${requireBuiltinProbe.error || requireBuiltinProbe.stderr || requireBuiltinProbe.stdout}`)
+}
+console.log('[verify-packaged-native-modules] Verified node-addon-require-builtin binding loads in Node')
+
 if (process.platform === 'linux' && process.arch === targetArch) {
   const executable = join(appDir, 'happy-friday-lite')
   const probeScript = fileURLToPath(new URL('./probe-packaged-native-modules.cjs', import.meta.url))
