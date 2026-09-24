@@ -158,7 +158,16 @@ jobs:
                 libasound2 libatk-bridge2.0-0 libatk1.0-0 libcups2 libdrm2 \
                 libgbm1 libgtk-3-0 libnss3 libpangocairo-1.0-0 libx11-xcb1 \
                 libxcomposite1 libxdamage1 libxkbcommon0 libxrandr2 libxshmfence1 libxss1
-              runuser -u nobody -- env HOME=/tmp ELECTRON_RUN_AS_NODE=1 \
+              # The probe is an artifact check, not a privilege-boundary test.
+              # Running Electron as `nobody` on Ubuntu 18.04 can segfault in
+              # Chromium's sandbox bootstrap (exit 139), before the JS probe
+              # starts. Disable the sandbox explicitly and keep the process as
+              # root so the check is deterministic in this container.
+              env \
+                HOME=/tmp \
+                ELECTRON_RUN_AS_NODE=1 \
+                ELECTRON_DISABLE_SANDBOX=1 \
+                LIBGL_ALWAYS_SOFTWARE=1 \
                 /workspace/release/${{ matrix.unpacked-dir }}/happy-friday-lite \
                 /workspace/scripts/probe-packaged-native-modules.cjs \
                 /workspace/release/${{ matrix.unpacked-dir }}/resources/app/node_modules
