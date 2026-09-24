@@ -5,24 +5,6 @@ const { verifyTargetRuntimePackages } = require('./native-runtime.cjs');
 const ELF_MACHINE = { x64: 62, arm64: 183 };
 const MACH_MAGICS = new Set(['cffaedfe', 'cefaedfe', 'feedfacf', 'feedface', 'cafebabe', 'bebafeca']);
 
-function compareVersion(a, b) {
-  const left = a.split('.').map(Number);
-  const right = b.split('.').map(Number);
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    const difference = (left[index] || 0) - (right[index] || 0);
-    if (difference) return difference;
-  }
-  return 0;
-}
-
-function maximumVersion(buffer, prefix) {
-  const values = [...buffer.toString('latin1').matchAll(new RegExp(`${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)`, 'g'))]
-    .map(match => match[1]);
-  values.sort(compareVersion);
-  return values.at(-1) || null;
-}
-
 function binaryFormat(header) {
   if (header.length >= 20 && header.toString('hex', 0, 4) === '7f454c46') {
     return { format: 'elf', machine: header.readUInt16LE(18) };
@@ -52,27 +34,11 @@ function collectNativeBinaries(root) {
       fs.closeSync(descriptor);
       const detected = binaryFormat(header.subarray(0, read));
       if (!detected) continue;
-      const item = { file: filename, ...detected };
-      if (item.format === 'elf') {
-        const buffer = fs.readFileSync(filename);
-        item.glibc = maximumVersion(buffer, 'GLIBC_');
-        item.glibcxx = maximumVersion(buffer, 'GLIBCXX_');
-      }
-      binaries.push(item);
+      binaries.push({ file: filename, ...detected });
     }
   }
   walk(root);
   return binaries;
-}
-
-function isStartupCritical(file) {
-  return [
-    `${path.sep}node-pty${path.sep}`,
-    `${path.sep}@koromix${path.sep}koffi-`,
-    `${path.sep}@deepseek-ai${path.sep}node-addon-system-linux-`,
-    `${path.sep}node-addon-require-builtin-linux-`,
-    `${path.sep}@vscode${path.sep}ripgrep-linux-`,
-  ].some(fragment => file.includes(fragment));
 }
 
 function resolvePackageFrom(ownerDir, name, boundary) {
@@ -142,18 +108,16 @@ function collectNodeModulesRoots(root) {
   return roots;
 }
 
-function auditNativeArtifact(appDir, arch, options = {}) {
+function auditNativeArtifact(appDir, arch) {
   const expectedMachine = ELF_MACHINE[arch];
   if (!expectedMachine) throw new Error(`Unsupported Linux architecture: ${arch}`);
   const nodeModules = path.join(appDir, 'resources', 'app', 'node_modules');
-  const startupGlibc = options.startupGlibc || '2.27';
   const specs = verifyTargetRuntimePackages(nodeModules, 'linux', arch);
   const resources = path.join(appDir, 'resources');
   const platformOptionals = collectNodeModulesRoots(resources)
     .flatMap(root => targetOptionalPackages(root, 'linux', arch));
   const binaries = collectNativeBinaries(resources);
   const failures = [];
-  const warnings = [];
 
   for (const spec of platformOptionals) {
     if (!spec.resolved) {
@@ -175,17 +139,10 @@ function auditNativeArtifact(appDir, arch, options = {}) {
     if (binary.machine !== expectedMachine) {
       failures.push(`${relative}: ELF machine ${binary.machine}, expected ${expectedMachine}`);
     }
-    if (binary.glibc && compareVersion(binary.glibc, startupGlibc) > 0) {
-      if (isStartupCritical(binary.file)) {
-        failures.push(`${relative}: requires GLIBC_${binary.glibc}, startup baseline is GLIBC_${startupGlibc}`);
-      } else {
-        warnings.push(`${relative}: requires GLIBC_${binary.glibc}; this lazy/optional feature is not Ubuntu 18.04 compatible`);
-      }
-    }
   }
 
   if (failures.length) throw new Error(`Native artifact audit failed:\n${failures.map(value => `- ${value}`).join('\n')}`);
-  return { binaries, platformOptionals, specs, warnings };
+  return { binaries, platformOptionals, specs, warnings: [] };
 }
 
 module.exports = {
@@ -193,7 +150,5 @@ module.exports = {
   binaryFormat,
   collectNativeBinaries,
   collectNodeModulesRoots,
-  compareVersion,
-  maximumVersion,
   targetOptionalPackages,
 };

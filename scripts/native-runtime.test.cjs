@@ -56,7 +56,7 @@ test('recursively removes foreign platform packages nested under entry packages'
   assert.equal(fs.existsSync(foreign), false);
 });
 
-test('removes the incompatible node-pty prebuild when a source build exists', t => {
+test('keeps the node-pty prebuild when a source build exists', t => {
   const { destination } = fixture(t);
   const pty = path.join(destination, 'node-pty');
   fs.mkdirSync(path.join(pty, 'build/Release'), { recursive: true });
@@ -64,10 +64,10 @@ test('removes the incompatible node-pty prebuild when a source build exists', t 
   fs.writeFileSync(path.join(pty, 'build/Release/pty.node'), 'compatible');
   fs.writeFileSync(path.join(pty, 'prebuilds/linux-arm64/pty.node'), 'incompatible');
   pruneNodeModules(destination, 'linux', 'arm64', []);
-  assert.equal(fs.existsSync(path.join(pty, 'prebuilds/linux-arm64')), false);
+  assert.equal(fs.existsSync(path.join(pty, 'prebuilds/linux-arm64')), true);
 });
 
-test('artifact audit rejects foreign binaries and startup GLIBC newer than Ubuntu 18.04', t => {
+test('artifact audit rejects foreign binaries', t => {
   const { root, source, destination } = fixture(t);
   const specs = targetRuntimeSpecs(destination, 'linux', 'arm64');
   writePackage(source, specs[0]);
@@ -77,9 +77,8 @@ test('artifact audit rejects foreign binaries and startup GLIBC newer than Ubunt
   const elf = Buffer.alloc(128);
   elf.write('7f454c46', 0, 'hex');
   elf.writeUInt16LE(183, 18);
-  elf.write('GLIBC_2.28\0', 32, 'ascii');
   fs.writeFileSync(native, elf, { mode: 0o755 });
-  assert.throws(() => auditNativeArtifact(path.join(root, 'app'), 'arm64'), /GLIBC_2\.28/);
+  assert.doesNotThrow(() => auditNativeArtifact(path.join(root, 'app'), 'arm64'));
 
   fs.writeFileSync(native, Buffer.from('cffaedfe00000000000000000000000000000000', 'hex'), { mode: 0o755 });
   assert.throws(() => auditNativeArtifact(path.join(root, 'app'), 'arm64'), /mach-o binary/);

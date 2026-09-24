@@ -116,25 +116,6 @@ jobs:
           node scripts/prebuild-install.mjs ${{ matrix.arch }}
           node scripts/prebuild-clean.mjs ${{ matrix.arch }}
 
-      - name: Build Ubuntu 18.04-compatible node-pty
-        # node-pty is Node-API, so a build against Node 16 headers loads in
-        # Electron 42. Compile inside glibc 2.27 instead of merely reducing the
-        # requirement to bullseye's incompatible glibc 2.31.
-        run: |
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:/workspace" \
-            -w /workspace \
-            ubuntu:18.04 \
-            bash -lc '
-              apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential ca-certificates curl python3 xz-utils
-              curl -fsSLO https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-${{ matrix.arch }}.tar.xz
-              mkdir -p /opt/node
-              tar -xJf node-v16.20.2-linux-${{ matrix.arch }}.tar.xz -C /opt/node --strip-components=1
-              PATH=/opt/node/bin:$PATH npm_config_nodedir=/opt/node npm rebuild node-pty --build-from-source
-            '
-          sudo chown -R "$(id -u):$(id -g)" node_modules/node-pty
-
       - name: Build Electron app (Linux ${{ matrix.arch }})
         run: npx electron-builder ${{ matrix.build-target }} ${{ matrix.arch-flag }} --config.npmRebuild=false
         env:

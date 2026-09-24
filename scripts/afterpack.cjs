@@ -142,16 +142,6 @@ function pruneNodeModules(nmDir, targetPlatform, targetArch, stats) {
       }
     }
 
-    // node-pty loads build/Release before prebuilds. When CI has produced the
-    // glibc-2.27 build, remove the upstream manylinux_2_28 fallback so it can
-    // never be selected later after a partial installation or file move.
-    if (relName === "node-pty" && fs.existsSync(path.join(packageDir, "build", "Release", "pty.node"))) {
-      const targetPrebuild = path.join(prebuildsDir, `${targetPlatform}-${targetArch}`);
-      if (fs.existsSync(targetPrebuild)) {
-        rmrf(targetPrebuild);
-        stats.push(`${relName}/prebuilds/${targetPlatform}-${targetArch} (replaced by source build)`);
-      }
-    }
   }
 
   for (const entry of fs.readdirSync(nmDir, { withFileTypes: true })) {
@@ -391,7 +381,7 @@ exports.default = async function afterPack(context) {
   // Restore every other platform package used by a runtime loader. This
   // covers nested optional packages that electron-builder can silently bind
   // to the build host (system addon, require-builtin and ripgrep), plus the
-  // Sharp WASM fallback required on glibc 2.27 systems.
+  // Sharp WASM fallback.
   restoreTargetRuntimePackages(srcNm, packagedNodeModules, platform, arch, stats);
   verifyTargetRuntimePackages(packagedNodeModules, platform, arch);
 
