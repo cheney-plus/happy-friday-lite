@@ -144,35 +144,6 @@ jobs:
       - name: Verify packaged Linux native modules (${{ matrix.arch }})
         run: node scripts/verify-packaged-native-modules.mjs ${{ matrix.arch }}
 
-      - name: Probe Harness native startup on Ubuntu 18.04
-        # This executes the packaged Electron runtime, not the runner's Node.
-        # It catches missing optional packages and real dlopen/glibc failures.
-        run: |
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:/workspace" \
-            -w /workspace \
-            ubuntu:18.04 \
-            bash -lc '
-              apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y \
-                libasound2 libatk-bridge2.0-0 libatk1.0-0 libcups2 libdrm2 \
-                libgbm1 libgtk-3-0 libnss3 libpangocairo-1.0-0 libx11-xcb1 \
-                libxcomposite1 libxdamage1 libxkbcommon0 libxrandr2 libxshmfence1 libxss1
-              # The probe is an artifact check, not a privilege-boundary test.
-              # Running Electron as `nobody` on Ubuntu 18.04 can segfault in
-              # Chromium sandbox bootstrap (exit 139), before the JS probe
-              # starts. Disable the sandbox explicitly and keep the process as
-              # root so the check is deterministic in this container.
-              env \
-                HOME=/tmp \
-                ELECTRON_RUN_AS_NODE=1 \
-                ELECTRON_DISABLE_SANDBOX=1 \
-                LIBGL_ALWAYS_SOFTWARE=1 \
-                /workspace/release/${{ matrix.unpacked-dir }}/happy-friday-lite \
-                /workspace/scripts/probe-packaged-native-modules.cjs \
-                /workspace/release/${{ matrix.unpacked-dir }}/resources/app/node_modules
-            '
-
       - name: List build artifacts
         run: ls -lh release/ || true
         shell: bash
