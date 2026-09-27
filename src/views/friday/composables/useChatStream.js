@@ -210,7 +210,6 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
       message: userMessage,
       attachments: attachments || [],
       enableThinking,
-      useKnowledgeBase: !!useKnowledgeBase,
       kbName: kbName || '',
       kbCategoryId: kbCategoryId || ''
     });
@@ -255,7 +254,6 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
       userMessage,
       attachments: data.attachments || [],
       thinkMode: data.thinkMode || fridayStore.thinkMode,
-      useKnowledgeBase: data.useKnowledgeBase || false,
       kbName: data.kbName || '',
       kbCategoryId: data.kbCategoryId || ''
     }).catch((err) => {
