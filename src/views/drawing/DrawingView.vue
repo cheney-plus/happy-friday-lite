@@ -95,7 +95,14 @@
           @contextmenu.prevent="openCardMenu($event, canvas)"
         >
           <div class="canvas-preview" :class="`preview-${canvas.kind}`">
-            <CanvasThumbnail :graph-json="canvas.graphJSON" />
+            <img
+              v-if="canvas.previewSvg"
+              class="canvas-preview-svg"
+              :src="`data:image/svg+xml;charset=utf-8,${encodeURIComponent(canvas.previewSvg)}`"
+              alt=""
+              draggable="false"
+            />
+            <CanvasThumbnail v-else :graph-json="canvas.graphJSON" />
           </div>
           <span class="canvas-card-footer">
             <input
@@ -134,6 +141,7 @@
         :key="`${drawingStore.currentCanvas.id}:${drawingStore.agentVersion}`"
         :canvas="drawingStore.currentCanvas"
         @change="onGraphChange"
+        @preview="onPreviewChange"
         @library-change="onLibraryChange"
       />
     </main>
@@ -586,11 +594,15 @@ const AGENT_SUPPRESS_MS = 1500
 let agentSuppressedSave = null
 let unlistenDrawingUpdated = null
 
-const onGraphChange = ({ id, graphJSON }) => {
+const onGraphChange = ({ id, graphJSON, previewSvg }) => {
   if (agentSuppressedSave && agentSuppressedSave.canvasId === id && Date.now() - agentSuppressedSave.at < AGENT_SUPPRESS_MS) {
     return
   }
-  if (id && graphJSON) drawingStore.saveGraph(id, graphJSON)
+  if (id && graphJSON) drawingStore.saveGraph(id, graphJSON, previewSvg)
+}
+
+const onPreviewChange = ({ id, previewSvg }) => {
+  if (id && previewSvg) drawingStore.savePreview(id, previewSvg)
 }
 
 let initialPointerX = 0
@@ -679,6 +691,7 @@ onUnmounted(() => {
 .canvas-card:hover { border-color: #a8a29e; }
 .canvas-card.active, .canvas-card.active:hover { border-color: #1c1917; box-shadow: none; }
 .canvas-preview { position: relative; display: flex; width: 100%; aspect-ratio: 3 / 2; align-items: center; justify-content: center; overflow: hidden; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); background-color: color-mix(in srgb, var(--bg-secondary) 72%, transparent); }
+.canvas-preview-svg { width: 100%; height: 100%; object-fit: contain; user-select: none; }
 .canvas-card-footer { display: flex; flex-direction: column; gap: 2px; padding: 5px 6px; flex-shrink: 0; }
 .canvas-card-footer strong { height: 16px; overflow: hidden; font-size: 12px; line-height: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-card-footer small { color: var(--text-tertiary); font-size: 10px; line-height: 1.2; }

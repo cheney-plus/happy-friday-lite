@@ -151,10 +151,18 @@ async function initDatabase() {
       kind TEXT NOT NULL DEFAULT 'blank',
       categoryId TEXT,
       graphJSON TEXT NOT NULL DEFAULT '{"cells":[]}',
+      previewSvg TEXT NOT NULL DEFAULT '',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
   `)
+
+  // 迁移：为旧版 drawing_canvases 表补充 previewSvg 列（真实 SVG 缩略图，已存在则忽略）
+  try {
+    db.run("ALTER TABLE drawing_canvases ADD COLUMN previewSvg TEXT NOT NULL DEFAULT ''")
+  } catch (_e) {
+    // 列已存在，忽略
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS drawing_categories (
@@ -799,18 +807,19 @@ export function getDrawingCanvas(canvasId) {
 
 export function saveDrawingCanvas(canvas) {
   const graphStr = JSON.stringify(canvas?.graphJSON || { cells: [] })
+  const previewSvg = typeof canvas?.previewSvg === 'string' ? canvas.previewSvg : ''
   const createdAt = isoTimestamp(canvas?.createdAt)
   const updatedAt = isoTimestamp(canvas?.updatedAt)
   const existing = queryOne('SELECT id FROM drawing_canvases WHERE id = ?', [canvas?.id])
   if (existing) {
     db.run(
-      'UPDATE drawing_canvases SET title = ?, titleKey = ?, kind = ?, categoryId = ?, graphJSON = ?, updatedAt = ? WHERE id = ?',
-      [canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, updatedAt, canvas.id]
+      'UPDATE drawing_canvases SET title = ?, titleKey = ?, kind = ?, categoryId = ?, graphJSON = ?, previewSvg = ?, updatedAt = ? WHERE id = ?',
+      [canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, previewSvg, updatedAt, canvas.id]
     )
   } else {
     db.run(
-      'INSERT INTO drawing_canvases (id, title, titleKey, kind, categoryId, graphJSON, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [canvas.id, canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, createdAt, updatedAt]
+      'INSERT INTO drawing_canvases (id, title, titleKey, kind, categoryId, graphJSON, previewSvg, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [canvas.id, canvas.title || '', canvas.titleKey || '', canvas.kind || 'blank', canvas.categoryId || null, graphStr, previewSvg, createdAt, updatedAt]
     )
   }
   saveDb()

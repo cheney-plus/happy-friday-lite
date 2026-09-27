@@ -67,6 +67,7 @@ import {
   addCatalogNode,
   applyAnimationToSelection,
   applyGraphTheme,
+  captureDrawingSvg,
   connectSelected,
   createDrawingGraph,
   downloadFile,
@@ -106,7 +107,7 @@ const props = defineProps({
   canvas: { type: Object, required: true }
 })
 
-const emit = defineEmits(['change', 'library-change'])
+const emit = defineEmits(['change', 'preview', 'library-change'])
 const { t } = useI18n()
 const { appliedTheme } = useTheme()
 
@@ -130,6 +131,8 @@ const imageInputRef = ref(null)
 const graph = ref(null)
 let dnd = null
 let saveTimer = null
+let previewTimer = null
+let previewDirty = false
 let skipSave = false
 let lastDropAt = 0
 let pendingImageItem = null
@@ -206,12 +209,28 @@ const syncHistory = () => {
   isEmpty.value = cellCount.value === 0
 }
 
+// graphJSON 保存与 SVG 快照捕获解耦：前者轻量，保持 400ms 防抖；
+// 后者因 copyStyles 需对全量节点做 getComputedStyle（大图可达数百毫秒且阻塞主线程），
+// 延后到编辑空闲后执行，高频编辑时不再拖慢交互。
 const scheduleSave = () => {
   if (skipSave || !graph.value) return
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    emit('change', { id: props.canvas.id, graphJSON: graph.value.toJSON() })
+    const id = props.canvas.id
+    emit('change', { id, graphJSON: graph.value.toJSON() })
+    previewDirty = true
+    clearTimeout(previewTimer)
+    previewTimer = setTimeout(capturePreview, 2000)
   }, 400)
+}
+
+const capturePreview = async () => {
+  previewTimer = null
+  previewDirty = false
+  if (!graph.value) return
+  const id = props.canvas.id
+  const previewSvg = await captureDrawingSvg(graph.value)
+  if (previewSvg) emit('preview', { id, previewSvg })
 }
 
 const refreshProps = () => {
@@ -555,7 +574,13 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu)
   document.removeEventListener('keydown', cancelPendingEdge)
   clearTimeout(saveTimer)
-  if (graph.value && !skipSave) emit('change', { id: props.canvas.id, graphJSON: graph.value.toJSON() })
+  clearTimeout(previewTimer)
+  previewTimer = null
+  if (graph.value && !skipSave) {
+    emit('change', { id: props.canvas.id, graphJSON: graph.value.toJSON() })
+    // 兜底刷新：离开画布时若还有未捕获的编辑，立即生成快照（克隆在同步阶段完成，dispose 不影响）
+    if (previewDirty) capturePreview()
+  }
   stopObservingGraphResize()
   dnd?.dispose()
   graph.value?.dispose()
