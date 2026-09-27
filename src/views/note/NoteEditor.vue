@@ -683,7 +683,6 @@ import Code from '@tiptap/extension-code';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
-import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import Superscript from '@tiptap/extension-superscript';
@@ -2349,6 +2348,12 @@ const editor = useEditor({
       },
       code: false,
       codeBlock: false,
+      link: {
+        openOnClick: false,
+        HTMLAttributes: {
+          class: 'text-link',
+        },
+      },
       paragraph: false,
     }),
     CustomParagraph,
@@ -2359,12 +2364,6 @@ const editor = useEditor({
     }),
     Highlight.configure({
       multicolor: true,
-    }),
-    Link.configure({
-      openOnClick: false,
-      HTMLAttributes: {
-        class: 'text-link',
-      },
     }),
     Image.configure({
       HTMLAttributes: {
