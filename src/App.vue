@@ -29,6 +29,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { allMenuConfigs, isElectronEnvironment } from '@/config/menu';
 import { useTheme } from '@/utils/theme';
 import { resolveFridayTabPath } from '@/utils/fridayNavigation';
+import { openMarkdownAsNotePage } from '@/utils/markdownImport';
 
 const appStore = useAppStore();
 const tabStore = useTabStore();
@@ -49,6 +50,30 @@ const routerViewKey = computed(() => {
 
 let unlistenConfig = null;
 let unlistenOfficeOpened = null;
+let unlistenOpenFileRequest = null;
+
+/** 系统打开文件请求 → 路由到应用内对应查看器/编辑器 */
+async function handleOsOpenFile(filePath) {
+  const name = filePath.split('/').pop().split('\\').pop();
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  if (['md', 'markdown', 'mdx'].includes(ext)) {
+    // Markdown：导入为笔记后进入笔记模块编辑界面（失败回退只读查看器）
+    const opened = await openMarkdownAsNotePage(filePath, router);
+    if (!opened) {
+      const tab = tabStore.addFileTab({ name, path: filePath, type: 'markdown' });
+      router.push(tab.fullPath);
+    }
+    return;
+  }
+  try {
+    const res = await electronService.invoke('office-open-file', { filePath });
+    if (res?.success && res.viewId) {
+      await router.push(`/office/${String(res.viewId).replace('-', '/')}`);
+      return;
+    }
+  } catch (_e) { /* 落入系统默认程序兜底 */ }
+  electronService.invoke('kb-open-file-external', { filePath }).catch(() => {});
+}
 
 watch(
   () => route.name,
@@ -177,6 +202,9 @@ onMounted(async () => {
         if (config.scheduleDefaultView) {
           appStore.setScheduleDefaultView(config.scheduleDefaultView);
         }
+        if (config.docOpenModes) {
+          appStore.setDocOpenModes(config.docOpenModes);
+        }
         appStore.setSidebarModules(config.sidebarModules);
         // 启动时默认收起侧边栏
         if (config.collapseSidebarOnLaunch) {
@@ -212,6 +240,13 @@ onMounted(async () => {
       }
     });
 
+    // 操作系统打开文件请求（系统文件关联双击/open-file 事件）：
+    // Markdown 进文件查看器，Office 类型进内置编辑器，其余兜底系统默认程序
+    unlistenOpenFileRequest = electronService.listen('open-file-request', (event) => {
+      const filePath = event.payload?.filePath;
+      if (filePath) handleOsOpenFile(filePath);
+    });
+
     unlistenConfig = electronService.listen('config-changed', (event) => {
       const data = event.payload;
       if (data.language) {
@@ -227,6 +262,9 @@ onMounted(async () => {
       }
       if (data.scheduleDefaultView) {
         appStore.setScheduleDefaultView(data.scheduleDefaultView);
+      }
+      if (data.docOpenModes) {
+        appStore.setDocOpenModes(data.docOpenModes);
       }
       if (data.sidebarModules !== undefined) {
         appStore.setSidebarModules(data.sidebarModules);
@@ -245,6 +283,10 @@ onUnmounted(() => {
   if (unlistenOfficeOpened) {
     unlistenOfficeOpened();
     unlistenOfficeOpened = null;
+  }
+  if (unlistenOpenFileRequest) {
+    unlistenOpenFileRequest();
+    unlistenOpenFileRequest = null;
   }
 });
 </script>

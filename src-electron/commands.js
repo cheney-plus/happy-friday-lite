@@ -23,6 +23,7 @@ import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
+import { getFileAssocStatus, setFileAssoc, clearFileAssoc } from './file-assoc.js'
 import { listProviderModels } from './modelCatalog.js'
 import { testChatModel, testEmbeddingModel } from './modelTest.js'
 import { registerAgentCommands } from './agent/ipc.js'
@@ -175,6 +176,19 @@ export function registerCommands(mainWindow) {
       console.warn('[Commands] Failed to sync Harness model config:', error.message)
     })
     return result
+  })
+
+  // 系统文件关联：查询/设置/取消本客户端作为系统默认打开程序
+  ipcMain.handle('file-assoc-get-status', () => {
+    return getFileAssocStatus()
+  })
+
+  ipcMain.handle('file-assoc-set', (_event, args) => {
+    return setFileAssoc(args?.groups || [])
+  })
+
+  ipcMain.handle('file-assoc-clear', (_event, args) => {
+    return clearFileAssoc(args?.groups || [])
   })
 
   ipcMain.handle('get-platform', () => {

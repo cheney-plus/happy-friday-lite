@@ -64,7 +64,44 @@ let powerBlockerId = null
 let shutdownStarted = false
 
 if (!headlessExportRun) {
-  app.on('second-instance', () => {
+  // 系统打开文件请求：macOS open-file 事件 / Windows、Linux second-instance argv。
+  // 统一推送给渲染进程（open-file-request），由其路由到内置 Office 编辑器或查看器。
+  const OPEN_FILE_EXTS = new Set([
+    'md', 'markdown', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx'
+  ])
+  const pendingOpenFilePaths = []
+  let pendingFlushTimer = null
+
+  function isSupportedDocPath(p) {
+    if (!p || !fs.existsSync(p) || fs.statSync(p).isDirectory()) return false
+    const ext = path.extname(p).slice(1).toLowerCase()
+    return OPEN_FILE_EXTS.has(ext)
+  }
+
+  function emitOpenFileRequest(filePath) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('open-file-request', { filePath })
+      return
+    }
+    // 窗口尚未就绪：排队等待，稍后补发（渲染层可能仍在启动中，延迟发送）
+    pendingOpenFilePaths.push(filePath)
+    if (pendingFlushTimer) return
+    pendingFlushTimer = setInterval(() => {
+      if (pendingOpenFilePaths.length === 0 || !mainWindow || mainWindow.isDestroyed()) return
+      const paths = pendingOpenFilePaths.splice(0)
+      paths.forEach(p => mainWindow.webContents.send('open-file-request', { filePath: p }))
+      clearInterval(pendingFlushTimer)
+      pendingFlushTimer = null
+    }, 3000)
+  }
+
+  app.on('open-file', (event, filePath) => {
+    event.preventDefault()
+    if (isSupportedDocPath(filePath)) emitOpenFileRequest(filePath)
+  })
+
+  app.on('second-instance', (_event, argv) => {
+    argv.filter(isSupportedDocPath).forEach(emitOpenFileRequest)
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()

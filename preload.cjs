@@ -90,6 +90,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-read-file',
       'kb-read-file-buffer',
       'kb-open-file-external',
+      'file-assoc-get-status',
+      'file-assoc-set',
+      'file-assoc-clear',
       'kb-watch-current-dir',
       'logs-open-dir',
       'backup-create',
@@ -217,7 +220,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-view-closed',
       'office-file-saved',
       'office-layout-sync',
-      'obsidian-sync-status'
+      'obsidian-sync-status',
+      'open-file-request'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)
