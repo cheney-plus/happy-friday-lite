@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 /**
  * Office 首页数据与动作（最近文件 / 收藏 / 类型过滤）。
@@ -6,6 +7,7 @@ import { ref, computed } from 'vue';
  */
 export function useOfficeHome() {
   const api = window.electronAPI;
+  const { t } = useI18n();
   const recents = ref([]);
   const filter = ref('all');
 
@@ -42,6 +44,26 @@ export function useOfficeHome() {
     } catch { /* ignore */ }
   }
 
+  async function deleteRecent(entry) {
+    if (!api || !entry?.path) return;
+    // 彻底删除前二次确认（window.confirm 与项目其他删除确认一致）
+    if (!window.confirm(t('office.deleteConfirm', { name: entry.name || entry.path }))) return;
+    try {
+      const res = await api.invoke('office-delete-file', entry.path);
+      if (res && res.success) {
+        recents.value = recents.value.filter(e => e.path !== entry.path);
+      } else {
+        const reason = {
+          'in-use': '文档正在编辑器中打开，请先关闭后再删除',
+          missing: '文件不存在或已被移动',
+          denied: '没有删除权限',
+          invalid: '路径无效',
+        }[res?.error] || '删除失败';
+        window.alert(reason);
+      }
+    } catch { /* ignore */ }
+  }
+
   function reveal(entry) {
     if (api) api.invoke('office-reveal-path', entry.path).catch(() => {});
   }
@@ -72,6 +94,7 @@ export function useOfficeHome() {
     loadRecents,
     toggleStar,
     removeRecent,
+    deleteRecent,
     reveal,
     renameRecent,
   };

@@ -38,6 +38,7 @@
           @open="$emit('open', $event)"
           @toggle-star="$emit('toggle-star', $event)"
           @remove="$emit('remove', $event)"
+          @delete="$emit('delete', $event)"
           @reveal="$emit('reveal', $event)"
           @rename="$emit('rename', $event)"
         />
@@ -55,7 +56,7 @@ defineProps({
   entries: { type: Array, required: true },
   filter: { type: String, required: true },
 });
-defineEmits(['update:filter', 'open', 'toggle-star', 'remove', 'reveal', 'rename']);
+defineEmits(['update:filter', 'open', 'toggle-star', 'remove', 'delete', 'reveal', 'rename']);
 
 const { t } = useI18n();
 

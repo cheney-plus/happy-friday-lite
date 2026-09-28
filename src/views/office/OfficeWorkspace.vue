@@ -13,6 +13,7 @@
         @open-local="handleOpenLocal"
         @open-recent="handleOpenRecent"
       />
+      <NewDocNameDialog :type="namingType" @confirm="confirmNewDoc" @cancel="namingType = null" />
     </div>
 
     <!-- 编辑器 Tab（/office/:editor/:instId）：原生编辑器视图占位区（由主进程全区域摆放，关闭 Tab 时自动保存） -->
@@ -27,6 +28,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useFridayStore, useTabStore } from '@/store';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
 import OfficeHome from './home/OfficeHome.vue';
+import NewDocNameDialog from './home/NewDocNameDialog.vue';
 
 const EDITOR_TYPES = ['docs', 'sheets', 'slides', 'pdf'];
 
@@ -80,13 +82,13 @@ function setTabFile(filePath) {
 
 // ---- 首页 Tab：打开/新建（先建视图拿到 viewId，再跳转对应编辑器 Tab） -------
 
-async function openEditorTab(type, filePath = null) {
+async function openEditorTab(type, filePath = null, name = '') {
   if (!api || busy.value || !EDITOR_TYPES.includes(type)) return;
   busy.value = true;
   try {
     const res = filePath
       ? await api.invoke('office-open-file', { filePath })
-      : await api.invoke('office-new', { type });
+      : await api.invoke('office-new', { type, name });
     if (res && res.success && res.viewId) {
       await router.push(officeEditorPath(res.viewId));
     } else {
@@ -99,8 +101,16 @@ async function openEditorTab(type, filePath = null) {
   }
 }
 
+// 新建前先命名：首页点击新建卡片 → 弹出命名框（默认"新建文档"名）→ 确认后创建
+const namingType = ref(null);
+
 function handleNewDoc(type) {
-  openEditorTab(type);
+  namingType.value = type;
+}
+
+async function confirmNewDoc({ type, name }) {
+  namingType.value = null;
+  await openEditorTab(type, null, name);
 }
 
 function handleOpenRecent(entry) {
@@ -217,6 +227,11 @@ async function showOpenEditor() {
   const st = await fetchEditorState();
   if (!st || !st.open) return false;
   currentFile.value = st.filePath;
+  // 命名新建/从首页打开的文件：激活时同步 Tab 标题与文件路径（openFileInEditor 之外的路径不会设置）
+  if (st.filePath) {
+    setTabTitle(baseName(st.filePath));
+    setTabFile(st.filePath);
+  }
   await syncBounds();
   try { await api.invoke('office-show', { viewId }); } catch { /* ignore */ }
   return true;

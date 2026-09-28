@@ -53,6 +53,7 @@
           <button role="menuitem" @click="copyPath">{{ t('office.menuCopyPath') }}</button>
           <div class="row-menu-divider" />
           <button role="menuitem" @click="act('remove')">{{ t('office.menuRemove') }}</button>
+          <button role="menuitem" class="danger" @click="act('delete')">{{ t('office.menuDelete') }}</button>
         </div>
       </span>
     </div>
@@ -67,7 +68,7 @@ import { badgeMeta, formatModified, formatSize } from './fileMeta';
 const props = defineProps({
   entry: { type: Object, required: true },
 });
-const emit = defineEmits(['open', 'toggle-star', 'remove', 'reveal', 'rename']);
+const emit = defineEmits(['open', 'toggle-star', 'remove', 'delete', 'reveal', 'rename']);
 
 const { t } = useI18n();
 const menuOpen = ref(false);
@@ -87,6 +88,7 @@ function act(kind) {
   else if (kind === 'rename') startRename();
   else if (kind === 'reveal') emit('reveal', props.entry);
   else if (kind === 'remove') emit('remove', props.entry);
+  else if (kind === 'delete') emit('delete', props.entry);
 }
 
 function startRename() {
@@ -298,6 +300,12 @@ async function copyPath() {
     cursor: pointer;
 
     &:hover { background: var(--of-bg-hover); }
+
+    &.danger {
+      color: #e5484d;
+
+      &:hover { background: rgb(229 72 77 / 8%); }
+    }
   }
 }
 

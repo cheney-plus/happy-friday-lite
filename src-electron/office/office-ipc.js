@@ -12,6 +12,7 @@ import {
   toggleOfficeStarred,
   removeOfficeRecents,
   renameOfficeFile,
+  deleteOfficeFile,
   revealOfficePath,
   openOfficeFileDialog,
   queryOfficeDirty,
@@ -46,11 +47,11 @@ export function registerOfficeIpc() {
     return autoSaveOfficeFile(viewId)
   })
 
-  ipcMain.handle('office-new', (_e, { type, viewId } = {}) => {
+  ipcMain.handle('office-new', (_e, { type, viewId, name } = {}) => {
     if (!['docs', 'sheets', 'slides', 'pdf'].includes(type)) {
       return { success: false, error: 'unsupported editor type' }
     }
-    return newOfficeDocument(type, viewId)
+    return newOfficeDocument(type, viewId, typeof name === 'string' ? name : '')
   })
 
   ipcMain.handle('office-hide-all', () => {
@@ -78,6 +79,13 @@ export function registerOfficeIpc() {
       return { success: false, error: 'invalid' }
     }
     return renameOfficeFile(filePath, newName)
+  })
+
+  ipcMain.handle('office-delete-file', (_e, filePath) => {
+    if (typeof filePath !== 'string' || !filePath) {
+      return { success: false, error: 'invalid' }
+    }
+    return deleteOfficeFile(filePath)
   })
 
   ipcMain.handle('office-reveal-path', (_e, filePath) => revealOfficePath(filePath))

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { app, dialog, ipcMain, shell } from 'electron'
 import XLSX from 'xlsx'
+import AdmZip from 'adm-zip'
 import { registerOfficeAiBridge } from './office-ai-bridge.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -462,9 +463,9 @@ function createTypeView(type, filePath) {
   return { view: b.pdf.createPdfView(filePath || null), filePath }
 }
 
-/** 新建空白表格的默认保存目录（与上游 sheets configuredDefaultSaveDir 一致：
+/** 新建空白文档的默认保存目录（与上游 sheets configuredDefaultSaveDir 一致：
  *  优先 app-settings.json 的 defaultSaveDir，回退 ~/Documents/GenOffice） */
-function sheetsDefaultSaveDir() {
+function officeDefaultSaveDir() {
   try {
     const settingsPath = path.join(app.getPath('userData'), 'app-settings.json')
     const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
@@ -478,7 +479,7 @@ function sheetsDefaultSaveDir() {
 
 /** 生成空白 xlsx 工作簿文件并返回路径（单空 Sheet1，复用上游 uniquePathIn 去重命名） */
 function createBlankWorkbookFile() {
-  const dir = sheetsDefaultSaveDir()
+  const dir = officeDefaultSaveDir()
   fs.mkdirSync(dir, { recursive: true })
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([]), 'Sheet1')
@@ -487,6 +488,93 @@ function createBlankWorkbookFile() {
   fs.writeFileSync(filePath, buffer)
   // 标记为"未命名"文件：沿用上游 autoRenameWorkbook 按内容自动改名的能力
   try { state.bundles.sheets.markSheetsUntitledPath(filePath) } catch { /* ignore */ }
+  return filePath
+}
+
+/** 落盘路径去重：同名时追加 (2)、(3)…（不依赖具体编辑器 bundle 的能力） */
+function uniqueOfficePath(dir, fileName) {
+  const ext = path.extname(fileName)
+  const base = fileName.slice(0, fileName.length - ext.length)
+  let candidate = path.join(dir, fileName)
+  let n = 2
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(dir, `${base} (${n})${ext}`)
+    n += 1
+  }
+  return candidate
+}
+
+/** 生成空白 docx（最小 OOXML 包：单个空段落） */
+function blankDocxBuffer() {
+  const zip = new AdmZip()
+  zip.addFile('[Content_Types].xml', Buffer.from(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    + '<Default Extension="xml" ContentType="application/xml"/>'
+    + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    + '</Types>'
+  ))
+  zip.addFile('_rels/.rels', Buffer.from(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+    + '</Relationships>'
+  ))
+  zip.addFile('word/document.xml', Buffer.from(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    + '<w:body><w:p/></w:body>'
+    + '</w:document>'
+  ))
+  return zip.toBuffer()
+}
+
+/** 生成空白 pptx（pptxgenjs：单个空白页），Node 侧同步产出 buffer */
+async function blankPptxBuffer() {
+  const { default: PptxGenJS } = await import('pptxgenjs')
+  const pptx = new PptxGenJS()
+  pptx.addSlide()
+  return Buffer.from(await pptx.write({ outputType: 'nodebuffer' }))
+}
+
+/** 生成空白单页 PDF（手工构造最小合法 PDF，含正确的 xref 偏移） */
+function blankPdfBuffer() {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << >> >>',
+  ]
+  let out = '%PDF-1.4\n'
+  const offsets = []
+  objects.forEach((body, i) => {
+    offsets.push(out.length)
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`
+  })
+  const xrefPos = out.length
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const off of offsets) out += `${String(off).padStart(10, '0')} 00000 n \n`
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`
+  return Buffer.from(out, 'latin1')
+}
+
+/** 按类型生成用户命名的空白文档文件并返回路径（命名新建场景；失败抛错由调用方兜底） */
+async function createBlankOfficeFile(type, displayName) {
+  const dir = officeDefaultSaveDir()
+  fs.mkdirSync(dir, { recursive: true })
+  const ext = { docs: '.docx', sheets: '.xlsx', slides: '.pptx', pdf: '.pdf' }[type]
+  const filePath = uniqueOfficePath(dir, `${displayName}${ext}`)
+  if (type === 'sheets') {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([]), 'Sheet1')
+    fs.writeFileSync(filePath, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }))
+  } else if (type === 'docs') {
+    fs.writeFileSync(filePath, blankDocxBuffer())
+  } else if (type === 'slides') {
+    fs.writeFileSync(filePath, await blankPptxBuffer())
+  } else {
+    fs.writeFileSync(filePath, blankPdfBuffer())
+  }
   return filePath
 }
 
@@ -609,15 +697,33 @@ export async function closeOfficeFile(viewId) {
 /**
  * 新建空白文档（对应编辑器的无参 createXxxView）。每个新建文档都是独立视图/Tab；
  * requestedViewId 用于 Tab 恢复场景（在原 Tab 的 viewId 下重建）。
- * sheets 新建会落盘空白工作簿文件，返回值携带其 filePath。
+ * name 非空时先按用户命名在默认保存目录落盘空白文件（docx/xlsx/pptx/pdf），
+ * 再按普通文件打开，文档即刻拥有真实文件名并进入最近列表；落盘失败回退原空白视图行为。
  */
-export function newOfficeDocument(type, requestedViewId) {
+export async function newOfficeDocument(type, requestedViewId, name) {
   if (!state.bundles?.[type]) return { success: false, error: 'editor unavailable' }
+  // 与 renameOfficeFile 一致的非法字符清理
+  const base = String(name || '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\.+$/, '')
+    .trim()
+  let namedPath = null
+  if (base) {
+    try {
+      namedPath = await createBlankOfficeFile(type, base)
+    } catch (e) {
+      console.warn('[Office] create named blank file failed, fallback to blank view:', e?.message || e)
+    }
+  }
   const viewId = allocViewId(type, requestedViewId)
-  const { view, filePath } = createTypeView(type, null)
+  const { view, filePath } = createTypeView(type, namedPath)
   attachView({ viewId, type, view, filePath })
+  if (namedPath) {
+    try { state.bundles.docs.recordRecentFile?.(filePath) } catch { /* ignore */ }
+  }
   showView(viewId)
-  return { success: true, type, viewId, blank: true, filePath }
+  return { success: true, type, viewId, blank: !namedPath, filePath }
 }
 
 /** 隐藏所有 Office 视图（路由离开 Office 工作区时调用，不销毁） */
@@ -762,6 +868,31 @@ export function renameOfficeFile(filePath, newName) {
   }
   try { docs.replaceRecentFile(oldPath, newPath) } catch { /* recents 同步失败不影响改名 */ }
   return { success: true, filePath: newPath, name: path.basename(newPath) }
+}
+
+/** 首页删除文档：彻底删除磁盘文件（不入回收站）+ 清理最近列表/收藏记录。
+ *  已打开的文件拒绝删除（编辑器会话仍占用，保存会复活文件）。 */
+export function deleteOfficeFile(filePath) {
+  const docs = state.bundles?.docs
+  const target = String(filePath || '')
+  let stat
+  try { stat = fs.statSync(target) } catch {
+    return { success: false, error: 'missing' }
+  }
+  if (!stat.isFile()) return { success: false, error: 'missing' }
+  for (const entry of state.views.values()) {
+    if (entry.filePath === target) return { success: false, error: 'in-use' }
+  }
+  try {
+    fs.rmSync(target, { force: true })
+  } catch (e) {
+    return { success: false, error: e.code === 'EACCES' || e.code === 'EPERM' ? 'denied' : 'failed' }
+  }
+  try {
+    if (docs?.readStarredFiles?.().includes(target)) docs.toggleStarredFile(target)
+  } catch { /* 收藏清理失败不影响删除 */ }
+  try { docs?.removeRecentFiles?.([target]) } catch { /* recents 同步失败不影响删除 */ }
+  return { success: true }
 }
 
 /** 在系统文件管理器中显示文件 */

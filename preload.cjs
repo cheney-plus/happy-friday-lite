@@ -155,6 +155,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-get-recents',
       'office-toggle-starred',
       'office-remove-recents',
+      'office-rename-file',
+      'office-delete-file',
       'office-reveal-path',
       'office-open-dialog',
       'office-set-ai-model',
