@@ -14,6 +14,8 @@
         </div>
       </main>
     </div>
+    <!-- 启动时处理系统打开文件请求的遮罩：先完成跳转再露出界面，避免首页闪现 -->
+    <div v-if="startupOpening" class="startup-open-overlay"></div>
   </div>
 </template>
 
@@ -39,6 +41,8 @@ const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
 
 // 分享视图：隐藏侧边栏/标签栏，全屏展示对话界面
 const isShareView = computed(() => route.meta?.share === true || !isElectronEnvironment());
+// 启动时是否有排队的系统打开文件请求待处理（期间显示遮罩避免首页闪现）
+const startupOpening = ref(isElectronEnvironment());
 const isHarnessRoute = computed(() => route.name === 'harness');
 const hasVisitedHarness = ref(false);
 const routerViewKey = computed(() => {
@@ -178,6 +182,18 @@ onMounted(async () => {
   initTheme();
 
   if (isElectronEnvironment()) {
+    // 启动时先拉取主进程排队的系统打开文件请求（如双击 doc/ppt 用本应用打开），
+    // 处理完成后再移除遮罩露出界面，避免先渲染首页再跳转
+    try {
+      const pending = await electronService.invoke('open-file-get-pending');
+      if (pending && pending.length > 0) {
+        for (const p of pending) {
+          await handleOsOpenFile(p);
+        }
+      }
+    } catch (_e) { /* 拉取失败按无待处理文件 */ }
+    startupOpening.value = false;
+
     try {
       const config = await electronService.invoke('get-config');
       if (config) {
@@ -298,6 +314,13 @@ onUnmounted(() => {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  background-color: var(--bg-secondary);
+}
+
+.startup-open-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   background-color: var(--bg-secondary);
 }
 

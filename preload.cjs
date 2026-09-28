@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   invoke(channel, ...args) {
     const validChannels = [
       'get-config',
+      'open-file-get-pending',
       'save-config',
       'get-platform',
       'save-file-dialog',

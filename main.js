@@ -79,7 +79,8 @@ if (!headlessExportRun) {
   }
 
   function emitOpenFileRequest(filePath) {
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    // 渲染层仍在加载时先入队，避免 send 丢失；由渲染层启动时拉取或稍后补发
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
       mainWindow.webContents.send('open-file-request', { filePath })
       return
     }
@@ -94,6 +95,15 @@ if (!headlessExportRun) {
       pendingFlushTimer = null
     }, 3000)
   }
+
+  // 渲染进程启动时主动拉取排队中的打开文件请求（先跳转再展示界面，避免首页闪现）
+  ipcMain.handle('open-file-get-pending', () => {
+    if (pendingFlushTimer) {
+      clearInterval(pendingFlushTimer)
+      pendingFlushTimer = null
+    }
+    return pendingOpenFilePaths.splice(0)
+  })
 
   app.on('open-file', (event, filePath) => {
     event.preventDefault()
