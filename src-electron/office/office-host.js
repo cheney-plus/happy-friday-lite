@@ -2,7 +2,7 @@ import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
-import { app, dialog, ipcMain, shell } from 'electron'
+import { app, dialog, ipcMain, nativeTheme, shell } from 'electron'
 import XLSX from 'xlsx'
 import AdmZip from 'adm-zip'
 import { registerOfficeAiBridge } from './office-ai-bridge.js'
@@ -171,6 +171,42 @@ function registerEditorIpc() {
   try { slides.registerSlidesIpc() } catch (e) { console.warn('[Office] registerSlidesIpc:', e.message) }
   // Friday 接管编辑器 ai:* 通道（须在编辑器注册之后，后注册者覆盖）
   registerOfficeAiBridge()
+}
+
+/**
+ * 上游 shell 主进程注册的 app 级偏好通道（镜像 apps/shell index.ts 契约）。
+ * 编辑器 renderer 启动即调用，缺失会报 "No handler registered for 'app:...'"。
+ * 主题/自动保存默认值持久化在 userData/app-settings.json（与上游同键同形）。
+ */
+function readOfficeAppSettings() {
+  try {
+    const raw = JSON.parse(
+      fs.readFileSync(path.join(app.getPath('userData'), 'app-settings.json'), 'utf8'),
+    )
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+  } catch { /* missing or corrupt: treat as empty settings */ }
+  return {}
+}
+
+function currentOfficeTheme() {
+  const saved = readOfficeAppSettings().theme
+  return saved === 'light' || saved === 'dark' ? saved : 'system'
+}
+
+function registerAppPrefsIpc() {
+  ipcMain.handle('app:get-theme', () => currentOfficeTheme())
+
+  ipcMain.handle('app:get-auto-save-default', () => {
+    const saved = readOfficeAppSettings()
+    const updatedAt = saved.autoSaveDefaultUpdatedAt
+    return {
+      on: saved.autoSaveDefault === true,
+      updatedAt: typeof updatedAt === 'number' && updatedAt > 0 ? updatedAt : 0,
+    }
+  })
+
+  // 原生菜单/滚动条等跟随持久化主题（上游 boot 同款）
+  nativeTheme.themeSource = currentOfficeTheme()
 }
 
 function wireShellHooks() {
@@ -376,6 +412,7 @@ export async function initOfficeHost(mainWindow) {
   tolerateDuplicateIpcHandlers()
   configureRuntimes()
   registerEditorIpc()
+  registerAppPrefsIpc()
   wireShellHooks()
   wireSlidesShowFullscreen()
 
