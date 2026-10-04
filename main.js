@@ -16,6 +16,7 @@ import { stopHarnessSidecar } from './src-electron/harness/index.js'
 import { initOfficeSession, shutdownOfficeHost } from './src-electron/office/office-session.js'
 import { registerOfficeIpc } from './src-electron/office/office-ipc.js'
 import { isHeadlessExportRun, runHeadlessExportEntry } from './src-electron/office/office-headless.js'
+import { startObsidianScheduler, stopObsidianScheduler } from './src-electron/obsidian/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -42,17 +43,81 @@ if (isDev) {
   app.setPath('userData', path.join(__dirname, 'app-data', 'electron-user-data'))
 }
 
+// The GUI and its DSH sidecar share one data directory. Multiple AppImage
+// instances would therefore contend for DSH's credentials writer lock.
+const headlessExportRun = isHeadlessExportRun()
+const hasSingleInstanceLock = headlessExportRun || app.requestSingleInstanceLock()
+if (!hasSingleInstanceLock) app.quit()
+
 // 尽早初始化文件日志器，接管 console.* 与未捕获异常，
 // 将运行日志落盘到数据目录，便于安装后排查异常。
 // 必须在 app.whenReady 之前同步执行，以捕获后续所有模块的输出。
-initLogger(
-  isDev ? path.join(__dirname, 'app-data') : app.getPath('userData')
-)
+if (hasSingleInstanceLock) {
+  initLogger(
+    isDev ? path.join(__dirname, 'app-data') : app.getPath('userData')
+  )
+}
 
 let mainWindow = null
 let kbWatcherHandle = null
 let powerBlockerId = null
 let shutdownStarted = false
+
+if (!headlessExportRun) {
+  // 系统打开文件请求：macOS open-file 事件 / Windows、Linux second-instance argv。
+  // 统一推送给渲染进程（open-file-request），由其路由到内置 Office 编辑器或查看器。
+  const OPEN_FILE_EXTS = new Set([
+    'md', 'markdown', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx'
+  ])
+  const pendingOpenFilePaths = []
+  let pendingFlushTimer = null
+
+  function isSupportedDocPath(p) {
+    if (!p || !fs.existsSync(p) || fs.statSync(p).isDirectory()) return false
+    const ext = path.extname(p).slice(1).toLowerCase()
+    return OPEN_FILE_EXTS.has(ext)
+  }
+
+  function emitOpenFileRequest(filePath) {
+    // 渲染层仍在加载时先入队，避免 send 丢失；由渲染层启动时拉取或稍后补发
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.send('open-file-request', { filePath })
+      return
+    }
+    // 窗口尚未就绪：排队等待，稍后补发（渲染层可能仍在启动中，延迟发送）
+    pendingOpenFilePaths.push(filePath)
+    if (pendingFlushTimer) return
+    pendingFlushTimer = setInterval(() => {
+      if (pendingOpenFilePaths.length === 0 || !mainWindow || mainWindow.isDestroyed()) return
+      const paths = pendingOpenFilePaths.splice(0)
+      paths.forEach(p => mainWindow.webContents.send('open-file-request', { filePath: p }))
+      clearInterval(pendingFlushTimer)
+      pendingFlushTimer = null
+    }, 3000)
+  }
+
+  // 渲染进程启动时主动拉取排队中的打开文件请求（先跳转再展示界面，避免首页闪现）
+  ipcMain.handle('open-file-get-pending', () => {
+    if (pendingFlushTimer) {
+      clearInterval(pendingFlushTimer)
+      pendingFlushTimer = null
+    }
+    return pendingOpenFilePaths.splice(0)
+  })
+
+  app.on('open-file', (event, filePath) => {
+    event.preventDefault()
+    if (isSupportedDocPath(filePath)) emitOpenFileRequest(filePath)
+  })
+
+  app.on('second-instance', (_event, argv) => {
+    argv.filter(isSupportedDocPath).forEach(emitOpenFileRequest)
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  })
+}
 
 async function ensureDataDir() {
   const dataDir = isDev
@@ -108,9 +173,10 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (!hasSingleInstanceLock) return
   // happyfriday-office CLI 的 headless 导出请求：跳过全部常规初始化，
   // 隐藏窗口渲染一次导出后退出（office-headless.js 内部负责 app.exit）
-  if (isHeadlessExportRun()) {
+  if (headlessExportRun) {
     try {
       await runHeadlessExportEntry()
     } catch (error) {
@@ -150,6 +216,7 @@ app.whenReady().then(async () => {
   }
 
   startAutomationScheduler(mainWindow)
+  startObsidianScheduler(mainWindow)
 
   // Office 工作区（happyoffice 编辑器以 WebContentsView 挂载到主窗口）
   try {
@@ -239,6 +306,7 @@ app.on('window-all-closed', function () {
   }
   stopShareServer()
   stopAutomationScheduler()
+  stopObsidianScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()
@@ -253,7 +321,8 @@ app.on('before-quit', (event) => {
     import('./src-electron/agent/mcp.js')
       .then(({ closeAgentMcpConnections }) => closeAgentMcpConnections()),
     stopHarnessSidecar(),
-    Promise.resolve(shutdownOfficeHost())
+    Promise.resolve(shutdownOfficeHost()),
+    Promise.resolve(stopObsidianScheduler())
   ]).finally(() => {
     shutdownStarted = true
     app.quit()

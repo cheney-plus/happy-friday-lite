@@ -8,6 +8,7 @@
       @open="entry => $emit('open-recent', entry)"
       @toggle-star="toggleStar"
       @remove="removeRecent"
+      @delete="deleteRecent"
       @reveal="reveal"
       @rename="renameRecent"
     />
@@ -29,6 +30,7 @@ const {
   loadRecents,
   toggleStar,
   removeRecent,
+  deleteRecent,
   reveal,
   renameRecent,
 } = useOfficeHome();

@@ -202,19 +202,35 @@
             <div class="form-group">
               <div class="model-name-label-row">
                 <label class="form-label">对话模型名称</label>
-                <button
-                  v-if="formData.provider && formData.provider !== 'other'"
-                  type="button"
-                  class="model-refresh-btn"
-                  :disabled="modelsLoading || !formData.apiKey"
-                  @click="loadAvailableModels"
-                >
-                  <svg :class="{ 'spin-icon': modelsLoading }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-                    <polyline points="21 3 21 9 15 9"></polyline>
-                  </svg>
-                  <span>{{ modelsLoading ? '获取中' : '刷新' }}</span>
-                </button>
+                <div class="model-label-actions">
+                  <button
+                    v-if="formData.provider && formData.provider !== 'other'"
+                    type="button"
+                    class="model-refresh-btn"
+                    :disabled="modelsLoading || !formData.apiKey"
+                    @click="loadAvailableModels"
+                  >
+                    <svg :class="{ 'spin-icon': modelsLoading }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                      <polyline points="21 3 21 9 15 9"></polyline>
+                    </svg>
+                    <span>{{ modelsLoading ? '获取中' : '刷新' }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="model-refresh-btn"
+                    :disabled="!canTestChat || chatTest.loading"
+                    @click="testChatConnection"
+                  >
+                    <svg v-if="!chatTest.loading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <svg v-else class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    </svg>
+                    <span>{{ chatTest.loading ? '测试中' : '测试' }}</span>
+                  </button>
+                </div>
               </div>
               <div v-if="availableChatModels.length || modelsLoading" class="custom-select model-name-select" ref="modelNameSelectRef">
                 <div
@@ -246,10 +262,30 @@
               </div>
               <input v-else type="text" v-model="formData.modelName" :placeholder="modelInputPlaceholder" class="form-input" />
               <p v-if="modelsError" class="model-fetch-error">{{ modelsError }}，可手动输入模型名称。</p>
+              <p v-if="chatTest.error" class="model-test-result error">{{ chatTest.error }}</p>
+              <p v-else-if="chatTest.success" class="model-test-result success">{{ chatTest.success }}</p>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Embedding 模型<span class="optional-tag">可选</span></label>
+              <div class="model-name-label-row">
+                <label class="form-label">Embedding 模型<span class="optional-tag">可选</span></label>
+                <div class="model-label-actions">
+                  <button
+                    type="button"
+                    class="model-refresh-btn"
+                    :disabled="!canTestEmbedding || embeddingTest.loading"
+                    @click="testEmbeddingConnection"
+                  >
+                    <svg v-if="!embeddingTest.loading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <svg v-else class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    </svg>
+                    <span>{{ embeddingTest.loading ? '测试中' : '测试' }}</span>
+                  </button>
+                </div>
+              </div>
               <div v-if="availableEmbeddingModels.length" class="custom-select model-name-select" ref="embeddingModelSelectRef">
                 <div class="select-trigger" @click="toggleEmbeddingModelsDropdown">
                   <span :class="{ placeholder: !formData.embeddingModelName }">
@@ -275,6 +311,8 @@
                 </div>
               </div>
               <input v-else type="text" v-model="formData.embeddingModelName" placeholder="输入 Embedding 模型名称，如 text-embedding-v4" class="form-input" />
+              <p v-if="embeddingTest.error" class="model-test-result error">{{ embeddingTest.error }}</p>
+              <p v-else-if="embeddingTest.success" class="model-test-result success">{{ embeddingTest.success }}</p>
             </div>
 
             <div v-if="formData.provider === 'other'" class="form-group">
@@ -753,6 +791,66 @@ const isFormValid = computed(() => {
   return baseValid;
 });
 
+// ========== 模型连通性测试 ==========
+// 测试结果状态：{ loading, success, error }
+const chatTest = ref({ loading: false, success: '', error: '' });
+const embeddingTest = ref({ loading: false, success: '', error: '' });
+
+const canTestChat = computed(() => {
+  const f = formData.value;
+  return !!(f.provider && f.apiKey && f.modelName && (f.provider !== 'other' || f.modelUrl));
+});
+
+const canTestEmbedding = computed(() => {
+  const f = formData.value;
+  if (!f.provider || !f.embeddingModelName) return false;
+  if (f.provider === 'other') {
+    if (f.useSeparateEmbeddingConfig) return !!(f.embeddingApiKey && f.embeddingUrl);
+    return !!(f.apiKey && f.modelUrl);
+  }
+  return !!f.apiKey;
+});
+
+// 组装测试参数（与 handleSave 中的 modelData 组装逻辑保持一致）
+const buildModelTestPayload = () => {
+  const provider = providerList.find(p => p.value === formData.value.provider);
+  const isOther = formData.value.provider === 'other';
+  return {
+    provider: formData.value.provider,
+    apiKey: formData.value.apiKey,
+    modelName: formData.value.modelName,
+    baseUrl: isOther ? formData.value.modelUrl : (provider?.baseUrl || ''),
+    embeddingModelName: formData.value.embeddingModelName || '',
+    useSeparateEmbeddingConfig: isOther && !!formData.value.useSeparateEmbeddingConfig,
+    embeddingApiKey: formData.value.embeddingApiKey || '',
+    embeddingBaseUrl: formData.value.embeddingUrl || ''
+  };
+};
+
+const testChatConnection = async () => {
+  chatTest.value = { loading: true, success: '', error: '' };
+  try {
+    const res = await electronService.invoke('model-test-chat', buildModelTestPayload());
+    if (!res) throw new Error('测试接口调用失败，请重启应用后重试');
+    if (!res.success) throw new Error(res.error || '测试失败');
+    chatTest.value = { loading: false, success: `连通正常，耗时 ${res.data.latencyMs} ms`, error: '' };
+  } catch (e) {
+    chatTest.value = { loading: false, success: '', error: e?.message || '测试失败' };
+  }
+};
+
+const testEmbeddingConnection = async () => {
+  embeddingTest.value = { loading: true, success: '', error: '' };
+  try {
+    const res = await electronService.invoke('model-test-embedding', buildModelTestPayload());
+    if (!res) throw new Error('测试接口调用失败，请重启应用后重试');
+    if (!res.success) throw new Error(res.error || '测试失败');
+    embeddingTest.value = { loading: false, success: `连通正常，向量维度 ${res.data.dimension}，耗时 ${res.data.latencyMs} ms`, error: '' };
+  } catch (e) {
+    embeddingTest.value = { loading: false, success: '', error: e?.message || '测试失败' };
+  }
+};
+
 const closeModal = () => {
   showAddModal.value = false;
   resetForm();
@@ -776,6 +874,8 @@ const resetForm = () => {
   modelsError.value = '';
   showAvailableModelsDropdown.value = false;
   editingModelId.value = null;
+  chatTest.value = { loading: false, success: '', error: '' };
+  embeddingTest.value = { loading: false, success: '', error: '' };
 };
 
 const handleSave = () => {
@@ -1378,6 +1478,12 @@ function formatTime(ts) {
   justify-content: space-between;
 }
 
+.model-label-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .model-refresh-btn {
   display: inline-flex;
   align-items: center;
@@ -1434,6 +1540,21 @@ function formatTime(ts) {
   color: #dc2626;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.model-test-result {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.model-test-result.success {
+  color: #10b981;
+}
+
+.model-test-result.error {
+  color: #dc2626;
+  word-break: break-all;
 }
 
 .optional-tag {

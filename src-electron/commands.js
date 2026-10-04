@@ -23,7 +23,9 @@ import { clearEmbeddingsCache } from './rag/embeddings.js'
 import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
+import { getFileAssocStatus, setFileAssoc, clearFileAssoc } from './file-assoc.js'
 import { listProviderModels } from './modelCatalog.js'
+import { testChatModel, testEmbeddingModel } from './modelTest.js'
 import { registerAgentCommands } from './agent/ipc.js'
 import {
   registerHarnessCommands,
@@ -39,6 +41,7 @@ import {
   updateAutomationTask,
   runAutomationTaskNow
 } from './automation.js'
+import { registerObsidianCommands } from './obsidian/ipc.js'
 
 const cancelTokens = new CancellationTokens()
 
@@ -175,6 +178,19 @@ export function registerCommands(mainWindow) {
     return result
   })
 
+  // 系统文件关联：查询/设置/取消本客户端作为系统默认打开程序
+  ipcMain.handle('file-assoc-get-status', () => {
+    return getFileAssocStatus()
+  })
+
+  ipcMain.handle('file-assoc-set', (_event, args) => {
+    return setFileAssoc(args?.groups || [])
+  })
+
+  ipcMain.handle('file-assoc-clear', (_event, args) => {
+    return clearFileAssoc(args?.groups || [])
+  })
+
   ipcMain.handle('get-platform', () => {
     return process.platform
   })
@@ -271,7 +287,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_with_memory', async (_event, args) => {
-    const { requestId, sessionId, model, message, enableThinking, systemPrompt, kbName, kbCategoryId, folderPath, topK, attachments } = args
+    const { requestId, sessionId, model, message, enableThinking, systemPrompt, useKnowledgeBase, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
     let currentSessionId = sessionId
     let isNewSession = false
@@ -340,12 +356,13 @@ export function registerCommands(mainWindow) {
       // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
       // 工作区(agent)不参与向量化与检索，跳过 RAG 配置
       const isAgentKb = kbCategoryId === 'agent'
-      const ragConfig = (!isAgentKb && (kbName || kbCategoryId || folderPath))
+      const ragConfig = (!isAgentKb && (useKnowledgeBase || kbName || kbCategoryId || folderPath))
         ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
         : null
 
       let fullContent = ''
       let fullReasoning = ''
+      let ragSources = []
 
       try {
         const result = ragConfig
@@ -353,6 +370,7 @@ export function registerCommands(mainWindow) {
           : await streamChat(mainWindow, allMessages, effectiveModel, requestId, currentSessionId, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
+        ragSources = Array.isArray(result.sources) ? result.sources : []
       } catch (e) {
         cancelTokens.remove(requestId)
         throw e
@@ -360,12 +378,11 @@ export function registerCommands(mainWindow) {
 
       cancelTokens.remove(requestId)
 
-      const assistantMsg = db.saveMessage(
-        currentSessionId,
-        'assistant',
-        fullContent,
-        db.buildAssistantMetadata({ reasoning: fullReasoning })
-      )
+      const assistantMetadata = {
+        ...db.buildAssistantMetadata({ reasoning: fullReasoning }),
+        ...(ragSources.length > 0 ? { sources: ragSources } : {})
+      }
+      const assistantMsg = db.saveMessage(currentSessionId, 'assistant', fullContent, assistantMetadata)
       db.updateSessionTimestamp(currentSessionId)
 
       mainWindow.webContents.send(CHAT_DONE, {
@@ -373,6 +390,7 @@ export function registerCommands(mainWindow) {
         sessionId: currentSessionId,
         fullContent,
         reasoningContent: fullReasoning,
+        sources: ragSources,
         messageId: assistantMsg.id,
         userMessageId
       })
@@ -396,7 +414,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('chat_without_memory', async (_event, args) => {
-    const { requestId, model, message, enableThinking, kbName, kbCategoryId, folderPath, topK, attachments } = args
+    const { requestId, model, message, enableThinking, useKnowledgeBase, kbName, kbCategoryId, folderPath, topK, attachments } = args
 
     // 校验模型配置：确保用户已配置自己的大模型
     const effectiveModel = validateModelConfig(model)
@@ -417,12 +435,13 @@ export function registerCommands(mainWindow) {
       // 选择了知识库时走 RAG Agent：由 LLM 通过 Function Calling 自主决定是否检索
       // 工作区(agent)不参与向量化与检索，跳过 RAG 配置
       const isAgentKb = kbCategoryId === 'agent'
-      const ragConfig = (!isAgentKb && (kbName || kbCategoryId || folderPath))
+      const ragConfig = (!isAgentKb && (useKnowledgeBase || kbName || kbCategoryId || folderPath))
         ? { kbName: kbName || '', kbCategoryId: kbCategoryId || '', folderPath: folderPath || '', topK: topK || 3 }
         : null
 
       let fullContent = ''
       let fullReasoning = ''
+      let ragSources = []
 
       try {
         const result = ragConfig
@@ -430,6 +449,7 @@ export function registerCommands(mainWindow) {
           : await streamChat(mainWindow, messages, effectiveModel, requestId, null, enableThinking || false, cancelToken)
         fullContent = result.fullContent
         fullReasoning = result.fullReasoning
+        ragSources = Array.isArray(result.sources) ? result.sources : []
       } catch (e) {
         cancelTokens.remove(requestId)
         throw e
@@ -442,6 +462,7 @@ export function registerCommands(mainWindow) {
         sessionId: null,
         fullContent,
         reasoningContent: fullReasoning,
+        sources: ragSources,
         messageId: null,
         userMessageId: null
       })
@@ -1509,6 +1530,28 @@ export function registerCommands(mainWindow) {
     }
   })
 
+  // 测试对话模型连通性（设置→模型 弹窗中点击「测试」）
+  ipcMain.handle('model-test-chat', async (_event, args) => {
+    try {
+      const data = await testChatModel(args || {})
+      return { success: true, data }
+    } catch (e) {
+      console.warn('[IPC] model-test-chat error:', e.message)
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 测试 Embedding 模型连通性
+  ipcMain.handle('model-test-embedding', async (_event, args) => {
+    try {
+      const data = await testEmbeddingModel(args || {})
+      return { success: true, data }
+    } catch (e) {
+      console.warn('[IPC] model-test-embedding error:', e.message)
+      return { success: false, error: e.message }
+    }
+  })
+
   // ========== Local DeepAgent automation ==========
   ipcMain.handle('automation-list-tasks', () => db.getAutomationTasks())
   ipcMain.handle('automation-list-runs', (_event, filters) => db.getAutomationRuns(filters || {}))
@@ -1549,6 +1592,7 @@ export function registerCommands(mainWindow) {
   // 支持 HITL 审批。会话复用 sessions 表，与普通对话历史一致。
   registerAgentCommands(mainWindow)
   registerHarnessCommands(mainWindow)
+  registerObsidianCommands(mainWindow)
 
   console.log('[Commands] ✅ All IPC handlers registered successfully')
 }

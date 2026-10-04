@@ -88,6 +88,13 @@
               >{{ t('settings.viewMonth') }}</div>
             </div>
           </div>
+          <div class="setting-item clickable" @click="goToFileOpenSettings">
+            <div class="item-label-group">
+              <span class="item-label">{{ t('settings.fileOpen') }}</span>
+              <span class="item-hint">{{ t('settings.fileOpenDesc') }}</span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>
         </div>
       </div>
 
@@ -1268,6 +1275,11 @@ const selectScheduleView = async (value) => {
       await electronService.invoke('save-config', config);
     }
   } catch (_e) {}
+};
+
+// 文件打开方式二级设置页（默认打开方式 + 系统文件关联）
+const goToFileOpenSettings = () => {
+  router.push('/settings/file-open');
 };
 
 const handleClickOutside = (event) => {

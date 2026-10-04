@@ -25,7 +25,7 @@ import {
 } from '../shapes/mindmap.js'
 import { registerDrawingShapes } from '../shapes/register.js'
 import { cloneTemplateAt, TEMPLATE_BUILDERS } from '../shapes/templates.js'
-import { getCanvasTheme } from '../shapes/theme.js'
+import { getCanvasTheme, isDarkTheme } from '../shapes/theme.js'
 
 // Graph instances are recreated whenever the active canvas changes. Keep the
 // serialized cells at module scope so copy/paste works between canvases.
@@ -495,18 +495,53 @@ export function getDrawingExportViewBox(graph, padding = 24) {
   }
 }
 
-export function sanitizeExportedDrawingSvg(svg) {
+export function sanitizeExportedDrawingSvg(svg, bg = '#ffffff') {
   svg.removeAttribute('style')
   svg.style.overflow = 'visible'
   // Pan/zoom lives on the viewport group. X6 toSVG only drops the stage transform,
   // then copyStyles inlines the leftover matrix and clips the bottom-right.
   clearExportedTransform(svg.querySelector('.x6-graph-svg-viewport'))
   clearExportedTransform(svg.querySelector('.x6-graph-svg-stage'))
-  paintExportedSvgBackground(svg, '#ffffff')
+  paintExportedSvgBackground(svg, bg)
   svg.querySelectorAll(
     '.x6-widget-selection, .x6-widget-selection-box, .x6-widget-selection-inner, .x6-graph-svg-overlay'
   ).forEach((node) => node.remove())
   return svg
+}
+
+// 保存画布时同步生成真实 SVG 快照，供侧栏缩略图直接渲染，替代近似重绘。
+// viewBox 扩展为与侧栏卡片一致的 3:2，缩略图才能铺满占位区域。
+export async function captureDrawingSvg(graph) {
+  if (!graph || graph.getCellCount() === 0) return ''
+  const box = getDrawingExportViewBox(graph)
+  const targetRatio = 3 / 2
+  if (box.width / box.height < targetRatio) {
+    const targetWidth = box.height * targetRatio
+    box.x -= (targetWidth - box.width) / 2
+    box.width = targetWidth
+  } else {
+    const targetHeight = box.width / targetRatio
+    box.y -= (targetHeight - box.height) / 2
+    box.height = targetHeight
+  }
+  const options = {
+    viewBox: box,
+    copyStyles: true,
+    beforeSerialize: (svg) => sanitizeExportedDrawingSvg(svg, isDarkTheme() ? '#1a1a1c' : '#ffffff')
+  }
+  try {
+    // X6 v3 的 Promise 版 API（toSVG 为回调式）
+    const svg = await graph.toSVGAsync(options)
+    if (typeof svg !== 'string' || !svg) return ''
+    // 根节点残留编辑器画布的固定 width/height，会让缩略图无法随占位缩放，仅保留 viewBox
+    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    const root = doc.documentElement
+    root.removeAttribute('width')
+    root.removeAttribute('height')
+    return new XMLSerializer().serializeToString(root)
+  } catch (_e) {
+    return ''
+  }
 }
 
 export function exportDrawingSVG(graph, filename) {

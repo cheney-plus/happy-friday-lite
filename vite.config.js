@@ -38,6 +38,16 @@ export default defineConfig(() => ({
     alias: {
       "@": resolve(__dirname, "src"),
     },
+    // Tiptap extensions and the app both consume ProseMirror through
+    // different package entry points. Keep one runtime copy so generated
+    // anonymous plugin keys remain unique across the whole editor.
+    dedupe: [
+      "@tiptap/pm",
+      "prosemirror-state",
+      "prosemirror-model",
+      "prosemirror-view",
+      "prosemirror-transform",
+    ],
   },
 
   clearScreen: false,

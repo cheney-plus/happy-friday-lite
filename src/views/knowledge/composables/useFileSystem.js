@@ -3,6 +3,8 @@ import { useRouter } from 'vue-router';
 import { useTabStore } from '@/store';
 import { isAllowedFile } from '../constants';
 import { getFileType } from '../utils';
+import { getDocOpenMode } from '@/utils/docOpen';
+import { openMarkdownAsNotePage } from '@/utils/markdownImport';
 
 // 可在应用内查看的文件类型（拥有对应的查看器组件）
 // 其余格式（图片、Word/Excel/PPT 等）均使用系统默认应用打开
@@ -146,8 +148,16 @@ export function useFileSystem() {
       await navigateTo(file.path);
       return;
     }
-    // Office 文件（DOCX/XLSX/CSV/PPTX/PDF）在可视化编辑器中打开（每个文件一个独立编辑器 Tab）
-    if (OFFICE_TYPES.includes(file.type) && api) {
+    // 用户将 Markdown/Word/Excel/PPT 默认打开方式设为"系统默认应用"时，
+    // 跳过内置编辑器/查看器，直接交给系统
+    if (getDocOpenMode(file.name) === 'system' && api) {
+      await api.invoke('kb-open-file-external', { filePath: file.path });
+      return;
+    }
+    // 内置打开：所有 word/excel/ppt 分组（含 .doc/.xls/.ppt 老格式）都先尝试
+    // Office 编辑器，编辑器不支持的格式由其返回失败后回退系统默认程序
+    const officeGroupTypes = ['word', 'excel', 'ppt'];
+    if ((OFFICE_TYPES.includes(file.type) || officeGroupTypes.includes(file.type)) && api) {
       try {
         const res = await api.invoke('office-open-file', { filePath: file.path });
         if (res && res.success && res.viewId) {
@@ -157,6 +167,13 @@ export function useFileSystem() {
         }
       } catch (e) {
         console.warn('Office editor open failed, fallback to external:', e);
+      }
+    }
+    // Markdown 内置打开：导入为可编辑笔记并进入笔记模块编辑界面（失败回退只读查看器）
+    if (file.type === 'markdown') {
+      const opened = await openMarkdownAsNotePage(file.path, router);
+      if (opened) {
+        return;
       }
     }
     // 可在应用内查看的文件类型在新标签页中打开

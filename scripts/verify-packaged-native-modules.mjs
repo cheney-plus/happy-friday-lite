@@ -1,38 +1,56 @@
-// Verify that native modules inside an unpacked Electron app match the target
-// Linux architecture. electron-builder can otherwise package an existing host
-// binary when a cross-architecture build is attempted.
-//
-// node-pty >= 1.2.0-beta.15 ships platform prebuilds, so a source-built
-// build/Release/pty.node is no longer guaranteed — accept the shipped
-// prebuilds/linux-<arch>/pty.node as well (runtime checks build first,
-// then prebuilds).
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+// Audit every native binary and every platform package in an unpacked Linux
+// Electron app. This runs after afterPack and before release artifact upload.
+import { existsSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { auditNativeArtifact } from './native-artifact-audit.cjs'
+import { verifyDeepseekImports } from './afterpack.cjs'
 
 const targetArch = process.argv[2] || process.arch
+const outputDir = process.argv[3] || 'release'
 const unpackedDir = targetArch === 'x64' ? 'linux-unpacked' : `linux-${targetArch}-unpacked`
-const targetMachine = targetArch === 'arm64' ? 183 : 62 // ELF: AArch64 / x86-64
-const targetLabel = targetArch === 'arm64' ? 'ARM64' : 'x64'
-const candidates = [
-  join('release', unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'build', 'Release', 'pty.node'),
-  join('release', unpackedDir, 'resources', 'app', 'node_modules', 'node-pty', 'prebuilds', `linux-${targetArch}`, 'pty.node'),
-]
-const nativeModule = candidates.find((file) => existsSync(file))
+const appDir = resolve(outputDir, unpackedDir)
+const packagedModules = join(appDir, 'resources', 'app', 'node_modules')
 
-if (!nativeModule) {
-  console.error(`[verify-packaged-native-modules] ERROR: Missing node-pty binary (checked: ${candidates.join(', ')})`)
-  process.exit(1)
+if (!existsSync(packagedModules)) {
+  throw new Error(`Unpacked app not found: ${packagedModules}`)
 }
 
-const header = readFileSync(nativeModule).subarray(0, 20)
-const machine = header.length >= 20 && header[0] === 0x7f && header.toString('ascii', 1, 4) === 'ELF'
-  ? header.readUInt16LE(18)
-  : null
+verifyDeepseekImports(packagedModules)
+console.log('[verify-packaged-native-modules] Verified packaged Harness imports')
 
-if (machine !== targetMachine) {
-  console.error(`[verify-packaged-native-modules] ERROR: Packaged node-pty is not a Linux ${targetLabel} binary.`)
-  console.error(`[verify-packaged-native-modules] Rebuild on a Linux ${targetLabel} machine before publishing this artifact.`)
-  process.exit(1)
+const audit = auditNativeArtifact(appDir, targetArch)
+console.log(`[verify-packaged-native-modules] Verified ${audit.binaries.length} native binaries are Linux ${targetArch}`)
+console.log(`[verify-packaged-native-modules] Verified ${audit.specs.length} target runtime packages`)
+console.log(`[verify-packaged-native-modules] Verified ${audit.platformOptionals.length} platform-specific optional dependency edges`)
+for (const warning of audit.warnings) {
+  console.warn(`[verify-packaged-native-modules] WARNING: ${warning}`)
 }
 
-console.log(`[verify-packaged-native-modules] Verified packaged node-pty is a Linux ${targetLabel} binary`)
+const requireBuiltinProbe = spawnSync(process.execPath, ['-e', `
+  const requireBuiltin = require(process.argv[1]);
+  const info = requireBuiltin.getBindingInfo();
+  if (!info.bindingPath || info.product !== 'require-builtin') process.exit(1);
+`, join(packagedModules, 'node-addon-require-builtin')], {
+  encoding: 'utf8',
+  timeout: 30000,
+})
+if (requireBuiltinProbe.error || requireBuiltinProbe.status !== 0) {
+  throw new Error(`Packaged Node addon probe failed: ${requireBuiltinProbe.error || requireBuiltinProbe.stderr || requireBuiltinProbe.stdout}`)
+}
+console.log('[verify-packaged-native-modules] Verified node-addon-require-builtin binding loads in Node')
+
+if (process.platform === 'linux' && process.arch === targetArch) {
+  const executable = join(appDir, 'happy-friday-lite')
+  const probeScript = fileURLToPath(new URL('./probe-packaged-native-modules.cjs', import.meta.url))
+  const probe = spawnSync(executable, [probeScript, packagedModules, '--include-lazy'], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    encoding: 'utf8',
+    timeout: 60000,
+  })
+  if (probe.error || probe.status !== 0) {
+    throw new Error(`Packaged Electron native probe failed: ${probe.error || probe.stderr || probe.stdout}`)
+  }
+  process.stdout.write(probe.stdout)
+}

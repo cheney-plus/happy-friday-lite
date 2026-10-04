@@ -52,7 +52,8 @@ function createCanvasRecord(partial = {}) {
     categoryId: partial.categoryId || null,
     createdAt: toTimestamp(partial.createdAt),
     updatedAt: toTimestamp(partial.updatedAt),
-    graphJSON: partial.graphJSON || templateForKind(kind)
+    graphJSON: partial.graphJSON || templateForKind(kind),
+    previewSvg: partial.previewSvg || ''
   }
 }
 
@@ -246,7 +247,8 @@ export const useDrawingStore = defineStore('drawing', {
         kind: source.kind,
         title,
         categoryId: source.categoryId,
-        graphJSON: toPlain(source.graphJSON || { cells: [] })
+        graphJSON: toPlain(source.graphJSON || { cells: [] }),
+        previewSvg: source.previewSvg || ''
       })
       this.canvases.unshift(canvas)
       this.selectedCanvasId = canvas.id
@@ -348,12 +350,21 @@ export const useDrawingStore = defineStore('drawing', {
       this.persist()
     },
 
-    saveGraph(id, graphJSON) {
+    saveGraph(id, graphJSON, previewSvg) {
       const canvas = this.canvases.find((item) => item.id === id)
       if (!canvas) return
       canvas.graphJSON = graphJSON
+      if (previewSvg) canvas.previewSvg = previewSvg
       canvas.updatedAt = Date.now()
       this.persistCanvas(canvas.id)
+    },
+
+    // 仅刷新缩略图快照，不视为内容修改（不更新 updatedAt）
+    savePreview(id, previewSvg) {
+      const canvas = this.canvases.find((item) => item.id === id)
+      if (!canvas || !previewSvg || canvas.previewSvg === previewSvg) return
+      canvas.previewSvg = previewSvg
+      this.persistCanvas(id)
     },
 
     // Agent 在主进程直接写 SQLite 后，从数据库拉取最新画布并刷新本地状态。

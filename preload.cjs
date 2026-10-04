@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   invoke(channel, ...args) {
     const validChannels = [
       'get-config',
+      'open-file-get-pending',
       'save-config',
       'get-platform',
       'save-file-dialog',
@@ -90,6 +91,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'kb-read-file',
       'kb-read-file-buffer',
       'kb-open-file-external',
+      'file-assoc-get-status',
+      'file-assoc-set',
+      'file-assoc-clear',
       'kb-watch-current-dir',
       'logs-open-dir',
       'backup-create',
@@ -114,6 +118,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'usage-clear',
       'model-query-balance',
       'model-list-available',
+      'model-test-chat',
+      'model-test-embedding',
       'automation-list-tasks',
       'automation-list-runs',
       'automation-get-active-run',
@@ -153,10 +159,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-get-recents',
       'office-toggle-starred',
       'office-remove-recents',
+      'office-rename-file',
+      'office-delete-file',
       'office-reveal-path',
       'office-open-dialog',
       'office-set-ai-model',
-      'office-is-dirty'
+      'office-is-dirty',
+      'obsidian-list-sources',
+      'obsidian-new-source-template',
+      'obsidian-save-source',
+      'obsidian-delete-source',
+      'obsidian-test-connection',
+      'obsidian-sync-now',
+      'obsidian-render-markdown'
     ]
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -179,6 +194,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const validChannels = [
       'chat-chunk',
       'chat-reasoning-chunk',
+      'chat-rag-sources',
       'chat-done',
       'chat-error',
       'session-title-updated',
@@ -204,7 +220,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'office-opened',
       'office-view-closed',
       'office-file-saved',
-      'office-layout-sync'
+      'office-layout-sync',
+      'obsidian-sync-status',
+      'open-file-request'
     ]
     if (validChannels.includes(channel)) {
       const subscription = (event, ...args) => callback(...args)

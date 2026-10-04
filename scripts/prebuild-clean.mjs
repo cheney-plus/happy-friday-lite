@@ -40,8 +40,7 @@ verifyDependencies()
 
 // node-pty binary check. Since 1.2.0-beta.15 node-pty ships prebuilds for
 // linux-x64/linux-arm64, so there are two valid layouts:
-//   1. build/Release/pty.node — source-built via node-gyp (e.g. the ARM64
-//      docker --build-from-source step that caps glibc at 2.31)
+//   1. build/Release/pty.node — source-built via node-gyp
 //   2. prebuilds/linux-<arch>/pty.node — shipped prebuild, used when
 //      build/Release is absent (runtime checks build first, then prebuilds)
 function verifyNodePtyArchitecture() {
@@ -107,9 +106,11 @@ function removePkg(pkg, reason) {
   }
 }
 
-// 1. Non-target arch native bindings
-removePkg(`@zvec/bindings-linux-${removeArch}`, `not needed for ${targetArch}`)
-removePkg(`@koromix/koffi-linux-${removeArch}`, `not needed for ${targetArch}`)
+// 1. Keep non-target native bindings in the build tree. electron-builder's
+// afterPack hook removes them from the artifact; retaining them here lets a
+// cross-architecture build restore the host bindings without another network
+// download after packaging.
+console.log(`[prebuild-clean] Retaining foreign native bindings for post-build host restoration`)
 
 // 2. tesseract.js — 44MB OCR library, not needed for basic office doc parsing
 removePkg('tesseract.js', 'OCR not used; saves ~44MB')

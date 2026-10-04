@@ -1,3 +1,5 @@
+import { Point } from '@antv/x6'
+
 export const EDGE_STYLES = {
   straight: {
     router: { name: 'normal' },
@@ -224,6 +226,19 @@ export const EDGE_STYLES = {
 }
 
 export const DEFAULT_EDGE_STYLE = 'manhattan'
+
+// manhattan 路由在源/目标周围没有可行路径点时（如拖拽节点与连通节点重叠、
+// 距离过近）会 console.warn "Unable to execute manhattan algorithm, use orth
+// instead" 并退化。提供 fallbackRoute 后 findRoute 不再返回 null，改为走这条
+// 简单的 Z 形直角兜底路径，避免拖拽时控制台刷警告。
+export function manhattanFallbackRoute(from, to) {
+  if (Math.abs(to.x - from.x) >= Math.abs(to.y - from.y)) {
+    const midX = Math.round((from.x + to.x) / 2)
+    return [new Point(midX, from.y), new Point(midX, to.y)]
+  }
+  const midY = Math.round((from.y + to.y) / 2)
+  return [new Point(from.x, midY), new Point(to.x, midY)]
+}
 
 export function applyEdgeStyle(edge, styleId) {
   const style = EDGE_STYLES[styleId] || EDGE_STYLES[DEFAULT_EDGE_STYLE]

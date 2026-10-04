@@ -1,4 +1,5 @@
-import { Graph, Shape } from '@antv/x6'
+import { Graph, Shape, routerRegistry } from '@antv/x6'
+import { manhattanFallbackRoute } from './edgeStyles.js'
 import { registerMindmap } from './mindmap.js'
 import { FONT_FAMILY } from './theme.js'
 import { SIDE_PORTS } from './ports.js'
@@ -99,9 +100,32 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
 }
 
+// 给全局 manhattan 路由注入 fallbackRoute：源/目标节点重叠或距离过近时，
+// X6 默认 console.warn 并退化到 orth，拖拽元素时控制台会被该警告刷屏。
+// 注入后 findRoute 走 manhattanFallbackRoute 返回的直角兜底路径，不再告警。
+// 全局重注册同时覆盖新边、历史画布 JSON 和 agent 生成的边（无 args）。
+function patchManhattanRouter() {
+  const original = routerRegistry.get('manhattan')
+  if (typeof original !== 'function') return
+  Graph.registerRouter(
+    'manhattan',
+    function (vertices, options, edgeView) {
+      return original.call(
+        this,
+        vertices,
+        { ...options, fallbackRoute: manhattanFallbackRoute },
+        edgeView
+      )
+    },
+    true
+  )
+}
+
 export function registerDrawingShapes() {
   if (registered) return
   registered = true
+
+  patchManhattanRouter()
 
   registerRect('draw-rect')
   registerRect('draw-rounded', { rx: 18, ry: 18 })

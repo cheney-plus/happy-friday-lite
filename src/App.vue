@@ -14,6 +14,8 @@
         </div>
       </main>
     </div>
+    <!-- 启动时处理系统打开文件请求的遮罩：先完成跳转再露出界面，避免首页闪现 -->
+    <div v-if="startupOpening" class="startup-open-overlay"></div>
   </div>
 </template>
 
@@ -29,6 +31,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { allMenuConfigs, isElectronEnvironment } from '@/config/menu';
 import { useTheme } from '@/utils/theme';
 import { resolveFridayTabPath } from '@/utils/fridayNavigation';
+import { openMarkdownAsNotePage } from '@/utils/markdownImport';
 
 const appStore = useAppStore();
 const tabStore = useTabStore();
@@ -38,6 +41,8 @@ const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
 
 // 分享视图：隐藏侧边栏/标签栏，全屏展示对话界面
 const isShareView = computed(() => route.meta?.share === true || !isElectronEnvironment());
+// 启动时是否有排队的系统打开文件请求待处理（期间显示遮罩避免首页闪现）
+const startupOpening = ref(isElectronEnvironment());
 const isHarnessRoute = computed(() => route.name === 'harness');
 const hasVisitedHarness = ref(false);
 const routerViewKey = computed(() => {
@@ -49,6 +54,30 @@ const routerViewKey = computed(() => {
 
 let unlistenConfig = null;
 let unlistenOfficeOpened = null;
+let unlistenOpenFileRequest = null;
+
+/** 系统打开文件请求 → 路由到应用内对应查看器/编辑器 */
+async function handleOsOpenFile(filePath) {
+  const name = filePath.split('/').pop().split('\\').pop();
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  if (['md', 'markdown', 'mdx'].includes(ext)) {
+    // Markdown：导入为笔记后进入笔记模块编辑界面（失败回退只读查看器）
+    const opened = await openMarkdownAsNotePage(filePath, router);
+    if (!opened) {
+      const tab = tabStore.addFileTab({ name, path: filePath, type: 'markdown' });
+      router.push(tab.fullPath);
+    }
+    return;
+  }
+  try {
+    const res = await electronService.invoke('office-open-file', { filePath });
+    if (res?.success && res.viewId) {
+      await router.push(`/office/${String(res.viewId).replace('-', '/')}`);
+      return;
+    }
+  } catch (_e) { /* 落入系统默认程序兜底 */ }
+  electronService.invoke('kb-open-file-external', { filePath }).catch(() => {});
+}
 
 watch(
   () => route.name,
@@ -153,6 +182,18 @@ onMounted(async () => {
   initTheme();
 
   if (isElectronEnvironment()) {
+    // 启动时先拉取主进程排队的系统打开文件请求（如双击 doc/ppt 用本应用打开），
+    // 处理完成后再移除遮罩露出界面，避免先渲染首页再跳转
+    try {
+      const pending = await electronService.invoke('open-file-get-pending');
+      if (pending && pending.length > 0) {
+        for (const p of pending) {
+          await handleOsOpenFile(p);
+        }
+      }
+    } catch (_e) { /* 拉取失败按无待处理文件 */ }
+    startupOpening.value = false;
+
     try {
       const config = await electronService.invoke('get-config');
       if (config) {
@@ -176,6 +217,9 @@ onMounted(async () => {
         }
         if (config.scheduleDefaultView) {
           appStore.setScheduleDefaultView(config.scheduleDefaultView);
+        }
+        if (config.docOpenModes) {
+          appStore.setDocOpenModes(config.docOpenModes);
         }
         appStore.setSidebarModules(config.sidebarModules);
         // 启动时默认收起侧边栏
@@ -212,6 +256,13 @@ onMounted(async () => {
       }
     });
 
+    // 操作系统打开文件请求（系统文件关联双击/open-file 事件）：
+    // Markdown 进文件查看器，Office 类型进内置编辑器，其余兜底系统默认程序
+    unlistenOpenFileRequest = electronService.listen('open-file-request', (event) => {
+      const filePath = event.payload?.filePath;
+      if (filePath) handleOsOpenFile(filePath);
+    });
+
     unlistenConfig = electronService.listen('config-changed', (event) => {
       const data = event.payload;
       if (data.language) {
@@ -227,6 +278,9 @@ onMounted(async () => {
       }
       if (data.scheduleDefaultView) {
         appStore.setScheduleDefaultView(data.scheduleDefaultView);
+      }
+      if (data.docOpenModes) {
+        appStore.setDocOpenModes(data.docOpenModes);
       }
       if (data.sidebarModules !== undefined) {
         appStore.setSidebarModules(data.sidebarModules);
@@ -246,6 +300,10 @@ onUnmounted(() => {
     unlistenOfficeOpened();
     unlistenOfficeOpened = null;
   }
+  if (unlistenOpenFileRequest) {
+    unlistenOpenFileRequest();
+    unlistenOpenFileRequest = null;
+  }
 });
 </script>
 
@@ -256,6 +314,13 @@ onUnmounted(() => {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  background-color: var(--bg-secondary);
+}
+
+.startup-open-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   background-color: var(--bg-secondary);
 }
 

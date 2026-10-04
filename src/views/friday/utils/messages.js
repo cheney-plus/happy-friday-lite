@@ -40,6 +40,9 @@ export function mapHistoryMessage(raw) {
   if (metadata?.segments && Array.isArray(metadata.segments)) {
     msg.segments = metadata.segments;
   }
+  if (raw.metadata?.sources && Array.isArray(raw.metadata.sources)) {
+    msg.sources = raw.metadata.sources;
+  }
   return msg;
 }
 

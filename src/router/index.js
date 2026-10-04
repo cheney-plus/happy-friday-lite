@@ -90,6 +90,11 @@ export const routes = [
     component: () => import('@/views/settings/SettingsModules.vue')
   },
   {
+    path: '/settings/file-open',
+    name: 'settings-file-open',
+    component: () => import('@/views/settings/SettingsFileOpen.vue')
+  },
+  {
     path: '/friday',
     component: () => import('@/views/friday/FridayLayout.vue'),
     children: [

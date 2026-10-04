@@ -22,6 +22,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
   const streamingContent = ref('');
   const streamingReasoning = ref('');
   const isReasoningStreaming = ref(false);
+  const streamingSources = ref([]);
   const agentSegments = ref([]);
   const pendingApproval = ref(null);
   const autoApproveAll = ref(false);
@@ -30,6 +31,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
   let unlistenChunk = null;
   let unlistenReasoning = null;
   let unlistenDone = null;
+  let unlistenRagSources = null;
   let unlistenError = null;
   let unlistenTitle = null;
   let unlistenAgentToolCall = null;
@@ -67,6 +69,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     streamingContent.value = '';
     streamingReasoning.value = '';
     isReasoningStreaming.value = false;
+    streamingSources.value = [];
     agentSegments.value = [];
     pendingApproval.value = null;
     autoApproveAll.value = false;
@@ -81,6 +84,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     streamingContent.value = '';
     streamingReasoning.value = '';
     isReasoningStreaming.value = false;
+    streamingSources.value = [];
     agentSegments.value = [];
     pendingApproval.value = null;
     activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -94,6 +98,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     setStreaming(true);
     isReasoningStreaming.value = false;
     streamingContent.value = output || '';
+    streamingSources.value = [];
     agentSegments.value = segments.map(segment => ({
       ...segment,
       id: segment.id || segment.toolCallId || `segment-${Math.random().toString(36).slice(2, 8)}`,
@@ -107,13 +112,15 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
       messages.value.push({
         role: 'assistant',
         content: `${streamingContent.value}\n\n${errorContent}`.trim(),
-        reasoning: streamingReasoning.value || undefined
+        reasoning: streamingReasoning.value || undefined,
+        sources: streamingSources.value.length ? [...streamingSources.value] : undefined
       });
     } else {
       messages.value.push({ role: 'assistant', content: errorContent });
     }
     streamingContent.value = '';
     streamingReasoning.value = '';
+    streamingSources.value = [];
     agentSegments.value = [];
     setStreaming(false);
   }
@@ -178,6 +185,19 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     if (value == null) return value;
     // Pinia/Vue Proxy cannot be structured-cloned by Electron IPC.
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function mergeSources(existing, incoming) {
+    const merged = [];
+    const seen = new Set();
+    for (const source of [...(existing || []), ...(incoming || [])]) {
+      if (!source) continue;
+      const key = source.metadata?.noteId || source.filePath || source.source || source.snippet;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(source);
+    }
+    return merged;
   }
 
   async function invokeChat({ mode, model, userMessage, attachments, thinkMode, kbName, kbCategoryId }) {
@@ -315,6 +335,12 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
       queueChunk('', data.content);
     });
 
+    unlistenRagSources = electronService.listen('chat-rag-sources', (event) => {
+      const data = event.payload;
+      if (data.requestId !== activeRequestId) return;
+      streamingSources.value = mergeSources(streamingSources.value, Array.isArray(data.sources) ? data.sources : []);
+    });
+
     unlistenDone = electronService.listen('chat-done', (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
@@ -334,11 +360,13 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
 
       const hasContent = streamingContent.value || data.fullContent;
       const hasReasoning = streamingReasoning.value || data.reasoningContent;
+      const finalSources = mergeSources(streamingSources.value, Array.isArray(data.sources) ? data.sources : []);
       if (hasContent || hasReasoning) {
         const newMsg = {
           role: 'assistant',
           content: data.fullContent || streamingContent.value,
           reasoning: data.reasoningContent || streamingReasoning.value || undefined,
+          sources: finalSources.length ? finalSources : undefined,
           id: data.messageId
         };
         if (currentMode.value === 'agent' && agentSegments.value.length > 0) {
@@ -357,6 +385,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
       hooks.onHistoryRefresh?.();
       streamingContent.value = '';
       streamingReasoning.value = '';
+      streamingSources.value = [];
       agentSegments.value = [];
     });
 
@@ -479,6 +508,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     if (unlistenChunk) unlistenChunk();
     if (unlistenReasoning) unlistenReasoning();
     if (unlistenDone) unlistenDone();
+    if (unlistenRagSources) unlistenRagSources();
     if (unlistenError) unlistenError();
     if (unlistenTitle) unlistenTitle();
     if (unlistenAgentToolCall) unlistenAgentToolCall();
@@ -521,6 +551,7 @@ function createChatStreamRuntime({ key, router, fridayStore, t }) {
     streamingContent,
     streamingReasoning,
     isReasoningStreaming,
+    streamingSources,
     agentSegments,
     pendingApproval,
     sessionTitle,

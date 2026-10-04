@@ -177,6 +177,8 @@ onUnmounted(() => {
 
 .error-message {
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-align: left;
 }
 
 .command-button {

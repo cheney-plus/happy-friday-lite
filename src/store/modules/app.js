@@ -8,6 +8,13 @@ export const useAppStore = defineStore('app', {
     loading: false,
     noteFimCompletion: true,
     scheduleDefaultView: 'month',
+    // 文档默认打开方式：internal = 应用内置编辑器/查看器，system = 系统默认应用
+    docOpenModes: {
+      markdown: 'internal',
+      word: 'internal',
+      excel: 'internal',
+      ppt: 'internal'
+    },
     sidebarModules: {
       note: true,
       drawing: true,
@@ -36,6 +43,14 @@ export const useAppStore = defineStore('app', {
     },
     setScheduleDefaultView(value) {
       this.scheduleDefaultView = value
+    },
+    setDocOpenModes(modes = {}) {
+      this.docOpenModes = {
+        ...this.docOpenModes,
+        ...Object.fromEntries(
+          Object.entries(modes).filter(([, v]) => v === 'internal' || v === 'system')
+        )
+      }
     },
     setSidebarModules(modules = {}) {
       this.sidebarModules = {
