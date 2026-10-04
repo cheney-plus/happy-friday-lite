@@ -2429,6 +2429,10 @@ const editor = useEditor({
     attributes: {
       class: 'prose-editor',
     },
+    // 复制为纯文本时块级节点（段落/标题/列表项等）用单个换行分隔，
+    // 覆盖 ProseMirror 默认的 "\n\n"，避免粘贴到其他应用时出现多余空行。
+    // 硬换行（Shift+Enter）仍按节点 leafText 序列化为 "\n"。
+    clipboardTextSerializer: (slice) => slice.content.textBetween(0, slice.content.size, '\n'),
     handleKeyDown: (view, event) => {
       if (event.key === 'Escape' && tableContextMenuVisible.value) {
         event.preventDefault();
@@ -2521,6 +2525,14 @@ const editor = useEditor({
       const html = event.clipboardData.getData('text/html');
 
       if (!text) return false;
+
+      // 编辑器内部复制的内容（ProseMirror 剪贴板自带 data-pm-slice 标记）
+      // 交给默认粘贴处理：按原始 slice 内联插入到光标处。
+      // 不能走下方 markdown 路径，否则会被 marked.parse 转成 <p> 块级内容，
+      // 粘贴时拆分段落，导致粘贴位置前后自动换行。
+      if (html && html.includes('data-pm-slice')) {
+        return false;
+      }
 
       if (html && isRichHtml(html)) {
         return false;
