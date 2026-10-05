@@ -3,7 +3,7 @@
     <div v-if="visible" class="event-modal-overlay" @click.self="close">
       <div class="event-modal">
         <div class="modal-header">
-          <h3>{{ t('schedule.createEvent') }}</h3>
+          <h3>{{ isEditing ? t('schedule.editEvent') : t('schedule.createEvent') }}</h3>
           <button class="modal-close-btn" @click="close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
@@ -12,6 +12,7 @@
           <ScheduleEventForm ref="formRef" :model="formData" @submit="save" />
         </div>
         <div class="modal-footer">
+          <button v-if="isEditing" class="btn btn-delete" @click="remove">{{ t('schedule.delete') }}</button>
           <div class="footer-spacer"></div>
           <button class="btn btn-secondary" @click="close">{{ t('schedule.cancel') }}</button>
           <button class="btn btn-primary" @click="save" :disabled="!formData.title.trim()">{{ t('schedule.save') }}</button>
@@ -22,16 +23,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { EVENT_COLORS, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 import ScheduleEventForm from './ScheduleEventForm.vue';
 
 const { t } = useI18n();
-const emit = defineEmits(['save']);
+const emit = defineEmits(['save', 'update', 'delete']);
 
 const visible = ref(false);
 const formRef = ref(null);
+/** 编辑模式的日程 id；null 表示新建 */
+const editingId = ref(null);
+const isEditing = computed(() => !!editingId.value);
 
 const formData = reactive({
   title: '',
@@ -49,26 +53,47 @@ const formData = reactive({
 });
 
 /**
- * 打开创建弹窗
- * @param {{ start?: string, end?: string, startTime?: string, endTime?: string, allDay?: boolean }} initial
+ * 打开弹窗：传 { event } 进入编辑模式，传 { start, end, ... } 进入新建模式
+ * @param {{ event?: object, start?: string, end?: string, startTime?: string, endTime?: string, allDay?: boolean }} initial
  */
 function open(initial = {}) {
-  const date = initial.start || new Date().toISOString().split('T')[0];
-  Object.assign(formData, {
-    title: '',
-    // 从具体日期格点击进入时预设该日期并默认勾选，其余情况默认无期限
-    hasDate: !!initial.start,
-    start: date,
-    end: initial.end || date,
-    allDay: initial.allDay !== undefined ? initial.allDay : true,
-    startTime: initial.startTime || '09:00',
-    endTime: initial.endTime || '10:00',
-    description: '',
-    color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
-    reminder: false,
-    completed: false,
-    priority: DEFAULT_EVENT_PRIORITY,
-  });
+  const ev = initial.event;
+  const today = new Date().toISOString().split('T')[0];
+  if (ev) {
+    editingId.value = ev.id;
+    Object.assign(formData, {
+      title: ev.title,
+      hasDate: !!ev.start,
+      start: ev.start || today,
+      end: ev.end || ev.start || today,
+      allDay: ev.allDay !== undefined ? ev.allDay : true,
+      startTime: ev.startTime || '09:00',
+      endTime: ev.endTime || '10:00',
+      description: ev.description || '',
+      color: ev.color || EVENT_COLORS[0],
+      reminder: ev.reminder || false,
+      completed: ev.completed || false,
+      priority: ev.priority || DEFAULT_EVENT_PRIORITY,
+    });
+  } else {
+    editingId.value = null;
+    const date = initial.start || today;
+    Object.assign(formData, {
+      title: '',
+      // 从具体日期格点击进入时预设该日期并默认勾选，其余情况默认无期限
+      hasDate: !!initial.start,
+      start: date,
+      end: initial.end || date,
+      allDay: initial.allDay !== undefined ? initial.allDay : true,
+      startTime: initial.startTime || '09:00',
+      endTime: initial.endTime || '10:00',
+      description: '',
+      color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
+      reminder: false,
+      completed: false,
+      priority: DEFAULT_EVENT_PRIORITY,
+    });
+  }
   visible.value = true;
   nextTick(() => formRef.value?.focusTitle());
 }
@@ -80,7 +105,7 @@ function close() {
 function save() {
   if (!formData.title.trim()) return;
   // 未勾选"设置日期"时按无期限提交（start/end 为空，永不过期）
-  emit('save', {
+  const payload = {
     title: formData.title,
     start: formData.hasDate ? formData.start : '',
     end: formData.hasDate ? formData.end : '',
@@ -92,8 +117,18 @@ function save() {
     reminder: formData.hasDate ? formData.reminder : false,
     completed: formData.completed,
     priority: formData.priority,
-  });
+  };
+  if (editingId.value) emit('update', { id: editingId.value, ...payload });
+  else emit('save', payload);
   close();
+}
+
+function remove() {
+  if (!editingId.value) return;
+  if (window.confirm(t('schedule.confirmDelete'))) {
+    emit('delete', editingId.value);
+    visible.value = false;
+  }
 }
 
 function onKeydown(e) {
@@ -207,5 +242,15 @@ defineExpose({ open, close, visible });
 .btn-secondary {
   background: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+.btn-delete {
+  background: transparent;
+  color: #ef4444;
+}
+
+.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  opacity: 1;
 }
 </style>

@@ -50,11 +50,6 @@ export const routes = [
     component: () => import('@/views/schedule/ScheduleCalendar.vue')
   },
   {
-    path: '/schedule/:id',
-    name: 'schedule-detail',
-    component: () => import('@/views/schedule/ScheduleDetail.vue')
-  },
-  {
     path: '/automation',
     name: 'automation',
     component: () => import('@/views/automation/AutomationView.vue')

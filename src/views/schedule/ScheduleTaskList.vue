@@ -178,11 +178,10 @@
 <script setup>
 import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
 import { useScheduleStore } from '@/store/modules/schedule';
 
 const { t } = useI18n();
-const router = useRouter();
+const emit = defineEmits(['open-event']);
 const scheduleStore = useScheduleStore();
 
 const activeFilter = ref('all');
@@ -326,7 +325,7 @@ function priorityLabel(p) {
 }
 
 function onTaskClick(task) {
-  router.push(`/schedule/${task.id}`);
+  emit('open-event', task);
 }
 
 async function toggleTaskComplete(task) {

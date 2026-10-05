@@ -218,14 +218,14 @@
       </div>
 
       <!-- Task List View -->
-      <ScheduleTaskList v-else-if="currentView === 'list'" />
+      <ScheduleTaskList v-else-if="currentView === 'list'" @open-event="onEventClick" />
 
       <!-- Quadrant View（四象限） -->
-      <ScheduleQuadrant v-else-if="currentView === 'quadrant'" />
+      <ScheduleQuadrant v-else-if="currentView === 'quadrant'" @open-event="onEventClick" />
     </div>
 
-    <!-- 创建日程弹窗 -->
-    <EventFormModal ref="eventModalRef" @save="onModalSave" />
+    <!-- 新建/编辑日程弹窗 -->
+    <EventFormModal ref="eventModalRef" @save="onModalSave" @update="onModalUpdate" @delete="onModalDelete" />
 
     <!-- 右键菜单 -->
     <EventContextMenu
@@ -257,7 +257,6 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, onDeactivated, onActivated } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
 import { useScheduleStore, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 import { useAppStore } from '@/store';
 import ScheduleTaskList from './ScheduleTaskList.vue';
@@ -279,7 +278,6 @@ import {
 } from './utils/calendarHelpers';
 
 const { t } = useI18n();
-const router = useRouter();
 const scheduleStore = useScheduleStore();
 const appStore = useAppStore();
 
@@ -1007,8 +1005,9 @@ function onWeekDayClick(date) {
 }
 
 // ========== 事件交互 ==========
+// 点击日程直接打开编辑弹窗（复用新建弹窗）
 function onEventClick(event) {
-  router.push(`/schedule/${event.id}`);
+  eventModalRef.value?.open({ event });
 }
 
 // ========== 创建弹窗 ==========
@@ -1020,6 +1019,15 @@ function openCreateModal(startDate, endDate, startTime, endTime, allDay) {
 
 async function onModalSave(eventData) {
   await scheduleStore.addEvent(eventData);
+}
+
+async function onModalUpdate(eventData) {
+  const { id, ...updates } = eventData;
+  await scheduleStore.updateEvent(id, updates);
+}
+
+async function onModalDelete(id) {
+  await scheduleStore.removeEvent(id);
 }
 
 function openAIAssistant() {
@@ -1048,7 +1056,7 @@ function onCtxViewDetail(evt) {
   if (!evt) return;
   contextMenuVisible.value = false;
   closeMorePanel();
-  router.push(`/schedule/${evt.id}`);
+  eventModalRef.value?.open({ event: evt });
 }
 
 // ========== +n 日程面板 ==========

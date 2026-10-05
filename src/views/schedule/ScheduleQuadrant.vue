@@ -65,12 +65,11 @@
 <script setup>
 import { ref, computed, onMounted, onActivated } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
 import { useScheduleStore, normalizePriority } from '@/store/modules/schedule';
 import { useCalendarHelpers } from './utils/calendarHelpers';
 
 const { t } = useI18n();
-const router = useRouter();
+const emit = defineEmits(['open-event']);
 const scheduleStore = useScheduleStore();
 const { getMonthDayLabel } = useCalendarHelpers();
 
@@ -197,7 +196,7 @@ function dateClass(ev) {
 }
 
 function openDetail(ev) {
-  router.push(`/schedule/${ev.id}`);
+  emit('open-event', ev);
 }
 
 async function toggleComplete(ev) {
