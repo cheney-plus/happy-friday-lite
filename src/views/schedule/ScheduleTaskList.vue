@@ -251,10 +251,11 @@ const sortOptions = computed(() => [
   { key: 'priority', label: t('schedule.sortByPriority') },
 ]);
 
-// 优先级权重：紧急 > 重要 > 次要，未设置按重要处理
+// 优先级权重：重要且紧急 > 重要不紧急 > 不重要但紧急 > 不重要不紧急，未设置按重要不紧急处理
 const priorityWeight = (p) => {
-  if (p === 'urgent') return 0;
-  if (p === 'minor') return 2;
+  if (p === 'urgent-important') return 0;
+  if (p === 'minor-urgent') return 2;
+  if (p === 'minor') return 3;
   return 1;
 };
 
@@ -317,7 +318,8 @@ function priorityClass(p) {
 
 function priorityLabel(p) {
   const key = p || 'important';
-  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'urgent-important') return t('schedule.priorityUrgentImportant');
+  if (key === 'minor-urgent') return t('schedule.priorityMinorUrgent');
   if (key === 'minor') return t('schedule.priorityMinor');
   return t('schedule.priorityImportant');
 }
@@ -789,11 +791,11 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.task-priority.priority-urgent {
+.task-priority.priority-urgent-important {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
 }
-.task-priority.priority-urgent .task-priority-dot { background: #ef4444; }
+.task-priority.priority-urgent-important .task-priority-dot { background: #ef4444; }
 
 .task-priority.priority-important {
   background: rgba(245, 158, 11, 0.12);
@@ -801,11 +803,17 @@ onUnmounted(() => {
 }
 .task-priority.priority-important .task-priority-dot { background: #f59e0b; }
 
-.task-priority.priority-minor {
-  background: rgba(100, 116, 139, 0.12);
-  color: #64748b;
+.task-priority.priority-minor-urgent {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
 }
-.task-priority.priority-minor .task-priority-dot { background: #64748b; }
+.task-priority.priority-minor-urgent .task-priority-dot { background: #3b82f6; }
+
+.task-priority.priority-minor {
+  background: rgba(20, 184, 166, 0.12);
+  color: #0d9488;
+}
+.task-priority.priority-minor .task-priority-dot { background: #14b8a6; }
 
 .task-status-badge {
   font-size: 11px;

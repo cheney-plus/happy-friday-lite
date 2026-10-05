@@ -59,6 +59,16 @@
   "november": "Nov",
   "december": "Dec",
   "list": "List",
+  "quadrant": "Quadrants",
+  "quadrantUrgentImportant": "Urgent & Important",
+  "quadrantImportant": "Important, Not Urgent",
+  "quadrantUrgent": "Not Important, Urgent",
+  "quadrantNeither": "Not Important, Not Urgent",
+  "quadrantEmpty": "No tasks",
+  "groupOverdue": "Overdue",
+  "groupPending": "To Do",
+  "groupToday": "Today",
+  "groupTomorrow": "Tomorrow",
   "filterAll": "All",
   "filterWeek": "This Week",
   "filterMonth": "This Month",
@@ -69,7 +79,8 @@
   "completionRate": "Done",
   "noTasks": "No tasks",
   "priority": "Priority",
-  "priorityUrgent": "Urgent",
-  "priorityImportant": "Important",
-  "priorityMinor": "Minor"
+  "priorityUrgentImportant": "Urgent & Important",
+  "priorityImportant": "Important, Not Urgent",
+  "priorityMinorUrgent": "Urgent Minor",
+  "priorityMinor": "No Priority"
 }

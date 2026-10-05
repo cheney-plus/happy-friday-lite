@@ -116,8 +116,9 @@ if (!props.model.priority) {
 }
 
 const priorityOptions = computed(() => [
-  { key: 'urgent', label: t('schedule.priorityUrgent') },
+  { key: 'urgent-important', label: t('schedule.priorityUrgentImportant') },
   { key: 'important', label: t('schedule.priorityImportant') },
+  { key: 'minor-urgent', label: t('schedule.priorityMinorUrgent') },
   { key: 'minor', label: t('schedule.priorityMinor') },
 ]);
 
@@ -316,7 +317,7 @@ defineExpose({ focusTitle });
   font-weight: 600;
 }
 
-.priority-option.active.urgent {
+.priority-option.active.urgent-important {
   background: rgba(239, 68, 68, 0.12);
   border-color: #ef4444;
 }
@@ -326,9 +327,14 @@ defineExpose({ focusTitle });
   border-color: #f59e0b;
 }
 
+.priority-option.active.minor-urgent {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #3b82f6;
+}
+
 .priority-option.active.minor {
-  background: rgba(100, 116, 139, 0.12);
-  border-color: #64748b;
+  background: rgba(20, 184, 166, 0.12);
+  border-color: #14b8a6;
 }
 
 .priority-dot {
@@ -339,7 +345,8 @@ defineExpose({ focusTitle });
   background: var(--text-tertiary);
 }
 
-.priority-option.urgent .priority-dot { background: #ef4444; }
+.priority-option.urgent-important .priority-dot { background: #ef4444; }
 .priority-option.important .priority-dot { background: #f59e0b; }
-.priority-option.minor .priority-dot { background: #64748b; }
+.priority-option.minor-urgent .priority-dot { background: #3b82f6; }
+.priority-option.minor .priority-dot { background: #14b8a6; }
 </style>

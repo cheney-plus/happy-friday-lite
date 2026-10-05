@@ -2,13 +2,15 @@
   <div class="schedule-calendar" @contextmenu.prevent>
     <div class="calendar-header">
       <div class="header-left">
-        <button class="nav-btn" @click="navigatePrev">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <button class="today-btn" @click="navigateToday">{{ t('schedule.today') }}</button>
-        <button class="nav-btn" @click="navigateNext">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
+        <template v-if="currentView !== 'quadrant'">
+          <button class="nav-btn" @click="navigatePrev">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="today-btn" @click="navigateToday">{{ t('schedule.today') }}</button>
+          <button class="nav-btn" @click="navigateNext">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </template>
         <h2 class="current-date-label">{{ currentDateLabel }}</h2>
       </div>
       <div class="header-right">
@@ -217,6 +219,9 @@
 
       <!-- Task List View -->
       <ScheduleTaskList v-else-if="currentView === 'list'" />
+
+      <!-- Quadrant View（四象限） -->
+      <ScheduleQuadrant v-else-if="currentView === 'quadrant'" />
     </div>
 
     <!-- 创建日程弹窗 -->
@@ -256,6 +261,7 @@ import { useRouter } from 'vue-router';
 import { useScheduleStore, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 import { useAppStore } from '@/store';
 import ScheduleTaskList from './ScheduleTaskList.vue';
+import ScheduleQuadrant from './ScheduleQuadrant.vue';
 import EventFormModal from './components/EventFormModal.vue';
 import EventContextMenu from './components/EventContextMenu.vue';
 import MoreEventsPanel from './components/MoreEventsPanel.vue';
@@ -294,6 +300,7 @@ const views = computed(() => [
   { key: 'week', label: t('schedule.week') },
   { key: 'year', label: t('schedule.year') },
   { key: 'list', label: t('schedule.list') },
+  { key: 'quadrant', label: t('schedule.quadrant') },
 ]);
 
 const currentViewLabel = computed(() => {
@@ -321,6 +328,9 @@ function onViewDocClick(e) {
 }
 
 const currentDateLabel = computed(() => {
+  if (currentView.value === 'quadrant') {
+    return t('schedule.quadrant');
+  }
   if (currentView.value === 'year') {
     return `${viewYear.value}`;
   }
@@ -688,7 +698,7 @@ const weekMultiDayBars = computed(() => {
  */
 const weekSingleDayEventsByDate = computed(() => {
   const map = new Map();
-  const pr = { urgent: 0, important: 1, minor: 2 };
+  const pr = { 'urgent-important': 0, important: 1, 'minor-urgent': 2, minor: 3 };
   for (const day of weekDays.value) {
     const evts = scheduleStore
       .getEventsForDateRange(day.date, day.date)
@@ -819,7 +829,8 @@ function priorityClass(p) {
 
 function priorityLabel(p) {
   const key = p || DEFAULT_EVENT_PRIORITY;
-  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'urgent-important') return t('schedule.priorityUrgentImportant');
+  if (key === 'minor-urgent') return t('schedule.priorityMinorUrgent');
   if (key === 'minor') return t('schedule.priorityMinor');
   return t('schedule.priorityImportant');
 }
@@ -1508,7 +1519,7 @@ onActivated(() => {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-tertiary) 60%, transparent);
 }
 
-.cell-event-priority.priority-urgent {
+.cell-event-priority.priority-urgent-important {
   background: #ef4444;
   box-shadow: none;
 }
@@ -1516,8 +1527,12 @@ onActivated(() => {
   background: #f59e0b;
   box-shadow: none;
 }
+.cell-event-priority.priority-minor-urgent {
+  background: #3b82f6;
+  box-shadow: none;
+}
 .cell-event-priority.priority-minor {
-  background: #64748b;
+  background: #14b8a6;
   box-shadow: none;
 }
 
@@ -1606,9 +1621,10 @@ onActivated(() => {
   background: #f59e0b;
 }
 
-.multi-day-bar-priority.priority-urgent { background: #ef4444; }
+.multi-day-bar-priority.priority-urgent-important { background: #ef4444; }
 .multi-day-bar-priority.priority-important { background: #f59e0b; }
-.multi-day-bar-priority.priority-minor { background: #64748b; }
+.multi-day-bar-priority.priority-minor-urgent { background: #3b82f6; }
+.multi-day-bar-priority.priority-minor { background: #14b8a6; }
 
 /* ========== Week View ========== */
 .week-view {
@@ -1891,7 +1907,7 @@ onActivated(() => {
   flex-shrink: 0;
 }
 
-.wk-priority-tag.priority-urgent {
+.wk-priority-tag.priority-urgent-important {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.14);
 }
@@ -1901,9 +1917,14 @@ onActivated(() => {
   background: rgba(245, 158, 11, 0.14);
 }
 
+.wk-priority-tag.priority-minor-urgent {
+  color: #2563eb;
+  background: rgba(59, 130, 246, 0.14);
+}
+
 .wk-priority-tag.priority-minor {
-  color: #64748b;
-  background: rgba(100, 116, 139, 0.14);
+  color: #0d9488;
+  background: rgba(20, 184, 166, 0.14);
 }
 
 /* ---- 空状态提示 ---- */

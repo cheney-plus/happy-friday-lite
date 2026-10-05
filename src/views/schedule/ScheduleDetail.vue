@@ -158,7 +158,8 @@ function priorityClass(p) {
 
 function priorityLabel(p) {
   const key = p || DEFAULT_EVENT_PRIORITY;
-  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'urgent-important') return t('schedule.priorityUrgentImportant');
+  if (key === 'minor-urgent') return t('schedule.priorityMinorUrgent');
   if (key === 'minor') return t('schedule.priorityMinor');
   return t('schedule.priorityImportant');
 }
@@ -599,11 +600,11 @@ onDeactivated(() => {
   flex-shrink: 0;
 }
 
-.priority-badge.priority-urgent {
+.priority-badge.priority-urgent-important {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
 }
-.priority-badge.priority-urgent .priority-badge-dot { background: #ef4444; }
+.priority-badge.priority-urgent-important .priority-badge-dot { background: #ef4444; }
 
 .priority-badge.priority-important {
   background: rgba(245, 158, 11, 0.12);
@@ -611,9 +612,15 @@ onDeactivated(() => {
 }
 .priority-badge.priority-important .priority-badge-dot { background: #f59e0b; }
 
-.priority-badge.priority-minor {
-  background: rgba(100, 116, 139, 0.12);
-  color: #64748b;
+.priority-badge.priority-minor-urgent {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
 }
-.priority-badge.priority-minor .priority-badge-dot { background: #64748b; }
+.priority-badge.priority-minor-urgent .priority-badge-dot { background: #3b82f6; }
+
+.priority-badge.priority-minor {
+  background: rgba(20, 184, 166, 0.12);
+  color: #0d9488;
+}
+.priority-badge.priority-minor .priority-badge-dot { background: #14b8a6; }
 </style>

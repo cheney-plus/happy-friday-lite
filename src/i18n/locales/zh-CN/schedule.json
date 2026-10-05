@@ -59,6 +59,16 @@
   "november": "11月",
   "december": "12月",
   "list": "列表",
+  "quadrant": "四象限",
+  "quadrantUrgentImportant": "重要且紧急",
+  "quadrantImportant": "重要不紧急",
+  "quadrantUrgent": "不重要但紧急",
+  "quadrantNeither": "不重要不紧急",
+  "quadrantEmpty": "没有任务",
+  "groupOverdue": "已过期",
+  "groupPending": "待完成",
+  "groupToday": "今天",
+  "groupTomorrow": "明天",
   "filterAll": "全部",
   "filterWeek": "本周",
   "filterMonth": "本月",
@@ -69,7 +79,8 @@
   "completionRate": "完成率",
   "noTasks": "暂无任务",
   "priority": "优先级",
-  "priorityUrgent": "紧急",
-  "priorityImportant": "重要",
-  "priorityMinor": "次要"
+  "priorityUrgentImportant": "重要紧急",
+  "priorityImportant": "重要不急",
+  "priorityMinorUrgent": "紧急小事",
+  "priorityMinor": "无优先级"
 }
