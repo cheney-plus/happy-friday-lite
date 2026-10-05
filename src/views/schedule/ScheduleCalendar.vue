@@ -287,7 +287,10 @@ const { isZh, getMonthDayLabel, weekDayLabels, weekDayMiniLabels, monthNames } =
 
 // ========== 视图状态 ==========
 // 初始视图取自设置：打开日程时默认显示用户配置的视图
-const currentView = ref(appStore.scheduleDefaultView === 'week' ? 'week' : 'month');
+function resolveDefaultView(v) {
+  return v === 'week' || v === 'quadrant' ? v : 'month';
+}
+const currentView = ref(resolveDefaultView(appStore.scheduleDefaultView));
 // 记录上次已知的默认视图，用于在 keep-alive 重新激活时检测设置是否变更
 const lastDefaultView = ref(appStore.scheduleDefaultView);
 const viewYear = ref(new Date().getFullYear());
@@ -299,8 +302,8 @@ const views = computed(() => [
   { key: 'month', label: t('schedule.month') },
   { key: 'week', label: t('schedule.week') },
   { key: 'year', label: t('schedule.year') },
-  { key: 'list', label: t('schedule.list') },
   { key: 'quadrant', label: t('schedule.quadrant') },
+  { key: 'list', label: t('schedule.list') },
 ]);
 
 const currentViewLabel = computed(() => {
@@ -1138,7 +1141,7 @@ onActivated(() => {
   // 若设置中的默认视图已变更（例如在设置页修改后返回），则同步切换到新默认视图
   if (appStore.scheduleDefaultView !== lastDefaultView.value) {
     lastDefaultView.value = appStore.scheduleDefaultView;
-    currentView.value = appStore.scheduleDefaultView === 'week' ? 'week' : 'month';
+    currentView.value = resolveDefaultView(appStore.scheduleDefaultView);
   }
 });
 </script>

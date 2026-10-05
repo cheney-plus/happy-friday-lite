@@ -308,6 +308,7 @@ const filteredTasks = computed(() => {
 });
 
 function formatDate(task) {
+  if (!task.start) return t('schedule.noDeadline');
   if (task.start === task.end) return task.start;
   return `${task.start} ~ ${task.end}`;
 }

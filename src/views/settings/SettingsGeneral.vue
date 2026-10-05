@@ -86,6 +86,10 @@
                 :class="['font-size-option', { active: settings.scheduleDefaultView === 'month' }]"
                 @click="selectScheduleView('month')"
               >{{ t('settings.viewMonth') }}</div>
+              <div
+                :class="['font-size-option', { active: settings.scheduleDefaultView === 'quadrant' }]"
+                @click="selectScheduleView('quadrant')"
+              >{{ t('settings.viewQuadrant') }}</div>
             </div>
           </div>
           <div class="setting-item clickable" @click="goToFileOpenSettings">
@@ -1265,7 +1269,7 @@ const saveRuntimeLogsConfig = async () => {
 };
 
 const selectScheduleView = async (value) => {
-  if (value !== 'week' && value !== 'month') return;
+  if (value !== 'week' && value !== 'month' && value !== 'quadrant') return;
   settings.scheduleDefaultView = value;
   appStore.setScheduleDefaultView(value);
   try {

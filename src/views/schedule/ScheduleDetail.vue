@@ -22,7 +22,8 @@
 
           <div class="setting-item">
             <span class="item-label">{{ t('schedule.dateRange') }}</span>
-            <span class="item-value-text" v-if="event.start === event.end">{{ event.start }}</span>
+            <span class="item-value-text" v-if="!event.start">{{ t('schedule.noDeadline') }}</span>
+            <span class="item-value-text" v-else-if="event.start === event.end">{{ event.start }}</span>
             <span class="item-value-text" v-else>{{ event.start }} ~ {{ event.end }}</span>
           </div>
 
@@ -140,6 +141,7 @@ const event = computed(() => scheduleStore.getEventById(eventId.value));
 
 const editForm = reactive({
   title: '',
+  hasDate: false,
   start: '',
   end: '',
   startTime: '09:00',
@@ -172,6 +174,7 @@ function startEdit() {
   if (!event.value) return;
   Object.assign(editForm, {
     title: event.value.title,
+    hasDate: !!event.value.start,
     start: event.value.start,
     end: event.value.end,
     allDay: event.value.allDay,
@@ -195,14 +198,14 @@ async function saveEdit() {
   if (!editForm.title.trim() || !event.value) return;
   await scheduleStore.updateEvent(eventId.value, {
     title: editForm.title,
-    start: editForm.start,
-    end: editForm.end,
+    start: editForm.hasDate ? editForm.start : '',
+    end: editForm.hasDate ? editForm.end : '',
     allDay: editForm.allDay,
-    startTime: editForm.allDay ? '' : editForm.startTime,
-    endTime: editForm.allDay ? '' : editForm.endTime,
+    startTime: editForm.hasDate && !editForm.allDay ? editForm.startTime : '',
+    endTime: editForm.hasDate && !editForm.allDay ? editForm.endTime : '',
     description: editForm.description,
     color: editForm.color,
-    reminder: editForm.reminder,
+    reminder: editForm.hasDate ? editForm.reminder : false,
     completed: editForm.completed,
     priority: editForm.priority,
   });

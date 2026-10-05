@@ -18,6 +18,7 @@
   "scheduleDefaultView": "Default Schedule View",
   "viewWeek": "Week",
   "viewMonth": "Month",
+  "viewQuadrant": "Quadrants",
   "docOpenModes": "Default Document Opener",
   "fileOpen": "File Open Preferences",
   "fileOpenDesc": "Set the default opener for documents, or make this app the system default viewer",

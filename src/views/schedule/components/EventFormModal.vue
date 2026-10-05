@@ -35,6 +35,7 @@ const formRef = ref(null);
 
 const formData = reactive({
   title: '',
+  hasDate: false,
   start: '',
   end: '',
   startTime: '09:00',
@@ -55,6 +56,8 @@ function open(initial = {}) {
   const date = initial.start || new Date().toISOString().split('T')[0];
   Object.assign(formData, {
     title: '',
+    // 从具体日期格点击进入时预设该日期并默认勾选，其余情况默认无期限
+    hasDate: !!initial.start,
     start: date,
     end: initial.end || date,
     allDay: initial.allDay !== undefined ? initial.allDay : true,
@@ -76,16 +79,17 @@ function close() {
 
 function save() {
   if (!formData.title.trim()) return;
+  // 未勾选"设置日期"时按无期限提交（start/end 为空，永不过期）
   emit('save', {
     title: formData.title,
-    start: formData.start,
-    end: formData.end,
+    start: formData.hasDate ? formData.start : '',
+    end: formData.hasDate ? formData.end : '',
     allDay: formData.allDay,
-    startTime: formData.allDay ? '' : formData.startTime,
-    endTime: formData.allDay ? '' : formData.endTime,
+    startTime: formData.hasDate && !formData.allDay ? formData.startTime : '',
+    endTime: formData.hasDate && !formData.allDay ? formData.endTime : '',
     description: formData.description,
     color: formData.color,
-    reminder: formData.reminder,
+    reminder: formData.hasDate ? formData.reminder : false,
     completed: formData.completed,
     priority: formData.priority,
   });

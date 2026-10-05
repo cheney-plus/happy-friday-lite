@@ -18,6 +18,7 @@
   "scheduleDefaultView": "日程默认视图",
   "viewWeek": "周视图",
   "viewMonth": "月视图",
+  "viewQuadrant": "四象限视图",
   "docOpenModes": "文档默认打开方式",
   "fileOpen": "文件打开方式",
   "fileOpenDesc": "设置文档默认打开软件，或将本客户端设为系统默认打开程序",
