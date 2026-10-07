@@ -92,6 +92,26 @@
               >{{ t('settings.viewQuadrant') }}</div>
             </div>
           </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.reminderLead') }}</span>
+            <div class="font-size-options">
+              <div
+                v-for="opt in reminderLeadOptions"
+                :key="opt.value"
+                :class="['font-size-option', { active: settings.reminderLeadMinutes === opt.value }]"
+                @click="selectReminderLead(opt.value)"
+              >{{ opt.label }}</div>
+            </div>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.reminderAllDayTime') }}</span>
+            <input
+              type="time"
+              v-model="settings.reminderAllDayTime"
+              class="text-input reminder-time-input"
+              @change="saveReminderConfig"
+            />
+          </div>
           <div class="setting-item clickable" @click="goToFileOpenSettings">
             <div class="item-label-group">
               <span class="item-label">{{ t('settings.fileOpen') }}</span>
@@ -645,8 +665,18 @@ const settings = reactive({
   fontSize: 16,
   messageNotify: false,
   noteFimCompletion: appStore.noteFimCompletion,
-  scheduleDefaultView: appStore.scheduleDefaultView || 'month'
+  scheduleDefaultView: appStore.scheduleDefaultView || 'month',
+  // 日程到期提醒：提前提醒分钟数 / 全天日程提醒时间
+  reminderLeadMinutes: 60,
+  reminderAllDayTime: '09:30'
 });
+
+const reminderLeadOptions = computed(() => [
+  { value: 10, label: t('settings.reminderLead10') },
+  { value: 30, label: t('settings.reminderLead30') },
+  { value: 60, label: t('settings.reminderLead60') },
+  { value: 120, label: t('settings.reminderLead120') }
+]);
 
 const enabledModuleCount = computed(() => Object.values(appStore.sidebarModules).filter(Boolean).length);
 const sidebarModuleCount = sidebarModuleConfig.length;
@@ -1281,6 +1311,24 @@ const selectScheduleView = async (value) => {
   } catch (_e) {}
 };
 
+// 日程到期提醒：提前提醒分钟 / 全天提醒时间，写入 config.json 供主进程调度器读取
+const saveReminderConfig = async () => {
+  try {
+    const config = await electronService.invoke('get-config');
+    if (!config) return;
+    config.reminderLeadMinutes = settings.reminderLeadMinutes;
+    const time = /^\d{1,2}:\d{2}$/.test(settings.reminderAllDayTime || '') ? settings.reminderAllDayTime : '09:30';
+    config.reminderAllDayTime = time;
+    await electronService.invoke('save-config', config);
+  } catch (_e) {}
+};
+
+const selectReminderLead = async (value) => {
+  if (![10, 30, 60, 120].includes(value)) return;
+  settings.reminderLeadMinutes = value;
+  await saveReminderConfig();
+};
+
 // 文件打开方式二级设置页（默认打开方式 + 系统文件关联）
 const goToFileOpenSettings = () => {
   router.push('/settings/file-open');
@@ -1317,6 +1365,8 @@ onMounted(() => {
     if (config) {
       runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
       appStore.setSidebarModules(config.sidebarModules);
+      if (config.reminderLeadMinutes) settings.reminderLeadMinutes = config.reminderLeadMinutes;
+      if (config.reminderAllDayTime) settings.reminderAllDayTime = config.reminderAllDayTime;
     }
   });
   loadBackupConfig();
@@ -1649,6 +1699,13 @@ const openAuthorEmail = () => {
 
 .text-input:focus {
   border-color: var(--text-tertiary);
+}
+
+/* 全天日程提醒时间选择 */
+.reminder-time-input {
+  width: 120px;
+  height: 30px;
+  font-family: inherit;
 }
 
 .toggle-switch {

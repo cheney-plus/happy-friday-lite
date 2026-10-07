@@ -12,6 +12,7 @@ import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
 import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
+import { startReminderScheduler, stopReminderScheduler } from './src-electron/scheduleReminder.js'
 import { stopHarnessSidecar } from './src-electron/harness/index.js'
 import { initOfficeSession, shutdownOfficeHost } from './src-electron/office/office-session.js'
 import { registerOfficeIpc } from './src-electron/office/office-ipc.js'
@@ -22,6 +23,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
+
+// Windows 系统通知需与 appId 一致（electron-builder build.appId），否则通知不显示
+app.setAppUserModelId('com.happyfriday.lite')
 
 // 禁止渲染进程后台化，避免窗口失焦/被遮挡时被系统挂起，切回时卡顿
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
@@ -218,6 +222,9 @@ app.whenReady().then(async () => {
   startAutomationScheduler(mainWindow)
   startObsidianScheduler(mainWindow)
 
+  // 日程到期提醒调度器（读取数据库中 reminder 开启的日程，发系统通知）
+  startReminderScheduler(mainWindow)
+
   // Office 工作区（happyoffice 编辑器以 WebContentsView 挂载到主窗口）
   try {
     const ok = await initOfficeSession(mainWindow)
@@ -307,6 +314,7 @@ app.on('window-all-closed', function () {
   stopShareServer()
   stopAutomationScheduler()
   stopObsidianScheduler()
+  stopReminderScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()

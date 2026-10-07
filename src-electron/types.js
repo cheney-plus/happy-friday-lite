@@ -22,6 +22,9 @@ export function defaultConfig() {
       autoDir: null,
       maxKeep: 7
     },
+    // 日程到期提醒：有时间的日程提前 N 分钟提醒；全天日程在到期日指定时间提醒
+    reminderLeadMinutes: 60,
+    reminderAllDayTime: '09:30',
     // 对话历史自动清理：默认关闭，开启后按阈值清理超过指定时间未活动的会话
     history: {
       autoClean: false,
