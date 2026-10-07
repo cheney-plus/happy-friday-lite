@@ -12,6 +12,16 @@
       />
     </div>
 
+    <div class="form-group">
+      <textarea
+        :value="model.description"
+        @input="onFieldChange('description', $event.target.value)"
+        class="desc-textarea"
+        :placeholder="t('schedule.descriptionPlaceholder')"
+        rows="3"
+      ></textarea>
+    </div>
+
     <div v-if="model.hasDate && !model.allDay" class="form-row">
       <div class="form-group">
         <label class="form-label">{{ t('schedule.startTime') }}</label>
@@ -21,16 +31,6 @@
         <label class="form-label">{{ t('schedule.endTime') }}</label>
         <input :value="model.endTime" @input="onFieldChange('endTime', $event.target.value)" type="time" class="form-input" />
       </div>
-    </div>
-
-    <div class="form-group">
-      <textarea
-        :value="model.description"
-        @input="onFieldChange('description', $event.target.value)"
-        class="desc-textarea"
-        :placeholder="t('schedule.descriptionPlaceholder')"
-        rows="3"
-      ></textarea>
     </div>
 
     <div class="form-group">
