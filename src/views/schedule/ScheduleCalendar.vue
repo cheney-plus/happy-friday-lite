@@ -87,7 +87,12 @@
                 @contextmenu.prevent.stop="onEventRightClick($event, event)"
               >
                 <span class="cell-event-title">{{ event.title }}</span>
-                <span class="cell-event-priority" :class="priorityClass(event.priority)" :title="priorityLabel(event.priority)"></span>
+                <span
+                  class="cell-event-priority"
+                  :class="priorityClass(event.priority)"
+                  @mouseenter="showPriorityTip($event, event.priority)"
+                  @mouseleave="hidePriorityTip"
+                ></span>
               </div>
             </div>
             <div v-if="shouldShowMore(cell.date)" class="cell-more" @click.stop="onMoreClick(cell.date, $event)">
@@ -110,7 +115,12 @@
             @contextmenu.prevent.stop="onEventRightClick($event, bar.event)"
           >
             <span class="multi-day-bar-title">{{ bar.event.title }}</span>
-            <span class="multi-day-bar-priority" :class="priorityClass(bar.event.priority)" :title="priorityLabel(bar.event.priority)"></span>
+            <span
+              class="multi-day-bar-priority"
+              :class="priorityClass(bar.event.priority)"
+              @mouseenter="showPriorityTip($event, bar.event.priority)"
+              @mouseleave="hidePriorityTip"
+            ></span>
           </div>
         </div>
       </div>
@@ -254,6 +264,15 @@
 
     <!-- Friday 日程助理 -->
     <FridayAssistant v-model:visible="showAssistant" />
+
+    <!-- 优先级即时提示（跟随圆点位置，悬停立即显示） -->
+    <Teleport to="body">
+      <div
+        v-if="priorityTip.visible"
+        class="priority-tip"
+        :style="{ left: priorityTip.x + 'px', top: priorityTip.y + 'px' }"
+      >{{ priorityTip.label }}</div>
+    </Teleport>
   </div>
 </template>
 
@@ -837,6 +856,24 @@ function priorityLabel(p) {
   if (key === 'minor-urgent') return t('schedule.priorityMinorUrgent');
   if (key === 'minor') return t('schedule.priorityMinor');
   return t('schedule.priorityImportant');
+}
+
+// ========== 优先级圆点即时提示 ==========
+// 替代原生 title（系统级延迟约 1s）：mouseenter 时按圆点位置立即显示浮层
+const priorityTip = ref({ visible: false, label: '', x: 0, y: 0 });
+
+function showPriorityTip(e, p) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  priorityTip.value = {
+    visible: true,
+    label: priorityLabel(p),
+    x: rect.left + rect.width / 2,
+    y: rect.top - 6,
+  };
+}
+
+function hidePriorityTip() {
+  priorityTip.value.visible = false;
 }
 
 // ========== 导航 ==========
@@ -1476,8 +1513,8 @@ onActivated(() => {
 .cell-holiday {
   margin-left: auto;
   font-size: 12px;
-  color: #16a34a;
-  font-weight: 500;
+  color: #ff1616;
+  font-weight: 1000;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1487,7 +1524,7 @@ onActivated(() => {
 }
 
 .cell-holiday.lunar-holiday {
-  color: #16a34a;
+  color: #ff1616;
 }
 
 .cell-events {
@@ -1548,6 +1585,22 @@ onActivated(() => {
 .cell-event-priority.priority-minor {
   background: #14b8a6;
   box-shadow: none;
+}
+
+/* 优先级即时提示浮层（Teleport 至 body，跟随圆点即时显示） */
+.priority-tip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .cell-event:hover {
