@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated } from 'vue';
+import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useScheduleStore, normalizePriority } from '@/store/modules/schedule';
 import { useCalendarHelpers } from './utils/calendarHelpers';
@@ -83,6 +83,11 @@ function toLocalDateStr(d) {
 }
 
 const todayStr = computed(() => toLocalDateStr(now.value));
+
+// 当前时刻 HH:mm，用于判断"今天但有具体时间"的日程是否已过期
+const nowTimeStr = computed(() =>
+  `${String(now.value.getHours()).padStart(2, '0')}:${String(now.value.getMinutes()).padStart(2, '0')}`
+);
 
 function shiftedStr(days) {
   const d = new Date(now.value);
@@ -110,7 +115,10 @@ const groupOrder = ['pending', 'overdue', 'completed'];
 
 function groupKeyOf(ev) {
   if (ev.completed) return 'completed';
-  if (ev.start && ev.start < todayStr.value) return 'overdue';
+  if (!ev.start) return 'pending';
+  if (ev.start < todayStr.value) return 'overdue';
+  // 日程为今天时：有具体开始时间且已过的，同样视为已过期
+  if (ev.start === todayStr.value && !ev.allDay && ev.startTime && ev.startTime <= nowTimeStr.value) return 'overdue';
   return 'pending';
 }
 
@@ -203,8 +211,18 @@ async function toggleComplete(ev) {
   await scheduleStore.updateEvent(ev.id, { completed: !ev.completed });
 }
 
+// 定时刷新当前时间：视图停留时已到时的日程能自动归入"已过期"
+let nowTimer = null
+
 onMounted(() => {
   scheduleStore.loadEvents();
+  nowTimer = setInterval(() => {
+    now.value = new Date();
+  }, 30 * 1000);
+});
+
+onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer);
 });
 
 // keep-alive 重激活时刷新数据与当前时间
