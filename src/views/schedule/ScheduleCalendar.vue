@@ -179,9 +179,12 @@
               @click.stop="onEventClick(bar.event)"
               @contextmenu.prevent.stop="onEventRightClick($event, bar.event)"
             >
-              <span class="wk-mday-bar-title">{{ bar.event.title }}</span>
-              <span class="wk-mday-bar-date">{{ formatWeekBarDateRange(bar.event) }}</span>
-              <span class="wk-priority-tag" :class="priorityClass(bar.event.priority)">{{ priorityLabel(bar.event.priority) }}</span>
+              <div class="wk-mday-bar-row">
+                <span class="wk-mday-bar-title">{{ bar.event.title }}</span>
+                <span class="wk-mday-bar-date">{{ formatWeekBarDateRange(bar.event) }}</span>
+                <span class="wk-priority-tag" :class="priorityClass(bar.event.priority)">{{ priorityLabel(bar.event.priority) }}</span>
+              </div>
+              <div v-if="bar.event.description" class="wk-mday-bar-desc">{{ bar.event.description }}</div>
             </div>
             <!-- 本周无日程时的居中提示（不阻挡点击，仍可点空白创建） -->
             <div v-if="!weekHasEvents" class="wk-empty">
@@ -728,8 +731,8 @@ function formatWeekBarDateRange(evt) {
   return s === e ? s : `${s} - ${e}`;
 }
 
-// 跨日色条尺寸常量（与 CSS 中 .wk-mday-bar 高度对应）
-const WK_BAR_H = 30;
+// 跨日色条尺寸常量（与 CSS 中 .wk-mday-bar 高度对应；双行高度以容纳描述内容）
+const WK_BAR_H = 46;
 const WK_BAR_GAP = 4;
 const WK_BASE_PAD = 6;
 
@@ -1724,22 +1727,31 @@ onActivated(() => {
   background: transparent;
 }
 
-/* ---- 跨日日程条（悬浮于列顶部，连续横跨多列） ---- */
+/* ---- 跨日日程条（悬浮于列顶部，连续横跨多列；双行：标题行 + 描述行） ---- */
 .wk-mday-bar {
   position: absolute;
   z-index: 2;
   box-sizing: border-box;
   border-radius: 8px;
-  padding: 0 10px;
+  padding: 4px 10px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   font-size: 12px;
   color: var(--text-primary);
   overflow: hidden;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+/* 标题行：标题 + 日期范围 + 优先级 */
+.wk-mday-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .wk-mday-bar:hover {
@@ -1774,6 +1786,21 @@ onActivated(() => {
   color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* 描述行：单行省略展示日程详细内容 */
+.wk-mday-bar-desc {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.wk-mday-bar.is-completed .wk-mday-bar-desc {
+  text-decoration: line-through;
 }
 
 /* ---- 单日日程卡片列 ---- */
