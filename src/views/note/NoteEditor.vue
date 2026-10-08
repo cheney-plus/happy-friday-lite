@@ -26,6 +26,19 @@
       </div>
 
       <div class="tooltip-wrapper">
+        <button
+          class="toolbar-btn format-painter-btn"
+          :class="{ active: !!formatPainter }"
+          :title="t('note.toolbar.formatPainter')"
+          @click="handleFormatPainterClick"
+          @dblclick.prevent="handleFormatPainterDblClick"
+        >
+          <PaintRoller :size="15" :stroke-width="2" />
+        </button>
+        <span class="tooltip">{{ t('note.toolbar.formatPainter') }}</span>
+      </div>
+
+      <div class="tooltip-wrapper">
         <button class="toolbar-btn" @click="clearFormatting">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
         </button>
@@ -122,13 +135,23 @@
       </div>
 
       <div class="dropdown-wrapper">
-        <button class="toolbar-btn dropdown-toggle" :class="{ active: editor.isActive('highlight') }" @click="toggleHighlightMenu">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        <button class="toolbar-btn dropdown-toggle highlight-toggle" :class="{ active: editor.isActive('highlight') }" @click="handleHighlightButtonClick">
+          <Highlighter :size="15" :stroke-width="2" />
+          <span class="highlight-current-color" :style="lastHighlightColor ? { backgroundColor: lastHighlightColor } : { display: 'none' }"></span>
+          <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" @click.stop="toggleHighlightMenu"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHighlightMenu" class="dropdown-menu highlight-menu">
           <div class="text-color-header">{{ t('note.toolbar.backgroundColor') }}</div>
-          <button class="default-color-btn" @click="setHighlight('transparent')">{{ t('note.toolbar.noBackground') }}</button>
+          <div class="color-picker-grid highlight-grid highlight-recent-grid">
+            <div class="color-option no-bg-option"
+                 :title="t('note.toolbar.noBackground')"
+                 @click="setHighlight('transparent')"></div>
+            <div class="color-option" v-for="color in recentHighlightColors" :key="'recent-' + color"
+                 :style="{ backgroundColor: color }"
+                 :title="color"
+                 @click="setHighlight(color)"></div>
+          </div>
+          <div v-if="recentHighlightColors.length" class="highlight-recent-divider"></div>
           <div class="color-picker-grid highlight-grid">
             <div class="color-option" v-for="color in highlightColorPalette" :key="color"
                  :style="{ backgroundColor: color, border: color === '#ffffff' ? '1px solid #e5e7eb' : 'none' }"
@@ -669,6 +692,7 @@ import {
   AlignCenter, AlignLeft, AlignRight, Bold, Code2, Eraser, Heading,
   Highlighter, Image as ToolbarImage, Italic, Link2, List, ListChecks, ListOrdered,
   Columns3, Combine, Minus, Palette, PanelLeft, PanelTop, Quote, Redo2, Rows3, Sigma, Split,
+  PaintRoller,
   Strikethrough, Table2, Trash2, Underline as ToolbarUnderline, Undo2,
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
@@ -2706,9 +2730,153 @@ const setHighlight = (color) => {
     editor.value?.chain().focus().unsetHighlight().run();
   } else {
     editor.value?.chain().focus().setHighlight({ color }).run();
+    recordRecentHighlightColor(color);
   }
   showHighlightMenu.value = false;
 };
+
+// ========== 最近使用的背景颜色 ==========
+const RECENT_HIGHLIGHT_KEY = 'happy-friday-recent-highlight-colors';
+const RECENT_HIGHLIGHT_MAX = 9;
+
+const loadRecentHighlightColors = () => {
+  try {
+    const arr = JSON.parse(localStorage.getItem(RECENT_HIGHLIGHT_KEY) || '[]');
+    return Array.isArray(arr) ? arr.filter(c => typeof c === 'string').slice(0, RECENT_HIGHLIGHT_MAX) : [];
+  } catch {
+    return [];
+  }
+};
+
+const recentHighlightColors = ref(loadRecentHighlightColors());
+const lastHighlightColor = computed(() => recentHighlightColors.value[0] || null);
+
+const recordRecentHighlightColor = (color) => {
+  const list = [color, ...recentHighlightColors.value.filter(c => c !== color)].slice(0, RECENT_HIGHLIGHT_MAX);
+  recentHighlightColors.value = list;
+  try {
+    localStorage.setItem(RECENT_HIGHLIGHT_KEY, JSON.stringify(list));
+  } catch {}
+};
+
+// 点击按钮直接应用最近使用的颜色；小箭头或无最近颜色时打开色板菜单
+const handleHighlightButtonClick = () => {
+  if (showHighlightMenu.value) {
+    exclusiveToggleMenu(showHighlightMenu);
+    return;
+  }
+  if (lastHighlightColor.value) {
+    setHighlight(lastHighlightColor.value);
+  } else {
+    toggleHighlightMenu();
+  }
+};
+
+// ========== 格式刷 ==========
+// formatPainter 为 null 表示未激活；{ marks, sticky } 表示已取格式
+// sticky=false 普通点击，仅下一次选中文本时生效一次；sticky=true 双击，持续复用直到再次点击或按 Esc
+const formatPainter = ref(null);
+let painterReleasedAt = 0;
+
+const capturePainterMarks = () => {
+  if (!editor.value) return [];
+  const { state } = editor.value;
+  const { from, to, empty } = state.selection;
+  const marks = [];
+  const push = (m) => {
+    if (!marks.some(x => x.eq(m))) marks.push(m);
+  };
+  state.doc.nodesBetween(from, to, (node) => {
+    (node.marks || []).forEach(push);
+  });
+  if (empty) {
+    (state.storedMarks || state.selection.$from.marks()).forEach(push);
+  }
+  return marks.map(m => ({ type: m.type.name, attrs: { ...m.attrs } }));
+};
+
+const armFormatPainter = (sticky) => {
+  const marks = capturePainterMarks();
+  if (!marks.length) return;
+  formatPainter.value = { marks, sticky };
+};
+
+const handleFormatPainterClick = () => {
+  if (formatPainter.value?.sticky) {
+    formatPainter.value = null;
+    painterReleasedAt = Date.now();
+    return;
+  }
+  armFormatPainter(false);
+};
+
+const handleFormatPainterDblClick = () => {
+  // 双击前必已触发过 click；若刚因点击解除了复用模式，忽略本次双击
+  if (formatPainter.value?.sticky || Date.now() - painterReleasedAt < 400) return;
+  armFormatPainter(true);
+};
+
+const applyFormatPainter = () => {
+  const fp = formatPainter.value;
+  if (!fp || !editor.value) return;
+  const { from, to } = editor.value.state.selection;
+  if (from === to) return;
+  let chain = editor.value.chain().focus().setTextSelection({ from, to }).unsetAllMarks();
+  fp.marks.forEach(({ type, attrs }) => {
+    chain = chain.setMark(type, attrs);
+  });
+  chain.run();
+};
+
+// 拖拽选中文本期间 selectionUpdate 会连续触发（第一次可能只选中一个字符），
+// 因此鼠标按下期间跳过，等 mouseup 选区稳定后再统一应用
+let painterMouseDown = false;
+
+const applyPainterOnce = () => {
+  const fp = formatPainter.value;
+  if (!fp || !editor.value) return;
+  const sel = editor.value.state.selection;
+  if (sel.empty) return;
+  applyFormatPainter();
+  if (!fp.sticky) formatPainter.value = null;
+};
+
+const handlePainterSelectionUpdate = () => {
+  if (painterMouseDown) return;
+  applyPainterOnce();
+};
+
+const handlePainterMouseDown = () => {
+  painterMouseDown = true;
+};
+
+const handlePainterMouseUp = () => {
+  painterMouseDown = false;
+  applyPainterOnce();
+};
+
+const handlePainterKeydown = (e) => {
+  if (e.key === 'Escape') formatPainter.value = null;
+};
+
+// 监听选区变化与鼠标释放以应用格式
+watch(editor, (instance) => {
+  if (!instance) return;
+  instance.on('selectionUpdate', handlePainterSelectionUpdate);
+  const dom = instance.view.dom;
+  dom.addEventListener('mousedown', handlePainterMouseDown);
+  dom.addEventListener('mouseup', handlePainterMouseUp);
+}, { immediate: true });
+
+// 激活时监听 Esc 退出复用模式
+watch(formatPainter, (fp) => {
+  const dom = editor.value?.view.dom;
+  if (fp) {
+    dom?.addEventListener('keydown', handlePainterKeydown);
+  } else {
+    dom?.removeEventListener('keydown', handlePainterKeydown);
+  }
+});
 
 const setTextColor = (color) => {
   if (!color || color === 'inherit' || color === 'transparent') {
@@ -3584,6 +3752,48 @@ const fixEmptyTableCells = (html) => {
 
 .highlight-grid {
   grid-template-columns: repeat(10, 1fr);
+}
+
+/* 无背景色块（紧凑，替代原整行按钮）：白底空色块 */
+.no-bg-option {
+  background-color: #fff;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme='dark'] .no-bg-option {
+  background-color: #f3f4f6;
+  border-color: #4b5563 !important;
+}
+
+.highlight-recent-divider {
+  height: 1px;
+  margin: 2px 10px 6px;
+  background: var(--border-color, #e5e7eb);
+}
+
+/* 工具栏按钮上的当前颜色指示条 */
+.highlight-toggle {
+  position: relative;
+}
+
+.highlight-current-color {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+[data-theme='dark'] .highlight-current-color {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.highlight-toggle .dropdown-arrow {
+  cursor: pointer;
 }
 
 .editor-content {

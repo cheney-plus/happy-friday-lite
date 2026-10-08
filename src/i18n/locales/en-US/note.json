@@ -90,6 +90,7 @@
     "underline": "Underline",
     "strike": "Strikethrough",
     "strikethrough": "Strikethrough",
+    "formatPainter": "Format painter (double-click to reuse)",
     "backgroundColor": "Background color",
     "noBackground": "No background",
     "cancelHighlight": "Cancel highlight",

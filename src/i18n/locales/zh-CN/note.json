@@ -90,6 +90,7 @@
     "underline": "下划线",
     "strike": "删除线",
     "strikethrough": "删除线",
+    "formatPainter": "格式刷（双击可复用）",
     "backgroundColor": "背景颜色",
     "noBackground": "无背景",
     "cancelHighlight": "取消高亮",
