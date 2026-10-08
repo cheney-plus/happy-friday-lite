@@ -4713,6 +4713,14 @@ const fixEmptyTableCells = (html) => {
   flex: 1;
   overflow-y: auto;
   padding: 16px 0;
+  /* 全局 main.css 设置了 * { user-select: none }，这里强制覆盖以允许选中复制 AI 输出 */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.sidebar-messages :deep(*) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .sidebar-messages::-webkit-scrollbar {

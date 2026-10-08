@@ -400,6 +400,9 @@ watch(() => props.visible, (val) => {
   max-height: 200px;
   overflow-y: auto;
   word-break: break-word;
+  /* 全局 main.css 设置了 * { user-select: none }，这里强制覆盖以允许选中和复制 */
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
 .bubble-text :deep(p) {
