@@ -5,6 +5,7 @@
         v-for="(quad, qIdx) in quadrantDefs"
         :key="quad.key"
         :class="['quadrant-card', `q-${quad.key}`]"
+        @dblclick="onQuadrantDblClick(quad.key)"
       >
         <header class="quadrant-header">
           <span class="quadrant-badge">{{ qIdx + 1 }}</span>
@@ -18,7 +19,7 @@
               :key="group.key"
               class="task-group"
             >
-              <div class="group-header" @click="toggleGroup(qIdx, group.key)">
+              <div class="group-header" @click="toggleGroup(qIdx, group.key)" @dblclick.stop>
                 <svg
                   class="group-chevron"
                   :class="{ collapsed: isGroupCollapsed(qIdx, group.key) }"
@@ -36,6 +37,7 @@
                   :key="ev.id"
                   :class="['task-row', { completed: ev.completed }]"
                   @click="openDetail(ev)"
+                  @dblclick.stop
                 >
                   <button class="task-checkbox" @click.stop="toggleComplete(ev)">
                     <svg v-if="ev.completed" width="16" height="16" viewBox="0 0 24 24" :fill="quad.color" stroke="white" stroke-width="2">
@@ -69,7 +71,7 @@ import { useScheduleStore, normalizePriority } from '@/store/modules/schedule';
 import { useCalendarHelpers } from './utils/calendarHelpers';
 
 const { t } = useI18n();
-const emit = defineEmits(['open-event']);
+const emit = defineEmits(['open-event', 'create-event']);
 const scheduleStore = useScheduleStore();
 const { getMonthDayLabel } = useCalendarHelpers();
 
@@ -152,9 +154,14 @@ const quadrantDefs = computed(() => {
 
 function sortItems(list) {
   return [...list].sort((a, b) => {
+    // 无日期的固定排最前；同日期按开始时间先后（无具体时间的排当日最前）
+    if (!a.start && !b.start) return 0;
+    if (!a.start) return -1;
+    if (!b.start) return 1;
     if (a.start !== b.start) return a.start < b.start ? -1 : 1;
-    if (a.startTime && b.startTime) return a.startTime < b.startTime ? -1 : 1;
-    return 0;
+    const at = a.startTime || '';
+    const bt = b.startTime || '';
+    return at < bt ? -1 : at > bt ? 1 : 0;
   });
 }
 
@@ -205,6 +212,11 @@ function dateClass(ev) {
 
 function openDetail(ev) {
   emit('open-event', ev);
+}
+
+// 双击象限空白处新建日程，自动带入该象限对应的优先级
+function onQuadrantDblClick(quadKey) {
+  emit('create-event', quadKey === 'neither' ? 'minor' : quadKey);
 }
 
 async function toggleComplete(ev) {

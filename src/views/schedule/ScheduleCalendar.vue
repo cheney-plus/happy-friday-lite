@@ -234,7 +234,7 @@
       <ScheduleTaskList v-else-if="currentView === 'list'" @open-event="onEventClick" />
 
       <!-- Quadrant View（四象限） -->
-      <ScheduleQuadrant v-else-if="currentView === 'quadrant'" @open-event="onEventClick" />
+      <ScheduleQuadrant v-else-if="currentView === 'quadrant'" @open-event="onEventClick" @create-event="onQuadrantCreate" />
     </div>
 
     <!-- 新建/编辑日程弹窗 -->
@@ -1055,6 +1055,11 @@ const eventModalRef = ref(null);
 
 function openCreateModal(startDate, endDate, startTime, endTime, allDay) {
   eventModalRef.value?.open({ start: startDate, end: endDate, startTime, endTime, allDay });
+}
+
+// 四象限双击新建：自动带入该象限对应的优先级
+function onQuadrantCreate(priority) {
+  eventModalRef.value?.open({ priority });
 }
 
 async function onModalSave(eventData) {

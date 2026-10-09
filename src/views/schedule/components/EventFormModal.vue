@@ -256,7 +256,7 @@ function open(initial = {}) {
       color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
       reminder: false,
       completed: false,
-      priority: DEFAULT_EVENT_PRIORITY,
+      priority: initial.priority || DEFAULT_EVENT_PRIORITY,
     });
   }
   visible.value = true;
