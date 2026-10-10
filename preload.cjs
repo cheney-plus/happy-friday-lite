@@ -135,6 +135,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-list-skills',
       'agent-delete-skill',
       'agent-import-skill',
+      'agent-restore-builtin-skills',
       'mcp-list-servers',
       'mcp-add-servers',
       'mcp-delete-server',

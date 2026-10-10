@@ -13,7 +13,11 @@
     "delete": "Delete",
     "importFailed": "Import failed",
     "deleteFailed": "Delete failed",
-    "duplicate": "A skill with the same name already exists"
+    "duplicate": "A skill with the same name already exists",
+    "restoreBuiltin": "Restore Built-in Skills",
+    "builtinBadge": "Built-in",
+    "restoredCount": "Restored {count} built-in skills",
+    "restoreFailed": "Restore failed"
   },
   "mcp": {
     "title": "MCP Connection",

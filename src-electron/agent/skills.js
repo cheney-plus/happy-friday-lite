@@ -45,6 +45,19 @@ const __dirname = path.dirname(__filename)
 // skills.js 位于 {项目根}/src-electron/agent/，故需上溯 2 级到达项目根
 const BUILTIN_SKILLS_SRC_DIR = path.resolve(__dirname, '..', '..', 'public', 'skills')
 
+// 内置技能清单：这些技能随应用内置（public/skills/ 同名目录），
+// 用户不可删除；被删除后可通过"恢复默认 SKILL"重新还原
+export const BUILTIN_SKILLS = ['docx', 'marp-slide', 'pdf', 'pptx', 'skill-creator', 'xlsx']
+
+/**
+ * 判断指定技能是否为内置技能
+ * @param {string} id 技能标识（SKILL 目录名）
+ * @returns {boolean}
+ */
+export function isBuiltinSkill(id) {
+  return BUILTIN_SKILLS.includes(id)
+}
+
 /**
  * 获取 SKILL 目录路径
  * @returns {string}
@@ -280,7 +293,8 @@ export function listSkills() {
             name: meta.name || entry.name,
             description: meta.description,
             path: `/SKILL/${entry.name}/SKILL.md`,
-            fileName: `${entry.name}/SKILL.md`
+            fileName: `${entry.name}/SKILL.md`,
+            builtin: isBuiltinSkill(entry.name)
           })
         } catch (e) {
           log.warn(`读取 Skill 文件失败: ${entry.name}/SKILL.md`, e.message)
@@ -318,6 +332,10 @@ export function generateSkillIndex() {
  * @returns {{ success: boolean, error?: string }}
  */
 export function deleteSkill(id) {
+  // 内置技能不可删除
+  if (isBuiltinSkill(id)) {
+    return { success: false, builtin: true, error: '内置技能不可删除' }
+  }
   // 安全校验：id 必须是单一路径分量，禁止任何目录穿越
   if (!id || id !== path.basename(id) || id === '.' || id === '..') {
     return { success: false, error: '非法的 Skill 标识' }
@@ -412,6 +430,52 @@ export function importSkill(srcDir) {
     log.warn(`导入 Skill 失败: ${e.message}`)
     return { success: false, error: e.message }
   }
+}
+
+/**
+ * 恢复默认（内置）技能
+ *
+ * 将 BUILTIN_SKILLS 清单中的技能从 public/skills/ 重新复制到用户 SKILL 目录，
+ * 已存在同名目录时先移除再复制（以源为唯一基准）。用于用户误删内置技能后的一键还原。
+ *
+ * @returns {{ success: boolean, restored: string[], error?: string }}
+ */
+export function restoreBuiltinSkills() {
+  ensureSkillDir()
+  const skillDir = getSkillDir()
+  const restored = []
+
+  if (!fs.existsSync(BUILTIN_SKILLS_SRC_DIR)) {
+    return { success: false, restored, error: '内置技能源目录不存在' }
+  }
+
+  for (const name of BUILTIN_SKILLS) {
+    const srcDir = path.join(BUILTIN_SKILLS_SRC_DIR, name)
+    if (!fs.existsSync(path.join(srcDir, 'SKILL.md'))) {
+      log.warn(`恢复内置技能失败：源不存在 ${name}`)
+      continue
+    }
+    try {
+      const destDir = path.join(skillDir, name)
+      if (fs.existsSync(destDir)) {
+        fs.rmSync(destDir, { recursive: true, force: true })
+      }
+      copyDirRecursive(srcDir, destDir)
+      restored.push(name)
+    } catch (e) {
+      log.warn(`恢复内置技能失败: ${name}`, e.message)
+    }
+  }
+
+  // 更新版本标记，避免下次启动因签名差异重复同步
+  try {
+    fs.writeFileSync(path.join(skillDir, '.builtin-synced'), computeBuiltinSignature(), 'utf-8')
+  } catch (_e) {
+    /* 标记写入失败不影响恢复结果 */
+  }
+  generateSkillIndex()
+  log.info(`已恢复内置技能: ${restored.length} 个 (${restored.join(', ')})`)
+  return { success: true, restored }
 }
 
 /**
