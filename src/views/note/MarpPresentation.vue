@@ -61,7 +61,12 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
+import katex from 'katex';
 import katexCss from 'katex/dist/katex.min.css?raw';
+import hljsCss from 'highlight.js/styles/github.css?raw';
+import marpDefaultTheme from '@/assets/marp-themes/default.css?raw';
+import marpGaiaTheme from '@/assets/marp-themes/gaia.css?raw';
+import marpUncoverTheme from '@/assets/marp-themes/uncover.css?raw';
 import { ChevronLeft, ChevronRight, CircleAlert, Loader2, Maximize, Minimize, Presentation, RefreshCw, X } from 'lucide-vue-next';
 
 const SLIDE_W = 1280;
@@ -208,21 +213,74 @@ const splitByHeadings = (markdown) => {
 
 /* ---------------- 官方 Marp 引擎渲染 ---------------- */
 
-// 懒加载 @marp-team/marp-core（体积较大，避免拖慢首屏）
-let marpInstance = null;
-const getMarp = async () => {
-  if (!marpInstance) {
-    const { Marp } = await import('@marp-team/marp-core');
-    marpInstance = new Marp({ html: true, math: 'katex' });
-  }
-  return marpInstance;
+// 懒加载 @marp-team/marpit（Marp 官方规范引擎）+ highlight.js + emoji 插件，
+// 相比 marp-core 体积更小（去除 MathJax，数学公式复用项目内 KaTeX）
+let marpitInstance = null;
+const getMarpit = async () => {
+  if (marpitInstance) return marpitInstance;
+  const [{ Marpit }, hljsModule, emojiModule] = await Promise.all([
+    import('@marp-team/marpit'),
+    import('highlight.js/lib/common'),
+    import('markdown-it-emoji'),
+  ]);
+  const hljs = hljsModule.default;
+  const escapeHtml = (code) => code.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  marpitInstance = new Marpit({
+    html: true,
+    inlineSVG: true,
+    markdown: {
+      highlight: (code, lang) => {
+        if (lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(code, { language: lang }).value;
+          } catch (_e) {
+            /* 高亮失败回退转义 */
+          }
+        }
+        return escapeHtml(code);
+      },
+    },
+  });
+  marpitInstance.markdown.use(emojiModule.full);
+  // 注册 Marp 官方内置主题（marpit 本体不包含，缺失会导致界面回退为极简默认样式）
+  marpitInstance.themeSet.add(marpDefaultTheme);
+  marpitInstance.themeSet.add(marpGaiaTheme);
+  marpitInstance.themeSet.add(marpUncoverTheme);
+  return marpitInstance;
 };
+
+// 数学公式：渲染前替换为占位符（避免 markdown 引擎破坏 LaTeX），渲染后用 KaTeX 还原
+const extractMathSegments = (markdown) => {
+  const mathSegments = [];
+  let md = markdown.replace(/\$\$([\s\S]+?)\$\$/g, (_m, latex) => {
+    mathSegments.push({ latex: latex.trim(), display: true });
+    return `MATHSEG${mathSegments.length - 1}END`;
+  });
+  md = md.replace(/\$([^$\n]+?)\$/g, (_m, latex) => {
+    mathSegments.push({ latex: latex.trim(), display: false });
+    return `MATHSEG${mathSegments.length - 1}END`;
+  });
+  return { md, mathSegments };
+};
+
+const renderMathInHtml = (html, mathSegments) =>
+  html.replace(/MATHSEG(\d+)END/g, (_m, index) => {
+    const seg = mathSegments[Number(index)];
+    if (!seg) return '';
+    try {
+      return katex.renderToString(seg.latex, { displayMode: seg.display, throwOnError: false });
+    } catch {
+      return seg.latex;
+    }
+  });
 
 const buildSrcdoc = (html, css) =>
   `<!DOCTYPE html><html><head><meta charset="utf-8">` +
   `<style>html,body{margin:0;padding:0;overflow:hidden}svg[data-marpit-svg]{display:block;vertical-align:top}` +
-  `.marp-slides-wrap{transition:transform .32s ease;will-change:transform}</style>` +
-  `<style>${css}</style><style>${katexCss}</style></head>` +
+  `.marp-slides-wrap{transition:transform .32s ease;will-change:transform}` +
+  `.marp-slides-wrap .marpit{display:flex}` +
+  `.marp-slides-wrap svg[data-marpit-svg]{flex:0 0 ${SLIDE_W}px;width:${SLIDE_W}px;height:${SLIDE_H}px}</style>` +
+  `<style>${css}</style><style>${hljsCss}</style><style>${katexCss}</style></head>` +
   `<body><div class="marp-slides-wrap">${html}</div></body></html>`;
 
 const buildSlides = async () => {
@@ -246,8 +304,10 @@ const buildSlides = async () => {
     if (!hasFrontMatter && blocks.length === 1) blocks = splitByHeadings(body);
     const md = hasFrontMatter ? markdown : blocks.length > 1 ? blocks.join('\n\n---\n\n') : markdown;
 
-    const marp = await getMarp();
-    const { html, css } = marp.render(md, { html: true });
+    const { md: mathMd, mathSegments } = extractMathSegments(md);
+    const marpit = await getMarpit();
+    const { html: rawHtml, css } = marpit.render(mathMd);
+    const html = renderMathInHtml(rawHtml, mathSegments);
 
     const doc = new DOMParser().parseFromString(html, 'text/html');
     slideCount.value = doc.querySelectorAll('section').length || 1;
@@ -287,7 +347,7 @@ const applySlideOffset = (animate = true) => {
   const wrap = iframeRef.value?.contentDocument?.querySelector('.marp-slides-wrap');
   if (!wrap) return;
   if (!animate) wrap.style.transition = 'none';
-  wrap.style.transform = `translateY(-${current.value * SLIDE_H}px)`;
+  wrap.style.transform = `translateX(-${current.value * SLIDE_W}px)`;
   if (!animate) {
     // 强制 reflow 后恢复过渡动画
     void wrap.offsetHeight;
