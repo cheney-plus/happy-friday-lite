@@ -18,24 +18,39 @@
       </div>
 
       <div class="marp-controls">
-        <button class="marp-nav-btn" :disabled="current <= 0" @click="prev" :title="t('note.presentation.prev')">
-          <ChevronLeft :size="18" :stroke-width="2" />
-        </button>
+        <div class="tooltip-wrapper">
+          <button class="marp-nav-btn" :disabled="current <= 0" @click="prev" :title="t('note.presentation.prev')">
+            <ChevronLeft :size="18" :stroke-width="2" />
+          </button>
+          <span class="tooltip">{{ t('note.presentation.prev') }}</span>
+        </div>
         <span class="marp-counter">{{ slideCount ? current + 1 : 0 }} / {{ slideCount }}</span>
-        <button class="marp-nav-btn" :disabled="current >= slideCount - 1" @click="next" :title="t('note.presentation.next')">
-          <ChevronRight :size="18" :stroke-width="2" />
-        </button>
+        <div class="tooltip-wrapper">
+          <button class="marp-nav-btn" :disabled="current >= slideCount - 1" @click="next" :title="t('note.presentation.next')">
+            <ChevronRight :size="18" :stroke-width="2" />
+          </button>
+          <span class="tooltip">{{ t('note.presentation.next') }}</span>
+        </div>
         <div class="marp-controls-divider"></div>
-        <button class="marp-nav-btn" @click="toggleFullscreen" :title="isFullscreen ? t('note.presentation.exitFullscreen') : t('note.presentation.fullscreen')">
-          <Minimize v-if="isFullscreen" :size="16" :stroke-width="2" />
-          <Maximize v-else :size="16" :stroke-width="2" />
-        </button>
-        <button class="marp-nav-btn" :disabled="generating" :title="t('note.presentation.regenerate')" @click="emit('regenerate')">
-          <RefreshCw :size="16" :stroke-width="2" :class="{ 'marp-spin-icon': generating }" />
-        </button>
-        <button class="marp-nav-btn marp-exit-btn" :title="t('note.presentation.exit')" @click="emit('close')">
-          <X :size="16" :stroke-width="2" />
-        </button>
+        <div class="tooltip-wrapper">
+          <button class="marp-nav-btn marp-exit-btn" :title="t('note.presentation.exit')" @click="emit('close')">
+            <X :size="16" :stroke-width="2" />
+          </button>
+          <span class="tooltip">{{ t('note.presentation.exit') }}</span>
+        </div>
+        <div class="tooltip-wrapper">
+          <button class="marp-nav-btn" :disabled="generating" :title="t('note.presentation.regenerate')" @click="emit('regenerate')">
+            <RefreshCw :size="16" :stroke-width="2" :class="{ 'marp-spin-icon': generating }" />
+          </button>
+          <span class="tooltip">{{ t('note.presentation.regenerate') }}</span>
+        </div>
+        <div class="tooltip-wrapper">
+          <button class="marp-nav-btn" @click="toggleFullscreen" :title="isFullscreen ? t('note.presentation.exitFullscreen') : t('note.presentation.fullscreen')">
+            <Minimize v-if="isFullscreen" :size="16" :stroke-width="2" />
+            <Maximize v-else :size="16" :stroke-width="2" />
+          </button>
+          <span class="tooltip">{{ isFullscreen ? t('note.presentation.exitFullscreen') : t('note.presentation.fullscreen') }}</span>
+        </div>
       </div>
 
       <div v-if="loading" class="marp-loading">
@@ -490,6 +505,35 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(6px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   z-index: 5;
+  /* 悬浮提示显示在控制栏上方，避免被裁剪 */
+  overflow: visible;
+}
+
+/* 按钮悬浮提示（与 NoteEditor 工具栏样式一致，显示在按钮上方） */
+.tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip-wrapper .tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  z-index: 1000;
+}
+
+.tooltip-wrapper:hover .tooltip {
+  opacity: 1;
 }
 
 .marp-nav-btn {

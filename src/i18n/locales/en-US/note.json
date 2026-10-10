@@ -200,7 +200,7 @@
     "emptyHint": "Master, I can use the writing Agent to help you modify this note",
     "quickPromptSummarize": "Summarize this note for me",
     "quickPromptTranslate": "Translate this note into English",
-    "quickPromptPolish": "Polish this note for me",
+    "quickPromptPolish": "Use SKILL to convert this note into presentation mode. Extract the core content and skip the details",
     "inputPlaceholder": "Type a message...",
     "noModelConfigured": "No model configured, please add your model in settings",
     "referenceContent": "Referenced note content:",
