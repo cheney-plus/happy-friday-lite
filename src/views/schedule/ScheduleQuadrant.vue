@@ -53,6 +53,12 @@
                     <span v-if="!ev.allDay && ev.startTime" class="task-time">{{ ev.startTime }}</span>
                     <span v-if="dateLabel(ev)" class="task-date" :class="dateClass(ev)">{{ dateLabel(ev) }}</span>
                   </span>
+                  <button class="task-delete" :title="t('schedule.delete')" @click.stop="deleteEvent(ev)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
@@ -148,26 +154,31 @@ const quadrantDefs = computed(() => {
     ...def,
     groups: groupOrder
       .filter(gKey => buckets[qIdx].has(gKey))
-      .map(gKey => ({ key: gKey, label: groupLabel(gKey), items: sortItems(buckets[qIdx].get(gKey)) })),
+      // 待完成/已过期按时间降序排列，已完成保持升序
+      .map(gKey => ({ key: gKey, label: groupLabel(gKey), items: sortItems(buckets[qIdx].get(gKey), gKey !== 'completed') })),
   }));
 });
 
-function sortItems(list) {
+function sortItems(list, descending = false) {
+  const dir = descending ? -1 : 1;
   return [...list].sort((a, b) => {
-    // 无日期的固定排最前；同日期按开始时间先后（无具体时间的排当日最前）
+    // 无日期的固定排最前；同日期按开始时间排序（无具体时间的排当日最前）
     if (!a.start && !b.start) return 0;
     if (!a.start) return -1;
     if (!b.start) return 1;
-    if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+    if (a.start !== b.start) return (a.start < b.start ? -1 : 1) * dir;
     const at = a.startTime || '';
     const bt = b.startTime || '';
-    return at < bt ? -1 : at > bt ? 1 : 0;
+    if (!at && !bt) return 0;
+    if (!at) return -1;
+    if (!bt) return 1;
+    return (at < bt ? -1 : at > bt ? 1 : 0) * dir;
   });
 }
 
 // ========== 分组折叠 ==========
-// 待完成默认展开，已过期/已完成默认收缩（仍可手动切换）
-const DEFAULT_COLLAPSED = ['overdue', 'completed'];
+// 待完成/已过期默认展开，已完成默认收缩（仍可手动切换）
+const DEFAULT_COLLAPSED = ['completed'];
 const collapsedGroups = ref(new Set(
   [0, 1, 2, 3].flatMap(qIdx => DEFAULT_COLLAPSED.map(g => `${qIdx}:${g}`))
 ));
@@ -221,6 +232,13 @@ function onQuadrantDblClick(quadKey) {
 
 async function toggleComplete(ev) {
   await scheduleStore.updateEvent(ev.id, { completed: !ev.completed });
+}
+
+// 删除日程（带确认），同 EventFormModal 的确认方式
+function deleteEvent(ev) {
+  if (window.confirm(t('schedule.confirmDelete'))) {
+    scheduleStore.removeEvent(ev.id);
+  }
 }
 
 // 定时刷新当前时间：视图停留时已到时的日程能自动归入"已过期"
@@ -508,6 +526,32 @@ onActivated(() => {
 
 .task-date.dim {
   color: var(--text-tertiary);
+}
+
+/* 删除按钮：默认隐藏，悬停任务行时显现 */
+.task-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.task-row:hover .task-delete {
+  opacity: 1;
+  visibility: visible;
+}
+
+.task-delete:hover {
+  color: var(--quadrant-red-text);
 }
 
 /* ========== 深色主题 ========== */
