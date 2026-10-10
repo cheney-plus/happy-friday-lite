@@ -117,7 +117,18 @@
     "exporting": "导出中...",
     "exportPdf": "导出 PDF",
     "exportMarkdown": "导出 Markdown",
+    "presentation": "切换演示文档",
     "fridayAssistant": "Friday 助理"
+  },
+  "presentation": {
+    "prev": "上一页",
+    "next": "下一页",
+    "exit": "退出演示",
+    "fullscreen": "全屏展示",
+    "exitFullscreen": "退出全屏",
+    "loading": "正在渲染演示文档...",
+    "empty": "暂无可演示的内容",
+    "renderError": "演示文档渲染失败"
   },
   "table": {
     "toolbarLabel": "表格工具",

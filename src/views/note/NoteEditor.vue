@@ -299,6 +299,13 @@
       <!-- 右侧功能按钮组 -->
       <div ref="toolbarRightRef" class="toolbar-right-group">
         <div class="tooltip-wrapper">
+          <button class="toolbar-btn" :class="{ active: showPresentation }" @click="togglePresentation">
+            <Repeat :size="15" :stroke-width="2" />
+          </button>
+          <span class="tooltip">{{ t('note.toolbar.presentation') }}</span>
+        </div>
+
+        <div class="tooltip-wrapper">
           <button class="toolbar-btn" @click="handleAddContent">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
@@ -412,7 +419,9 @@
       <span class="toc-char">{{ t('note.toc.char2') }}</span>
     </div>
 
-    <EditorContent ref="editorContentRef" :editor="editor" class="editor-content" />
+    <EditorContent v-show="!showPresentation" ref="editorContentRef" :editor="editor" class="editor-content" />
+
+    <MarpPresentation v-if="showPresentation" :source="presentationSource" @close="showPresentation = false" />
 
     <div
       v-if="fimCompletionVisible && fimCompletionText"
@@ -693,7 +702,7 @@ import {
   Highlighter, Image as ToolbarImage, Italic, Link2, List, ListChecks, ListOrdered,
   Columns3, Combine, Minus, Palette, PanelLeft, PanelTop, Quote, Redo2, Rows3, Sigma, Split,
   PaintRoller,
-  Strikethrough, Table2, Trash2, Underline as ToolbarUnderline, Undo2,
+  Repeat, Strikethrough, Table2, Trash2, Underline as ToolbarUnderline, Undo2,
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
@@ -745,6 +754,7 @@ import ini from 'highlight.js/lib/languages/ini';
 import diff from 'highlight.js/lib/languages/diff';
 import { VueNodeViewRenderer } from '@tiptap/vue-3';
 import CodeBlockComponent from './CodeBlockComponent.vue';
+import MarpPresentation from './MarpPresentation.vue';
 import NoteBubbleMenu from './NoteBubbleMenu.vue';
 import KbDirSelectDialog from '@/views/knowledge/components/KbDirSelectDialog.vue';
 import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue';
@@ -949,6 +959,18 @@ const showTextColorMenu = ref(false);
 const showHeadingMenu = ref(false);
 const showTableSubmenu = ref(false);
 const showMoreMenu = ref(false);
+const showPresentation = ref(false);
+const presentationSource = ref('');
+
+const togglePresentation = () => {
+  if (showPresentation.value) {
+    showPresentation.value = false;
+    return;
+  }
+  if (!editor.value) return;
+  presentationSource.value = editor.value.getHTML();
+  showPresentation.value = true;
+};
 const showToolbarOverflow = ref(false);
 const toolbarOverflowColor = ref(null);
 const toolbarRef = ref(null);

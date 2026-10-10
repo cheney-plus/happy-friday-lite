@@ -117,7 +117,18 @@
     "exporting": "Exporting...",
     "exportPdf": "Export PDF",
     "exportMarkdown": "Export Markdown",
+    "presentation": "Switch to presentation",
     "fridayAssistant": "Friday Assistant"
+  },
+  "presentation": {
+    "prev": "Previous slide",
+    "next": "Next slide",
+    "exit": "Exit presentation",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "loading": "Rendering presentation...",
+    "empty": "Nothing to present",
+    "renderError": "Failed to render presentation"
   },
   "table": {
     "toolbarLabel": "Table tools",
