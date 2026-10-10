@@ -118,6 +118,7 @@
     "exportPdf": "Export PDF",
     "exportMarkdown": "Export Markdown",
     "presentation": "Switch to presentation",
+    "backToEdit": "Switch to edit mode",
     "fridayAssistant": "Friday Assistant"
   },
   "presentation": {

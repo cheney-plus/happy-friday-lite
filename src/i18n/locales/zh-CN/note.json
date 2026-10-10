@@ -117,7 +117,8 @@
     "exporting": "导出中...",
     "exportPdf": "导出 PDF",
     "exportMarkdown": "导出 Markdown",
-    "presentation": "切换演示文档",
+    "presentation": "切换演示模式",
+    "backToEdit": "切换编辑模式",
     "fridayAssistant": "Friday 助理"
   },
   "presentation": {

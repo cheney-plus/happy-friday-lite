@@ -24,11 +24,10 @@
           <Minimize v-if="isFullscreen" :size="16" :stroke-width="2" />
           <Maximize v-else :size="16" :stroke-width="2" />
         </button>
+        <button class="marp-nav-btn marp-exit-btn" :title="t('note.presentation.exit')" @click="emit('close')">
+          <X :size="16" :stroke-width="2" />
+        </button>
       </div>
-
-      <button class="marp-exit-btn" :title="t('note.presentation.exit')" @click="emit('close')">
-        <X :size="16" :stroke-width="2" />
-      </button>
 
       <div v-if="loading" class="marp-loading">{{ t('note.presentation.loading') }}</div>
       <div v-else-if="renderError" class="marp-error">{{ renderError }}</div>
@@ -706,26 +705,8 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.25);
 }
 
-.marp-exit-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(20, 26, 34, 0.78);
-  color: #dfe6ee;
-  cursor: pointer;
-  transition: background 0.15s;
-  z-index: 5;
-
-  &:hover {
-    background: rgba(220, 60, 60, 0.85);
-  }
+.marp-exit-btn:hover:not(:disabled) {
+  background: rgba(220, 60, 60, 0.85);
 }
 
 .marp-loading,

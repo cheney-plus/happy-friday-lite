@@ -302,7 +302,7 @@
           <button class="toolbar-btn" :class="{ active: showPresentation }" @click="togglePresentation">
             <Repeat :size="15" :stroke-width="2" />
           </button>
-          <span class="tooltip">{{ t('note.toolbar.presentation') }}</span>
+          <span class="tooltip">{{ showPresentation ? t('note.toolbar.backToEdit') : t('note.toolbar.presentation') }}</span>
         </div>
 
         <div class="tooltip-wrapper">
