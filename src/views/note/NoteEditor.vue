@@ -421,7 +421,7 @@
 
     <EditorContent v-show="!showPresentation" ref="editorContentRef" :editor="editor" class="editor-content" />
 
-    <MarpPresentation v-if="showPresentation" :source="presentationSource" @close="showPresentation = false" />
+    <MarpPresentation v-if="showPresentation" :source="presentationSource" :format="presentationFormat" @close="showPresentation = false" />
 
     <div
       v-if="fimCompletionVisible && fimCompletionText"
@@ -761,6 +761,7 @@ import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue'
 import KbFileDialog from '@/views/knowledge/components/KbFileDialog.vue';
 import { DEFAULT_CATEGORIES } from '@/views/knowledge/constants';
 import { useAppStore } from '@/store';
+import { useNoteStore } from '@/store/modules/note';
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import { CellSelection } from '@tiptap/pm/tables';
@@ -961,6 +962,8 @@ const showTableSubmenu = ref(false);
 const showMoreMenu = ref(false);
 const showPresentation = ref(false);
 const presentationSource = ref('');
+const presentationFormat = ref('html');
+const noteStore = useNoteStore();
 
 const togglePresentation = () => {
   if (showPresentation.value) {
@@ -968,7 +971,10 @@ const togglePresentation = () => {
     return;
   }
   if (!editor.value) return;
-  presentationSource.value = editor.value.getHTML();
+  // 仅使用笔记的 marpContent（Marp Markdown 源），为空时显示空演示
+  const note = noteStore.notes.find(n => n.id === props.noteId);
+  presentationSource.value = note?.marpContent || '';
+  presentationFormat.value = 'markdown';
   showPresentation.value = true;
 };
 const showToolbarOverflow = ref(false);

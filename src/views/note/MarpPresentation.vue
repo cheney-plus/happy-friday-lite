@@ -29,9 +29,18 @@
         </button>
       </div>
 
-      <div v-if="loading" class="marp-loading">{{ t('note.presentation.loading') }}</div>
-      <div v-else-if="renderError" class="marp-error">{{ renderError }}</div>
-      <div v-else-if="!slides.length" class="marp-empty">{{ t('note.presentation.empty') }}</div>
+      <div v-if="loading" class="marp-loading">
+        <Loader2 :size="28" :stroke-width="2" class="marp-loading-icon" />
+        <span>{{ t('note.presentation.loading') }}</span>
+      </div>
+      <div v-else-if="renderError" class="marp-error">
+        <CircleAlert :size="28" :stroke-width="2" />
+        <span>{{ renderError }}</span>
+      </div>
+      <div v-else-if="!slides.length" class="marp-empty">
+        <Presentation :size="52" :stroke-width="1.5" />
+        <span>{{ t('note.presentation.empty') }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -41,7 +50,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import katex from 'katex';
-import { ChevronLeft, ChevronRight, Maximize, Minimize, X } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, CircleAlert, Loader2, Maximize, Minimize, Presentation, X } from 'lucide-vue-next';
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
@@ -50,8 +59,9 @@ const STAGE_PADDING = 0;
 const { t } = useI18n();
 
 const props = defineProps({
-  // 编辑器的 HTML 内容（NoteEditor 的 getHTML() 结果）
+  // 演示内容：format 为 'html' 时是编辑器 HTML（内部转 Markdown），'markdown' 时直接是 Marp Markdown 源
   source: { type: String, default: '' },
+  format: { type: String, default: 'html' },
 });
 
 const emit = defineEmits(['close']);
@@ -235,7 +245,9 @@ const buildSlides = async () => {
   slides.value = [];
   current.value = 0;
   try {
-    const markdown = await htmlToMarkdown(props.source);
+    const markdown = props.format === 'markdown'
+      ? (props.source || '')
+      : await htmlToMarkdown(props.source);
     if (!markdown.trim()) {
       slides.value = [];
       return;
@@ -710,19 +722,49 @@ onBeforeUnmount(() => {
 }
 
 .marp-loading,
-.marp-error,
 .marp-empty {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: rgba(223, 230, 238, 0.6);
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: #24292e;
+  font-size: 15px;
   user-select: none;
+
+  svg {
+    opacity: 0.45;
+  }
+}
+
+.marp-loading-icon {
+  animation: marp-spin 1.2s linear infinite;
+}
+
+@keyframes marp-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .marp-error {
-  color: #ff9c9c;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #c0392b;
+  font-size: 15px;
+  user-select: none;
+
+  svg {
+    opacity: 0.7;
+  }
 }
 
 .marp-slide-fade-enter-active,

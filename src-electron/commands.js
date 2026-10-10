@@ -503,7 +503,7 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('update_note', (_event, args) => {
     const oldNote = db.getNote(args.noteId)
-    const updated = db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId)
+    const updated = db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId, args.marpContent)
     // 标题变更时同步重命名关联的 .note 文件
     if (updated && oldNote && oldNote.title !== updated.title) {
       syncNoteRefOnRename(args.noteId, updated.title)

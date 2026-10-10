@@ -97,8 +97,8 @@ export const useNoteStore = defineStore('note', {
       this.currentNoteId = noteId
     },
 
-    scheduleSave(noteId, title, content, contentText) {
-      this._pendingSave = { noteId, title, content, contentText }
+    scheduleSave(noteId, title, content, contentText, marpContent) {
+      this._pendingSave = { noteId, title, content, contentText, marpContent }
 
       if (this._saveTimer) {
         clearTimeout(this._saveTimer)
@@ -135,13 +135,17 @@ export const useNoteStore = defineStore('note', {
           title: pending.title,
           content: pending.content,
           contentText: pending.contentText,
-          notebookId
+          notebookId,
+          ...(pending.marpContent !== undefined ? { marpContent: pending.marpContent } : {})
         })
 
         if (note) {
           note.title = pending.title
           note.content = pending.content
           note.contentText = pending.contentText
+          if (pending.marpContent !== undefined) {
+            note.marpContent = pending.marpContent
+          }
           note.updatedAt = new Date().toISOString()
         }
       } finally {

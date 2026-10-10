@@ -126,11 +126,19 @@ async function initDatabase() {
       title TEXT NOT NULL DEFAULT '新建笔记',
       content TEXT NOT NULL DEFAULT '',
       contentText TEXT NOT NULL DEFAULT '',
+      marpContent TEXT NOT NULL DEFAULT '',
       isDeleted INTEGER NOT NULL DEFAULT 0,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
   `)
+
+  // 迁移：为旧版 notes 表补充 marpContent 列（Marp 演示内容，默认为空）
+  try {
+    db.run("ALTER TABLE notes ADD COLUMN marpContent TEXT NOT NULL DEFAULT ''")
+  } catch (_e) {
+    // 列已存在，忽略
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS notebooks (
@@ -660,6 +668,7 @@ export function createNote(knowledgeBaseId, notebookId, title) {
     title: title || '新建笔记',
     content: '',
     contentText: '',
+    marpContent: '',
     isDeleted: false,
     createdAt: now,
     updatedAt: now
@@ -681,6 +690,7 @@ export function importNote(knowledgeBaseId, notebookId, title, content, contentT
     title: title || '新建笔记',
     content: content || '',
     contentText: contentText || '',
+    marpContent: '',
     isDeleted: false,
     createdAt: now,
     updatedAt: now
@@ -718,19 +728,24 @@ export function getNote(noteId) {
   ))
 }
 
-export function updateNote(noteId, title, content, contentText, notebookId) {
+export function updateNote(noteId, title, content, contentText, notebookId, marpContent) {
   const now = nowISO()
+  const sets = ['title = ?', 'content = ?', 'contentText = ?', 'updatedAt = ?']
+  const params = [title, content, contentText, now]
   if (notebookId !== undefined) {
-    db.run(
-      'UPDATE notes SET title = ?, content = ?, contentText = ?, notebookId = ?, updatedAt = ? WHERE id = ?',
-      [title, content, contentText, notebookId, now, noteId]
-    )
-  } else {
-    db.run(
-      'UPDATE notes SET title = ?, content = ?, contentText = ?, updatedAt = ? WHERE id = ?',
-      [title, content, contentText, now, noteId]
-    )
+    sets.push('notebookId = ?')
+    params.push(notebookId)
   }
+  // marpContent 仅在显式传入时更新，避免误清空已有演示内容
+  if (marpContent !== undefined) {
+    sets.push('marpContent = ?')
+    params.push(marpContent)
+  }
+  params.push(noteId)
+  db.run(
+    `UPDATE notes SET ${sets.join(', ')} WHERE id = ?`,
+    params
+  )
   const modified = db.getRowsModified()
   saveDb()
   if (modified > 0) {
