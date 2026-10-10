@@ -168,11 +168,15 @@ registerTool({
 const updateNoteSchema = z.object({
   noteId: z.string().describe('要更新的笔记 ID'),
   title: z.string().optional().describe('新标题（可选）'),
-  content: z.string().optional().describe('新正文内容（可选，Markdown 格式）')
+  content: z.string().optional().describe('新正文内容（可选，Markdown 格式）'),
+  marpContent: z
+    .string()
+    .optional()
+    .describe('Marp 演示文稿 Markdown 内容（可选，含 front matter 与 --- 分页；仅更新演示内容时不传 content）')
 })
 
 async function updateNoteHandler(args, ctx) {
-  const { noteId, title, content } = args
+  const { noteId, title, content, marpContent } = args
   ctx.logger.info(`[update_note] noteId=${noteId}`)
 
   const { getNote, updateNote } = await import('../../../db.js')
@@ -191,14 +195,14 @@ async function updateNoteHandler(args, ctx) {
   }
   const contentText = htmlContent.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 
-  const updated = updateNote(noteId, newTitle, htmlContent, contentText)
+  const updated = updateNote(noteId, newTitle, htmlContent, contentText, undefined, marpContent)
   ctx.logger.info(`[update_note] 已更新笔记: ${noteId}`)
   return `已更新笔记: id=${noteId}, title="${newTitle}"`
 }
 
 registerTool({
   name: 'update_note',
-  description: '更新已有笔记的标题或内容。只需传需要修改的字段。',
+  description: '更新已有笔记的标题、正文内容或 Marp 演示内容（marpContent）。只需传需要修改的字段。',
   schema: updateNoteSchema,
   handler: updateNoteHandler,
   meta: { requireApproval: true, exposedViaMcp: true } // 写操作需审批

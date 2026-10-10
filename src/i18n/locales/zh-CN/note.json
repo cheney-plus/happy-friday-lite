@@ -129,7 +129,14 @@
     "exitFullscreen": "退出全屏",
     "loading": "正在渲染演示文档...",
     "empty": "暂无可演示的内容",
-    "renderError": "演示文档渲染失败"
+    "renderError": "演示文档渲染失败",
+    "generateTitle": "生成演示文档",
+    "generateBody": "当前演示内容未生成，是否生成演示文档？",
+    "generateConfirm": "生成",
+    "generating": "正在生成演示文档，请稍候...",
+    "generateFailed": "演示文档生成失败",
+    "regenerate": "重新生成",
+    "generatePrompt": "任务：将当前笔记改写为 Marp 演示文稿并保存。请严格按以下步骤执行：\n1. 先使用文件读取工具读取技能文件 /SKILL/marp-slide/SKILL.md（marp-slide 技能），完整理解其中的演示文档编写规范、front matter 写法与主题模板要求；\n2. 使用 get_note 工具获取当前笔记的完整内容；\n3. 严格按照 marp-slide 技能文档中的规范，将笔记内容改写为一份专业的 Marp 演示文稿 Markdown：包含 YAML front matter（theme 等）、用 --- 分页、忠于笔记原意、结构清晰；\n4. 调用 update_note 工具，将完整的 Marp Markdown 仅保存到该笔记的 marpContent 字段，不要修改笔记的 title 和 content。"
   },
   "table": {
     "toolbarLabel": "表格工具",

@@ -421,7 +421,14 @@
 
     <EditorContent v-show="!showPresentation" ref="editorContentRef" :editor="editor" class="editor-content" />
 
-    <MarpPresentation v-if="showPresentation" :source="presentationSource" :format="presentationFormat" @close="showPresentation = false" />
+    <MarpPresentation
+      v-if="showPresentation"
+      :source="presentationSource"
+      :format="presentationFormat"
+      :generating="isGeneratingMarp"
+      @close="showPresentation = false"
+      @regenerate="generateMarpContent"
+    />
 
     <div
       v-if="fimCompletionVisible && fimCompletionText"
@@ -555,6 +562,27 @@
           <button class="btn btn-primary" @click="confirmFormula" :disabled="!formulaLatex.trim()">
             {{ isEditingFormula ? t('note.formulaDialog.update') : t('note.formulaDialog.insert') }}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 演示文档生成确认对话框 -->
+    <div v-if="showMarpGenerateConfirm" class="dialog-overlay" @click.self="!isGeneratingMarp && (showMarpGenerateConfirm = false)">
+      <div class="dialog">
+        <div class="dialog-header">
+          <h3>{{ isGeneratingMarp ? t('note.presentation.generating') : t('note.presentation.generateTitle') }}</h3>
+          <button v-if="!isGeneratingMarp" class="dialog-close" @click="showMarpGenerateConfirm = false">×</button>
+        </div>
+        <div class="dialog-body">
+          <p v-if="!isGeneratingMarp" class="marp-generate-tip">{{ t('note.presentation.generateBody') }}</p>
+          <p v-else class="marp-generate-tip">
+            <span class="export-spinner"></span>
+            {{ t('note.presentation.generating') }}
+          </p>
+        </div>
+        <div v-if="!isGeneratingMarp" class="dialog-footer">
+          <button class="btn btn-secondary" @click="showMarpGenerateConfirm = false">{{ t('note.cancel') }}</button>
+          <button class="btn btn-primary" @click="generateMarpContent">{{ t('note.presentation.generateConfirm') }}</button>
         </div>
       </div>
     </div>
@@ -963,6 +991,9 @@ const showMoreMenu = ref(false);
 const showPresentation = ref(false);
 const presentationSource = ref('');
 const presentationFormat = ref('html');
+const showMarpGenerateConfirm = ref(false);
+const isGeneratingMarp = ref(false);
+let marpUnlisteners = [];
 const noteStore = useNoteStore();
 
 const togglePresentation = () => {
@@ -971,11 +1002,87 @@ const togglePresentation = () => {
     return;
   }
   if (!editor.value) return;
-  // 仅使用笔记的 marpContent（Marp Markdown 源），为空时显示空演示
   const note = noteStore.notes.find(n => n.id === props.noteId);
-  presentationSource.value = note?.marpContent || '';
+  if (!note?.marpContent || !note.marpContent.trim()) {
+    // marpContent 为空：提示用户生成演示文档
+    showMarpGenerateConfirm.value = true;
+    return;
+  }
+  presentationSource.value = note.marpContent;
   presentationFormat.value = 'markdown';
   showPresentation.value = true;
+};
+
+const cleanupMarpListeners = () => {
+  marpUnlisteners.forEach(fn => { try { fn(); } catch (_e) { /* ignore */ } });
+  marpUnlisteners = [];
+};
+
+// 调用 Agent（参考笔记 Friday 助理）根据当前笔记内容生成 Marp 演示并保存到 marpContent
+const generateMarpContent = async () => {
+  if (isGeneratingMarp.value) return;
+  const model = loadModelConfig();
+  if (!model) {
+    alert(t('note.aiSidebar.noModelConfigured'));
+    return;
+  }
+  isGeneratingMarp.value = true;
+  cleanupMarpListeners();
+
+  const requestId = `marp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const message = t('note.presentation.generatePrompt')
+    + '\n\n---\n' + t('note.aiSidebar.agentNoteContext', { noteId: props.noteId });
+
+  const finish = () => {
+    cleanupMarpListeners();
+    isGeneratingMarp.value = false;
+  };
+
+  // 写工具审批：与笔记侧边栏 Friday 助理保持一致，自动批准
+  marpUnlisteners.push(electronService.listen('agent-tool-approval', (event) => {
+    if (event.payload.requestId !== requestId) return;
+    electronService.invoke('agent-tool-approval-resume', {
+      requestId: event.payload.requestId,
+      decision: { type: 'approve' }
+    });
+  }));
+
+  marpUnlisteners.push(electronService.listen('chat-done', async (event) => {
+    if (event.payload.requestId !== requestId) return;
+    finish();
+    showMarpGenerateConfirm.value = false;
+    // 生成完成：从数据库取回最新 marpContent 并进入演示模式
+    const note = await noteStore.fetchNote(props.noteId);
+    if (note?.marpContent && note.marpContent.trim()) {
+      presentationSource.value = note.marpContent;
+      presentationFormat.value = 'markdown';
+      showPresentation.value = true;
+    } else {
+      alert(t('note.presentation.generateFailed'));
+    }
+  }));
+
+  marpUnlisteners.push(electronService.listen('chat-error', (event) => {
+    if (event.payload.requestId !== requestId) return;
+    finish();
+    console.error('Marp generation error:', event.payload.error);
+    alert(t('note.presentation.generateFailed'));
+  }));
+
+  try {
+    await electronService.invoke('agent-invoke', {
+      requestId,
+      sessionId: '',
+      model,
+      message,
+      attachments: [],
+      enableThinking: false
+    });
+  } catch (err) {
+    console.error('Marp generation invoke error:', err);
+    finish();
+    alert(t('note.presentation.generateFailed'));
+  }
 };
 const showToolbarOverflow = ref(false);
 const toolbarOverflowColor = ref(null);
@@ -3043,6 +3150,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('contextmenu', handleDocumentContextMenu);
   cleanupChatListeners();
   cleanupFim();
+  cleanupMarpListeners();
   toolbarResizeObserver?.disconnect();
   tableScrollTarget?.removeEventListener('scroll', hideTableContextMenu);
   window.removeEventListener('resize', hideTableContextMenu);
@@ -3582,6 +3690,19 @@ const fixEmptyTableCells = (html) => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.marp-generate-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 14px;
+  color: #374151;
+}
+
+[data-theme='dark'] .marp-generate-tip {
+  color: #d1d5db;
 }
 
 .menu-item svg {

@@ -129,7 +129,14 @@
     "exitFullscreen": "Exit fullscreen",
     "loading": "Rendering presentation...",
     "empty": "Nothing to present",
-    "renderError": "Failed to render presentation"
+    "renderError": "Failed to render presentation",
+    "generateTitle": "Generate Presentation",
+    "generateBody": "Presentation content has not been generated yet. Generate it now?",
+    "generateConfirm": "Generate",
+    "generating": "Generating presentation, please wait...",
+    "generateFailed": "Failed to generate presentation",
+    "regenerate": "Regenerate",
+    "generatePrompt": "Task: rewrite the current note into a Marp presentation and save it. Follow these steps strictly:\n1. First use the file reading tool to read the skill file /SKILL/marp-slide/SKILL.md (the marp-slide skill) and fully understand its presentation authoring rules, front matter conventions and theme template requirements;\n2. Use the get_note tool to fetch the current note's full content;\n3. Strictly following the marp-slide skill documentation, rewrite the note's content into a professional Marp presentation Markdown: include YAML front matter (theme, etc.), paginate with ---, stay faithful to the note's original meaning with clear structure;\n4. Call the update_note tool to save the complete Marp Markdown to the note's marpContent field only; do not modify the note's title or content."
   },
   "table": {
     "toolbarLabel": "Table tools",

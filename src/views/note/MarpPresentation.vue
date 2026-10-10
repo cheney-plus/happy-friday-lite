@@ -4,9 +4,15 @@
       <div class="slide-frame" :style="frameStyle">
         <div class="slide-scaler" :style="scalerStyle">
           <Transition name="marp-slide-fade" mode="out-in">
-            <div v-if="currentSlide" :key="current" class="marp-slide" :class="currentSlide.className" ref="slideRef">
-              <div ref="slideContentRef" class="slide-content" :style="contentStyle" v-html="currentSlide.html"></div>
-            </div>
+            <iframe
+              v-if="iframeSrcdoc"
+              :key="iframeSrcdoc"
+              ref="iframeRef"
+              class="marp-iframe"
+              title="Marp presentation"
+              :srcdoc="iframeSrcdoc"
+              @load="onIframeLoad"
+            ></iframe>
           </Transition>
         </div>
       </div>
@@ -15,14 +21,17 @@
         <button class="marp-nav-btn" :disabled="current <= 0" @click="prev" :title="t('note.presentation.prev')">
           <ChevronLeft :size="18" :stroke-width="2" />
         </button>
-        <span class="marp-counter">{{ slides.length ? current + 1 : 0 }} / {{ slides.length }}</span>
-        <button class="marp-nav-btn" :disabled="current >= slides.length - 1" @click="next" :title="t('note.presentation.next')">
+        <span class="marp-counter">{{ slideCount ? current + 1 : 0 }} / {{ slideCount }}</span>
+        <button class="marp-nav-btn" :disabled="current >= slideCount - 1" @click="next" :title="t('note.presentation.next')">
           <ChevronRight :size="18" :stroke-width="2" />
         </button>
         <div class="marp-controls-divider"></div>
         <button class="marp-nav-btn" @click="toggleFullscreen" :title="isFullscreen ? t('note.presentation.exitFullscreen') : t('note.presentation.fullscreen')">
           <Minimize v-if="isFullscreen" :size="16" :stroke-width="2" />
           <Maximize v-else :size="16" :stroke-width="2" />
+        </button>
+        <button class="marp-nav-btn" :disabled="generating" :title="t('note.presentation.regenerate')" @click="emit('regenerate')">
+          <RefreshCw :size="16" :stroke-width="2" :class="{ 'marp-spin-icon': generating }" />
         </button>
         <button class="marp-nav-btn marp-exit-btn" :title="t('note.presentation.exit')" @click="emit('close')">
           <X :size="16" :stroke-width="2" />
@@ -33,11 +42,15 @@
         <Loader2 :size="28" :stroke-width="2" class="marp-loading-icon" />
         <span>{{ t('note.presentation.loading') }}</span>
       </div>
+      <div v-else-if="generating" class="marp-loading">
+        <Loader2 :size="28" :stroke-width="2" class="marp-loading-icon" />
+        <span>{{ t('note.presentation.generating') }}</span>
+      </div>
       <div v-else-if="renderError" class="marp-error">
         <CircleAlert :size="28" :stroke-width="2" />
         <span>{{ renderError }}</span>
       </div>
-      <div v-else-if="!slides.length" class="marp-empty">
+      <div v-else-if="!slideCount" class="marp-empty">
         <Presentation :size="52" :stroke-width="1.5" />
         <span>{{ t('note.presentation.empty') }}</span>
       </div>
@@ -46,11 +59,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { marked } from 'marked';
-import katex from 'katex';
-import { ChevronLeft, ChevronRight, CircleAlert, Loader2, Maximize, Minimize, Presentation, X } from 'lucide-vue-next';
+import katexCss from 'katex/dist/katex.min.css?raw';
+import { ChevronLeft, ChevronRight, CircleAlert, Loader2, Maximize, Minimize, Presentation, RefreshCw, X } from 'lucide-vue-next';
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
@@ -62,23 +74,22 @@ const props = defineProps({
   // 演示内容：format 为 'html' 时是编辑器 HTML（内部转 Markdown），'markdown' 时直接是 Marp Markdown 源
   source: { type: String, default: '' },
   format: { type: String, default: 'html' },
+  // Agent 正在重新生成演示内容
+  generating: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'regenerate']);
 
 const stageRef = ref(null);
-const slideRef = ref(null);
-const slideContentRef = ref(null);
+const iframeRef = ref(null);
 
-const slides = ref([]);
+const iframeSrcdoc = ref('');
+const slideCount = ref(0);
 const deckTheme = ref('default');
 const current = ref(0);
 const loading = ref(true);
 const renderError = ref('');
 const stageScale = ref(1);
-const fitScale = ref(1);
-
-const currentSlide = computed(() => slides.value[current.value] || null);
 
 const frameStyle = computed(() => ({
   width: `${SLIDE_W * stageScale.value}px`,
@@ -87,10 +98,6 @@ const frameStyle = computed(() => ({
 
 const scalerStyle = computed(() => ({
   transform: `scale(${stageScale.value})`,
-}));
-
-const contentStyle = computed(() => ({
-  transform: `scale(${fitScale.value})`,
 }));
 
 /* ---------------- Markdown 转换 ---------------- */
@@ -142,15 +149,19 @@ const htmlToMarkdown = async (html) => {
 
 /* ---------------- Marp 解析 ---------------- */
 
-// 解析 front matter（仅在文档以 `---` YAML 块开头时）
+// 解析 front matter（仅在文档以 `---` YAML 块开头时），用于识别主题
 const extractFrontMatter = (markdown) => {
   const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  if (!match) return { markdown, theme: 'default' };
+  if (!match) return { markdown, theme: 'default', hasFrontMatter: false };
   const fm = match[1];
   // 只有当块内容像 YAML（key: value）时才视为 front matter，否则当作分页线
-  if (!/^[A-Za-z_][\w-]*\s*:/m.test(fm)) return { markdown, theme: 'default' };
+  if (!/^[A-Za-z_][\w-]*\s*:/m.test(fm)) return { markdown, theme: 'default', hasFrontMatter: false };
   const themeMatch = fm.match(/^theme\s*:\s*(\S+)\s*$/m);
-  return { markdown: markdown.slice(match[0].length), theme: themeMatch ? themeMatch[1] : 'default' };
+  return {
+    markdown: markdown.slice(match[0].length),
+    theme: themeMatch ? themeMatch[1] : 'default',
+    hasFrontMatter: true,
+  };
 };
 
 // 按分页线切分（忽略代码块内的 `---`）
@@ -195,82 +206,57 @@ const splitByHeadings = (markdown) => {
   return chunks.filter((c) => c);
 };
 
-// 提取 slide 级 Marp 指令（class / theme）
-const extractDirectives = (markdown) => {
-  let className = '';
-  let theme = '';
-  const cleaned = markdown.replace(/<!--\s*(_?class|theme)\s*:\s*([^>]*?)\s*-->/g, (_m, key, value) => {
-    const v = value.trim();
-    if (key === 'theme') theme = v;
-    else className = v;
-    return '';
-  });
-  return { cleaned: cleaned.trim(), className, theme };
+/* ---------------- 官方 Marp 引擎渲染 ---------------- */
+
+// 懒加载 @marp-team/marp-core（体积较大，避免拖慢首屏）
+let marpInstance = null;
+const getMarp = async () => {
+  if (!marpInstance) {
+    const { Marp } = await import('@marp-team/marp-core');
+    marpInstance = new Marp({ html: true, math: 'katex' });
+  }
+  return marpInstance;
 };
 
-/* ---------------- 渲染 ---------------- */
-
-const renderSlideHtml = (markdown) => {
-  // 先抽取数学公式，避免 marked 转义破坏 LaTeX
-  const mathSegments = [];
-  let md = markdown.replace(/\$\$([\s\S]+?)\$\$/g, (_m, latex) => {
-    mathSegments.push({ latex: latex.trim(), display: true });
-    return `MATHSEG${mathSegments.length - 1}END`;
-  });
-  md = md.replace(/\$([^$\n]+?)\$/g, (_m, latex) => {
-    mathSegments.push({ latex: latex.trim(), display: false });
-    return `MATHSEG${mathSegments.length - 1}END`;
-  });
-
-  let html = marked.parse(md, { gfm: true, breaks: false });
-
-  html = html.replace(/MATHSEG(\d+)END/g, (_m, index) => {
-    const seg = mathSegments[Number(index)];
-    if (!seg) return '';
-    try {
-      return katex.renderToString(seg.latex, {
-        displayMode: seg.display,
-        throwOnError: false,
-      });
-    } catch {
-      return seg.latex;
-    }
-  });
-  return html;
-};
+const buildSrcdoc = (html, css) =>
+  `<!DOCTYPE html><html><head><meta charset="utf-8">` +
+  `<style>html,body{margin:0;padding:0;overflow:hidden}svg[data-marpit-svg]{display:block;vertical-align:top}` +
+  `.marp-slides-wrap{transition:transform .32s ease;will-change:transform}</style>` +
+  `<style>${css}</style><style>${katexCss}</style></head>` +
+  `<body><div class="marp-slides-wrap">${html}</div></body></html>`;
 
 const buildSlides = async () => {
   loading.value = true;
   renderError.value = '';
-  slides.value = [];
+  iframeSrcdoc.value = '';
+  slideCount.value = 0;
   current.value = 0;
   try {
     const markdown = props.format === 'markdown'
       ? (props.source || '')
       : await htmlToMarkdown(props.source);
     if (!markdown.trim()) {
-      slides.value = [];
       return;
     }
-    const { markdown: body, theme } = extractFrontMatter(markdown);
+
+    // front matter 仅用于识别主题（画布外配色）；无显式分页的普通笔记按标题切分补分页线
+    const { markdown: body, theme, hasFrontMatter } = extractFrontMatter(markdown);
     deckTheme.value = theme;
-
     let blocks = splitBySlideBreaks(body);
-    if (blocks.length === 1) blocks = splitByHeadings(blocks[0]);
+    if (!hasFrontMatter && blocks.length === 1) blocks = splitByHeadings(body);
+    const md = hasFrontMatter ? markdown : blocks.length > 1 ? blocks.join('\n\n---\n\n') : markdown;
 
-    slides.value = blocks.map((block) => {
-      const { cleaned, className, theme: slideTheme } = extractDirectives(block);
-      const classes = [];
-      if (className) classes.push(...className.split(/\s+/).filter(Boolean));
-      if (slideTheme) classes.push(`theme-${slideTheme}`);
-      return { html: cleaned ? renderSlideHtml(cleaned) : '', className: classes.join(' ') };
-    });
+    const marp = await getMarp();
+    const { html, css } = marp.render(md, { html: true });
+
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    slideCount.value = doc.querySelectorAll('section').length || 1;
+    iframeSrcdoc.value = buildSrcdoc(html, css);
   } catch (error) {
     console.error('Marp 渲染失败:', error);
     renderError.value = t('note.presentation.renderError');
   } finally {
     loading.value = false;
-    nextTick(computeFitScale);
   }
 };
 
@@ -285,37 +271,33 @@ const updateStageScale = () => {
   stageScale.value = Math.min(availableW / SLIDE_W, availableH / SLIDE_H);
 };
 
-// 内容超出画布时自动缩小
-const computeFitScale = () => {
-  const contentEl = slideContentRef.value;
-  const slideEl = slideRef.value;
-  if (!contentEl || !slideEl) {
-    fitScale.value = 1;
-    return;
-  }
-  contentEl.style.transform = 'none';
-  const slideStyle = getComputedStyle(slideEl);
-  const availH = slideEl.clientHeight - parseFloat(slideStyle.paddingTop) - parseFloat(slideStyle.paddingBottom);
-  const availW = slideEl.clientWidth - parseFloat(slideStyle.paddingLeft) - parseFloat(slideStyle.paddingRight);
-  const h = contentEl.scrollHeight;
-  const w = contentEl.scrollWidth;
-  if (!availH || !availW || !h || !w) {
-    fitScale.value = 1;
-    return;
-  }
-  fitScale.value = Math.min(1, availH / h, availW / w);
-};
-
 let resizeObserver = null;
 
 /* ---------------- 翻页 ---------------- */
 
 const next = () => {
-  if (current.value < slides.value.length - 1) current.value += 1;
+  if (current.value < slideCount.value - 1) current.value += 1;
 };
 const prev = () => {
   if (current.value > 0) current.value -= 1;
 };
+
+// 通过平移幻灯片容器切换页面（iframe 内无滚动条）
+const applySlideOffset = (animate = true) => {
+  const wrap = iframeRef.value?.contentDocument?.querySelector('.marp-slides-wrap');
+  if (!wrap) return;
+  if (!animate) wrap.style.transition = 'none';
+  wrap.style.transform = `translateY(-${current.value * SLIDE_H}px)`;
+  if (!animate) {
+    // 强制 reflow 后恢复过渡动画
+    void wrap.offsetHeight;
+    wrap.style.transition = '';
+  }
+};
+
+const onIframeLoad = () => applySlideOffset(false);
+
+watch(current, () => applySlideOffset());
 
 /* ---------------- 全屏 ---------------- */
 
@@ -348,7 +330,7 @@ const handleKeydown = (event) => {
   } else if (event.key === 'Home') {
     current.value = 0;
   } else if (event.key === 'End') {
-    current.value = Math.max(slides.value.length - 1, 0);
+    current.value = Math.max(slideCount.value - 1, 0);
   } else if (event.key === 'f' || event.key === 'F') {
     event.preventDefault();
     toggleFullscreen();
@@ -358,11 +340,6 @@ const handleKeydown = (event) => {
     if (!isFullscreen.value) emit('close');
   }
 };
-
-watch(current, () => {
-  fitScale.value = 1;
-  nextTick(computeFitScale);
-});
 
 watch(() => props.source, buildSlides, { immediate: true });
 
@@ -429,237 +406,14 @@ onBeforeUnmount(() => {
   transform-origin: top left;
 }
 
-.marp-slide {
+.marp-iframe {
+  display: block;
   width: 1280px;
   height: 720px;
-  box-sizing: border-box;
-  padding: 64px 80px;
-  overflow: hidden;
+  border: 0;
   background: #fdfdfd;
-  color: #24292e;
-  font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  font-size: 30px;
-  line-height: 1.55;
-  text-align: left;
-
-  /* gaia 主题时画布外区域同色 */
-  .deck-theme-gaia & {
-    background: transparent;
-  }
-
-  :deep(*) {
-    user-select: text;
-  }
-
-  :deep(h1),
-  :deep(h2),
-  :deep(h3) {
-    font-weight: 700;
-    line-height: 1.25;
-    margin: 0 0 0.5em;
-  }
-
-  :deep(h1) {
-    font-size: 1.6em;
-    padding-bottom: 0.3em;
-    border-bottom: 3px solid currentColor;
-    opacity: 0.92;
-  }
-
-  :deep(h2) {
-    font-size: 1.25em;
-    color: #1f6fb2;
-  }
-
-  :deep(h3) {
-    font-size: 1.1em;
-    color: #1f6fb2;
-  }
-
-  :deep(p) {
-    margin: 0.4em 0;
-  }
-
-  :deep(ul),
-  :deep(ol) {
-    margin: 0.4em 0;
-    padding-left: 1.4em;
-  }
-
-  :deep(li) {
-    margin: 0.25em 0;
-  }
-
-  :deep(blockquote) {
-    margin: 0.5em 0;
-    padding: 0.2em 1em;
-    border-left: 6px solid #1f6fb2;
-    background: rgba(31, 111, 178, 0.08);
-    color: #4a5560;
-  }
-
-  :deep(code) {
-    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-    font-size: 0.85em;
-    background: rgba(110, 118, 129, 0.15);
-    border-radius: 4px;
-    padding: 0.15em 0.35em;
-  }
-
-  :deep(pre) {
-    background: #f6f8fa;
-    border: 1px solid #d0d7de;
-    border-radius: 8px;
-    padding: 0.8em 1em;
-    overflow: hidden;
-
-    code {
-      background: transparent;
-      padding: 0;
-      font-size: 0.7em;
-      line-height: 1.45;
-    }
-  }
-
-  :deep(table) {
-    border-collapse: collapse;
-    margin: 0.5em 0;
-    font-size: 0.8em;
-
-    th,
-    td {
-      border: 1px solid #c6cbd1;
-      padding: 0.35em 0.8em;
-    }
-
-    th {
-      background: #f2f4f6;
-      font-weight: 700;
-    }
-  }
-
-  :deep(img) {
-    max-width: 100%;
-    max-height: 480px;
-    object-fit: contain;
-  }
-
-  :deep(a) {
-    color: #1f6fb2;
-    text-decoration: none;
-  }
-
-  :deep(hr) {
-    border: none;
-    border-top: 2px solid #d8dce0;
-    margin: 0.8em 0;
-  }
-
-  :deep(.katex) {
-    font-size: 1.05em;
-  }
-
-  :deep(.katex-display) {
-    margin: 0.4em 0;
-  }
-
-  /* lead 风格：标题页居中 */
-  &.lead {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-
-    h1 {
-      font-size: 2.1em;
-      border-bottom: none;
-      text-align: center;
-    }
-
-    p {
-      text-align: center;
-      opacity: 0.75;
-    }
-  }
-
-  /* gaia 主题（近似） */
-  &.theme-gaia {
-    background: linear-gradient(150deg, #23557c 0%, #123049 100%);
-    color: #f0f5f9;
-
-    h2,
-    h3 {
-      color: #8ecdf5;
-    }
-
-    :deep(h2),
-    :deep(h3) {
-      color: #8ecdf5;
-    }
-
-    :deep(blockquote) {
-      border-left-color: #8ecdf5;
-      background: rgba(142, 205, 245, 0.12);
-      color: #c8d8e4;
-    }
-
-    :deep(pre) {
-      background: rgba(0, 0, 0, 0.3);
-      border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    :deep(code) {
-      background: rgba(0, 0, 0, 0.3);
-    }
-
-    :deep(a) {
-      color: #8ecdf5;
-    }
-
-    :deep(table) {
-      th,
-      td {
-        border-color: rgba(255, 255, 255, 0.25);
-      }
-
-      th {
-        background: rgba(255, 255, 255, 0.12);
-      }
-    }
-
-    &.lead {
-      align-items: center;
-    }
-  }
-
-  /* uncover 主题（近似） */
-  &.theme-uncover {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-
-    :deep(h1),
-    :deep(h2),
-    :deep(h3) {
-      text-align: center;
-    }
-
-    :deep(h1) {
-      border-bottom: none;
-    }
-
-    :deep(ul),
-    :deep(ol) {
-      text-align: left;
-    }
-  }
-}
-
-.slide-content {
-  width: 100%;
-  transform-origin: top center;
-  transition: transform 0.15s ease-out;
+  /* 键盘与点击由外层接管，避免 iframe 抢焦点 */
+  pointer-events: none;
 }
 
 .marp-controls {
@@ -741,6 +495,10 @@ onBeforeUnmount(() => {
 }
 
 .marp-loading-icon {
+  animation: marp-spin 1.2s linear infinite;
+}
+
+.marp-spin-icon {
   animation: marp-spin 1.2s linear infinite;
 }
 
