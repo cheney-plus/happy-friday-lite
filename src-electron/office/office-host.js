@@ -6,6 +6,7 @@ import { app, dialog, ipcMain, nativeTheme, shell } from 'electron'
 import XLSX from 'xlsx'
 import AdmZip from 'adm-zip'
 import { registerOfficeAiBridge } from './office-ai-bridge.js'
+import { getDataDir } from '../config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const _require = createRequire(import.meta.url)
@@ -500,9 +501,9 @@ function createTypeView(type, filePath) {
   return { view: b.pdf.createPdfView(filePath || null), filePath }
 }
 
-/** 新建空白文档的默认保存目录（与上游 sheets configuredDefaultSaveDir 一致：
- *  优先 app-settings.json 的 defaultSaveDir，回退 ~/Documents/GenOffice） */
-function officeDefaultSaveDir() {
+/** 新建空白文档的默认保存目录：优先 app-settings.json 的 defaultSaveDir，
+ *  回退 {dataDir}/happyOffice（跟随用户数据目录） */
+export function officeDefaultSaveDir() {
   try {
     const settingsPath = path.join(app.getPath('userData'), 'app-settings.json')
     const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
@@ -511,7 +512,7 @@ function officeDefaultSaveDir() {
       if (typeof dir === 'string' && path.isAbsolute(dir)) return dir
     }
   } catch { /* ignore */ }
-  return path.join(app.getPath('documents'), 'GenOffice')
+  return path.join(getDataDir() || app.getPath('userData'), 'happyOffice')
 }
 
 /** 生成空白 xlsx 工作簿文件并返回路径（单空 Sheet1，复用上游 uniquePathIn 去重命名） */

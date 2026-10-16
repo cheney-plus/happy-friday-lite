@@ -18,6 +18,7 @@ import { initOfficeSession, shutdownOfficeHost } from './src-electron/office/off
 import { registerOfficeIpc } from './src-electron/office/office-ipc.js'
 import { isHeadlessExportRun, runHeadlessExportEntry } from './src-electron/office/office-headless.js'
 import { startObsidianScheduler, stopObsidianScheduler } from './src-electron/obsidian/scheduler.js'
+import { resolveDataDir, applyUserDataRedirect, migrateDataIfNeeded } from './src-electron/data-dir.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -47,6 +48,11 @@ if (isDev) {
   app.setPath('userData', path.join(__dirname, 'app-data', 'electron-user-data'))
 }
 
+// 解析用户自定义数据目录（指针文件机制，须在 requestSingleInstanceLock 之前执行，
+// 使单实例锁与 Chromium profile 一并跟随自定义目录）
+const resolvedDataDir = resolveDataDir()
+applyUserDataRedirect(resolvedDataDir.dataDir, resolvedDataDir.isCustom)
+
 // The GUI and its DSH sidecar share one data directory. Multiple AppImage
 // instances would therefore contend for DSH's credentials writer lock.
 const headlessExportRun = isHeadlessExportRun()
@@ -57,9 +63,7 @@ if (!hasSingleInstanceLock) app.quit()
 // 将运行日志落盘到数据目录，便于安装后排查异常。
 // 必须在 app.whenReady 之前同步执行，以捕获后续所有模块的输出。
 if (hasSingleInstanceLock) {
-  initLogger(
-    isDev ? path.join(__dirname, 'app-data') : app.getPath('userData')
-  )
+  initLogger(resolvedDataDir.dataDir)
 }
 
 let mainWindow = null
@@ -124,9 +128,18 @@ if (!headlessExportRun) {
 }
 
 async function ensureDataDir() {
-  const dataDir = isDev
-    ? path.join(__dirname, 'app-data')
-    : app.getPath('userData')
+  // 自定义数据目录且尚未迁移：在 initDb 之前复制旧目录数据（此时数据库未被占用）。
+  // 迁移失败时指针已被清除，回退到默认数据目录。
+  try {
+    migrateDataIfNeeded(resolvedDataDir)
+  } catch (e) {
+    console.error('[Main] Data migration failed, staying on default data dir:', e.message)
+    const fallback = resolveDataDir()
+    resolvedDataDir.dataDir = fallback.dataDir
+    resolvedDataDir.isCustom = false
+  }
+
+  const dataDir = resolvedDataDir.dataDir
 
   try {
     if (!fs.existsSync(dataDir)) {

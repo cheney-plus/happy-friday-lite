@@ -277,6 +277,27 @@
         </div>
       </div>
 
+      <!-- 数据存储 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.dataStorage') }}</div>
+        <div class="group-content">
+          <div class="setting-item clickable" @click="selectDataDir">
+            <div class="item-label-group">
+              <span class="item-label">{{ t('settings.userDataDir') }}</span>
+              <span class="item-hint">{{ t('settings.userDataDirHint') }}</span>
+            </div>
+            <span class="item-link" :title="dataDirState.current">
+              {{ shortenPath(dataDirState.current) }}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </span>
+          </div>
+          <div v-if="dataDirState.isCustom" class="setting-item">
+            <span class="item-label">{{ t('settings.resetDataDir') }}</span>
+            <button class="text-btn" @click="resetDataDir">{{ t('settings.resetToDefault') }}</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 对话历史 -->
       <div class="settings-group">
         <div class="group-title">{{ t('settings.history') }}</div>
@@ -919,6 +940,88 @@ const formatBackupTime = (iso) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+// ========== 数据存储 ==========
+const dataDirState = reactive({
+  current: '',
+  isCustom: false,
+  defaultDir: ''
+});
+
+const loadDataDirInfo = async () => {
+  try {
+    const info = await electronService.invoke('data-dir-get');
+    if (info) {
+      dataDirState.current = info.current || '';
+      dataDirState.isCustom = !!info.isCustom;
+      dataDirState.defaultDir = info.defaultDir || '';
+    }
+  } catch (e) {
+    console.error('加载数据目录信息失败:', e);
+  }
+};
+
+// 选择并切换数据目录：写指针 → 提示重启（可立即重启）
+const selectDataDir = async () => {
+  try {
+    const picked = await electronService.invoke('data-dir-select');
+    if (!picked.success) {
+      if (!picked.canceled) await notifyError(t('settings.dataDirSelectFailed') + ': ' + (picked.error || t('settings.unknownError')));
+      return;
+    }
+    if (picked.path === dataDirState.current) return;
+    const confirmed = await confirmDialog(t('settings.dataDirChangeConfirm', { dir: picked.path }), {
+      confirmText: t('settings.dialogConfirm'),
+      cancelText: t('settings.dialogCancel')
+    });
+    if (!confirmed) return;
+    const result = await electronService.invoke('data-dir-set', { dir: picked.path });
+    if (!result.success) {
+      await notifyError(t('settings.dataDirSetFailed') + ': ' + (result.error || t('settings.unknownError')));
+      return;
+    }
+    if (!result.needRestart) {
+      await notifyWarning(t('settings.dataDirSameAsCurrent'));
+      return;
+    }
+    const restart = await showDialog({
+      type: 'info',
+      message: t('settings.dataDirRestartHint'),
+      confirmText: t('settings.restartNow'),
+      cancelText: t('settings.restartLater')
+    });
+    if (restart) await electronService.invoke('app-relaunch');
+  } catch (e) {
+    await notifyError(t('settings.dataDirSetFailed') + ': ' + e);
+  }
+};
+
+// 恢复默认数据目录（数据保留在原自定义目录，重启后生效）
+const resetDataDir = async () => {
+  try {
+    const confirmed = await confirmDialog(t('settings.dataDirResetConfirm'), {
+      confirmText: t('settings.dialogConfirm'),
+      cancelText: t('settings.dialogCancel')
+    });
+    if (!confirmed) return;
+    const result = await electronService.invoke('data-dir-reset');
+    if (!result.success) {
+      await notifyError(t('settings.dataDirSetFailed') + ': ' + (result.error || t('settings.unknownError')));
+      return;
+    }
+    if (!result.needRestart) return;
+    const restart = await showDialog({
+      type: 'info',
+      message: t('settings.dataDirRestartHint'),
+      confirmText: t('settings.restartNow'),
+      cancelText: t('settings.restartLater')
+    });
+    if (restart) await electronService.invoke('app-relaunch');
+  } catch (e) {
+    await notifyError(t('settings.dataDirSetFailed') + ': ' + e);
+  }
+};
+
+
 // ========== 对话历史自动清理 ==========
 const loadHistoryConfig = async () => {
   try {
@@ -1370,6 +1473,7 @@ onMounted(() => {
     }
   });
   loadBackupConfig();
+  loadDataDirInfo();
   loadHistoryConfig();
   loadRagStats();
   loadPythonStatus();
