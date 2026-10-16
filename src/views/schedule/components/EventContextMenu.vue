@@ -9,9 +9,13 @@
           </svg>
           {{ event.completed ? t('schedule.markUncomplete') : t('schedule.markComplete') }}
         </div>
-        <div class="ctx-item danger" @click="onViewDetail">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-          {{ t('schedule.viewDetail') }}
+        <div v-if="event && event.start" class="ctx-item" @click="onPostponeWeek">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+          {{ t('schedule.postponeWeek') }}
+        </div>
+        <div class="ctx-item danger" @click="onDelete">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          {{ t('schedule.deleteEvent') }}
         </div>
       </div>
     </div>
@@ -30,12 +34,12 @@ const props = defineProps({
   pos: { type: Object, default: () => ({ x: 0, y: 0 }) },
 });
 
-const emit = defineEmits(['close', 'toggle-complete', 'view-detail']);
+const emit = defineEmits(['close', 'toggle-complete', 'postpone-week', 'delete']);
 
 // 钳制菜单位置，避免靠近右/下边缘时溢出视口
 const MENU_MARGIN = 8;
 const MENU_EST_WIDTH = 180;
-const MENU_EST_HEIGHT = 96;
+const MENU_EST_HEIGHT = 132;
 
 const menuStyle = computed(() => {
   const vw = window.innerWidth;
@@ -55,8 +59,12 @@ function onToggleComplete() {
   emit('toggle-complete', props.event);
 }
 
-function onViewDetail() {
-  emit('view-detail', props.event);
+function onPostponeWeek() {
+  emit('postpone-week', props.event);
+}
+
+function onDelete() {
+  emit('delete', props.event);
 }
 
 onDeactivated(() => emit('close'));

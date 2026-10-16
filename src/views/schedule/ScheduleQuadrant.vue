@@ -38,6 +38,7 @@
                   :class="['task-row', { completed: ev.completed }]"
                   @click="openDetail(ev)"
                   @dblclick.stop
+                  @contextmenu.prevent.stop="onRowRightClick($event, ev)"
                 >
                   <button class="task-checkbox" @click.stop="toggleComplete(ev)">
                     <svg v-if="ev.completed" width="16" height="16" viewBox="0 0 24 24" :fill="quad.color" stroke="white" stroke-width="2">
@@ -67,6 +68,17 @@
         </div>
       </section>
     </div>
+
+    <!-- 右键菜单 -->
+    <EventContextMenu
+      :visible="contextMenuVisible"
+      :event="contextMenuEvent"
+      :pos="contextMenuPos"
+      @close="contextMenuVisible = false"
+      @toggle-complete="onCtxToggleComplete"
+      @postpone-week="onCtxPostpone"
+      @delete="onCtxDelete"
+    />
   </div>
 </template>
 
@@ -74,7 +86,8 @@
 import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useScheduleStore, normalizePriority } from '@/store/modules/schedule';
-import { useCalendarHelpers } from './utils/calendarHelpers';
+import { useCalendarHelpers, postponeEventUpdates } from './utils/calendarHelpers';
+import EventContextMenu from './components/EventContextMenu.vue';
 
 const { t } = useI18n();
 const emit = defineEmits(['open-event', 'create-event']);
@@ -124,9 +137,11 @@ const groupOrder = ['pending', 'overdue', 'completed'];
 function groupKeyOf(ev) {
   if (ev.completed) return 'completed';
   if (!ev.start) return 'pending';
-  if (ev.start < todayStr.value) return 'overdue';
-  // 日程为今天时：有具体开始时间且已过的，同样视为已过期
-  if (ev.start === todayStr.value && !ev.allDay && ev.startTime && ev.startTime <= nowTimeStr.value) return 'overdue';
+  // 过期以结束时间（截止日）为准：区间日程开始过但截止未到仍算待完成
+  const endDay = ev.end || ev.start;
+  if (endDay < todayStr.value) return 'overdue';
+  // 截止日为今天时：有具体结束时间且已过的，同样视为已过期
+  if (endDay === todayStr.value && !ev.allDay && ev.endTime && ev.endTime <= nowTimeStr.value) return 'overdue';
   return 'pending';
 }
 
@@ -215,9 +230,12 @@ function dateLabel(ev) {
 
 function dateClass(ev) {
   if (ev.completed) return '';
-  if (!ev.start || ev.start > horizonStr.value) return 'dim';
-  if (ev.start < todayStr.value) return 'overdue';
-  if (ev.start <= tomorrowStr.value) return 'soon';
+  if (!ev.start) return 'dim';
+  // 颜色同样按截止日判断，与过期分组保持一致
+  const endDay = ev.end || ev.start;
+  if (endDay < todayStr.value) return 'overdue';
+  if (endDay <= tomorrowStr.value) return 'soon';
+  if (endDay > horizonStr.value) return 'dim';
   return '';
 }
 
@@ -239,6 +257,36 @@ function deleteEvent(ev) {
   if (window.confirm(t('schedule.confirmDelete'))) {
     scheduleStore.removeEvent(ev.id);
   }
+}
+
+// ========== 右键菜单 ==========
+const contextMenuVisible = ref(false);
+const contextMenuEvent = ref(null);
+const contextMenuPos = ref({ x: 0, y: 0 });
+
+function onRowRightClick(e, ev) {
+  contextMenuEvent.value = ev;
+  contextMenuPos.value = { x: e.clientX, y: e.clientY };
+  contextMenuVisible.value = true;
+}
+
+function onCtxToggleComplete(ev) {
+  contextMenuVisible.value = false;
+  toggleComplete(ev);
+}
+
+// 延期一周：区间日程结束日期 +7 天，单日日程整体 +7 天
+function onCtxPostpone(ev) {
+  if (!ev) return;
+  contextMenuVisible.value = false;
+  const updates = postponeEventUpdates(ev);
+  if (updates) scheduleStore.updateEvent(ev.id, updates);
+}
+
+function onCtxDelete(ev) {
+  if (!ev) return;
+  contextMenuVisible.value = false;
+  deleteEvent(ev);
 }
 
 // 定时刷新当前时间：视图停留时已到时的日程能自动归入"已过期"

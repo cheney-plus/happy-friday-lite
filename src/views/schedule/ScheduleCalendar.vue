@@ -247,7 +247,8 @@
       :pos="contextMenuPos"
       @close="contextMenuVisible = false"
       @toggle-complete="onCtxToggleComplete"
-      @view-detail="onCtxViewDetail"
+      @postpone-week="onCtxPostpone"
+      @delete="onCtxDelete"
     />
 
     <!-- +n 日程面板 -->
@@ -297,6 +298,7 @@ import {
   isDateInRange,
   getEventBgColor,
   getEventDisplayColor,
+  postponeEventUpdates,
 } from './utils/calendarHelpers';
 
 const { t } = useI18n();
@@ -1097,11 +1099,21 @@ async function onCtxToggleComplete(evt) {
   contextMenuVisible.value = false;
 }
 
-function onCtxViewDetail(evt) {
+// 延期一周：区间日程结束日期 +7 天，单日日程整体 +7 天
+async function onCtxPostpone(evt) {
   if (!evt) return;
   contextMenuVisible.value = false;
   closeMorePanel();
-  eventModalRef.value?.open({ event: evt });
+  const updates = postponeEventUpdates(evt);
+  if (updates) await scheduleStore.updateEvent(evt.id, updates);
+}
+
+async function onCtxDelete(evt) {
+  if (!evt) return;
+  contextMenuVisible.value = false;
+  closeMorePanel();
+  if (!window.confirm(t('schedule.confirmDelete'))) return;
+  await scheduleStore.removeEvent(evt.id);
 }
 
 // ========== +n 日程面板 ==========
