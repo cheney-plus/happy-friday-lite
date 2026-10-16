@@ -29272,6 +29272,8 @@ const SKIP_SCRIPT_RE = new RegExp(
 );
 const MEASURE_RETRY_MAX$2 = 10;
 const MEASURE_SIGS_MAX$2 = 12;
+const STREAM_MEASURE_GAP_MS$2 = 900;
+const STREAM_FRESH_BUDGET$1 = 220;
 let spaceCtx;
 const wordRange = rangeSlot();
 function spaceAdvancePx(cs2) {
@@ -29309,6 +29311,10 @@ class JustifyShrinkView {
   frozen = false;
   retryRaf = 0;
   retries = 0;
+  /** constructor-set: the first duty claim waits one window past the mount */
+  streamMeasureAt = performance.now();
+  catchupTimer;
+  inCatchup = false;
   resizeObserver;
   lastDomWidth = -1;
   results = new SettledParagraphCache(
@@ -29320,9 +29326,28 @@ class JustifyShrinkView {
     this.measure();
   };
   onPhasedSettled = () => {
-    this.invalidate();
     this.measure();
   };
+  /** once per duty-cycle window while a streamed tail is landing */
+  claimStreamMeasure() {
+    const now = performance.now();
+    if (now - this.streamMeasureAt < STREAM_MEASURE_GAP_MS$2) return false;
+    this.streamMeasureAt = now;
+    return true;
+  }
+  /** continue a truncated progressive measurement outside the current task */
+  scheduleCatchup() {
+    if (this.catchupTimer) return;
+    this.catchupTimer = setTimeout(() => {
+      this.catchupTimer = void 0;
+      this.inCatchup = true;
+      try {
+        this.measure();
+      } finally {
+        this.inCatchup = false;
+      }
+    }, 30);
+  }
   /** layout input changed (resize, fonts): every paragraph re-measures */
   invalidate() {
     this.results.clear();
@@ -29346,6 +29371,7 @@ class JustifyShrinkView {
     document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled);
     this.resizeObserver?.disconnect();
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf);
+    if (this.catchupTimer) clearTimeout(this.catchupTimer);
   }
   scheduleRetry() {
     if (this.retryRaf || this.retries >= MEASURE_RETRY_MAX$2) return;
@@ -29361,7 +29387,7 @@ class JustifyShrinkView {
       this.retryRaf = 0;
     }
     const { view } = this;
-    if (isPhasedContentPending()) return;
+    if (isPhasedContentPending() && !this.inCatchup && !this.claimStreamMeasure()) return;
     if (view.dom.closest(".app.pv-exporting")) {
       this.retries = 0;
       this.scheduleRetry();
@@ -29391,6 +29417,8 @@ class JustifyShrinkView {
     });
     const shrinks = [];
     let measurable = paras.length === 0;
+    let freshBudget = STREAM_FRESH_BUDGET$1;
+    let truncated = false;
     this.results.beginPass(view);
     const topLevel = SettledParagraphCache.topLevelDom(view);
     for (const para of paras) {
@@ -29398,7 +29426,14 @@ class JustifyShrinkView {
         view,
         para.node,
         para.pos,
-        (el) => this.measureParagraph(para.node, para.pos, el),
+        (el) => {
+          if (freshBudget <= 0) {
+            truncated = true;
+            return null;
+          }
+          freshBudget--;
+          return this.measureParagraph(para.node, para.pos, el);
+        },
         topLevel.get(para.node)
       );
       if (!measured) continue;
@@ -29410,6 +29445,12 @@ class JustifyShrinkView {
       return;
     }
     this.retries = 0;
+    if (truncated) {
+      this.seenSigs.clear();
+      this.frozen = false;
+      this.scheduleCatchup();
+      return;
+    }
     const sig = JSON.stringify(shrinks.map((s2) => [s2.from, s2.to, s2.perChar]));
     if (sig === this.lastSig) return;
     if (this.frozen) return;
@@ -29667,6 +29708,8 @@ const NOISE = 0.25;
 const PARA_CHAR_BUDGET = 4e3;
 const MEASURE_RETRY_MAX$1 = 10;
 const MEASURE_SIGS_MAX$1 = 12;
+const STREAM_MEASURE_GAP_MS$1 = 900;
+const STREAM_FRESH_BUDGET = 220;
 const DOC_CSS_COMMITTED_EVENT = "genoffice:doc-css";
 function measuresAlignment(textAlign, legacyLayout) {
   return textAlign === "justify" || legacyLayout;
@@ -29807,6 +29850,10 @@ class CjkPunctShrinkView {
   frozen = false;
   retryRaf = 0;
   retries = 0;
+  /** constructor-set: the first duty claim waits one window past the mount */
+  streamMeasureAt = performance.now();
+  catchupTimer;
+  inCatchup = false;
   resizeObserver;
   lastDomWidth = -1;
   onFontsLoaded = () => {
@@ -29820,9 +29867,28 @@ class CjkPunctShrinkView {
     this.measure();
   };
   onPhasedSettled = () => {
-    this.invalidate();
     this.measure();
   };
+  /** once per duty-cycle window while a streamed tail is landing */
+  claimStreamMeasure() {
+    const now = performance.now();
+    if (now - this.streamMeasureAt < STREAM_MEASURE_GAP_MS$1) return false;
+    this.streamMeasureAt = now;
+    return true;
+  }
+  /** continue a truncated progressive measurement outside the current task */
+  scheduleCatchup() {
+    if (this.catchupTimer) return;
+    this.catchupTimer = setTimeout(() => {
+      this.catchupTimer = void 0;
+      this.inCatchup = true;
+      try {
+        this.measure();
+      } finally {
+        this.inCatchup = false;
+      }
+    }, 30);
+  }
   /** layout input changed (resize, fonts, stylesheet): every paragraph re-measures */
   invalidate() {
     this.results.clear();
@@ -29847,6 +29913,7 @@ class CjkPunctShrinkView {
     document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled);
     this.resizeObserver?.disconnect();
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf);
+    if (this.catchupTimer) clearTimeout(this.catchupTimer);
   }
   scheduleRetry() {
     if (this.retryRaf || this.retries >= MEASURE_RETRY_MAX$1) return;
@@ -29862,7 +29929,7 @@ class CjkPunctShrinkView {
       this.retryRaf = 0;
     }
     const { view } = this;
-    if (isPhasedContentPending()) return;
+    if (isPhasedContentPending() && !this.inCatchup && !this.claimStreamMeasure()) return;
     if (view.dom.closest(".app.pv-exporting")) {
       this.retries = 0;
       this.scheduleRetry();
@@ -29888,6 +29955,8 @@ class CjkPunctShrinkView {
     });
     const shrinks = [];
     let measurable = paras.length === 0;
+    let freshBudget = STREAM_FRESH_BUDGET;
+    let truncated = false;
     this.results.beginPass(view);
     const topLevel = SettledParagraphCache.topLevelDom(view);
     for (const para of paras) {
@@ -29895,7 +29964,14 @@ class CjkPunctShrinkView {
         view,
         para.node,
         para.pos,
-        (el) => this.measureParagraph(para.node, para.pos, el),
+        (el) => {
+          if (freshBudget <= 0) {
+            truncated = true;
+            return null;
+          }
+          freshBudget--;
+          return this.measureParagraph(para.node, para.pos, el);
+        },
         topLevel.get(para.node)
       );
       if (!measured) continue;
@@ -29907,6 +29983,12 @@ class CjkPunctShrinkView {
       return;
     }
     this.retries = 0;
+    if (truncated) {
+      this.seenSigs.clear();
+      this.frozen = false;
+      this.scheduleCatchup();
+      return;
+    }
     const sig = JSON.stringify(shrinks.map((s2) => [s2.from, s2.perChar, s2.baseLs]));
     if (sig === this.lastSig) return;
     if (this.frozen) return;
@@ -123318,6 +123400,95 @@ function clearFloatShifts(pm) {
 function anchorShiftPx(el) {
   return parseFloat(el.dataset.anchorDy ?? "") || 0;
 }
+const blockGeomCache = /* @__PURE__ */ new WeakMap();
+function blockFingerprint(el, rect) {
+  const text = el.textContent ?? "";
+  let h = 5381;
+  for (let i2 = 0; i2 < text.length; i2++) h = (h << 5) + h + text.charCodeAt(i2) | 0;
+  return `${h}|${el.className}|${el.style.cssText}|${el.childElementCount}|${Math.round(rect.width * 4)}|${Math.round(rect.height * 4)}`;
+}
+function scanBlockGeom(el, rect, zoomFactor) {
+  const breakEls = Array.from(el.querySelectorAll(".doc-field-pagebreak, .doc-page-br")).filter(
+    (b2) => !b2.closest("td, th, .doc-textbox")
+  );
+  const hasBreak = breakEls.length > 0;
+  const colBreakEls = Array.from(el.querySelectorAll(".doc-col-br")).filter(
+    (b2) => !b2.closest("td, th, .doc-textbox")
+  );
+  const hasColBreak = colBreakEls.length > 0;
+  const innerGap = innerGapHeight(el);
+  const height = (rect.height - innerGap) / zoomFactor;
+  const emptyPara = !(el.textContent ?? "").trim() && !el.querySelector("img");
+  const breakOnly = hasBreak && emptyPara;
+  const brLines = breakOnly ? el.querySelectorAll("br").length : 0;
+  let breakOnlyLineH;
+  if (breakOnly) {
+    const box = brLines > 1 ? height / brLines : height;
+    const inlineMult = el.style.getPropertyValue("--doc-line-mult");
+    const fixed = el.classList.contains("doc-lh-fixed") || !inlineMult && (el.style.getPropertyValue("--doc-line-fixed") || getComputedStyle(el).getPropertyValue("--doc-line-fixed")).trim() === "1";
+    const mult = fixed ? 1 : parseFloat(inlineMult || getComputedStyle(el).getPropertyValue("--doc-line-mult")) || 1;
+    breakOnlyLineH = box / Math.max(1, mult);
+  }
+  let hasText = false;
+  let leadingCount = 0;
+  let trailingCount = 0;
+  let leadingCut = false;
+  let leadingColBreak = false;
+  if (colBreakEls.length === 1) {
+    const r = document.createRange();
+    r.setStart(el, 0);
+    r.setEndBefore(colBreakEls[0]);
+    leadingColBreak = !r.toString().trim();
+  }
+  const innerBreaks = [];
+  if (hasBreak) {
+    const gapRects = Array.from(el.querySelectorAll(".page-gap-inline")).map(
+      (g2) => g2.getBoundingClientRect()
+    );
+    const gapAbove = (y2) => gapRects.reduce((s2, g2) => g2.top <= y2 ? s2 + g2.height : s2, 0);
+    const r = document.createRange();
+    const brs = breakEls.map((b2) => {
+      r.setStart(el, 0);
+      r.setEndBefore(b2);
+      const before = r.toString().trim() !== "";
+      r.setStartAfter(b2);
+      r.setEnd(el, el.childNodes.length);
+      const after = r.toString().trim() !== "";
+      return { b: b2, before, after };
+    });
+    hasText = brs.some((x2) => x2.before || x2.after);
+    leadingCount = brs.filter((x2) => !x2.before).length;
+    trailingCount = brs.filter((x2) => !x2.after).length;
+    brs.forEach(({ b: b2, before, after }, i2) => {
+      if (!after || !b2.classList.contains("doc-page-br")) return;
+      if (!before && i2 !== leadingCount - 1) return;
+      r.setStartAfter(b2);
+      r.setEnd(el, el.childNodes.length);
+      const first2 = Array.from(r.getClientRects?.() ?? []).find(
+        (c) => c.height > 0 && c.width > 0
+      );
+      if (!first2) return;
+      innerBreaks.push((first2.top - rect.top - gapAbove(first2.top)) / zoomFactor);
+      if (!before) leadingCut = true;
+    });
+  }
+  const fixedWidth = el.tagName === "TABLE" || el.classList.contains("doc-protected-textboxes") || !!el.querySelector("table");
+  return {
+    height,
+    innerGap,
+    innerBreaks,
+    hasBreak,
+    hasColBreak,
+    hasText,
+    leadingCount,
+    trailingCount,
+    leadingCut,
+    leadingColBreak,
+    ...breakOnlyLineH !== void 0 ? { breakOnlyLineH } : {},
+    emptyPara,
+    fixedWidth
+  };
+}
 function measureBlocks(pm, origin, zoomFactor) {
   const blocks = [];
   const floats = [];
@@ -123382,73 +123553,16 @@ function measureBlocks(pm, origin, zoomFactor) {
       if (idx) sectBreaks.add(parseInt(idx, 10));
       continue;
     }
-    const breakEls = Array.from(el.querySelectorAll(".doc-field-pagebreak, .doc-page-br")).filter(
-      (b2) => !b2.closest("td, th, .doc-textbox")
-    );
-    const hasBreak = breakEls.length > 0;
-    const colBreakEls = Array.from(el.querySelectorAll(".doc-col-br")).filter(
-      (b2) => !b2.closest("td, th, .doc-textbox")
-    );
-    const hasColBreak = colBreakEls.length > 0;
+    const fp = blockFingerprint(el, rect);
+    const cachedGeom = blockGeomCache.get(el);
+    const geom = cachedGeom?.fp === fp ? cachedGeom.g : scanBlockGeom(el, rect, zoomFactor);
+    if (!cachedGeom || cachedGeom.fp !== fp) blockGeomCache.set(el, { fp, g: geom });
+    const { hasBreak } = geom;
     if (rect.height <= 0 && !hasBreak) continue;
-    const innerGap = innerGapHeight(el);
     const top = (rect.top - anchorShiftPx(el) * zoomFactor - origin - gapAccum) / zoomFactor;
-    const height = (rect.height - innerGap) / zoomFactor;
+    const height = geom.height;
     const idxAttr = el.getAttribute("data-idx");
-    const breakOnly = hasBreak && !(el.textContent ?? "").trim() && !el.querySelector("img");
-    const brLines = breakOnly ? el.querySelectorAll("br").length : 0;
-    let breakOnlyLineH;
-    if (breakOnly) {
-      const box = brLines > 1 ? height / brLines : height;
-      const inlineMult = el.style.getPropertyValue("--doc-line-mult");
-      const fixed = el.classList.contains("doc-lh-fixed") || !inlineMult && (el.style.getPropertyValue("--doc-line-fixed") || getComputedStyle(el).getPropertyValue("--doc-line-fixed")).trim() === "1";
-      const mult = fixed ? 1 : parseFloat(inlineMult || getComputedStyle(el).getPropertyValue("--doc-line-mult")) || 1;
-      breakOnlyLineH = box / Math.max(1, mult);
-    }
-    let hasText = false;
-    let leadingCount = 0;
-    let trailingCount = 0;
-    let leadingCut = false;
-    let leadingColBreak = false;
-    if (colBreakEls.length === 1) {
-      const r = document.createRange();
-      r.setStart(el, 0);
-      r.setEndBefore(colBreakEls[0]);
-      leadingColBreak = !r.toString().trim();
-    }
-    const innerBreaks = [];
-    if (hasBreak) {
-      const gapRects = Array.from(el.querySelectorAll(".page-gap-inline")).map(
-        (g2) => g2.getBoundingClientRect()
-      );
-      const gapAbove = (y2) => gapRects.reduce((s2, g2) => g2.top <= y2 ? s2 + g2.height : s2, 0);
-      const r = document.createRange();
-      const brs = breakEls.map((b2) => {
-        r.setStart(el, 0);
-        r.setEndBefore(b2);
-        const before = r.toString().trim() !== "";
-        r.setStartAfter(b2);
-        r.setEnd(el, el.childNodes.length);
-        const after = r.toString().trim() !== "";
-        return { b: b2, before, after };
-      });
-      hasText = brs.some((x2) => x2.before || x2.after);
-      leadingCount = brs.filter((x2) => !x2.before).length;
-      trailingCount = brs.filter((x2) => !x2.after).length;
-      brs.forEach(({ b: b2, before, after }, i2) => {
-        if (!after || !b2.classList.contains("doc-page-br")) return;
-        if (!before && i2 !== leadingCount - 1) return;
-        r.setStartAfter(b2);
-        r.setEnd(el, el.childNodes.length);
-        const first22 = Array.from(r.getClientRects?.() ?? []).find(
-          (c) => c.height > 0 && c.width > 0
-        );
-        if (!first22) return;
-        innerBreaks.push((first22.top - rect.top - gapAbove(first22.top)) / zoomFactor);
-        if (!before) leadingCut = true;
-      });
-    }
-    const leadingBreak = hasText && leadingCount > 0 && !leadingCut;
+    const leadingBreak = geom.hasText && geom.leadingCount > 0 && !geom.leadingCut;
     const floatTable = el.classList.contains("doc-table-float-left") || el.classList.contains("doc-table-float-right");
     const floatFlowed = floatTable && el.classList.contains("doc-table-float-flow");
     const floated = /(?:^|\s)img-wrap-(?:square|tight|through)-(?:left|right)(?:\s|$)/.test(el.className) || el.classList.contains("doc-para-frame-float") || floatTable && !floatFlowed;
@@ -123456,8 +123570,7 @@ function measureBlocks(pm, origin, zoomFactor) {
     const relVAnchor = el.dataset.tblpVanchor;
     const relVSpec = el.dataset.tblpVspec;
     const relVApplied = Number.isFinite(relVy) ? parseFloat(el.dataset.tblpDy ?? "") || 0 : 0;
-    const emptyPara = !(el.textContent ?? "").trim() && !el.querySelector("img");
-    const fixedWidth = el.tagName === "TABLE" || el.classList.contains("doc-protected-textboxes") || !!el.querySelector("table");
+    const fixedWidth = geom.fixedWidth;
     const bandKeep = el.dataset.bandKeep === "1" && el.classList.contains("doc-protected-floating");
     const liftPx = parseFloat(el.dataset.tblpLift ?? "");
     blocks.push({
@@ -123474,24 +123587,24 @@ function measureBlocks(pm, origin, zoomFactor) {
         pageRelVAnchor: relVAnchor,
         ...relVSpec === "top" || relVSpec === "center" || relVSpec === "bottom" ? { pageRelVSpec: relVSpec } : {}
       } : {},
-      ...emptyPara ? { emptyPara: true } : {},
+      ...geom.emptyPara ? { emptyPara: true } : {},
       ...fixedWidth ? { fixedWidthPx: rect.width / zoomFactor } : { widthPx: rect.width / zoomFactor },
       breakBefore: el.classList.contains("page-break-before") || leadingBreak || void 0,
       breakBeforeBr: leadingBreak || void 0,
-      ...hasText && leadingCount > 1 ? { extraBreaksBefore: leadingCount - 1 } : {},
-      breakAfter: trailingCount > 0 || void 0,
-      ...trailingCount > 1 ? { extraBreaksAfter: trailingCount - 1 } : {},
-      ...innerBreaks.length > 0 ? { innerBreaks } : {},
-      colBreakBefore: leadingColBreak || void 0,
-      colBreakAfter: hasColBreak && !leadingColBreak || void 0,
+      ...geom.hasText && geom.leadingCount > 1 ? { extraBreaksBefore: geom.leadingCount - 1 } : {},
+      breakAfter: geom.trailingCount > 0 || void 0,
+      ...geom.trailingCount > 1 ? { extraBreaksAfter: geom.trailingCount - 1 } : {},
+      ...geom.innerBreaks.length > 0 ? { innerBreaks: geom.innerBreaks } : {},
+      colBreakBefore: geom.leadingColBreak || void 0,
+      colBreakAfter: geom.hasColBreak && !geom.leadingColBreak || void 0,
       breakForce: hasBreak && rect.height <= 0 || void 0,
       el,
-      ...breakOnlyLineH !== void 0 ? { breakOnlyLineH } : {},
+      ...geom.breakOnlyLineH !== void 0 ? { breakOnlyLineH: geom.breakOnlyLineH } : {},
       ...idxAttr ? { docxIndex: parseInt(idxAttr, 10) } : {},
       ...carryApplied > 0 ? { carryAppliedPx: carryApplied } : {}
     });
     carryApplied = 0;
-    if (!floated) gapAccum += innerGap;
+    if (!floated) gapAccum += geom.innerGap;
     totalHeight = Math.max(totalHeight, top + height);
   }
   for (let i2 = 0; i2 + 1 < blocks.length; i2++) {
@@ -125710,7 +125823,7 @@ function lineSampleSig(el, textH) {
     const per = Math.round((parseFloat(sp.style.wordSpacing) || 0) * -100);
     js = js * 33 + per + (sp.textContent?.length ?? 0) | 0;
   }
-  return `${lineSampleFontEpoch}:${Math.round(textH * 4)}:${Math.round(w2 * 4)}:${nodes}:${h}:${js}`;
+  return `${Math.round(textH * 4)}:${Math.round(w2 * 4)}:${nodes}:${h}:${js}`;
 }
 function fillLineBoxes(blocks, geoms, zoomFactor, slices, metaOf2) {
   const geomOf = (s2) => geoms[Math.max(0, Math.min(s2, geoms.length - 1))];
@@ -125759,10 +125872,15 @@ function fillLineBoxes(blocks, geoms, zoomFactor, slices, metaOf2) {
     const textH = block.height - (block.spaceAfterPx ?? 0) - (block.spaceBeforePx ?? 0) - (block.footnoteExtraPx ?? 0);
     const sig = lineSampleSig(block.el, textH);
     const cached2 = lineSampleCache.get(block.el);
-    const hit = cached2?.sig === sig ? cached2 : null;
+    let hit = cached2?.sig === sig ? cached2 : null;
+    if (hit && hit.epoch !== lineSampleFontEpoch) {
+      if (block.el.querySelector("tr")) hit = null;
+      else hit.epoch = lineSampleFontEpoch;
+    }
     if (block.el.querySelector("tr")) {
       const rows = hit?.rows ? hit.rows.map((r) => ({ ...r })) : domTableRows(block.el, textH, zoomFactor);
-      if (!hit?.rows) lineSampleCache.set(block.el, { sig, rows: rows.map((r) => ({ ...r })) });
+      if (!hit?.rows)
+        lineSampleCache.set(block.el, { sig, epoch: lineSampleFontEpoch, rows: rows.map((r) => ({ ...r })) });
       if (rows.length > 0) {
         const flags = block.docxIndex !== void 0 ? metaOf2?.(block.docxIndex)?.tableRowFlags : void 0;
         if (flags)
@@ -125790,6 +125908,7 @@ function fillLineBoxes(blocks, geoms, zoomFactor, slices, metaOf2) {
       soleLineBottom = lines.length === 1 ? lines[0].bottom : void 0;
       lineSampleCache.set(block.el, {
         sig,
+        epoch: lineSampleFontEpoch,
         boundaries: [...boundaries],
         ...soleLineBottom !== void 0 ? { soleLineBottom } : {}
       });
@@ -129453,6 +129572,7 @@ function tabGlyphLeft(view, pos) {
 const SEG_BREAKABLE_RE = /\s|[\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/;
 const MEASURE_RETRY_MAX = 10;
 const MEASURE_SIGS_MAX = 8;
+const STREAM_MEASURE_GAP_MS = 900;
 class TabLayoutView {
   constructor(view, storage) {
     this.view = view;
@@ -129478,6 +129598,7 @@ class TabLayoutView {
   frozen = false;
   retryRaf = 0;
   retries = 0;
+  streamMeasureAt = 0;
   resizeObserver;
   lastDomWidth = -1;
   // font swaps change text metrics, which shifts every tab's start x
@@ -129486,9 +129607,15 @@ class TabLayoutView {
     this.measure();
   };
   onPhasedSettled = () => {
-    this.invalidate();
     this.measure();
   };
+  /** once per duty-cycle window while a streamed tail is landing */
+  claimStreamMeasure() {
+    const now = performance.now();
+    if (now - this.streamMeasureAt < STREAM_MEASURE_GAP_MS) return false;
+    this.streamMeasureAt = now;
+    return true;
+  }
   /** external layout input changed: start a fresh convergence run */
   invalidate() {
     this.seenSigs.clear();
@@ -129527,7 +129654,7 @@ class TabLayoutView {
       this.retryRaf = 0;
     }
     const { view } = this;
-    if (isPhasedContentPending()) return;
+    if (isPhasedContentPending() && !this.claimStreamMeasure()) return;
     if (!view.dom.isConnected) {
       this.scheduleRetry();
       return;
@@ -154067,6 +154194,16 @@ function App() {
           gapsBuildMs: tGapsBuild,
           setGapsMs: tSetGaps
         };
+        const dbgPeak = window.__pageDebugPeak ?? {};
+        window.__pageDebugPeak = dbgPeak;
+        const ms2 = performance.now() - tStart;
+        if (ms2 > (dbgPeak.remeasureMsMax ?? 0)) {
+          dbgPeak.remeasureMsMax = ms2;
+          dbgPeak.measureMsAtMax = tMeasure;
+          dbgPeak.sliceMsAtMax = tSlice;
+          dbgPeak.gapsBuildMsAtMax = tGapsBuild;
+          dbgPeak.setGapsMsAtMax = tSetGaps;
+        }
         requestAnimationFrame(() => {
           const tf = performance.now();
           requestAnimationFrame(() => {
