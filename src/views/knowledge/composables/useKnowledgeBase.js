@@ -1,4 +1,5 @@
 import { ref, reactive, computed, nextTick, watch } from 'vue';
+import { useKnowledgeStore } from '@/store';
 import { coverOptions, DEFAULT_CATEGORIES } from '../constants';
 
 // Agent 智能体目录下需要隐藏的系统目录（SKILL 由后端维护不在侧边栏展示，仅显示 SANDBOX 及用户创建的目录）
@@ -6,6 +7,7 @@ const AGENT_HIDDEN_DIRS = ['memories', 'large_tool_results', 'SKILL'];
 
 export function useKnowledgeBase(fileSystem, sidebar, t = key => key) {
   const api = window.electronAPI;
+  const knowledgeStore = useKnowledgeStore();
   const selectedKB = ref('');
   const currentTitle = ref('知识库');
   const categories = reactive(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)).map(category => ({
@@ -67,6 +69,26 @@ export function useKnowledgeBase(fileSystem, sidebar, t = key => key) {
       }
     }
 
+    // 会话恢复：优先回到上次选中的知识库与停留目录（知识库/目录已删除则回退默认）
+    const savedState = knowledgeStore.sessionState;
+    if (savedState && savedState.selectedKB) {
+      const savedCategory = categories.find(c => c.id === savedState.categoryId);
+      const savedItem = savedCategory?.items.find(
+        i => i.id === savedState.selectedKB || i.name === savedState.title
+      );
+      if (savedItem) {
+        await selectKnowledgeBase(savedItem.id, savedItem.name, savedCategory.id);
+        const kbRoot = fileSystem.kbRootPath.value;
+        const savedPath = savedState.currentPath;
+        const inScope = savedPath && (savedPath === kbRoot || savedPath.startsWith(kbRoot + '/'));
+        if (inScope && await api.invoke('kb-path-exists', { path: savedPath })) {
+          await fileSystem.navigateTo(savedPath);
+        }
+        knowledgeStore.sessionState = null;
+        return;
+      }
+    }
+
     // 默认选中个人知识库中的第一个知识库
     const personalCategory = categories.find(c => c.id === 'personal');
     if (personalCategory && personalCategory.items.length > 0 && !selectedKB.value) {
@@ -92,6 +114,16 @@ export function useKnowledgeBase(fileSystem, sidebar, t = key => key) {
       category.expanded = !category.expanded;
     }
   }
+
+  // 记录当前知识库与停留目录，供退出时会话保存使用（未选中时清空）
+  watch(
+    () => [selectedKB.value, currentTitle.value, currentCategoryId.value, fileSystem.currentPath.value],
+    ([kbId, title, categoryId, currentPath]) => {
+      knowledgeStore.sessionState = kbId
+        ? { selectedKB: kbId, title, categoryId, currentPath }
+        : null;
+    }
+  );
 
   async function selectKnowledgeBase(id, name, categoryId) {
     selectedKB.value = id;

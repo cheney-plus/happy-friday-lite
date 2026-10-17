@@ -19,6 +19,7 @@ import { registerOfficeIpc } from './src-electron/office/office-ipc.js'
 import { isHeadlessExportRun, runHeadlessExportEntry } from './src-electron/office/office-headless.js'
 import { startObsidianScheduler, stopObsidianScheduler } from './src-electron/obsidian/scheduler.js'
 import { resolveDataDir, applyUserDataRedirect, migrateDataIfNeeded } from './src-electron/data-dir.js'
+import { initSession, registerSessionIpc } from './src-electron/session.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -151,6 +152,8 @@ async function ensureDataDir() {
 
   setConfigDataDir(dataDir)
   setDbDataDir(dataDir)
+  initSession(dataDir)
+  registerSessionIpc()
   await initDb()
 
   return dataDir

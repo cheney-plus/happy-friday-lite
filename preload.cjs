@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'get-config',
       'open-file-get-pending',
       'save-config',
+      'session-get',
+      'session-save',
       'get-platform',
       'save-file-dialog',
       'open-file-dialog',
@@ -189,7 +191,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const validChannels = [
       'window-minimize',
       'window-maximize',
-      'window-close'
+      'window-close',
+      'session-save-sync'
     ]
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args)

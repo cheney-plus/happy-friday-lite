@@ -32,9 +32,12 @@ import { allMenuConfigs, isElectronEnvironment } from '@/config/menu';
 import { useTheme } from '@/utils/theme';
 import { resolveFridayTabPath } from '@/utils/fridayNavigation';
 import { openMarkdownAsNotePage } from '@/utils/markdownImport';
+import { restoreSession, scheduleSessionSave, flushSessionSave } from '@/utils/tabSession';
+import { useKnowledgeStore } from '@/store';
 
 const appStore = useAppStore();
 const tabStore = useTabStore();
+const knowledgeStore = useKnowledgeStore();
 const route = useRoute();
 const router = useRouter();
 const { currentMode, initTheme, setTheme: applyThemeFromConfig } = useTheme();
@@ -55,6 +58,8 @@ const routerViewKey = computed(() => {
 let unlistenConfig = null;
 let unlistenOfficeOpened = null;
 let unlistenOpenFileRequest = null;
+let sessionSaveUnwatch = null;
+let unlistenBeforeUnload = null;
 
 /** 系统打开文件请求 → 路由到应用内对应查看器/编辑器 */
 async function handleOsOpenFile(filePath) {
@@ -182,20 +187,9 @@ onMounted(async () => {
   initTheme();
 
   if (isElectronEnvironment()) {
-    // 启动时先拉取主进程排队的系统打开文件请求（如双击 doc/ppt 用本应用打开），
-    // 处理完成后再移除遮罩露出界面，避免先渲染首页再跳转
+    let config = null;
     try {
-      const pending = await electronService.invoke('open-file-get-pending');
-      if (pending && pending.length > 0) {
-        for (const p of pending) {
-          await handleOsOpenFile(p);
-        }
-      }
-    } catch (_e) { /* 拉取失败按无待处理文件 */ }
-    startupOpening.value = false;
-
-    try {
-      const config = await electronService.invoke('get-config');
+      config = await electronService.invoke('get-config');
       if (config) {
         if (config.language) {
           appStore.setLanguage(config.language);
@@ -226,26 +220,58 @@ onMounted(async () => {
         if (config.collapseSidebarOnLaunch) {
           appStore.setSidebarVisible(false);
         }
-        // 启动首页：仅在仍停留在初始 Friday 页面时跳转，避免打断用户已开始的导航
-        await router.isReady();
-        const homePage = typeof config.homePage === 'string' && config.homePage ? config.homePage : '/friday';
-        if (homePage !== '/friday' && route.path.startsWith('/friday')) {
-          const homeKey = homePage.split('/')[1];
-          const moduleEnabled = homeKey === 'friday' || appStore.sidebarModules[homeKey] !== false;
-          const initialFridayTab = tabStore.openedTabs.find(t => t.path === '/friday');
-          if (moduleEnabled && initialFridayTab) {
-            try {
-              await router.replace(homePage);
-              if (tabStore.activeTabId !== initialFridayTab.id) {
-                tabStore.openedTabs = tabStore.openedTabs.filter(t => t.id !== initialFridayTab.id);
-              }
-            } catch (_e) {}
-          }
-        }
       }
     } catch (error) {
       console.error('Failed to load config:', error);
     }
+
+    // 会话恢复：还原上次打开的标签页、激活项与知识库目录（优先于首页跳转）
+    let sessionRestored = false;
+    try {
+      sessionRestored = await restoreSession(router);
+    } catch (_e) { /* 恢复失败按无会话处理 */ }
+
+    // 标签页/激活项/知识库目录变化时防抖保存会话；窗口关闭前兜底同步保存
+    sessionSaveUnwatch = watch(
+      () => [tabStore.openedTabs, tabStore.activeTabId, knowledgeStore.sessionState],
+      scheduleSessionSave,
+      { deep: true }
+    );
+    window.addEventListener('beforeunload', flushSessionSave);
+    unlistenBeforeUnload = () => window.removeEventListener('beforeunload', flushSessionSave);
+
+    // 启动首页：仅在无会话恢复且仍停留在初始 Friday 页面时跳转，避免打断恢复结果
+    if (!sessionRestored) {
+      await router.isReady();
+      const homePage = typeof config?.homePage === 'string' && config.homePage ? config.homePage : '/friday';
+      if (homePage !== '/friday' && route.path.startsWith('/friday')) {
+        const homeKey = homePage.split('/')[1];
+        const moduleEnabled = homeKey === 'friday' || appStore.sidebarModules[homeKey] !== false;
+        const initialFridayTab = tabStore.openedTabs.find(t => t.path === '/friday');
+        if (moduleEnabled && initialFridayTab) {
+          try {
+            await router.replace(homePage);
+            if (tabStore.activeTabId !== initialFridayTab.id) {
+              tabStore.openedTabs = tabStore.openedTabs.filter(t => t.id !== initialFridayTab.id);
+            }
+          } catch (_e) {}
+        }
+      }
+    }
+
+    // 系统打开文件请求（如双击 doc/ppt 用本应用打开）：在会话恢复之后处理，
+    // 避免恢复时整体替换标签列表把排队打开的文件标签冲掉
+    try {
+      const pending = await electronService.invoke('open-file-get-pending');
+      if (pending && pending.length > 0) {
+        for (const p of pending) {
+          await handleOsOpenFile(p);
+        }
+      }
+    } catch (_e) { /* 拉取失败按无待处理文件 */ }
+
+    // 恢复与跳转全部完成后移除遮罩露出界面
+    startupOpening.value = false;
 
     // 主进程内部发起的 Office 打开（如编辑器导出/转换生成的文件）：
     // 视图已在主进程创建，这里跳转到对应编辑器 Tab（Tab 由上方 office 分支自动创建）
@@ -303,6 +329,14 @@ onUnmounted(() => {
   if (unlistenOpenFileRequest) {
     unlistenOpenFileRequest();
     unlistenOpenFileRequest = null;
+  }
+  if (sessionSaveUnwatch) {
+    sessionSaveUnwatch();
+    sessionSaveUnwatch = null;
+  }
+  if (unlistenBeforeUnload) {
+    unlistenBeforeUnload();
+    unlistenBeforeUnload = null;
   }
 });
 </script>
