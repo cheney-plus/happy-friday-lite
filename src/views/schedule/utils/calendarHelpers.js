@@ -32,6 +32,27 @@ export function isDateInRange(date, start, end) {
   return date >= s && date <= e;
 }
 
+/** 日期字符串（YYYY-MM-DD）按天数平移 */
+export function shiftDateStr(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return formatDate(dt.getFullYear(), dt.getMonth(), dt.getDate());
+}
+
+/**
+ * "延期一周"的更新字段：有起止两个日期时结束日期 +7 天，
+ * 仅一个日期（单日日程）时该日期整体 +7 天；无日期日程返回 null。
+ */
+export function postponeEventUpdates(evt) {
+  if (!evt.start) return null;
+  if (!evt.end || evt.start === evt.end) {
+    const shifted = shiftDateStr(evt.start, 7);
+    return { start: shifted, end: shifted };
+  }
+  return { end: shiftDateStr(evt.end, 7) };
+}
+
 // ========== 事件颜色 ==========
 // 完成/未完成使用同一颜色，仅透明度不同：已完成 18（淡），未完成 40（深）
 
