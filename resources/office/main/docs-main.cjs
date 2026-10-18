@@ -18283,8 +18283,8 @@ function deepCompare(a, b) {
 }
 function toRomanNumerals(number, lowerCase = false) {
   assert(Number.isInteger(number) && number > 0, "The number should be a positive integer.");
-  const roman = "M".repeat(number / 1e3 | 0) + ROMAN_NUMBER_MAP[number % 1e3 / 100 | 0] + ROMAN_NUMBER_MAP[10 + (number % 100 / 10 | 0)] + ROMAN_NUMBER_MAP[20 + number % 10];
-  return lowerCase ? roman.toLowerCase() : roman;
+  const roman2 = "M".repeat(number / 1e3 | 0) + ROMAN_NUMBER_MAP[number % 1e3 / 100 | 0] + ROMAN_NUMBER_MAP[10 + (number % 100 / 10 | 0)] + ROMAN_NUMBER_MAP[20 + number % 10];
+  return lowerCase ? roman2.toLowerCase() : roman2;
 }
 function isWhiteSpace2(ch2) {
   return ch2 === 32 || ch2 === 9 || ch2 === 13 || ch2 === 10;
@@ -24490,12 +24490,12 @@ function createDataNode(root, container, expr) {
       return root.createNodes(parsed.slice(i));
     }
     if (index2 < children2.length) {
-      const child = children2[index2];
-      if (!child.isXFAObject) {
+      const child2 = children2[index2];
+      if (!child2.isXFAObject) {
         warn(`XFA - Cannot create a node.`);
         return null;
       }
-      root = child;
+      root = child2;
     } else {
       parsed[i].index = index2 - children2.length;
       return root.createNodes(parsed.slice(i));
@@ -24951,8 +24951,8 @@ function addHTML(node, html, bbox) {
       extra.width += w;
       extra.height = Math.max(extra.height, h);
       const height = measureToString(extra.height);
-      for (const child of extra.children) {
-        child.attributes.style.height = height;
+      for (const child2 of extra.children) {
+        child2.attributes.style.height = height;
       }
       break;
     }
@@ -25171,12 +25171,12 @@ function _setValue(templateNode, value) {
   templateNode.value[$setValue](value);
 }
 function* getContainedChildren(node) {
-  for (const child of node[$getChildren]()) {
-    if (child instanceof SubformSet) {
-      yield* child[$getContainedChildren]();
+  for (const child2 of node[$getChildren]()) {
+    if (child2 instanceof SubformSet) {
+      yield* child2[$getContainedChildren]();
       continue;
     }
-    yield child;
+    yield child2;
   }
 }
 function isRequired(node) {
@@ -25192,9 +25192,9 @@ function setTabIndex(node) {
       return;
     }
     let next = null;
-    for (const child of node.traversal[$getChildren]()) {
-      if (child.operation === "next") {
-        next = child;
+    for (const child2 of node.traversal[$getChildren]()) {
+      if (child2.operation === "next") {
+        next = child2;
         break;
       }
     }
@@ -29849,7 +29849,7 @@ var init_pdf_worker = __esm({
           }
         })();
         if (Uint8Array2) $2({ target: "Uint8Array", proto: true, forced: INCORRECT_BEHAVIOR_OR_DOESNT_EXISTS }, {
-          toHex: function toHex() {
+          toHex: function toHex2() {
             anUint8Array(this);
             notDetached(this.buffer);
             var result = $Array(this.length);
@@ -62431,7 +62431,7 @@ var init_pdf_worker = __esm({
         if (!this.childNodes) {
           return this.nodeValue || "";
         }
-        return this.childNodes.map((child) => child.textContent).join("");
+        return this.childNodes.map((child2) => child2.textContent).join("");
       }
       get children() {
         return this.childNodes || [];
@@ -62461,10 +62461,10 @@ var init_pdf_worker = __esm({
             } else {
               const [parent] = stack.pop();
               let siblingPos = 0;
-              for (const child of parent.childNodes) {
-                if (component.name === child.nodeName) {
+              for (const child2 of parent.childNodes) {
+                if (component.name === child2.nodeName) {
                   if (siblingPos === component.pos) {
-                    return child.searchNode(paths, pos + 1);
+                    return child2.searchNode(paths, pos + 1);
                   }
                   siblingPos++;
                 }
@@ -62506,8 +62506,8 @@ var init_pdf_worker = __esm({
         }
         if (this.hasChildNodes()) {
           buffer.push(">");
-          for (const child of this.childNodes) {
-            child.dump(buffer);
+          for (const child2 of this.childNodes) {
+            child2.dump(buffer);
           }
           buffer.push(`</${this.nodeName}>`);
         } else if (this.nodeValue) {
@@ -63486,11 +63486,11 @@ var init_pdf_worker = __esm({
         const root = /* @__PURE__ */ Object.create(null);
         root.children = [];
         root.role = "Root";
-        for (const child of this.nodes) {
-          if (!child) {
+        for (const child2 of this.nodes) {
+          if (!child2) {
             continue;
           }
-          nodeToSerializable(child, root);
+          nodeToSerializable(child2, root);
         }
         return root;
       }
@@ -65639,23 +65639,23 @@ var init_pdf_worker = __esm({
         }
         return node;
       }
-      [$onChild](child) {
-        if (!this[_hasChildren] || !this[$onChildCheck](child)) {
+      [$onChild](child2) {
+        if (!this[_hasChildren] || !this[$onChildCheck](child2)) {
           return false;
         }
-        const name = child[$nodeName];
+        const name = child2[$nodeName];
         const node = this[name];
         if (node instanceof XFAObjectArray) {
-          if (node.push(child)) {
-            this[$appendChild](child);
+          if (node.push(child2)) {
+            this[$appendChild](child2);
             return true;
           }
         } else {
           if (node !== null) {
             this[$removeChild](node);
           }
-          this[name] = child;
-          this[$appendChild](child);
+          this[name] = child2;
+          this[$appendChild](child2);
           return true;
         }
         let id = "";
@@ -65667,8 +65667,8 @@ var init_pdf_worker = __esm({
         warn(`XFA - node "${this[$nodeName]}"${id} has already enough "${name}"!`);
         return false;
       }
-      [$onChildCheck](child) {
-        return Object.hasOwn(this, child[$nodeName]) && child[$namespaceId] === this[$namespaceId];
+      [$onChildCheck](child2) {
+        return Object.hasOwn(this, child2[$nodeName]) && child2[$namespaceId] === this[$namespaceId];
       }
       [$isNsAgnostic]() {
         return false;
@@ -65704,15 +65704,15 @@ var init_pdf_worker = __esm({
       [$isThereMoreWidth]() {
         return false;
       }
-      [$appendChild](child) {
-        child[_parent] = this;
-        this[_children].push(child);
-        if (!child[$globalData] && this[$globalData]) {
-          child[$globalData] = this[$globalData];
+      [$appendChild](child2) {
+        child2[_parent] = this;
+        this[_children].push(child2);
+        if (!child2[$globalData] && this[$globalData]) {
+          child2[$globalData] = this[$globalData];
         }
       }
-      [$removeChild](child) {
-        const i = this[_children].indexOf(child);
+      [$removeChild](child2) {
+        const i = this[_children].indexOf(child2);
         this[_children].splice(i, 1);
       }
       [$hasSettableValue]() {
@@ -65731,14 +65731,14 @@ var init_pdf_worker = __esm({
           delete this[$cleanup];
         }
       }
-      [$indexOf](child) {
-        return this[_children].indexOf(child);
+      [$indexOf](child2) {
+        return this[_children].indexOf(child2);
       }
-      [$insertAt](i, child) {
-        child[_parent] = this;
-        this[_children].splice(i, 0, child);
-        if (!child[$globalData] && this[$globalData]) {
-          child[$globalData] = this[$globalData];
+      [$insertAt](i, child2) {
+        child2[_parent] = this;
+        this[_children].splice(i, 0, child2);
+        if (!child2[$globalData] && this[$globalData]) {
+          child2[$globalData] = this[$globalData];
         }
       }
       [$isTransparent]() {
@@ -65883,8 +65883,8 @@ var init_pdf_worker = __esm({
         return protoAttributes.keys().filter((x) => allAttr.has(x) && !setAttr.has(x)).toArray();
       }
       [$resolvePrototypes](ids, ancestors = /* @__PURE__ */ new Set()) {
-        for (const child of this[_children]) {
-          child[_resolvePrototypesHelper](ids, ancestors);
+        for (const child2 of this[_children]) {
+          child2[_resolvePrototypesHelper](ids, ancestors);
         }
       }
       [_resolvePrototypesHelper](ids, ancestors) {
@@ -65974,15 +65974,15 @@ var init_pdf_worker = __esm({
           const value = this[name];
           const protoValue = proto[name];
           if (value instanceof XFAObjectArray) {
-            for (const child of value[_children]) {
-              child[_resolvePrototypesHelper](ids, ancestors);
+            for (const child2 of value[_children]) {
+              child2[_resolvePrototypesHelper](ids, ancestors);
             }
             for (let i = value[_children].length, ii = protoValue[_children].length; i < ii; i++) {
-              const child = proto[_children][i][$clone]();
-              if (value.push(child)) {
-                child[_parent] = this;
-                this[_children].push(child);
-                child[_resolvePrototypesHelper](ids, ancestors);
+              const child2 = proto[_children][i][$clone]();
+              if (value.push(child2)) {
+                child2[_parent] = this;
+                this[_children].push(child2);
+                child2[_resolvePrototypesHelper](ids, ancestors);
               } else {
                 break;
               }
@@ -65997,11 +65997,11 @@ var init_pdf_worker = __esm({
             continue;
           }
           if (protoValue !== null) {
-            const child = protoValue[$clone]();
-            child[_parent] = this;
-            this[name] = child;
-            this[_children].push(child);
-            child[_resolvePrototypesHelper](ids, ancestors);
+            const child2 = protoValue[$clone]();
+            child2[_parent] = this;
+            this[name] = child2;
+            this[_children].push(child2);
+            child2[_resolvePrototypesHelper](ids, ancestors);
           }
         }
       }
@@ -66033,9 +66033,9 @@ var init_pdf_worker = __esm({
           const value = this[name];
           clone[name] = value instanceof XFAObjectArray ? new XFAObjectArray(value[_max]) : null;
         }
-        for (const child of this[_children]) {
-          const name = child[$nodeName];
-          const clonedChild = child[$clone]();
+        for (const child2 of this[_children]) {
+          const name = child2[$nodeName];
+          const clonedChild = child2[$clone]();
           clone[_children].push(clonedChild);
           clonedChild[_parent] = clone;
           if (clone[name] === null) {
@@ -66063,15 +66063,15 @@ var init_pdf_worker = __esm({
           yield this[_parent];
           return;
         }
-        for (const child of this[_children]) {
-          if (child[$nodeName] === name) {
-            yield child;
+        for (const child2 of this[_children]) {
+          if (child2[$nodeName] === name) {
+            yield child2;
           }
-          if (child.name === name) {
-            yield child;
+          if (child2.name === name) {
+            yield child2;
           }
-          if (allTransparent || child[$isTransparent]()) {
-            yield* child[$getChildrenByNameIt](name, allTransparent, false);
+          if (allTransparent || child2[$isTransparent]()) {
+            yield* child2[$getChildrenByNameIt](name, allTransparent, false);
           }
         }
         if (first && this[_attributeNames].has(name)) {
@@ -66090,13 +66090,13 @@ var init_pdf_worker = __esm({
       get isXFAObjectArray() {
         return true;
       }
-      push(child) {
+      push(child2) {
         const len = this[_children].length;
         if (len <= this[_max]) {
-          this[_children].push(child);
+          this[_children].push(child2);
           return true;
         }
-        warn(`XFA - node "${child[$nodeName]}" accepts no more than ${this[_max]} children`);
+        warn(`XFA - node "${child2[$nodeName]}" accepts no more than ${this[_max]} children`);
         return false;
       }
       isEmpty() {
@@ -66201,20 +66201,20 @@ var init_pdf_worker = __esm({
             this[$content][$toString](buf);
           }
         } else {
-          for (const child of this[_children]) {
-            child[$toString](buf);
+          for (const child2 of this[_children]) {
+            child2[$toString](buf);
           }
         }
         buf.push(`</${prefix}${utf8TagName}>`);
       }
-      [$onChild](child) {
+      [$onChild](child2) {
         if (this[$content]) {
           const node = new _XmlObject(this[$namespaceId], "#text");
           this[$appendChild](node);
           node[$content] = this[$content];
           this[$content] = "";
         }
-        this[$appendChild](child);
+        this[$appendChild](child2);
         return true;
       }
       [$onText](str) {
@@ -66258,12 +66258,12 @@ var init_pdf_worker = __esm({
         if (value) {
           yield value;
         }
-        for (const child of this[_children]) {
-          if (child[$nodeName] === name) {
-            yield child;
+        for (const child2 of this[_children]) {
+          if (child2[$nodeName] === name) {
+            yield child2;
           }
           if (allTransparent) {
-            yield* child[$getChildrenByNameIt](name, allTransparent);
+            yield* child2[$getChildrenByNameIt](name, allTransparent);
           }
         }
       }
@@ -66272,17 +66272,17 @@ var init_pdf_worker = __esm({
         if (value && (!skipConsumed || !value[$consumed])) {
           yield value;
         }
-        for (const child of this[_children]) {
-          yield* child[$getAttributeIt](name, skipConsumed);
+        for (const child2 of this[_children]) {
+          yield* child2[$getAttributeIt](name, skipConsumed);
         }
       }
       *[$getRealChildrenByNameIt](name, allTransparent, skipConsumed) {
-        for (const child of this[_children]) {
-          if (child[$nodeName] === name && (!skipConsumed || !child[$consumed])) {
-            yield child;
+        for (const child2 of this[_children]) {
+          if (child2[$nodeName] === name && (!skipConsumed || !child2[$consumed])) {
+            yield child2;
           }
           if (allTransparent) {
-            yield* child[$getRealChildrenByNameIt](name, allTransparent, skipConsumed);
+            yield* child2[$getRealChildrenByNameIt](name, allTransparent, skipConsumed);
           }
         }
       }
@@ -66318,8 +66318,8 @@ var init_pdf_worker = __esm({
         }
         dumped.$name = this[$nodeName];
         dumped.children = [];
-        for (const child of this[_children]) {
-          dumped.children.push(child[$dump](hasNS));
+        for (const child2 of this[_children]) {
+          dumped.children.push(child2[$dump](hasNS));
         }
         dumped.attributes = /* @__PURE__ */ Object.create(null);
         for (const [name, value] of this[_attributes]) {
@@ -67856,13 +67856,13 @@ var init_pdf_worker = __esm({
       [$isCDATAXml]() {
         return this.contentType === "text/html";
       }
-      [$onChild](child) {
-        if (this.contentType === "text/html" && child[$namespaceId] === NamespaceIds.xhtml.id) {
-          this[$content] = child;
+      [$onChild](child2) {
+        if (this.contentType === "text/html" && child2[$namespaceId] === NamespaceIds.xhtml.id) {
+          this[$content] = child2;
           return true;
         }
         if (this.contentType === "text/xml") {
-          this[$content] = child;
+          this[$content] = child2;
           return true;
         }
         return false;
@@ -68842,8 +68842,8 @@ var init_pdf_worker = __esm({
       }
       [$toHTML]() {
         const output = [];
-        for (const child of this[$getChildren]()) {
-          output.push(child[$text]());
+        for (const child2 of this[$getChildren]()) {
+          output.push(child2[$text]());
         }
         return HTMLResult.success(output);
       }
@@ -70431,12 +70431,12 @@ var init_pdf_worker = __esm({
       [$acceptWhitespace]() {
         return true;
       }
-      [$onChild](child) {
-        if (child[$namespaceId] === NamespaceIds.xhtml.id) {
-          this[$content] = child;
+      [$onChild](child2) {
+        if (child2[$namespaceId] === NamespaceIds.xhtml.id) {
+          this[$content] = child2;
           return true;
         }
-        warn(`XFA - Invalid content in Text: ${child[$nodeName]}.`);
+        warn(`XFA - Invalid content in Text: ${child2[$nodeName]}.`);
         return false;
       }
       [$onText](str) {
@@ -71165,7 +71165,7 @@ var init_pdf_worker = __esm({
             const value = data[$getDataValue]();
             formNode[$setValue](createText(value));
           } else if (formNode instanceof Field && formNode.ui?.choiceList?.open === "multiSelect") {
-            const value = data[$getChildren]().map((child) => child[$content].trim()).join("\n");
+            const value = data[$getChildren]().map((child2) => child2[$content].trim()).join("\n");
             formNode[$setValue](createText(value));
           } else if (this._isConsumeData()) {
             warn(`XFA - Nodes haven't the same type.`);
@@ -71420,54 +71420,54 @@ var init_pdf_worker = __esm({
       _bindElement(formNode, dataNode) {
         const uselessNodes = [];
         this._createOccurrences(formNode);
-        for (const child of formNode[$getChildren]()) {
-          if (child[$data]) {
+        for (const child2 of formNode[$getChildren]()) {
+          if (child2[$data]) {
             continue;
           }
-          if (this._mergeMode === void 0 && child[$nodeName] === "subform") {
-            this._mergeMode = child.mergeMode === "consumeData";
+          if (this._mergeMode === void 0 && child2[$nodeName] === "subform") {
+            this._mergeMode = child2.mergeMode === "consumeData";
             const dataChildren = dataNode[$getChildren]();
             if (dataChildren.length > 0) {
-              this._bindOccurrences(child, [dataChildren[0]], null);
+              this._bindOccurrences(child2, [dataChildren[0]], null);
             } else if (this.emptyMerge) {
               const nsId = dataNode[$namespaceId] === bind_NS_DATASETS ? -1 : dataNode[$namespaceId];
-              const dataChild = child[$data] = new XmlObject(nsId, child.name || "root");
+              const dataChild = child2[$data] = new XmlObject(nsId, child2.name || "root");
               dataNode[$appendChild](dataChild);
-              this._bindElement(child, dataChild);
+              this._bindElement(child2, dataChild);
             }
             continue;
           }
-          if (!child[$isBindable]()) {
+          if (!child2[$isBindable]()) {
             continue;
           }
           let global3 = false;
           let picture = null;
           let ref = null;
           let match = null;
-          if (child.bind) {
-            switch (child.bind.match) {
+          if (child2.bind) {
+            switch (child2.bind.match) {
               case "none":
-                this._setAndBind(child, dataNode);
+                this._setAndBind(child2, dataNode);
                 continue;
               case "global":
                 global3 = true;
                 break;
               case "dataRef":
-                if (!child.bind.ref) {
-                  warn(`XFA - ref is empty in node ${child[$nodeName]}.`);
-                  this._setAndBind(child, dataNode);
+                if (!child2.bind.ref) {
+                  warn(`XFA - ref is empty in node ${child2[$nodeName]}.`);
+                  this._setAndBind(child2, dataNode);
                   continue;
                 }
-                ref = child.bind.ref;
+                ref = child2.bind.ref;
                 break;
               default:
                 break;
             }
-            if (child.bind.picture) {
-              picture = child.bind.picture[$content];
+            if (child2.bind.picture) {
+              picture = child2.bind.picture[$content];
             }
           }
-          const [min, max] = this._getOccurInfo(child);
+          const [min, max] = this._getOccurInfo(child2);
           if (ref) {
             match = searchNode(this.root, dataNode, ref, true, false);
             if (match === null) {
@@ -71478,7 +71478,7 @@ var init_pdf_worker = __esm({
               if (this._isConsumeData()) {
                 match[$consumed] = true;
               }
-              this._setAndBind(child, match);
+              this._setAndBind(child2, match);
               continue;
             } else {
               if (this._isConsumeData()) {
@@ -71496,14 +71496,14 @@ var init_pdf_worker = __esm({
               }
             }
           } else {
-            if (!child.name) {
-              this._setAndBind(child, dataNode);
+            if (!child2.name) {
+              this._setAndBind(child2, dataNode);
               continue;
             }
             if (this._isConsumeData()) {
               const matches2 = [];
               while (matches2.length < max) {
-                const found = this._findDataByNameToConsume(child.name, child[$hasSettableValue](), dataNode, global3);
+                const found = this._findDataByNameToConsume(child2.name, child2[$hasSettableValue](), dataNode, global3);
                 if (!found) {
                   break;
                 }
@@ -71512,19 +71512,19 @@ var init_pdf_worker = __esm({
               }
               match = matches2.length > 0 ? matches2 : null;
             } else {
-              match = dataNode[$getRealChildrenByNameIt](child.name, false, this.emptyMerge).next().value;
+              match = dataNode[$getRealChildrenByNameIt](child2.name, false, this.emptyMerge).next().value;
               if (!match) {
                 if (min === 0) {
-                  uselessNodes.push(child);
+                  uselessNodes.push(child2);
                   continue;
                 }
                 const nsId = dataNode[$namespaceId] === bind_NS_DATASETS ? -1 : dataNode[$namespaceId];
-                match = child[$data] = new XmlObject(nsId, child.name);
+                match = child2[$data] = new XmlObject(nsId, child2.name);
                 if (this.emptyMerge) {
                   match[$consumed] = true;
                 }
                 dataNode[$appendChild](match);
-                this._setAndBind(child, match);
+                this._setAndBind(child2, match);
                 continue;
               }
               if (this.emptyMerge) {
@@ -71534,11 +71534,11 @@ var init_pdf_worker = __esm({
             }
           }
           if (match) {
-            this._bindOccurrences(child, match, picture);
+            this._bindOccurrences(child2, match, picture);
           } else if (min > 0) {
-            this._setAndBind(child, dataNode);
+            this._setAndBind(child2, dataNode);
           } else {
-            uselessNodes.push(child);
+            uselessNodes.push(child2);
           }
         }
         uselessNodes.forEach((node) => node[$getParent]()[$removeChild](node));
@@ -71558,12 +71558,12 @@ var init_pdf_worker = __esm({
             stack.pop();
             continue;
           }
-          const child = children2[++last[0]];
-          const storageEntry = storage.get(child[$uid]);
+          const child2 = children2[++last[0]];
+          const storageEntry = storage.get(child2[$uid]);
           if (storageEntry) {
-            child[$setValue](storageEntry);
+            child2[$setValue](storageEntry);
           } else {
-            const attributes = child[$getAttributes]();
+            const attributes = child2[$getAttributes]();
             for (const value of attributes.values()) {
               const entry = storage.get(value[$uid]);
               if (entry) {
@@ -71572,16 +71572,16 @@ var init_pdf_worker = __esm({
               }
             }
           }
-          const nodes = child[$getChildren]();
+          const nodes = child2[$getChildren]();
           if (nodes.length > 0) {
             stack.push([-1, nodes]);
           }
         }
         const buf = [`<xfa:datasets xmlns:xfa="http://www.xfa.org/schema/xfa-data/1.0/">`];
         if (this.dataset) {
-          for (const child of this.dataset[$getChildren]()) {
-            if (child[$nodeName] !== "data") {
-              child[$toString](buf);
+          for (const child2 of this.dataset[$getChildren]()) {
+            if (child2[$nodeName] !== "data") {
+              child2[$toString](buf);
             }
           }
         }
@@ -73182,12 +73182,12 @@ var init_pdf_worker = __esm({
         this.data = null;
         this.Signature = null;
       }
-      [$onChild](child) {
-        const name = child[$nodeName];
-        if (name === "data" && child[$namespaceId] === DATASETS_NS_ID || name === "Signature" && child[$namespaceId] === NamespaceIds.signature.id) {
-          this[name] = child;
+      [$onChild](child2) {
+        const name = child2[$nodeName];
+        if (name === "data" && child2[$namespaceId] === DATASETS_NS_ID || name === "Signature" && child2[$namespaceId] === NamespaceIds.signature.id) {
+          this[name] = child2;
         }
-        this[$appendChild](child);
+        this[$appendChild](child2);
       }
     };
     DatasetsNamespace = class _DatasetsNamespace {
@@ -73494,9 +73494,9 @@ var init_pdf_worker = __esm({
         this.stylesheet = new XFAObjectArray();
         this.template = null;
       }
-      [$onChildCheck](child) {
-        const ns = NamespaceIds[child[$nodeName]];
-        return ns && child[$namespaceId] === ns.id;
+      [$onChildCheck](child2) {
+        const ns = NamespaceIds[child2[$nodeName]];
+        return ns && child2[$namespaceId] === ns.id;
       }
     };
     XdpNamespace = class _XdpNamespace {
@@ -73617,12 +73617,12 @@ var init_pdf_worker = __esm({
         if (this[$content]) {
           measure.addString(this[$content]);
         } else {
-          for (const child of this[$getChildren]()) {
-            if (child[$nodeName] === "#text") {
-              measure.addString(child[$content]);
+          for (const child2 of this[$getChildren]()) {
+            if (child2[$nodeName] === "#text") {
+              measure.addString(child2[$content]);
               continue;
             }
-            child[$pushGlyphs](measure);
+            child2[$pushGlyphs](measure);
           }
         }
         if (mustPop) {
@@ -73727,9 +73727,9 @@ var init_pdf_worker = __esm({
           });
         }
         if (children2.length === 1) {
-          const child = children2[0];
-          if (child.attributes?.class.includes("xfaRich")) {
-            return HTMLResult.success(child);
+          const child2 = children2[0];
+          if (child2.attributes?.class.includes("xfaRich")) {
+            return HTMLResult.success(child2);
           }
         }
         return HTMLResult.success({
@@ -73874,8 +73874,8 @@ var init_pdf_worker = __esm({
         this.element = null;
         this[$ids] = ids;
       }
-      [$onChild](child) {
-        this.element = child;
+      [$onChild](child2) {
+        this.element = child2;
         return true;
       }
       [$finalize]() {
@@ -78181,7 +78181,7 @@ var init_pdf_worker = __esm({
         }
         const first = node.firstChild;
         if (first?.nodeName === "value") {
-          return node.children.map((child) => decodeString(child.textContent));
+          return node.children.map((child2) => decodeString(child2.textContent));
         }
         return decodeString(node.textContent);
       }
@@ -90897,7 +90897,7 @@ var init_pdf = __esm({
           }
         })();
         if (Uint8Array2) $2({ target: "Uint8Array", proto: true, forced: INCORRECT_BEHAVIOR_OR_DOESNT_EXISTS }, {
-          toHex: function toHex() {
+          toHex: function toHex2() {
             anUint8Array(this);
             notDetached(this.buffer);
             var result = $Array(this.length);
@@ -91739,8 +91739,8 @@ var init_pdf = __esm({
           if (!node.children) {
             return;
           }
-          for (const child of node.children) {
-            walk(child);
+          for (const child2 of node.children) {
+            walk(child2);
           }
         }
         walk(xfa);
@@ -91952,37 +91952,37 @@ var init_pdf = __esm({
             stack.pop();
             continue;
           }
-          const child = parent.children[++stack.at(-1)[1]];
-          if (child === null) {
+          const child2 = parent.children[++stack.at(-1)[1]];
+          if (child2 === null) {
             continue;
           }
           const {
             name
-          } = child;
+          } = child2;
           if (name === "#text") {
-            const node = document.createTextNode(child.value);
+            const node = document.createTextNode(child2.value);
             textDivs.push(node);
             html.append(node);
             continue;
           }
-          const childHtml = this.#createElement(name, child.attributes?.xmlns, intent);
+          const childHtml = this.#createElement(name, child2.attributes?.xmlns, intent);
           if (!childHtml) {
             continue;
           }
           html.append(childHtml);
-          if (child.attributes) {
+          if (child2.attributes) {
             this.setAttributes({
               html: childHtml,
-              element: child,
+              element: child2,
               storage,
               intent,
               linkService
             });
           }
-          if (child.children?.length > 0) {
-            stack.push([child, -1, childHtml]);
-          } else if (child.value) {
-            const node = document.createTextNode(child.value);
+          if (child2.children?.length > 0) {
+            stack.push([child2, -1, childHtml]);
+          } else if (child2.value) {
+            const node = document.createTextNode(child2.value);
             if (isNotForRichText && XfaText.shouldBuildText(name)) {
               textDivs.push(node);
             }
@@ -96755,10 +96755,10 @@ var init_pdf = __esm({
             }
           }
           let i = 0;
-          for (const child of children2) {
+          for (const child2 of children2) {
             const div = this.#allResizerDivs[i++];
             const name = div.getAttribute("data-resizer-name");
-            child.setAttribute("data-l10n-id", _AnnotationEditor._l10nResizer[name]);
+            child2.setAttribute("data-l10n-id", _AnnotationEditor._l10nResizer[name]);
           }
         }
         this.#setResizerTabIndex(0);
@@ -106526,8 +106526,8 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           return;
         }
         const i = this.#uiManager.highlightColors.values();
-        for (const child of this.#dropdown.children) {
-          child.ariaSelected = i.next().value === color.toUpperCase();
+        for (const child2 of this.#dropdown.children) {
+          child2.ariaSelected = i.next().value === color.toUpperCase();
         }
       }
       destroy() {
@@ -110176,13 +110176,13 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
             canvas.ariaHidden = true;
           }
           const toRemove = [];
-          for (const child of element.children) {
-            if (child.nodeName === "CANVAS") {
-              toRemove.push(child);
+          for (const child2 of element.children) {
+            if (child2.nodeName === "CANVAS") {
+              toRemove.push(child2);
             }
           }
-          for (const child of toRemove) {
-            child.remove();
+          for (const child2 of toRemove) {
+            child2.remove();
           }
           const firstCanvas = Array.isArray(canvas) ? canvas[0] : canvas;
           const {
@@ -110517,12 +110517,12 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
         const buffer = [];
         this.editorDiv.normalize();
         let prevChild = null;
-        for (const child of this.editorDiv.childNodes) {
-          if (prevChild?.nodeType === Node.TEXT_NODE && child.nodeName === "BR") {
+        for (const child2 of this.editorDiv.childNodes) {
+          if (prevChild?.nodeType === Node.TEXT_NODE && child2.nodeName === "BR") {
             continue;
           }
-          buffer.push(_FreeTextEditor.#getNodeContent(child));
-          prevChild = child;
+          buffer.push(_FreeTextEditor.#getNodeContent(child2));
+          prevChild = child2;
         }
         return buffer.join("\n");
       }
@@ -110734,23 +110734,23 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           bufferAfter.push(startContainer.nodeValue.slice(startOffset).replaceAll(EOL_PATTERN, ""));
           if (parent !== this.editorDiv) {
             let buffer = bufferBefore;
-            for (const child of this.editorDiv.childNodes) {
-              if (child === parent) {
+            for (const child2 of this.editorDiv.childNodes) {
+              if (child2 === parent) {
                 buffer = bufferAfter;
                 continue;
               }
-              buffer.push(_FreeTextEditor.#getNodeContent(child));
+              buffer.push(_FreeTextEditor.#getNodeContent(child2));
             }
           }
           bufferBefore.push(startContainer.nodeValue.slice(0, startOffset).replaceAll(EOL_PATTERN, ""));
         } else if (startContainer === this.editorDiv) {
           let buffer = bufferBefore;
           let i = 0;
-          for (const child of this.editorDiv.childNodes) {
+          for (const child2 of this.editorDiv.childNodes) {
             if (i++ === startOffset) {
               buffer = bufferAfter;
             }
-            buffer.push(_FreeTextEditor.#getNodeContent(child));
+            buffer.push(_FreeTextEditor.#getNodeContent(child2));
           }
         }
         this.#content = `${bufferBefore.join("\n")}${paste}${bufferAfter.join("\n")}`;
@@ -137746,13 +137746,13 @@ var require_XMLNamedNodeMap = __commonJS({
         XMLNamedNodeMap2.prototype.item = function(index2) {
           return this.nodes[Object.keys(this.nodes)[index2]] || null;
         };
-        XMLNamedNodeMap2.prototype.getNamedItemNS = function(namespaceURI, localName) {
+        XMLNamedNodeMap2.prototype.getNamedItemNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented.");
         };
         XMLNamedNodeMap2.prototype.setNamedItemNS = function(node) {
           throw new Error("This DOM method is not implemented.");
         };
-        XMLNamedNodeMap2.prototype.removeNamedItemNS = function(namespaceURI, localName) {
+        XMLNamedNodeMap2.prototype.removeNamedItemNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented.");
         };
         return XMLNamedNodeMap2;
@@ -137765,17 +137765,17 @@ var require_XMLNamedNodeMap = __commonJS({
 var require_XMLElement = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLElement.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLAttribute, XMLElement, XMLNamedNodeMap, XMLNode, getValue, isFunction, isObject, ref, extend = function(child, parent) {
+      var NodeType, XMLAttribute, XMLElement, XMLNamedNodeMap, XMLNode, getValue, isFunction, isObject, ref, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       ref = require_Utility(), isObject = ref.isObject, isFunction = ref.isFunction, getValue = ref.getValue;
       XMLNode = require_XMLNode();
@@ -137785,7 +137785,7 @@ var require_XMLElement = __commonJS({
       module2.exports = XMLElement = (function(superClass) {
         extend(XMLElement2, superClass);
         function XMLElement2(parent, name, attributes) {
-          var child, j, len, ref1;
+          var child2, j, len, ref1;
           XMLElement2.__super__.constructor.call(this, parent);
           if (name == null) {
             throw new Error("Missing element name. " + this.debugInfo());
@@ -137804,9 +137804,9 @@ var require_XMLElement = __commonJS({
             if (parent.children) {
               ref1 = parent.children;
               for (j = 0, len = ref1.length; j < len; j++) {
-                child = ref1[j];
-                if (child.type === NodeType.DocType) {
-                  child.name = this.name;
+                child2 = ref1[j];
+                if (child2.type === NodeType.DocType) {
+                  child2.name = this.name;
                   break;
                 }
               }
@@ -137870,9 +137870,9 @@ var require_XMLElement = __commonJS({
             clonedSelf.attribs[attName] = att.clone();
           }
           clonedSelf.children = [];
-          this.children.forEach(function(child) {
+          this.children.forEach(function(child2) {
             var clonedChild;
-            clonedChild = child.clone();
+            clonedChild = child2.clone();
             clonedChild.parent = clonedSelf;
             return clonedSelf.children.push(clonedChild);
           });
@@ -137952,28 +137952,28 @@ var require_XMLElement = __commonJS({
         XMLElement2.prototype.getElementsByTagName = function(name) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
-        XMLElement2.prototype.getAttributeNS = function(namespaceURI, localName) {
+        XMLElement2.prototype.getAttributeNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
         XMLElement2.prototype.setAttributeNS = function(namespaceURI, qualifiedName, value) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
-        XMLElement2.prototype.removeAttributeNS = function(namespaceURI, localName) {
+        XMLElement2.prototype.removeAttributeNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
-        XMLElement2.prototype.getAttributeNodeNS = function(namespaceURI, localName) {
+        XMLElement2.prototype.getAttributeNodeNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
         XMLElement2.prototype.setAttributeNodeNS = function(newAttr) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
-        XMLElement2.prototype.getElementsByTagNameNS = function(namespaceURI, localName) {
+        XMLElement2.prototype.getElementsByTagNameNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
         XMLElement2.prototype.hasAttribute = function(name) {
           return this.attribs.hasOwnProperty(name);
         };
-        XMLElement2.prototype.hasAttributeNS = function(namespaceURI, localName) {
+        XMLElement2.prototype.hasAttributeNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
         XMLElement2.prototype.setIdAttribute = function(name, isId) {
@@ -137983,7 +137983,7 @@ var require_XMLElement = __commonJS({
             return isId;
           }
         };
-        XMLElement2.prototype.setIdAttributeNS = function(namespaceURI, localName, isId) {
+        XMLElement2.prototype.setIdAttributeNS = function(namespaceURI, localName2, isId) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
         XMLElement2.prototype.setIdAttributeNode = function(idAttr, isId) {
@@ -137992,7 +137992,7 @@ var require_XMLElement = __commonJS({
         XMLElement2.prototype.getElementsByTagName = function(tagname) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
-        XMLElement2.prototype.getElementsByTagNameNS = function(namespaceURI, localName) {
+        XMLElement2.prototype.getElementsByTagNameNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
         XMLElement2.prototype.getElementsByClassName = function(classNames) {
@@ -138032,17 +138032,17 @@ var require_XMLElement = __commonJS({
 var require_XMLCharacterData = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLCharacterData.js"(exports2, module2) {
     (function() {
-      var XMLCharacterData, XMLNode, extend = function(child, parent) {
+      var XMLCharacterData, XMLNode, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       XMLNode = require_XMLNode();
       module2.exports = XMLCharacterData = (function(superClass) {
@@ -138109,17 +138109,17 @@ var require_XMLCharacterData = __commonJS({
 var require_XMLCData = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLCData.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLCData, XMLCharacterData, extend = function(child, parent) {
+      var NodeType, XMLCData, XMLCharacterData, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       NodeType = require_NodeType();
       XMLCharacterData = require_XMLCharacterData();
@@ -138150,17 +138150,17 @@ var require_XMLCData = __commonJS({
 var require_XMLComment = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLComment.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLCharacterData, XMLComment, extend = function(child, parent) {
+      var NodeType, XMLCharacterData, XMLComment, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       NodeType = require_NodeType();
       XMLCharacterData = require_XMLCharacterData();
@@ -138191,17 +138191,17 @@ var require_XMLComment = __commonJS({
 var require_XMLDeclaration = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDeclaration.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDeclaration, XMLNode, isObject, extend = function(child, parent) {
+      var NodeType, XMLDeclaration, XMLNode, isObject, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       isObject = require_Utility().isObject;
       XMLNode = require_XMLNode();
@@ -138239,17 +138239,17 @@ var require_XMLDeclaration = __commonJS({
 var require_XMLDTDAttList = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDAttList.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDTDAttList, XMLNode, extend = function(child, parent) {
+      var NodeType, XMLDTDAttList, XMLNode, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       XMLNode = require_XMLNode();
       NodeType = require_NodeType();
@@ -138300,17 +138300,17 @@ var require_XMLDTDAttList = __commonJS({
 var require_XMLDTDEntity = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDEntity.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDTDEntity, XMLNode, isObject, extend = function(child, parent) {
+      var NodeType, XMLDTDEntity, XMLNode, isObject, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       isObject = require_Utility().isObject;
       XMLNode = require_XMLNode();
@@ -138396,17 +138396,17 @@ var require_XMLDTDEntity = __commonJS({
 var require_XMLDTDElement = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDElement.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDTDElement, XMLNode, extend = function(child, parent) {
+      var NodeType, XMLDTDElement, XMLNode, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       XMLNode = require_XMLNode();
       NodeType = require_NodeType();
@@ -138440,17 +138440,17 @@ var require_XMLDTDElement = __commonJS({
 var require_XMLDTDNotation = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDNotation.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDTDNotation, XMLNode, extend = function(child, parent) {
+      var NodeType, XMLDTDNotation, XMLNode, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       XMLNode = require_XMLNode();
       NodeType = require_NodeType();
@@ -138496,17 +138496,17 @@ var require_XMLDTDNotation = __commonJS({
 var require_XMLDocType = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDocType.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDocType, XMLNamedNodeMap, XMLNode, isObject, extend = function(child, parent) {
+      var NodeType, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDocType, XMLNamedNodeMap, XMLNode, isObject, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       isObject = require_Utility().isObject;
       XMLNode = require_XMLNode();
@@ -138519,15 +138519,15 @@ var require_XMLDocType = __commonJS({
       module2.exports = XMLDocType = (function(superClass) {
         extend(XMLDocType2, superClass);
         function XMLDocType2(parent, pubID, sysID) {
-          var child, i, len, ref, ref1, ref2;
+          var child2, i, len, ref, ref1, ref2;
           XMLDocType2.__super__.constructor.call(this, parent);
           this.type = NodeType.DocType;
           if (parent.children) {
             ref = parent.children;
             for (i = 0, len = ref.length; i < len; i++) {
-              child = ref[i];
-              if (child.type === NodeType.Element) {
-                this.name = child.name;
+              child2 = ref[i];
+              if (child2.type === NodeType.Element) {
+                this.name = child2.name;
                 break;
               }
             }
@@ -138548,13 +138548,13 @@ var require_XMLDocType = __commonJS({
         }
         Object.defineProperty(XMLDocType2.prototype, "entities", {
           get: function() {
-            var child, i, len, nodes, ref;
+            var child2, i, len, nodes, ref;
             nodes = {};
             ref = this.children;
             for (i = 0, len = ref.length; i < len; i++) {
-              child = ref[i];
-              if (child.type === NodeType.EntityDeclaration && !child.pe) {
-                nodes[child.name] = child;
+              child2 = ref[i];
+              if (child2.type === NodeType.EntityDeclaration && !child2.pe) {
+                nodes[child2.name] = child2;
               }
             }
             return new XMLNamedNodeMap(nodes);
@@ -138562,13 +138562,13 @@ var require_XMLDocType = __commonJS({
         });
         Object.defineProperty(XMLDocType2.prototype, "notations", {
           get: function() {
-            var child, i, len, nodes, ref;
+            var child2, i, len, nodes, ref;
             nodes = {};
             ref = this.children;
             for (i = 0, len = ref.length; i < len; i++) {
-              child = ref[i];
-              if (child.type === NodeType.NotationDeclaration) {
-                nodes[child.name] = child;
+              child2 = ref[i];
+              if (child2.type === NodeType.NotationDeclaration) {
+                nodes[child2.name] = child2;
               }
             }
             return new XMLNamedNodeMap(nodes);
@@ -138590,33 +138590,33 @@ var require_XMLDocType = __commonJS({
           }
         });
         XMLDocType2.prototype.element = function(name, value) {
-          var child;
-          child = new XMLDTDElement(this, name, value);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLDTDElement(this, name, value);
+          this.children.push(child2);
           return this;
         };
         XMLDocType2.prototype.attList = function(elementName, attributeName, attributeType, defaultValueType, defaultValue) {
-          var child;
-          child = new XMLDTDAttList(this, elementName, attributeName, attributeType, defaultValueType, defaultValue);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLDTDAttList(this, elementName, attributeName, attributeType, defaultValueType, defaultValue);
+          this.children.push(child2);
           return this;
         };
         XMLDocType2.prototype.entity = function(name, value) {
-          var child;
-          child = new XMLDTDEntity(this, false, name, value);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLDTDEntity(this, false, name, value);
+          this.children.push(child2);
           return this;
         };
         XMLDocType2.prototype.pEntity = function(name, value) {
-          var child;
-          child = new XMLDTDEntity(this, true, name, value);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLDTDEntity(this, true, name, value);
+          this.children.push(child2);
           return this;
         };
         XMLDocType2.prototype.notation = function(name, value) {
-          var child;
-          child = new XMLDTDNotation(this, name, value);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLDTDNotation(this, name, value);
+          this.children.push(child2);
           return this;
         };
         XMLDocType2.prototype.toString = function(options) {
@@ -138665,17 +138665,17 @@ var require_XMLDocType = __commonJS({
 var require_XMLRaw = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLRaw.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLNode, XMLRaw, extend = function(child, parent) {
+      var NodeType, XMLNode, XMLRaw, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       NodeType = require_NodeType();
       XMLNode = require_XMLNode();
@@ -138705,17 +138705,17 @@ var require_XMLRaw = __commonJS({
 var require_XMLText = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLText.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLCharacterData, XMLText, extend = function(child, parent) {
+      var NodeType, XMLCharacterData, XMLText, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       NodeType = require_NodeType();
       XMLCharacterData = require_XMLCharacterData();
@@ -138775,17 +138775,17 @@ var require_XMLText = __commonJS({
 var require_XMLProcessingInstruction = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLProcessingInstruction.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLCharacterData, XMLProcessingInstruction, extend = function(child, parent) {
+      var NodeType, XMLCharacterData, XMLProcessingInstruction, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       NodeType = require_NodeType();
       XMLCharacterData = require_XMLCharacterData();
@@ -138828,17 +138828,17 @@ var require_XMLProcessingInstruction = __commonJS({
 var require_XMLDummy = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDummy.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDummy, XMLNode, extend = function(child, parent) {
+      var NodeType, XMLDummy, XMLNode, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       XMLNode = require_XMLNode();
       NodeType = require_NodeType();
@@ -139006,14 +139006,14 @@ var require_XMLNode = __commonJS({
         });
         Object.defineProperty(XMLNode2.prototype, "textContent", {
           get: function() {
-            var child, j, len, ref2, str;
+            var child2, j, len, ref2, str;
             if (this.nodeType === NodeType.Element || this.nodeType === NodeType.DocumentFragment) {
               str = "";
               ref2 = this.children;
               for (j = 0, len = ref2.length; j < len; j++) {
-                child = ref2[j];
-                if (child.textContent) {
-                  str += child.textContent;
+                child2 = ref2[j];
+                if (child2.textContent) {
+                  str += child2.textContent;
                 }
               }
               return str;
@@ -139026,7 +139026,7 @@ var require_XMLNode = __commonJS({
           }
         });
         XMLNode2.prototype.setParent = function(parent) {
-          var child, j, len, ref2, results;
+          var child2, j, len, ref2, results;
           this.parent = parent;
           if (parent) {
             this.options = parent.options;
@@ -139035,8 +139035,8 @@ var require_XMLNode = __commonJS({
           ref2 = this.children;
           results = [];
           for (j = 0, len = ref2.length; j < len; j++) {
-            child = ref2[j];
-            results.push(child.setParent(this));
+            child2 = ref2[j];
+            results.push(child2.setParent(this));
           }
           return results;
         };
@@ -139119,7 +139119,7 @@ var require_XMLNode = __commonJS({
           return lastChild;
         };
         XMLNode2.prototype.insertBefore = function(name, attributes, text) {
-          var child, i, newChild, refChild, removed;
+          var child2, i, newChild, refChild, removed;
           if (name != null ? name.type : void 0) {
             newChild = name;
             refChild = attributes;
@@ -139139,21 +139139,21 @@ var require_XMLNode = __commonJS({
             }
             i = this.parent.children.indexOf(this);
             removed = this.parent.children.splice(i);
-            child = this.parent.element(name, attributes, text);
+            child2 = this.parent.element(name, attributes, text);
             Array.prototype.push.apply(this.parent.children, removed);
-            return child;
+            return child2;
           }
         };
         XMLNode2.prototype.insertAfter = function(name, attributes, text) {
-          var child, i, removed;
+          var child2, i, removed;
           if (this.isRoot) {
             throw new Error("Cannot insert elements at root level. " + this.debugInfo(name));
           }
           i = this.parent.children.indexOf(this);
           removed = this.parent.children.splice(i + 1);
-          child = this.parent.element(name, attributes, text);
+          child2 = this.parent.element(name, attributes, text);
           Array.prototype.push.apply(this.parent.children, removed);
-          return child;
+          return child2;
         };
         XMLNode2.prototype.remove = function() {
           var i, ref2;
@@ -139165,7 +139165,7 @@ var require_XMLNode = __commonJS({
           return this.parent;
         };
         XMLNode2.prototype.node = function(name, attributes, text) {
-          var child, ref2;
+          var child2, ref2;
           if (name != null) {
             name = getValue(name);
           }
@@ -139174,60 +139174,60 @@ var require_XMLNode = __commonJS({
           if (!isObject(attributes)) {
             ref2 = [attributes, text], text = ref2[0], attributes = ref2[1];
           }
-          child = new XMLElement(this, name, attributes);
+          child2 = new XMLElement(this, name, attributes);
           if (text != null) {
-            child.text(text);
+            child2.text(text);
           }
-          this.children.push(child);
-          return child;
+          this.children.push(child2);
+          return child2;
         };
         XMLNode2.prototype.text = function(value) {
-          var child;
+          var child2;
           if (isObject(value)) {
             this.element(value);
           }
-          child = new XMLText(this, value);
-          this.children.push(child);
+          child2 = new XMLText(this, value);
+          this.children.push(child2);
           return this;
         };
         XMLNode2.prototype.cdata = function(value) {
-          var child;
-          child = new XMLCData(this, value);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLCData(this, value);
+          this.children.push(child2);
           return this;
         };
         XMLNode2.prototype.comment = function(value) {
-          var child;
-          child = new XMLComment(this, value);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLComment(this, value);
+          this.children.push(child2);
           return this;
         };
         XMLNode2.prototype.commentBefore = function(value) {
-          var child, i, removed;
+          var child2, i, removed;
           i = this.parent.children.indexOf(this);
           removed = this.parent.children.splice(i);
-          child = this.parent.comment(value);
+          child2 = this.parent.comment(value);
           Array.prototype.push.apply(this.parent.children, removed);
           return this;
         };
         XMLNode2.prototype.commentAfter = function(value) {
-          var child, i, removed;
+          var child2, i, removed;
           i = this.parent.children.indexOf(this);
           removed = this.parent.children.splice(i + 1);
-          child = this.parent.comment(value);
+          child2 = this.parent.comment(value);
           Array.prototype.push.apply(this.parent.children, removed);
           return this;
         };
         XMLNode2.prototype.raw = function(value) {
-          var child;
-          child = new XMLRaw(this, value);
-          this.children.push(child);
+          var child2;
+          child2 = new XMLRaw(this, value);
+          this.children.push(child2);
           return this;
         };
         XMLNode2.prototype.dummy = function() {
-          var child;
-          child = new XMLDummy(this);
-          return child;
+          var child2;
+          child2 = new XMLDummy(this);
+          return child2;
         };
         XMLNode2.prototype.instruction = function(target, value) {
           var insTarget, insValue, instruction, j, len;
@@ -139258,18 +139258,18 @@ var require_XMLNode = __commonJS({
           return this;
         };
         XMLNode2.prototype.instructionBefore = function(target, value) {
-          var child, i, removed;
+          var child2, i, removed;
           i = this.parent.children.indexOf(this);
           removed = this.parent.children.splice(i);
-          child = this.parent.instruction(target, value);
+          child2 = this.parent.instruction(target, value);
           Array.prototype.push.apply(this.parent.children, removed);
           return this;
         };
         XMLNode2.prototype.instructionAfter = function(target, value) {
-          var child, i, removed;
+          var child2, i, removed;
           i = this.parent.children.indexOf(this);
           removed = this.parent.children.splice(i + 1);
-          child = this.parent.instruction(target, value);
+          child2 = this.parent.instruction(target, value);
           Array.prototype.push.apply(this.parent.children, removed);
           return this;
         };
@@ -139287,21 +139287,21 @@ var require_XMLNode = __commonJS({
           return doc.root() || doc;
         };
         XMLNode2.prototype.dtd = function(pubID, sysID) {
-          var child, doc, doctype, i, j, k, len, len1, ref2, ref3;
+          var child2, doc, doctype, i, j, k, len, len1, ref2, ref3;
           doc = this.document();
           doctype = new XMLDocType(doc, pubID, sysID);
           ref2 = doc.children;
           for (i = j = 0, len = ref2.length; j < len; i = ++j) {
-            child = ref2[i];
-            if (child.type === NodeType.DocType) {
+            child2 = ref2[i];
+            if (child2.type === NodeType.DocType) {
               doc.children[i] = doctype;
               return doctype;
             }
           }
           ref3 = doc.children;
           for (i = k = 0, len1 = ref3.length; k < len1; i = ++k) {
-            child = ref3[i];
-            if (child.isRoot) {
+            child2 = ref3[i];
+            if (child2.isRoot) {
               doc.children.splice(i, 0, doctype);
               return doctype;
             }
@@ -139520,14 +139520,14 @@ var require_XMLNode = __commonJS({
           return other === this || this.isDescendant(other);
         };
         XMLNode2.prototype.isDescendant = function(node) {
-          var child, isDescendantChild, j, len, ref2;
+          var child2, isDescendantChild, j, len, ref2;
           ref2 = this.children;
           for (j = 0, len = ref2.length; j < len; j++) {
-            child = ref2[j];
-            if (node === child) {
+            child2 = ref2[j];
+            if (node === child2) {
               return true;
             }
-            isDescendantChild = child.isDescendant(node);
+            isDescendantChild = child2.isDescendant(node);
             if (isDescendantChild) {
               return true;
             }
@@ -139574,15 +139574,15 @@ var require_XMLNode = __commonJS({
           }
         };
         XMLNode2.prototype.foreachTreeNode = function(node, func) {
-          var child, j, len, ref2, res;
+          var child2, j, len, ref2, res;
           node || (node = this.document());
           ref2 = node.children;
           for (j = 0, len = ref2.length; j < len; j++) {
-            child = ref2[j];
-            if (res = func(child)) {
+            child2 = ref2[j];
+            if (res = func(child2)) {
               return res;
             } else {
-              res = this.foreachTreeNode(child, func);
+              res = this.foreachTreeNode(child2, func);
               if (res) {
                 return res;
               }
@@ -139953,7 +139953,7 @@ var require_XMLWriterBase = __commonJS({
           return r;
         };
         XMLWriterBase2.prototype.docType = function(node, options, level) {
-          var child, i, len, r, ref;
+          var child2, i, len, r, ref;
           level || (level = 0);
           this.openNode(node, options, level);
           options.state = WriterState.OpenTag;
@@ -139970,8 +139970,8 @@ var require_XMLWriterBase = __commonJS({
             options.state = WriterState.InsideTag;
             ref = node.children;
             for (i = 0, len = ref.length; i < len; i++) {
-              child = ref[i];
-              r += this.writeChildNode(child, options, level + 1);
+              child2 = ref[i];
+              r += this.writeChildNode(child2, options, level + 1);
             }
             options.state = WriterState.CloseTag;
             r += "]";
@@ -139984,7 +139984,7 @@ var require_XMLWriterBase = __commonJS({
           return r;
         };
         XMLWriterBase2.prototype.element = function(node, options, level) {
-          var att, child, childNodeCount, firstChildNode, i, j, len, len1, name, prettySuppressed, r, ref, ref1, ref2;
+          var att, child2, childNodeCount, firstChildNode, i, j, len, len1, name, prettySuppressed, r, ref, ref1, ref2;
           level || (level = 0);
           prettySuppressed = false;
           r = "";
@@ -140024,8 +140024,8 @@ var require_XMLWriterBase = __commonJS({
             if (options.dontPrettyTextNodes) {
               ref1 = node.children;
               for (i = 0, len = ref1.length; i < len; i++) {
-                child = ref1[i];
-                if ((child.type === NodeType.Text || child.type === NodeType.Raw) && child.value != null) {
+                child2 = ref1[i];
+                if ((child2.type === NodeType.Text || child2.type === NodeType.Raw) && child2.value != null) {
                   options.suppressPrettyCount++;
                   prettySuppressed = true;
                   break;
@@ -140036,8 +140036,8 @@ var require_XMLWriterBase = __commonJS({
             options.state = WriterState.InsideTag;
             ref2 = node.children;
             for (j = 0, len1 = ref2.length; j < len1; j++) {
-              child = ref2[j];
-              r += this.writeChildNode(child, options, level + 1);
+              child2 = ref2[j];
+              r += this.writeChildNode(child2, options, level + 1);
             }
             options.state = WriterState.CloseTag;
             r += this.indent(node, options, level) + "</" + node.name + ">";
@@ -140223,17 +140223,17 @@ var require_XMLWriterBase = __commonJS({
 var require_XMLStringWriter = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLStringWriter.js"(exports2, module2) {
     (function() {
-      var XMLStringWriter, XMLWriterBase, extend = function(child, parent) {
+      var XMLStringWriter, XMLWriterBase, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       XMLWriterBase = require_XMLWriterBase();
       module2.exports = XMLStringWriter = (function(superClass) {
@@ -140242,13 +140242,13 @@ var require_XMLStringWriter = __commonJS({
           XMLStringWriter2.__super__.constructor.call(this, options);
         }
         XMLStringWriter2.prototype.document = function(doc, options) {
-          var child, i, len, r, ref;
+          var child2, i, len, r, ref;
           options = this.filterOptions(options);
           r = "";
           ref = doc.children;
           for (i = 0, len = ref.length; i < len; i++) {
-            child = ref[i];
-            r += this.writeChildNode(child, options, 0);
+            child2 = ref[i];
+            r += this.writeChildNode(child2, options, 0);
           }
           if (options.pretty && r.slice(-options.newline.length) === options.newline) {
             r = r.slice(0, -options.newline.length);
@@ -140265,17 +140265,17 @@ var require_XMLStringWriter = __commonJS({
 var require_XMLDocument = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDocument.js"(exports2, module2) {
     (function() {
-      var NodeType, XMLDOMConfiguration, XMLDOMImplementation, XMLDocument, XMLNode, XMLStringWriter, XMLStringifier, isPlainObject, extend = function(child, parent) {
+      var NodeType, XMLDOMConfiguration, XMLDOMImplementation, XMLDocument, XMLNode, XMLStringWriter, XMLStringifier, isPlainObject, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       isPlainObject = require_Utility().isPlainObject;
       XMLDOMImplementation = require_XMLDOMImplementation();
@@ -140304,12 +140304,12 @@ var require_XMLDocument = __commonJS({
         });
         Object.defineProperty(XMLDocument2.prototype, "doctype", {
           get: function() {
-            var child, i, len, ref;
+            var child2, i, len, ref;
             ref = this.children;
             for (i = 0, len = ref.length; i < len; i++) {
-              child = ref[i];
-              if (child.type === NodeType.DocType) {
-                return child;
+              child2 = ref[i];
+              if (child2.type === NodeType.DocType) {
+                return child2;
               }
             }
             return null;
@@ -140432,7 +140432,7 @@ var require_XMLDocument = __commonJS({
         XMLDocument2.prototype.createAttributeNS = function(namespaceURI, qualifiedName) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
-        XMLDocument2.prototype.getElementsByTagNameNS = function(namespaceURI, localName) {
+        XMLDocument2.prototype.getElementsByTagNameNS = function(namespaceURI, localName2) {
           throw new Error("This DOM method is not implemented." + this.debugInfo());
         };
         XMLDocument2.prototype.getElementById = function(elementId) {
@@ -140521,7 +140521,7 @@ var require_XMLDocumentCB = __commonJS({
           this.root = null;
         }
         XMLDocumentCB2.prototype.createChildNode = function(node) {
-          var att, attName, attributes, child, i, len, ref1, ref2;
+          var att, attName, attributes, child2, i, len, ref1, ref2;
           switch (node.type) {
             case NodeType.CData:
               this.cdata(node.value);
@@ -140556,9 +140556,9 @@ var require_XMLDocumentCB = __commonJS({
           }
           ref2 = node.children;
           for (i = 0, len = ref2.length; i < len; i++) {
-            child = ref2[i];
-            this.createChildNode(child);
-            if (child.type === NodeType.Element) {
+            child2 = ref2[i];
+            this.createChildNode(child2);
+            if (child2.type === NodeType.Element) {
               this.up();
             }
           }
@@ -140594,7 +140594,7 @@ var require_XMLDocumentCB = __commonJS({
           return this;
         };
         XMLDocumentCB2.prototype.element = function(name, attributes, text) {
-          var child, i, len, oldValidationFlag, ref1, root;
+          var child2, i, len, oldValidationFlag, ref1, root;
           if (this.currentNode && this.currentNode.type === NodeType.DocType) {
             this.dtdElement.apply(this, arguments);
           } else {
@@ -140606,9 +140606,9 @@ var require_XMLDocumentCB = __commonJS({
               this.options.noValidation = oldValidationFlag;
               ref1 = root.children;
               for (i = 0, len = ref1.length; i < len; i++) {
-                child = ref1[i];
-                this.createChildNode(child);
-                if (child.type === NodeType.Element) {
+                child2 = ref1[i];
+                this.createChildNode(child2);
+                if (child2.type === NodeType.Element) {
                   this.up();
                 }
               }
@@ -140938,17 +140938,17 @@ var require_XMLDocumentCB = __commonJS({
 var require_XMLStreamWriter = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLStreamWriter.js"(exports2, module2) {
     (function() {
-      var NodeType, WriterState, XMLStreamWriter, XMLWriterBase, extend = function(child, parent) {
+      var NodeType, WriterState, XMLStreamWriter, XMLWriterBase, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       NodeType = require_NodeType();
       XMLWriterBase = require_XMLWriterBase();
@@ -140967,18 +140967,18 @@ var require_XMLStreamWriter = __commonJS({
           }
         };
         XMLStreamWriter2.prototype.document = function(doc, options) {
-          var child, i, j, k, len, len1, ref, ref1, results;
+          var child2, i, j, k, len, len1, ref, ref1, results;
           ref = doc.children;
           for (i = j = 0, len = ref.length; j < len; i = ++j) {
-            child = ref[i];
-            child.isLastRootNode = i === doc.children.length - 1;
+            child2 = ref[i];
+            child2.isLastRootNode = i === doc.children.length - 1;
           }
           options = this.filterOptions(options);
           ref1 = doc.children;
           results = [];
           for (k = 0, len1 = ref1.length; k < len1; k++) {
-            child = ref1[k];
-            results.push(this.writeChildNode(child, options, 0));
+            child2 = ref1[k];
+            results.push(this.writeChildNode(child2, options, 0));
           }
           return results;
         };
@@ -140995,7 +140995,7 @@ var require_XMLStreamWriter = __commonJS({
           return this.stream.write(XMLStreamWriter2.__super__.declaration.call(this, node, options, level));
         };
         XMLStreamWriter2.prototype.docType = function(node, options, level) {
-          var child, j, len, ref;
+          var child2, j, len, ref;
           level || (level = 0);
           this.openNode(node, options, level);
           options.state = WriterState.OpenTag;
@@ -141012,8 +141012,8 @@ var require_XMLStreamWriter = __commonJS({
             options.state = WriterState.InsideTag;
             ref = node.children;
             for (j = 0, len = ref.length; j < len; j++) {
-              child = ref[j];
-              this.writeChildNode(child, options, level + 1);
+              child2 = ref[j];
+              this.writeChildNode(child2, options, level + 1);
             }
             options.state = WriterState.CloseTag;
             this.stream.write("]");
@@ -141025,7 +141025,7 @@ var require_XMLStreamWriter = __commonJS({
           return this.closeNode(node, options, level);
         };
         XMLStreamWriter2.prototype.element = function(node, options, level) {
-          var att, child, childNodeCount, firstChildNode, j, len, name, prettySuppressed, ref, ref1;
+          var att, child2, childNodeCount, firstChildNode, j, len, name, prettySuppressed, ref, ref1;
           level || (level = 0);
           this.openNode(node, options, level);
           options.state = WriterState.OpenTag;
@@ -141064,8 +141064,8 @@ var require_XMLStreamWriter = __commonJS({
             options.state = WriterState.InsideTag;
             ref1 = node.children;
             for (j = 0, len = ref1.length; j < len; j++) {
-              child = ref1[j];
-              this.writeChildNode(child, options, level + 1);
+              child2 = ref1[j];
+              this.writeChildNode(child2, options, level + 1);
             }
             options.state = WriterState.CloseTag;
             this.stream.write(this.indent(node, options, level) + "</" + node.name + ">");
@@ -141200,7 +141200,7 @@ var require_builder = __commonJS({
           }
           render = /* @__PURE__ */ (function(_this) {
             return function(element, obj) {
-              var attr, child, entry, index2, key, value;
+              var attr, child2, entry, index2, key, value;
               if (typeof obj !== "object") {
                 if (_this.options.cdata && requiresCDATA(obj)) {
                   element.raw(wrapCDATA(obj));
@@ -141210,33 +141210,33 @@ var require_builder = __commonJS({
               } else if (Array.isArray(obj)) {
                 for (index2 in obj) {
                   if (!hasProp.call(obj, index2)) continue;
-                  child = obj[index2];
-                  for (key in child) {
-                    entry = child[key];
+                  child2 = obj[index2];
+                  for (key in child2) {
+                    entry = child2[key];
                     element = render(element.ele(key), entry).up();
                   }
                 }
               } else {
                 for (key in obj) {
                   if (!hasProp.call(obj, key)) continue;
-                  child = obj[key];
+                  child2 = obj[key];
                   if (key === attrkey) {
-                    if (typeof child === "object") {
-                      for (attr in child) {
-                        value = child[attr];
+                    if (typeof child2 === "object") {
+                      for (attr in child2) {
+                        value = child2[attr];
                         element = element.att(attr, value);
                       }
                     }
                   } else if (key === charkey) {
-                    if (_this.options.cdata && requiresCDATA(child)) {
-                      element = element.raw(wrapCDATA(child));
+                    if (_this.options.cdata && requiresCDATA(child2)) {
+                      element = element.raw(wrapCDATA(child2));
                     } else {
-                      element = element.txt(child);
+                      element = element.txt(child2);
                     }
-                  } else if (Array.isArray(child)) {
-                    for (index2 in child) {
-                      if (!hasProp.call(child, index2)) continue;
-                      entry = child[index2];
+                  } else if (Array.isArray(child2)) {
+                    for (index2 in child2) {
+                      if (!hasProp.call(child2, index2)) continue;
+                      entry = child2[index2];
                       if (typeof entry === "string") {
                         if (_this.options.cdata && requiresCDATA(entry)) {
                           element = element.ele(key).raw(wrapCDATA(entry)).up();
@@ -141247,16 +141247,16 @@ var require_builder = __commonJS({
                         element = render(element.ele(key), entry).up();
                       }
                     }
-                  } else if (typeof child === "object") {
-                    element = render(element.ele(key), child).up();
+                  } else if (typeof child2 === "object") {
+                    element = render(element.ele(key), child2).up();
                   } else {
-                    if (typeof child === "string" && _this.options.cdata && requiresCDATA(child)) {
-                      element = element.ele(key).raw(wrapCDATA(child)).up();
+                    if (typeof child2 === "string" && _this.options.cdata && requiresCDATA(child2)) {
+                      element = element.ele(key).raw(wrapCDATA(child2)).up();
                     } else {
-                      if (child == null) {
-                        child = "";
+                      if (child2 == null) {
+                        child2 = "";
                       }
-                      element = element.ele(key, child.toString()).up();
+                      element = element.ele(key, child2.toString()).up();
                     }
                   }
                 }
@@ -142924,17 +142924,17 @@ var require_parser = __commonJS({
         return function() {
           return fn.apply(me, arguments);
         };
-      }, extend = function(child, parent) {
+      }, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       sax = require_sax2();
       events = require("events");
@@ -143311,17 +143311,17 @@ var require_xml2js2 = __commonJS({
   "vendor/happyoffice/node_modules/xml2js/lib/xml2js.js"(exports2) {
     (function() {
       "use strict";
-      var builder, defaults, parser3, processors, extend = function(child, parent) {
+      var builder, defaults, parser3, processors, extend = function(child2, parent) {
         for (var key in parent) {
-          if (hasProp.call(parent, key)) child[key] = parent[key];
+          if (hasProp.call(parent, key)) child2[key] = parent[key];
         }
         function ctor() {
-          this.constructor = child;
+          this.constructor = child2;
         }
         ctor.prototype = parent.prototype;
-        child.prototype = new ctor();
-        child.__super__ = parent.prototype;
-        return child;
+        child2.prototype = new ctor();
+        child2.__super__ = parent.prototype;
+        return child2;
       }, hasProp = {}.hasOwnProperty;
       defaults = require_defaults2();
       builder = require_builder();
@@ -167911,9 +167911,9 @@ var require_PDFForm = __commonJS({
           var fieldKids = field.acroField.normalizedEntries().Kids;
           var kidsCount = fieldKids.size();
           for (var childIndex = 0; childIndex < kidsCount; childIndex++) {
-            var child = fieldKids.get(childIndex);
-            if (child instanceof core_1.PDFRef) {
-              this.doc.context.delete(child);
+            var child2 = fieldKids.get(childIndex);
+            if (child2 instanceof core_1.PDFRef) {
+              this.doc.context.delete(child2);
             }
           }
           this.doc.context.delete(field.ref);
@@ -176289,9 +176289,9 @@ var Parser = class {
   }
   /** @protected */
   _adoptNodes(donor, recipient) {
-    for (let child = this.treeAdapter.getFirstChild(donor); child; child = this.treeAdapter.getFirstChild(donor)) {
-      this.treeAdapter.detachNode(child);
-      this.treeAdapter.appendChild(recipient, child);
+    for (let child2 = this.treeAdapter.getFirstChild(donor); child2; child2 = this.treeAdapter.getFirstChild(donor)) {
+      this.treeAdapter.detachNode(child2);
+      this.treeAdapter.appendChild(recipient, child2);
     }
   }
   /** @protected */
@@ -179209,9 +179209,9 @@ function sanitizeChildren(parent) {
       node.parentNode = parent;
       safe.push(node);
     } else {
-      for (const child of node.childNodes ?? []) {
-        child.parentNode = parent;
-        safe.push(child);
+      for (const child2 of node.childNodes ?? []) {
+        child2.parentNode = parent;
+        safe.push(child2);
       }
     }
   }
@@ -184371,9 +184371,9 @@ function attrsOf(node) {
 }
 function textOf(node) {
   let out = "";
-  for (const child of childrenOf(node)) {
-    if ("#text" in child) out += String(child["#text"]);
-    else out += textOf(child);
+  for (const child2 of childrenOf(node)) {
+    if ("#text" in child2) out += String(child2["#text"]);
+    else out += textOf(child2);
   }
   return out;
 }
@@ -184387,11 +184387,11 @@ function childrenThroughSdt(node, name) {
   const names = Array.isArray(name) ? name : [name];
   const out = [];
   const visit = (n) => {
-    for (const child of childrenOf(n)) {
-      const cn = nameOf(child);
-      if (cn !== void 0 && names.includes(cn)) out.push(child);
+    for (const child2 of childrenOf(n)) {
+      const cn = nameOf(child2);
+      if (cn !== void 0 && names.includes(cn)) out.push(child2);
       else if (cn === "w:sdt") {
-        const content = findChild(child, "w:sdtContent");
+        const content = findChild(child2, "w:sdtContent");
         if (content) visit(content);
       }
     }
@@ -184400,16 +184400,16 @@ function childrenThroughSdt(node, name) {
   return out;
 }
 function boolProp(parent, name) {
-  const child = findChild(parent, name);
-  if (!child) return false;
-  const val2 = attrsOf(child)["w:val"];
+  const child2 = findChild(parent, name);
+  if (!child2) return false;
+  const val2 = attrsOf(child2)["w:val"];
   if (val2 === void 0) return true;
   return !["0", "false", "none", "off"].includes(val2.toLowerCase());
 }
 function underlineProp(parent) {
-  const child = findChild(parent, "w:u");
-  if (!child) return false;
-  const val2 = attrsOf(child)["w:val"];
+  const child2 = findChild(parent, "w:u");
+  if (!child2) return false;
+  const val2 = attrsOf(child2)["w:val"];
   return val2 !== void 0 && val2 !== "none";
 }
 function serializeXNode(node) {
@@ -185651,8 +185651,8 @@ function digitWise(value, digits) {
   return String(value).split("").map((d) => table[Number(d)]).join("");
 }
 function fromAlphabet(value, alphabet, fallback = String(value)) {
-  const letters = Array.from(alphabet);
-  return value >= 1 && value <= letters.length ? letters[value - 1] : fallback;
+  const letters2 = Array.from(alphabet);
+  return value >= 1 && value <= letters2.length ? letters2[value - 1] : fallback;
 }
 function enclosed(value, base, count = 20) {
   return value >= 1 && value <= count ? String.fromCodePoint(base + value - 1) : String(value);
@@ -186049,9 +186049,9 @@ function autoColorOf(container) {
   return attrsOf(findChild(container, "w:color") ?? {})["w:val"] === "auto" ? "auto" : void 0;
 }
 function onOffOf(parent, name) {
-  const child = findChild(parent, name);
-  if (!child) return void 0;
-  const val2 = attrsOf(child)["w:val"];
+  const child2 = findChild(parent, name);
+  if (!child2) return void 0;
+  const val2 = attrsOf(child2)["w:val"];
   if (val2 === void 0) return true;
   return !["0", "false", "none", "off"].includes(val2.toLowerCase());
 }
@@ -186127,12 +186127,12 @@ async function parseRels(zip, path) {
 }
 function resultTextOf(node) {
   let out = "";
-  for (const child of childrenOf(node)) {
-    if ("#text" in child) continue;
-    const name = nameOf(child);
-    if (name === "w:t") out += textOf(child);
+  for (const child2 of childrenOf(node)) {
+    if ("#text" in child2) continue;
+    const name = nameOf(child2);
+    if (name === "w:t") out += textOf(child2);
     else if (name !== "w:instrText" && name !== "w:delInstrText" && name !== "w:delText")
-      out += resultTextOf(child);
+      out += resultTextOf(child2);
   }
   return out;
 }
@@ -186306,12 +186306,12 @@ function parseNumberingLevel(lvlNode) {
   return level;
 }
 function picBulletRId(node) {
-  for (const child of childrenOf(node)) {
-    if ("#text" in child) continue;
-    const name = nameOf(child);
-    if (name === "v:imagedata") return attrsOf(child)["r:id"];
-    if (name === "a:blip") return attrsOf(child)["r:embed"];
-    const nested = picBulletRId(child);
+  for (const child2 of childrenOf(node)) {
+    if ("#text" in child2) continue;
+    const name = nameOf(child2);
+    if (name === "v:imagedata") return attrsOf(child2)["r:id"];
+    if (name === "a:blip") return attrsOf(child2)["r:embed"];
+    const nested = picBulletRId(child2);
     if (nested) return nested;
   }
   return void 0;
@@ -187015,11 +187015,11 @@ function textProps(node, theme) {
   if (!node) return {};
   let rPr;
   const walk = (n) => {
-    for (const child of childrenOf(n)) {
+    for (const child2 of childrenOf(n)) {
       if (rPr) return;
-      const name = nameOf(child);
-      if (name === "a:defRPr" || name === "a:rPr") rPr = child;
-      else walk(child);
+      const name = nameOf(child2);
+      if (name === "a:defRPr" || name === "a:rPr") rPr = child2;
+      else walk(child2);
     }
   };
   walk(node);
@@ -187099,9 +187099,9 @@ function autoLineHex(theme) {
 function richText(node) {
   const texts = [];
   const walk = (n, tag) => {
-    for (const child of childrenOf(n)) {
-      if (nameOf(child) === tag) texts.push(textOf(child));
-      else walk(child, tag);
+    for (const child2 of childrenOf(n)) {
+      if (nameOf(child2) === tag) texts.push(textOf(child2));
+      else walk(child2, tag);
     }
   };
   walk(node, "a:t");
@@ -187186,10 +187186,10 @@ function applyColorMods(hex, clr) {
   let lumOff;
   let shadeV;
   let tintV;
-  for (const child of childrenOf(clr)) {
-    const v = parseInt(attrsOf(child)["val"] ?? "", 10);
+  for (const child2 of childrenOf(clr)) {
+    const v = parseInt(attrsOf(child2)["val"] ?? "", 10);
     if (!Number.isFinite(v)) continue;
-    const name = nameOf(child);
+    const name = nameOf(child2);
     if (name === "a:lumMod") lumMod = v / 1e5;
     else if (name === "a:lumOff") lumOff = v / 1e5;
     else if (name === "a:shade") shadeV = v / 1e5;
@@ -187351,9 +187351,9 @@ function chartexTitle(chart) {
   if (!title) return void 0;
   const texts = [];
   const walk = (node) => {
-    for (const child of childrenOf(node)) {
-      if (nameOf(child) === "a:t") texts.push(textOf(child));
-      else walk(child);
+    for (const child2 of childrenOf(node)) {
+      if (nameOf(child2) === "a:t") texts.push(textOf(child2));
+      else walk(child2);
     }
   };
   walk(title);
@@ -187447,8 +187447,8 @@ function decodeXmlEntities(text) {
 
 // vendor/happyoffice/packages/docx-engine/src/vendor/emf-converter/index.mjs
 function colorRefToHex(r, g, b) {
-  const toHex = (v) => v.toString(16).padStart(2, "0");
-  return `#${toHex(r & 255)}${toHex(g & 255)}${toHex(b & 255)}`;
+  const toHex2 = (v) => v.toString(16).padStart(2, "0");
+  return `#${toHex2(r & 255)}${toHex2(g & 255)}${toHex2(b & 255)}`;
 }
 function readColorRef(view, offset) {
   const r = view.getUint8(offset);
@@ -187484,8 +187484,8 @@ function invertCssColor(color) {
   const shortHex = /^#([0-9a-f]{3})$/i.exec(color);
   if (shortHex) {
     const [r, g, b] = shortHex[1].split("").map((c) => parseInt(c + c, 16));
-    const toHex = (v) => (255 - v).toString(16).padStart(2, "0");
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    const toHex2 = (v) => (255 - v).toString(16).padStart(2, "0");
+    return `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
   }
   const rgba = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(color);
   if (rgba) {
@@ -193040,9 +193040,9 @@ function mmlSlot(parent, name) {
 function propVal(node, prName, childName) {
   const pr = findChild(node, prName);
   if (!pr) return void 0;
-  const child = findChild(pr, childName);
-  if (!child) return void 0;
-  return attrsOf(child)["m:val"];
+  const child2 = findChild(pr, childName);
+  if (!child2) return void 0;
+  return attrsOf(child2)["m:val"];
 }
 function propOn(node, prName, childName) {
   const val2 = propVal(node, prName, childName);
@@ -193169,8 +193169,8 @@ function runToMml(run2) {
   const sty = propVal(run2, "m:rPr", "m:sty");
   const plain = sty === "p" || !!findChild(findChild(run2, "m:rPr") ?? {}, "m:nor");
   let out = "";
-  for (const child of childrenOf(run2)) {
-    if (nameOf(child) === "m:t") out += runTextToMml(textOf(child), plain);
+  for (const child2 of childrenOf(run2)) {
+    if (nameOf(child2) === "m:t") out += runTextToMml(textOf(child2), plain);
   }
   return out;
 }
@@ -193530,8 +193530,8 @@ function plainTextOfRuns(node) {
   if (!node) return "";
   let out = "";
   for (const run2 of findChildren(node, "m:r")) {
-    for (const child of childrenOf(run2)) {
-      if (nameOf(child) === "m:t") out += textOf(child);
+    for (const child2 of childrenOf(run2)) {
+      if (nameOf(child2) === "m:t") out += textOf(child2);
     }
   }
   return out;
@@ -193540,8 +193540,8 @@ function runToLatex(run2) {
   const sty = propVal(run2, "m:rPr", "m:sty");
   const plain = sty === "p" || !!findChild(findChild(run2, "m:rPr") ?? {}, "m:nor");
   let text = "";
-  for (const child of childrenOf(run2)) {
-    if (nameOf(child) === "m:t") text += textOf(child);
+  for (const child2 of childrenOf(run2)) {
+    if (nameOf(child2) === "m:t") text += textOf(child2);
   }
   if (!plain) return charsToLatex(text);
   const trimmed = text.trim();
@@ -195129,10 +195129,10 @@ function readWatermarkShape(pictXml) {
   return img;
 }
 var PICTURE_WATERMARK_ID = /<v:shape\b[^>]*\bid="(?:WordPictureWatermark|PowerPlusWaterMarkObject)/;
-function isWatermarkChild(child) {
-  if (child.name !== "w:p" && child.name !== "w:sdt") return false;
-  if (child.xml.includes("<v:textpath")) return true;
-  return child.xml.includes("<v:imagedata") && (PICTURE_WATERMARK_ID.test(child.xml) || child.xml.includes('<w:docPartGallery w:val="Watermarks"/>'));
+function isWatermarkChild(child2) {
+  if (child2.name !== "w:p" && child2.name !== "w:sdt") return false;
+  if (child2.xml.includes("<v:textpath")) return true;
+  return child2.xml.includes("<v:imagedata") && (PICTURE_WATERMARK_ID.test(child2.xml) || child2.xml.includes('<w:docPartGallery w:val="Watermarks"/>'));
 }
 function isPictureWatermarkShape(xml) {
   return PICTURE_WATERMARK_ID.test(xml);
@@ -196179,11 +196179,11 @@ function staysVanished(xml) {
 }
 var LAYOUT_RUN_CONTENT = /^w:(?:br|cr|tab|sym|footnoteReference|endnoteReference)$/;
 function hasLayoutRunContent(node) {
-  for (const child of childrenOf(node)) {
-    const name = nameOf(child);
+  for (const child2 of childrenOf(node)) {
+    const name = nameOf(child2);
     if (name === "w:pPr" || name === "w:rPr") continue;
     if (name !== void 0 && LAYOUT_RUN_CONTENT.test(name)) return true;
-    if (hasLayoutRunContent(child)) return true;
+    if (hasLayoutRunContent(child2)) return true;
   }
   return false;
 }
@@ -196551,10 +196551,10 @@ function splitImageRun(rNode) {
   const rPr = findChild(rNode, "w:rPr");
   const parts = [];
   let current = rPr ? [rPr] : [];
-  for (const child of childrenOf(rNode)) {
-    if (nameOf(child) === "w:rPr") continue;
-    current.push(child);
-    if (IMAGE_RUN_CHILDREN.has(nameOf(child) ?? "")) {
+  for (const child2 of childrenOf(rNode)) {
+    if (nameOf(child2) === "w:rPr") continue;
+    current.push(child2);
+    if (IMAGE_RUN_CHILDREN.has(nameOf(child2) ?? "")) {
       parts.push(current);
       current = rPr ? [rPr] : [];
     }
@@ -196569,12 +196569,12 @@ function splitSymRun(rNode) {
   const rPr = findChild(rNode, "w:rPr");
   const parts = [];
   let current = [];
-  for (const child of kids) {
-    if (nameOf(child) === "w:sym") {
+  for (const child2 of kids) {
+    if (nameOf(child2) === "w:sym") {
       if (current.length > 0) parts.push(current);
-      parts.push([child]);
+      parts.push([child2]);
       current = [];
-    } else current.push(child);
+    } else current.push(child2);
   }
   if (current.length > 0) parts.push(current);
   return parts.map((children2) => ({
@@ -196802,9 +196802,9 @@ function borderLinesOf(node, withInside) {
   };
   const borders = {};
   for (const [tag, side] of Object.entries(ALIAS)) {
-    const child = findChild(node, tag);
-    if (!child || borders[side]) continue;
-    const a = attrsOf(child);
+    const child2 = findChild(node, tag);
+    if (!child2 || borders[side]) continue;
+    const a = attrsOf(child2);
     if (!a["w:val"]) continue;
     borders[side] = {
       style: a["w:val"],
@@ -197283,12 +197283,12 @@ async function parseStyles(zip, theme, themeFonts) {
   }
   return { styles, docDefaults };
 }
-function mergeTableDisplay(parent, child) {
-  const merged = { ...parent, ...child ?? {} };
+function mergeTableDisplay(parent, child2) {
+  const merged = { ...parent, ...child2 ?? {} };
   const DEEP = ["wholeTable", "firstRow", "firstCol", "lastCol", "lastRow", "paraSpacing"];
   for (const key of DEEP) {
-    if (parent[key] || child?.[key]) {
-      merged[key] = { ...parent[key] ?? {}, ...child?.[key] ?? {} };
+    if (parent[key] || child2?.[key]) {
+      merged[key] = { ...parent[key] ?? {}, ...child2?.[key] ?? {} };
     }
   }
   return Object.keys(merged).length > 0 ? merged : void 0;
@@ -197923,14 +197923,14 @@ async function buildBlock(el, index2, xml, ctx, zoteroField) {
   if (el.name === "w:ins" || el.name === "w:del") {
     const openEnd = xml.indexOf(">") + 1;
     const closeStart = xml.lastIndexOf(`</${el.name}>`);
-    const child = splitXmlChildren(xml.slice(openEnd, closeStart)).find(
+    const child2 = splitXmlChildren(xml.slice(openEnd, closeStart)).find(
       (entry) => entry.name === "w:p" || entry.name === "w:tbl"
     );
-    if (child) {
+    if (child2) {
       const inner = await buildBlock(
-        { name: child.name, start: el.start, end: el.end },
+        { name: child2.name, start: el.start, end: el.end },
         index2,
-        child.xml,
+        child2.xml,
         ctx
       );
       let revisionAttrs = {};
@@ -198791,11 +198791,11 @@ function txbxContentParas(content, ctx, docOffset) {
   return out;
 }
 function collectTxbxParas(content, ctx, docOffset, out, listItems) {
-  for (const child of childrenOf(content)) {
-    const name = nameOf(child);
+  for (const child2 of childrenOf(content)) {
+    const name = nameOf(child2);
     if (name === "w:p") {
-      const para = { runs: extractRuns(child, ctx, [], [], true) };
-      const pPr = findChild(child, "w:pPr");
+      const para = { runs: extractRuns(child2, ctx, [], [], true) };
+      const pPr = findChild(child2, "w:pPr");
       const styleId = pPr ? attrsOf(findChild(pPr, "w:pStyle") ?? {})["w:val"] : void 0;
       const listRef = listRefOf(ctx, pPr, styleId);
       Object.assign(
@@ -198807,7 +198807,7 @@ function collectTxbxParas(content, ctx, docOffset, out, listItems) {
             styleId ? ctx.styles.get(styleId)?.display?.bidi : void 0
           ) : void 0,
           ctx,
-          child,
+          child2,
           pPr,
           styleId,
           para.runs,
@@ -198818,22 +198818,22 @@ function collectTxbxParas(content, ctx, docOffset, out, listItems) {
         )
       );
       if (styleId) para.styleId = styleId;
-      if (spaceOnlyRuns(para.runs) && !hasLayoutRunContent(child)) {
-        const markSz = emptyParaSizeHalfPoints(child, pPr, true);
+      if (spaceOnlyRuns(para.runs) && !hasLayoutRunContent(child2)) {
+        const markSz = emptyParaSizeHalfPoints(child2, pPr, true);
         if (markSz) para.emptyRunSizeHalfPoints = markSz;
       }
       if (listRef) {
         listItems.push({
           para,
           ref: listRef,
-          textSizeHalf: paraTextSizeHalfPoints(ctx, para.runs, child, pPr, styleId)
+          textSizeHalf: paraTextSizeHalfPoints(ctx, para.runs, child2, pPr, styleId)
         });
       }
       out.push(para);
     } else if (name === "w:tbl") {
-      out.push(...txbxTableParas(child, ctx));
+      out.push(...txbxTableParas(child2, ctx));
     } else if (name === "w:sdt") {
-      const inner = findChild(child, "w:sdtContent");
+      const inner = findChild(child2, "w:sdtContent");
       if (inner) collectTxbxParas(inner, ctx, docOffset, out, listItems);
     }
   }
@@ -198941,7 +198941,7 @@ function extractTextboxes(xml, ctx, opts) {
     collectNodes(childrenOf(shape), "w:txbxContent", contents);
     const topContents = [];
     collectTopNodes(childrenOf(shape), "w:txbxContent", topContents);
-    const ordinal = txbxOrdinal;
+    const ordinal2 = txbxOrdinal;
     if (!nested) txbxOrdinal += topContents.length;
     if (contents.length === 0) {
       const extRid = attrsOf(findChild(shape, "wps:txbx") ?? {})["r:txbx"];
@@ -198983,7 +198983,7 @@ function extractTextboxes(xml, ctx, opts) {
       }
     }
     const box = { paras: [] };
-    if (!nested && topContents.length > 0) box.txbxIndex = ordinal;
+    if (!nested && topContents.length > 0) box.txbxIndex = ordinal2;
     if (nested) box.readOnly = true;
     const shapeId = attrsOf(findChild(shape, "wps:cNvPr") ?? {})["id"];
     if (!nested && shapeId) box.shapeId = shapeId;
@@ -200265,21 +200265,21 @@ var TEXT_EFFECTS = ["outline", "emboss", "imprint", "shadow"];
 function buildRun(rNode, link, theme, themeFonts, mediaByRid, styles, paraRtl, partPreserve, paraVanish, paraBdr, vmlShapeTypes) {
   let text = "";
   let sym;
-  for (const child of childrenOf(rNode)) {
-    const name = nameOf(child);
+  for (const child2 of childrenOf(rNode)) {
+    const name = nameOf(child2);
     if (name === "w:t" || name === "w:delText") {
-      const own = attrsOf(child)["xml:space"];
+      const own = attrsOf(child2)["xml:space"];
       text += wtText(
-        decodeNumericCharRefs(textOf(child)),
+        decodeNumericCharRefs(textOf(child2)),
         own === "preserve" || own === void 0 && partPreserve === true
       );
     } else if (name === "w:tab" || name === "w:ptab") text += "	";
-    else if (name === "w:br") text += BREAK_CHAR[attrsOf(child)["w:type"] ?? ""] ?? "\n";
+    else if (name === "w:br") text += BREAK_CHAR[attrsOf(child2)["w:type"] ?? ""] ?? "\n";
     else if (name === "w:cr") text += "\n";
     else if (name === "w:noBreakHyphen") text += "\u2011";
     else if (name === "w:softHyphen") text += "\xAD";
     else if (name === "w:sym") {
-      const a = attrsOf(child);
+      const a = attrsOf(child2);
       const glyph = symbolGlyph(a["w:font"] ?? "", a["w:char"] ?? "");
       if (glyph !== null) {
         text += glyph;
@@ -200975,11 +200975,11 @@ function hasDeepChild(node, names) {
   return hasDeepChildOutside(node, names);
 }
 function hasDeepChildOutside(node, names, skip) {
-  for (const child of childrenOf(node)) {
-    const name = nameOf(child);
+  for (const child2 of childrenOf(node)) {
+    const name = nameOf(child2);
     if (name && names.has(name)) return true;
     if (name && skip?.has(name)) continue;
-    if (hasDeepChildOutside(child, names, skip)) return true;
+    if (hasDeepChildOutside(child2, names, skip)) return true;
   }
   return false;
 }
@@ -202017,7 +202017,7 @@ function textboxParagraphs(pNode, ctx) {
     } else if (box && name === "v:textbox") {
       readVmlInset(node, box);
     }
-    for (const child of childrenOf(node)) walk(child, next);
+    for (const child2 of childrenOf(node)) walk(child2, next);
   };
   walk(pNode, void 0);
   return out;
@@ -202033,8 +202033,8 @@ function hfTextBoxOfAnchor(anchor) {
   const cy = parseInt(ext["cy"] ?? "", 10);
   if (cx > 0) box.widthPx = Math.round(cx / EMU_PER_PX);
   if (cy > 0) box.heightPx = Math.round(cy / EMU_PER_PX);
-  for (const child of childrenOf(anchor)) {
-    const wrap = /^wp:wrap(None|Square|Tight|Through|TopAndBottom)$/.exec(nameOf(child) ?? "")?.[1];
+  for (const child2 of childrenOf(anchor)) {
+    const wrap = /^wp:wrap(None|Square|Tight|Through|TopAndBottom)$/.exec(nameOf(child2) ?? "")?.[1];
     if (wrap)
       box.wrap = wrap === "TopAndBottom" ? "topBottom" : wrap.toLowerCase();
   }
@@ -202542,10 +202542,10 @@ function extractLockedCanvas(xml, ctx) {
   const scaleX = chExtCx > 0 ? extCx / chExtCx : 1;
   const scaleY = chExtCy > 0 ? extCy / chExtCy : 1;
   const shapes = [];
-  for (const child of childrenOf(canvasNode)) {
-    const name = nameOf(child);
+  for (const child2 of childrenOf(canvasNode)) {
+    const name = nameOf(child2);
     if (name !== "a:sp" && name !== "a:pic") continue;
-    const spPr = findChild(child, "a:spPr");
+    const spPr = findChild(child2, "a:spPr");
     const xfrm = findChild(spPr ?? {}, "a:xfrm");
     const off = findChild(xfrm ?? {}, "a:off");
     const ext = findChild(xfrm ?? {}, "a:ext");
@@ -202562,14 +202562,14 @@ function extractLockedCanvas(xml, ctx) {
     const prst = attrsOf(findChild(spPr ?? {}, "a:prstGeom") ?? {})["prst"];
     if (prst && prst !== "rect") shape.prst = prst;
     if (name === "a:pic") {
-      const rId = attrsOf(findChild(findChild(child, "a:blipFill") ?? {}, "a:blip") ?? {})["r:embed"];
+      const rId = attrsOf(findChild(findChild(child2, "a:blipFill") ?? {}, "a:blip") ?? {})["r:embed"];
       const dataUrl2 = rId ? ctx.mediaByRid?.get(rId) : void 0;
       if (dataUrl2) shape.imageDataUrl = dataUrl2;
     } else if (spPr && !findChild(spPr, "a:noFill")) {
       const fill = colorNodeHex(findChild(spPr, "a:solidFill"), ctx.themeColors) ?? gradFillApproxHex(spPr, ctx.themeColors);
       if (fill) shape.fillHex = fill;
     }
-    const body = findChild(findChild(child, "a:txSp") ?? {}, "a:txBody");
+    const body = findChild(findChild(child2, "a:txSp") ?? {}, "a:txBody");
     if (body) {
       const texts = [];
       let sizePt;
@@ -202622,7 +202622,7 @@ function extractLockedCanvas(xml, ctx) {
       if (g.lines < chars2.length) continue;
       const at = shapes.indexOf(s);
       if (at === -1) continue;
-      const letters = chars2.map((ch2, i) => ({
+      const letters2 = chars2.map((ch2, i) => ({
         xPx: s.xPx,
         yPx: Math.round(s.yPx + i * g.pitchPx),
         wPx: s.wPx,
@@ -202631,7 +202631,7 @@ function extractLockedCanvas(xml, ctx) {
         ...s.fontSizePt ? { fontSizePt: s.fontSizePt } : {},
         ...s.textColorHex ? { textColorHex: s.textColorHex } : {}
       }));
-      shapes.splice(at, 1, ...letters);
+      shapes.splice(at, 1, ...letters2);
     }
     shapes.sort((a, b) => a.yPx - b.yPx);
   }
@@ -203220,13 +203220,13 @@ function sharedStringText(si) {
 }
 function columnIndex(cellRef) {
   let index2 = 0;
-  let letters = 0;
+  let letters2 = 0;
   for (const ch2 of cellRef.toUpperCase()) {
     if (ch2 < "A" || ch2 > "Z") break;
-    letters += 1;
+    letters2 += 1;
     index2 = index2 * 26 + (ch2.charCodeAt(0) - 64);
   }
-  if (letters === 0) return -1;
+  if (letters2 === 0) return -1;
   return index2 - 1;
 }
 function cellText(cell, shared) {
@@ -205773,7 +205773,14 @@ var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames2 = Object.getOwnPropertyNames;
 var __getProtoOf2 = Object.getPrototypeOf;
 var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-var __esmMin = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
+var __esmMin = (fn, res, err) => () => {
+  if (err) throw err[0];
+  try {
+    return fn && (res = fn(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
+};
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __copyProps2 = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames2(from), i = 0, n = keys.length, key; i < n; i++) {
@@ -205785,7 +205792,7 @@ var __copyProps2 = (to, from, except, desc) => {
   }
   return to;
 };
-var __toESM2 = (mod, isNodeMode, target) => (target = mod != null ? __create2(__getProtoOf2(mod)) : {}, __copyProps2(isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", {
+var __toESM2 = (mod, isNodeMode, target) => (target = mod != null ? __create2(__getProtoOf2(mod)) : {}, __copyProps2(isNodeMode || !mod || !mod.__esModule || !__hasOwnProp2.call(mod, "default") ? __defProp2(target, "default", {
   value: mod,
   enumerable: true
 }) : target, mod));
@@ -205838,6 +205845,14 @@ var BaseXmlComponent = class {
     );
     this.rootKey = rootKey;
   }
+  /**
+  * The components written in this one's place, one after another, when it can't be written as a single element,
+  * such as a run with another run in its children. Undefined when it is written as itself.
+  *
+  * @internal
+  */
+  get writtenAs() {
+  }
 };
 var EMPTY_OBJECT = Object.seal({});
 var XmlComponent = class extends BaseXmlComponent {
@@ -205887,8 +205902,11 @@ var XmlComponent = class extends BaseXmlComponent {
   prepForXml(context) {
     var _children$;
     context.stack.push(this);
-    const children2 = this.root.map((comp) => {
-      if (comp instanceof BaseXmlComponent) return comp.prepForXml(context);
+    const children2 = this.root.flatMap((comp) => {
+      if (comp instanceof BaseXmlComponent) {
+        const parts = comp.writtenAs;
+        return parts ? parts.map((part) => part.prepForXml(context)) : comp.prepForXml(context);
+      }
       return comp;
     }).filter((comp) => comp !== void 0);
     context.stack.pop();
@@ -205901,8 +205919,8 @@ var XmlComponent = class extends BaseXmlComponent {
   * @param child - The child component or text string to add
   * @returns This component (for chaining)
   */
-  addChildElement(child) {
-    this.root.push(child);
+  addChildElement(child2) {
+    this.root.push(child2);
     return this;
   }
 };
@@ -205921,7 +205939,7 @@ var IgnoreIfEmptyXmlComponent = class extends XmlComponent {
   prepForXml(context) {
     const result = super.prepForXml(context);
     if (this.includeIfEmpty) return result;
-    if (result && (typeof result[this.rootKey] !== "object" || Object.keys(result[this.rootKey]).length)) return result;
+    return result && (typeof result[this.rootKey] !== "object" || Object.keys(result[this.rootKey]).length) ? result : void 0;
   }
 };
 function ownKeys(e, r) {
@@ -206200,12 +206218,13 @@ var require_events = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
     if (events === void 0) return this;
     list = events[type];
     if (list === void 0) return this;
-    if (list === listener || list.listener === listener) if (--this._eventsCount === 0) this._events = /* @__PURE__ */ Object.create(null);
-    else {
-      delete events[type];
-      if (events.removeListener) this.emit("removeListener", type, list.listener || listener);
-    }
-    else if (typeof list !== "function") {
+    if (list === listener || list.listener === listener) {
+      if (--this._eventsCount === 0) this._events = /* @__PURE__ */ Object.create(null);
+      else {
+        delete events[type];
+        if (events.removeListener) this.emit("removeListener", type, list.listener || listener);
+      }
+    } else if (typeof list !== "function") {
       position = -1;
       for (i = list.length - 1; i >= 0; i--) if (list[i] === listener || list[i].listener === listener) {
         originalListener = list[i].listener;
@@ -206228,8 +206247,10 @@ var require_events = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
       if (arguments.length === 0) {
         this._events = /* @__PURE__ */ Object.create(null);
         this._eventsCount = 0;
-      } else if (events[type] !== void 0) if (--this._eventsCount === 0) this._events = /* @__PURE__ */ Object.create(null);
-      else delete events[type];
+      } else if (events[type] !== void 0) {
+        if (--this._eventsCount === 0) this._events = /* @__PURE__ */ Object.create(null);
+        else delete events[type];
+      }
       return this;
     }
     if (arguments.length === 0) {
@@ -206313,9 +206334,10 @@ var require_events = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
     if (typeof emitter.on === "function") eventTargetAgnosticAddListener(emitter, "error", handler, flags);
   }
   function eventTargetAgnosticAddListener(emitter, name, listener, flags) {
-    if (typeof emitter.on === "function") if (flags.once) emitter.once(name, listener);
-    else emitter.on(name, listener);
-    else if (typeof emitter.addEventListener === "function") emitter.addEventListener(name, function wrapListener(arg) {
+    if (typeof emitter.on === "function") {
+      if (flags.once) emitter.once(name, listener);
+      else emitter.on(name, listener);
+    } else if (typeof emitter.addEventListener === "function") emitter.addEventListener(name, function wrapListener(arg) {
       if (flags.once) emitter.removeEventListener(name, wrapListener);
       listener(arg);
     });
@@ -206533,8 +206555,8 @@ var require_base64_js = /* @__PURE__ */ __commonJSMin(((exports2) => {
     var arr = new Arr(_byteLength(b64, validLen, placeHoldersLen));
     var curByte = 0;
     var len2 = placeHoldersLen > 0 ? validLen - 4 : validLen;
-    var i2;
-    for (i2 = 0; i2 < len2; i2 += 4) {
+    var i2 = 0;
+    for (; i2 < len2; i2 += 4) {
       tmp = revLookup[b64.charCodeAt(i2)] << 18 | revLookup[b64.charCodeAt(i2 + 1)] << 12 | revLookup[b64.charCodeAt(i2 + 2)] << 6 | revLookup[b64.charCodeAt(i2 + 3)];
       arr[curByte++] = tmp >> 16 & 255;
       arr[curByte++] = tmp >> 8 & 255;
@@ -206663,7 +206685,7 @@ var require_buffer = /* @__PURE__ */ __commonJSMin(((exports2) => {
   if (!Buffer2.TYPED_ARRAY_SUPPORT && typeof console !== "undefined" && typeof console.error === "function") console.error("This browser lacks typed array (Uint8Array) support which is required by `buffer` v5.x. Use `buffer` v4.x if you require old browser support.");
   function typedArraySupport() {
     try {
-      var arr = new Uint8Array(1);
+      var arr = /* @__PURE__ */ new Uint8Array(1);
       var proto = { foo: function() {
         return 42;
       } };
@@ -206847,9 +206869,10 @@ var require_buffer = /* @__PURE__ */ __commonJSMin(((exports2) => {
     var pos = 0;
     for (i = 0; i < list.length; ++i) {
       var buf = list[i];
-      if (isInstance(buf, Uint8Array)) if (pos + buf.length > buffer.length) Buffer2.from(buf).copy(buffer, pos);
-      else Uint8Array.prototype.set.call(buffer, buf, pos);
-      else if (!Buffer2.isBuffer(buf)) throw new TypeError('"list" argument must be an Array of Buffers');
+      if (isInstance(buf, Uint8Array)) {
+        if (pos + buf.length > buffer.length) Buffer2.from(buf).copy(buffer, pos);
+        else Uint8Array.prototype.set.call(buffer, buf, pos);
+      } else if (!Buffer2.isBuffer(buf)) throw new TypeError('"list" argument must be an Array of Buffers');
       else buf.copy(buffer, pos);
       pos += buf.length;
     }
@@ -207013,18 +207036,23 @@ var require_buffer = /* @__PURE__ */ __commonJSMin(((exports2) => {
     byteOffset = +byteOffset;
     if (numberIsNaN(byteOffset)) byteOffset = dir ? 0 : buffer.length - 1;
     if (byteOffset < 0) byteOffset = buffer.length + byteOffset;
-    if (byteOffset >= buffer.length) if (dir) return -1;
-    else byteOffset = buffer.length - 1;
-    else if (byteOffset < 0) if (dir) byteOffset = 0;
-    else return -1;
+    if (byteOffset >= buffer.length) {
+      if (dir) return -1;
+      else byteOffset = buffer.length - 1;
+    } else if (byteOffset < 0) {
+      if (dir) byteOffset = 0;
+      else return -1;
+    }
     if (typeof val2 === "string") val2 = Buffer2.from(val2, encoding);
     if (Buffer2.isBuffer(val2)) {
       if (val2.length === 0) return -1;
       return arrayIndexOf(buffer, val2, byteOffset, encoding, dir);
     } else if (typeof val2 === "number") {
       val2 = val2 & 255;
-      if (typeof Uint8Array.prototype.indexOf === "function") if (dir) return Uint8Array.prototype.indexOf.call(buffer, val2, byteOffset);
-      else return Uint8Array.prototype.lastIndexOf.call(buffer, val2, byteOffset);
+      if (typeof Uint8Array.prototype.indexOf === "function") {
+        if (dir) return Uint8Array.prototype.indexOf.call(buffer, val2, byteOffset);
+        else return Uint8Array.prototype.lastIndexOf.call(buffer, val2, byteOffset);
+      }
       return arrayIndexOf(buffer, [val2], byteOffset, encoding, dir);
     }
     throw new TypeError("val must be string, number or Buffer");
@@ -208423,16 +208451,20 @@ var require_for_each = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
   var toStr = Object.prototype.toString;
   var hasOwnProperty = Object.prototype.hasOwnProperty;
   var forEachArray = function forEachArray2(array, iterator, receiver) {
-    for (var i = 0, len = array.length; i < len; i++) if (hasOwnProperty.call(array, i)) if (receiver == null) iterator(array[i], i, array);
-    else iterator.call(receiver, array[i], i, array);
+    for (var i = 0, len = array.length; i < len; i++) if (hasOwnProperty.call(array, i)) {
+      if (receiver == null) iterator(array[i], i, array);
+      else iterator.call(receiver, array[i], i, array);
+    }
   };
   var forEachString = function forEachString2(string, iterator, receiver) {
     for (var i = 0, len = string.length; i < len; i++) if (receiver == null) iterator(string.charAt(i), i, string);
     else iterator.call(receiver, string.charAt(i), i, string);
   };
   var forEachObject = function forEachObject2(object, iterator, receiver) {
-    for (var k in object) if (hasOwnProperty.call(object, k)) if (receiver == null) iterator(object[k], k, object);
-    else iterator.call(receiver, object[k], k, object);
+    for (var k in object) if (hasOwnProperty.call(object, k)) {
+      if (receiver == null) iterator(object[k], k, object);
+      else iterator.call(receiver, object[k], k, object);
+    }
   };
   function isArray(x) {
     return toStr.call(x) === "[object Array]";
@@ -208531,8 +208563,10 @@ var require_set_function_length = /* @__PURE__ */ __commonJSMin(((exports2, modu
       if (desc && !desc.configurable) functionLengthIsConfigurable = false;
       if (desc && !desc.writable) functionLengthIsWritable = false;
     }
-    if (functionLengthIsConfigurable || functionLengthIsWritable || !loose) if (hasDescriptors) define2(fn, "length", length, true, true);
-    else define2(fn, "length", length);
+    if (functionLengthIsConfigurable || functionLengthIsWritable || !loose) {
+      if (hasDescriptors) define2(fn, "length", length, true, true);
+      else define2(fn, "length", length);
+    }
     return fn;
   };
 }));
@@ -208912,14 +208946,16 @@ var require_util2 = /* @__PURE__ */ __commonJSMin(((exports2) => {
   }
   exports2.debuglog = function(set) {
     set = set.toUpperCase();
-    if (!debugs[set]) if (debugEnvRegex.test(set)) {
-      var pid = process$1.pid;
-      debugs[set] = function() {
-        var msg = exports2.format.apply(exports2, arguments);
-        console.error("%s %d: %s", set, pid, msg);
+    if (!debugs[set]) {
+      if (debugEnvRegex.test(set)) {
+        var pid = process$1.pid;
+        debugs[set] = function() {
+          var msg = exports2.format.apply(exports2, arguments);
+          console.error("%s %d: %s", set, pid, msg);
+        };
+      } else debugs[set] = function() {
       };
-    } else debugs[set] = function() {
-    };
+    }
     return debugs[set];
   };
   function inspect(obj, opts) {
@@ -209010,8 +209046,10 @@ var require_util2 = /* @__PURE__ */ __commonJSMin(((exports2) => {
     if (isDate(value)) base = " " + Date.prototype.toUTCString.call(value);
     if (isError(value)) base = " " + formatError(value);
     if (keys.length === 0 && (!array || value.length == 0)) return braces[0] + base + braces[1];
-    if (recurseTimes < 0) if (isRegExp(value)) return ctx.stylize(RegExp.prototype.toString.call(value), "regexp");
-    else return ctx.stylize("[Object]", "special");
+    if (recurseTimes < 0) {
+      if (isRegExp(value)) return ctx.stylize(RegExp.prototype.toString.call(value), "regexp");
+      else return ctx.stylize("[Object]", "special");
+    }
     ctx.seen.push(value);
     var output;
     if (array) output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
@@ -209045,20 +209083,25 @@ var require_util2 = /* @__PURE__ */ __commonJSMin(((exports2) => {
   }
   function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
     var name, str, desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
-    if (desc.get) if (desc.set) str = ctx.stylize("[Getter/Setter]", "special");
-    else str = ctx.stylize("[Getter]", "special");
-    else if (desc.set) str = ctx.stylize("[Setter]", "special");
+    if (desc.get) {
+      if (desc.set) str = ctx.stylize("[Getter/Setter]", "special");
+      else str = ctx.stylize("[Getter]", "special");
+    } else if (desc.set) str = ctx.stylize("[Setter]", "special");
     if (!hasOwnProperty(visibleKeys, key)) name = "[" + key + "]";
-    if (!str) if (ctx.seen.indexOf(desc.value) < 0) {
-      if (isNull(recurseTimes)) str = formatValue(ctx, desc.value, null);
-      else str = formatValue(ctx, desc.value, recurseTimes - 1);
-      if (str.indexOf("\n") > -1) if (array) str = str.split("\n").map(function(line) {
-        return "  " + line;
-      }).join("\n").slice(2);
-      else str = "\n" + str.split("\n").map(function(line) {
-        return "   " + line;
-      }).join("\n");
-    } else str = ctx.stylize("[Circular]", "special");
+    if (!str) {
+      if (ctx.seen.indexOf(desc.value) < 0) {
+        if (isNull(recurseTimes)) str = formatValue(ctx, desc.value, null);
+        else str = formatValue(ctx, desc.value, recurseTimes - 1);
+        if (str.indexOf("\n") > -1) {
+          if (array) str = str.split("\n").map(function(line) {
+            return "  " + line;
+          }).join("\n").slice(2);
+          else str = "\n" + str.split("\n").map(function(line) {
+            return "   " + line;
+          }).join("\n");
+        }
+      } else str = ctx.stylize("[Circular]", "special");
+    }
     if (isUndefined(name)) {
       if (array && key.match(/^\d+$/)) return str;
       name = JSON.stringify("" + key);
@@ -209521,12 +209564,13 @@ var require_destroy2 = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
     if (this._readableState) this._readableState.destroyed = true;
     if (this._writableState) this._writableState.destroyed = true;
     this._destroy(err || null, function(err2) {
-      if (!cb && err2) if (!_this._writableState) process$1.nextTick(emitErrorAndCloseNT, _this, err2);
-      else if (!_this._writableState.errorEmitted) {
-        _this._writableState.errorEmitted = true;
-        process$1.nextTick(emitErrorAndCloseNT, _this, err2);
-      } else process$1.nextTick(emitCloseNT, _this);
-      else if (cb) {
+      if (!cb && err2) {
+        if (!_this._writableState) process$1.nextTick(emitErrorAndCloseNT, _this, err2);
+        else if (!_this._writableState.errorEmitted) {
+          _this._writableState.errorEmitted = true;
+          process$1.nextTick(emitErrorAndCloseNT, _this, err2);
+        } else process$1.nextTick(emitCloseNT, _this);
+      } else if (cb) {
         process$1.nextTick(emitCloseNT, _this);
         cb(err2);
       } else process$1.nextTick(emitCloseNT, _this);
@@ -209668,7 +209712,7 @@ var require_state = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
       if (!(isFinite(hwm) && Math.floor(hwm) === hwm) || hwm < 0) throw new ERR_INVALID_OPT_VALUE(isDuplex ? duplexKey : "highWaterMark", hwm);
       return Math.floor(hwm);
     }
-    return state.objectMode ? 16 : 16 * 1024;
+    return state.objectMode ? 16 : 16384;
   }
   module2.exports = { getHighWaterMark };
 }));
@@ -209727,7 +209771,15 @@ var require__stream_writable = /* @__PURE__ */ __commonJSMin(((exports2, module2
   }
   var destroyImpl = require_destroy2();
   var getHighWaterMark = require_state().getHighWaterMark;
-  var _require$codes = require_errors_browser().codes, ERR_INVALID_ARG_TYPE = _require$codes.ERR_INVALID_ARG_TYPE, ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED, ERR_MULTIPLE_CALLBACK = _require$codes.ERR_MULTIPLE_CALLBACK, ERR_STREAM_CANNOT_PIPE = _require$codes.ERR_STREAM_CANNOT_PIPE, ERR_STREAM_DESTROYED = _require$codes.ERR_STREAM_DESTROYED, ERR_STREAM_NULL_VALUES = _require$codes.ERR_STREAM_NULL_VALUES, ERR_STREAM_WRITE_AFTER_END = _require$codes.ERR_STREAM_WRITE_AFTER_END, ERR_UNKNOWN_ENCODING = _require$codes.ERR_UNKNOWN_ENCODING;
+  var _require$codes = require_errors_browser().codes;
+  var ERR_INVALID_ARG_TYPE = _require$codes.ERR_INVALID_ARG_TYPE;
+  var ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED;
+  var ERR_MULTIPLE_CALLBACK = _require$codes.ERR_MULTIPLE_CALLBACK;
+  var ERR_STREAM_CANNOT_PIPE = _require$codes.ERR_STREAM_CANNOT_PIPE;
+  var ERR_STREAM_DESTROYED = _require$codes.ERR_STREAM_DESTROYED;
+  var ERR_STREAM_NULL_VALUES = _require$codes.ERR_STREAM_NULL_VALUES;
+  var ERR_STREAM_WRITE_AFTER_END = _require$codes.ERR_STREAM_WRITE_AFTER_END;
+  var ERR_UNKNOWN_ENCODING = _require$codes.ERR_UNKNOWN_ENCODING;
   var errorOrDestroy = destroyImpl.errorOrDestroy;
   require_inherits_browser2()(Writable, Stream2);
   function nop() {
@@ -210057,13 +210109,15 @@ var require__stream_writable = /* @__PURE__ */ __commonJSMin(((exports2, module2
     });
   }
   function prefinish(stream, state) {
-    if (!state.prefinished && !state.finalCalled) if (typeof stream._final === "function" && !state.destroyed) {
-      state.pendingcb++;
-      state.finalCalled = true;
-      process$1.nextTick(callFinal, stream, state);
-    } else {
-      state.prefinished = true;
-      stream.emit("prefinish");
+    if (!state.prefinished && !state.finalCalled) {
+      if (typeof stream._final === "function" && !state.destroyed) {
+        state.pendingcb++;
+        state.finalCalled = true;
+        process$1.nextTick(callFinal, stream, state);
+      } else {
+        state.prefinished = true;
+        stream.emit("prefinish");
+      }
     }
   }
   function finishMaybe(stream, state) {
@@ -210084,8 +210138,10 @@ var require__stream_writable = /* @__PURE__ */ __commonJSMin(((exports2, module2
   function endWritable(stream, state, cb) {
     state.ending = true;
     finishMaybe(stream, state);
-    if (cb) if (state.finished) process$1.nextTick(cb);
-    else stream.once("finish", cb);
+    if (cb) {
+      if (state.finished) process$1.nextTick(cb);
+      else stream.once("finish", cb);
+    }
     state.ended = true;
     stream.writable = false;
   }
@@ -210207,9 +210263,10 @@ var require_safe_buffer2 = /* @__PURE__ */ __commonJSMin(((exports2, module2) =>
   SafeBuffer.alloc = function(size, fill, encoding) {
     if (typeof size !== "number") throw new TypeError("Argument must be a number");
     var buf = Buffer2(size);
-    if (fill !== void 0) if (typeof encoding === "string") buf.fill(fill, encoding);
-    else buf.fill(fill);
-    else buf.fill(0);
+    if (fill !== void 0) {
+      if (typeof encoding === "string") buf.fill(fill, encoding);
+      else buf.fill(fill);
+    } else buf.fill(0);
     return buf;
   };
   SafeBuffer.allocUnsafe = function(size) {
@@ -210347,8 +210404,10 @@ var require_string_decoder2 = /* @__PURE__ */ __commonJSMin(((exports2) => {
     if (--j < i || nb === -2) return 0;
     nb = utf8CheckByte(buf[j]);
     if (nb >= 0) {
-      if (nb > 0) if (nb === 2) nb = 0;
-      else self2.lastNeed = nb - 3;
+      if (nb > 0) {
+        if (nb === 2) nb = 0;
+        else self2.lastNeed = nb - 3;
+      }
       return nb;
     }
     return 0;
@@ -210730,7 +210789,11 @@ var require__stream_readable = /* @__PURE__ */ __commonJSMin(((exports2, module2
   var BufferList = require_buffer_list();
   var destroyImpl = require_destroy2();
   var getHighWaterMark = require_state().getHighWaterMark;
-  var _require$codes = require_errors_browser().codes, ERR_INVALID_ARG_TYPE = _require$codes.ERR_INVALID_ARG_TYPE, ERR_STREAM_PUSH_AFTER_EOF = _require$codes.ERR_STREAM_PUSH_AFTER_EOF, ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED, ERR_STREAM_UNSHIFT_AFTER_END_EVENT = _require$codes.ERR_STREAM_UNSHIFT_AFTER_END_EVENT;
+  var _require$codes = require_errors_browser().codes;
+  var ERR_INVALID_ARG_TYPE = _require$codes.ERR_INVALID_ARG_TYPE;
+  var ERR_STREAM_PUSH_AFTER_EOF = _require$codes.ERR_STREAM_PUSH_AFTER_EOF;
+  var ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED;
+  var ERR_STREAM_UNSHIFT_AFTER_END_EVENT = _require$codes.ERR_STREAM_UNSHIFT_AFTER_END_EVENT;
   var StringDecoder;
   var createReadableStreamAsyncIterator;
   var from;
@@ -210842,9 +210905,10 @@ var require__stream_readable = /* @__PURE__ */ __commonJSMin(((exports2, module2
       if (er) errorOrDestroy(stream, er);
       else if (state.objectMode || chunk && chunk.length > 0) {
         if (typeof chunk !== "string" && !state.objectMode && Object.getPrototypeOf(chunk) !== Buffer2.prototype) chunk = _uint8ArrayToBuffer(chunk);
-        if (addToFront) if (state.endEmitted) errorOrDestroy(stream, new ERR_STREAM_UNSHIFT_AFTER_END_EVENT());
-        else addChunk(stream, state, chunk, true);
-        else if (state.ended) errorOrDestroy(stream, new ERR_STREAM_PUSH_AFTER_EOF());
+        if (addToFront) {
+          if (state.endEmitted) errorOrDestroy(stream, new ERR_STREAM_UNSHIFT_AFTER_END_EVENT());
+          else addChunk(stream, state, chunk, true);
+        } else if (state.ended) errorOrDestroy(stream, new ERR_STREAM_PUSH_AFTER_EOF());
         else if (state.destroyed) return false;
         else {
           state.reading = false;
@@ -210918,8 +210982,10 @@ var require__stream_readable = /* @__PURE__ */ __commonJSMin(((exports2, module2
   function howMuchToRead(n, state) {
     if (n <= 0 || state.length === 0 && state.ended) return 0;
     if (state.objectMode) return 1;
-    if (n !== n) if (state.flowing && state.length) return state.buffer.head.data.length;
-    else return state.length;
+    if (n !== n) {
+      if (state.flowing && state.length) return state.buffer.head.data.length;
+      else return state.length;
+    }
     if (n > state.highWaterMark) state.highWaterMark = computeNewHighWaterMark(n);
     if (n <= state.length) return n;
     if (!state.ended) {
@@ -211050,7 +211116,6 @@ var require__stream_readable = /* @__PURE__ */ __commonJSMin(((exports2, module2
         break;
       default:
         state.pipes.push(dest);
-        break;
     }
     state.pipesCount += 1;
     debug("pipe count=%d opts=%j", state.pipesCount, pipeOpts);
@@ -211360,7 +211425,11 @@ var require__stream_readable = /* @__PURE__ */ __commonJSMin(((exports2, module2
 }));
 var require__stream_transform = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
   module2.exports = Transform2;
-  var _require$codes = require_errors_browser().codes, ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED, ERR_MULTIPLE_CALLBACK = _require$codes.ERR_MULTIPLE_CALLBACK, ERR_TRANSFORM_ALREADY_TRANSFORMING = _require$codes.ERR_TRANSFORM_ALREADY_TRANSFORMING, ERR_TRANSFORM_WITH_LENGTH_0 = _require$codes.ERR_TRANSFORM_WITH_LENGTH_0;
+  var _require$codes = require_errors_browser().codes;
+  var ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED;
+  var ERR_MULTIPLE_CALLBACK = _require$codes.ERR_MULTIPLE_CALLBACK;
+  var ERR_TRANSFORM_ALREADY_TRANSFORMING = _require$codes.ERR_TRANSFORM_ALREADY_TRANSFORMING;
+  var ERR_TRANSFORM_WITH_LENGTH_0 = _require$codes.ERR_TRANSFORM_WITH_LENGTH_0;
   var Duplex = require__stream_duplex();
   require_inherits_browser2()(Transform2, Duplex);
   function afterTransform(er, data) {
@@ -211461,7 +211530,9 @@ var require_pipeline = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
       callback.apply(void 0, arguments);
     };
   }
-  var _require$codes = require_errors_browser().codes, ERR_MISSING_ARGS = _require$codes.ERR_MISSING_ARGS, ERR_STREAM_DESTROYED = _require$codes.ERR_STREAM_DESTROYED;
+  var _require$codes = require_errors_browser().codes;
+  var ERR_MISSING_ARGS = _require$codes.ERR_MISSING_ARGS;
+  var ERR_STREAM_DESTROYED = _require$codes.ERR_STREAM_DESTROYED;
   function noop2(err) {
     if (err) throw err;
   }
@@ -211598,7 +211669,7 @@ var require_sax = /* @__PURE__ */ __commonJSMin(((exports2) => {
     sax.SAXParser = SAXParser;
     sax.SAXStream = SAXStream;
     sax.createStream = createStream;
-    sax.MAX_BUFFER_LENGTH = 64 * 1024;
+    sax.MAX_BUFFER_LENGTH = 65536;
     var buffers = [
       "comment",
       "sgmlDecl",
@@ -212202,13 +212273,15 @@ var require_sax = /* @__PURE__ */ __commonJSMin(((exports2) => {
         var qn = qname(parser3.attribName, true);
         var prefix = qn.prefix;
         var local = qn.local;
-        if (prefix === "xmlns") if (local === "xml" && parser3.attribValue !== XML_NAMESPACE) strictFail(parser3, "xml: prefix must be bound to " + XML_NAMESPACE + "\nActual: " + parser3.attribValue);
-        else if (local === "xmlns" && parser3.attribValue !== XMLNS_NAMESPACE) strictFail(parser3, "xmlns: prefix must be bound to " + XMLNS_NAMESPACE + "\nActual: " + parser3.attribValue);
-        else {
-          var tag = parser3.tag;
-          var parent = parser3.tags[parser3.tags.length - 1] || parser3;
-          if (tag.ns === parent.ns) tag.ns = Object.create(parent.ns);
-          tag.ns[local] = parser3.attribValue;
+        if (prefix === "xmlns") {
+          if (local === "xml" && parser3.attribValue !== XML_NAMESPACE) strictFail(parser3, "xml: prefix must be bound to " + XML_NAMESPACE + "\nActual: " + parser3.attribValue);
+          else if (local === "xmlns" && parser3.attribValue !== XMLNS_NAMESPACE) strictFail(parser3, "xmlns: prefix must be bound to " + XMLNS_NAMESPACE + "\nActual: " + parser3.attribValue);
+          else {
+            var tag = parser3.tag;
+            var parent = parser3.tags[parser3.tags.length - 1] || parser3;
+            if (tag.ns === parent.ns) tag.ns = Object.create(parent.ns);
+            tag.ns[local] = parser3.attribValue;
+          }
         }
         parser3.attribList.push([parser3.attribName, parser3.attribValue]);
       } else {
@@ -212334,14 +212407,16 @@ var require_sax = /* @__PURE__ */ __commonJSMin(((exports2) => {
       if (parser3.ENTITIES[entity]) return parser3.ENTITIES[entity];
       if (parser3.ENTITIES[entityLC]) return parser3.ENTITIES[entityLC];
       entity = entityLC;
-      if (entity.charAt(0) === "#") if (entity.charAt(1) === "x") {
-        entity = entity.slice(2);
-        num = parseInt(entity, 16);
-        numStr = num.toString(16);
-      } else {
-        entity = entity.slice(1);
-        num = parseInt(entity, 10);
-        numStr = num.toString(10);
+      if (entity.charAt(0) === "#") {
+        if (entity.charAt(1) === "x") {
+          entity = entity.slice(2);
+          num = parseInt(entity, 16);
+          numStr = num.toString(16);
+        } else {
+          entity = entity.slice(1);
+          num = parseInt(entity, 10);
+          numStr = num.toString(10);
+        }
       }
       entity = entity.replace(/^0+/, "");
       if (isNaN(num) || numStr.toLowerCase() !== entity) {
@@ -212694,13 +212769,15 @@ var require_sax = /* @__PURE__ */ __commonJSMin(((exports2) => {
             else parser3.state = S2.ATTRIB;
             continue;
           case S2.CLOSE_TAG:
-            if (!parser3.tagName) if (isWhitespace3(c)) continue;
-            else if (notMatch(nameStart, c)) if (parser3.script) {
-              parser3.script += "</" + c;
-              parser3.state = S2.SCRIPT;
-            } else strictFail(parser3, "Invalid tagname in closing tag.");
-            else parser3.tagName = c;
-            else if (c === ">") closeTag(parser3);
+            if (!parser3.tagName) {
+              if (isWhitespace3(c)) continue;
+              else if (notMatch(nameStart, c)) {
+                if (parser3.script) {
+                  parser3.script += "</" + c;
+                  parser3.state = S2.SCRIPT;
+                } else strictFail(parser3, "Invalid tagname in closing tag.");
+              } else parser3.tagName = c;
+            } else if (c === ">") closeTag(parser3);
             else if (isMatch(nameBody, c)) parser3.tagName += c;
             else if (parser3.script) {
               parser3.script += "</" + parser3.tagName;
@@ -212733,7 +212810,6 @@ var require_sax = /* @__PURE__ */ __commonJSMin(((exports2) => {
               case S2.ATTRIB_VALUE_ENTITY_U:
                 returnState = S2.ATTRIB_VALUE_UNQUOTED;
                 buffer = "attribValue";
-                break;
             }
             if (c === ";") {
               parser3[buffer] += parseEntity(parser3);
@@ -212893,11 +212969,13 @@ var require_xml2js = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
       if (currentElement[options[type + "Key"]] && !isArray(currentElement[options[type + "Key"]])) currentElement[options[type + "Key"]] = [currentElement[options[type + "Key"]]];
       if (type + "Fn" in options && typeof value === "string") value = options[type + "Fn"](value, currentElement);
       if (type === "instruction" && ("instructionFn" in options || "instructionNameFn" in options)) {
-        for (key in value) if (value.hasOwnProperty(key)) if ("instructionFn" in options) value[key] = options.instructionFn(value[key], key, currentElement);
-        else {
-          var temp = value[key];
-          delete value[key];
-          value[options.instructionNameFn(key, temp, currentElement)] = temp;
+        for (key in value) if (value.hasOwnProperty(key)) {
+          if ("instructionFn" in options) value[key] = options.instructionFn(value[key], key, currentElement);
+          else {
+            var temp = value[key];
+            delete value[key];
+            value[options.instructionNameFn(key, temp, currentElement)] = temp;
+          }
         }
       }
       if (isArray(currentElement[options[type + "Key"]])) currentElement[options[type + "Key"]].push(value);
@@ -213081,7 +213159,8 @@ var require_xml2json = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
 var require_js2xml = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
   var helper = require_options_helper();
   var isArray = require_array_helper().isArray;
-  var currentElement, currentElementName;
+  var currentElement;
+  var currentElementName;
   function validateOptions(userOptions) {
     var options = helper.copyOptions(userOptions);
     helper.ensureFlagExists("ignoreDeclaration", options);
@@ -213205,8 +213284,10 @@ var require_js2xml = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
     xml.push("<" + elementName);
     if (element[options.attributesKey]) xml.push(writeAttributes(element[options.attributesKey], options, depth));
     var withClosingTag = element[options.elementsKey] && element[options.elementsKey].length || element[options.attributesKey] && element[options.attributesKey]["xml:space"] === "preserve";
-    if (!withClosingTag) if ("fullTagEmptyElementFn" in options) withClosingTag = options.fullTagEmptyElementFn(element.name, element);
-    else withClosingTag = options.fullTagEmptyElement;
+    if (!withClosingTag) {
+      if ("fullTagEmptyElementFn" in options) withClosingTag = options.fullTagEmptyElementFn(element.name, element);
+      else withClosingTag = options.fullTagEmptyElement;
+    }
     if (withClosingTag) {
       xml.push(">");
       if (element[options.elementsKey] && element[options.elementsKey].length) {
@@ -213277,8 +213358,10 @@ var require_js2xml = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
       }
       if (element[options.attributesKey]) xml.push(writeAttributes(element[options.attributesKey], options, depth));
       var withClosingTag = hasContentCompact(element, options, true) || element[options.attributesKey] && element[options.attributesKey]["xml:space"] === "preserve";
-      if (!withClosingTag) if ("fullTagEmptyElementFn" in options) withClosingTag = options.fullTagEmptyElementFn(name, element);
-      else withClosingTag = options.fullTagEmptyElement;
+      if (!withClosingTag) {
+        if ("fullTagEmptyElementFn" in options) withClosingTag = options.fullTagEmptyElementFn(name, element);
+        else withClosingTag = options.fullTagEmptyElement;
+      }
       if (withClosingTag) xml.push(">");
       else {
         xml.push("/>");
@@ -213368,8 +213451,8 @@ var convertToXmlComponent = (element) => {
       const xmlComponent = new ImportedXmlComponent(element.name, element.attributes);
       const childElements = element.elements || [];
       for (const childElm of childElements) {
-        const child = convertToXmlComponent(childElm);
-        if (child !== void 0) xmlComponent.push(child);
+        const child2 = convertToXmlComponent(childElm);
+        if (child2 !== void 0) xmlComponent.push(child2);
       }
       return xmlComponent;
     case "text":
@@ -213473,6 +213556,22 @@ var universalMeasureValue = (val2) => {
   const amount = val2.substring(0, val2.length - 2);
   return `${Number(amount)}${unit}`;
 };
+var TWIPS_PER_UNIT = {
+  in: 1440,
+  cm: 1440 / 2.54,
+  mm: 1440 / 25.4,
+  pt: 20,
+  pc: 240,
+  pi: 240
+};
+var universalMeasureToTwips = (val2) => {
+  if (typeof val2 === "number") return val2;
+  const unit = val2.slice(-2);
+  const amount = Number(val2.substring(0, val2.length - 2));
+  const twipsPerUnit = TWIPS_PER_UNIT[unit];
+  if (twipsPerUnit === void 0 || Number.isNaN(amount)) throw new Error(`Invalid universal measure '${val2}'. Expected a number followed by mm, cm, in, pt, pc or pi.`);
+  return amount * twipsPerUnit;
+};
 var positiveUniversalMeasureValue = (val2) => {
   const value = universalMeasureValue(val2);
   if (parseFloat(value) < 0) throw new Error(`Invalid value '${value}' specified. Expected a positive number.`);
@@ -213491,8 +213590,7 @@ var percentageValue = (val2) => {
 };
 var measurementOrPercentValue = (val2) => {
   if (typeof val2 === "number") return decimalNumber(val2);
-  if (val2.slice(-1) === "%") return percentageValue(val2);
-  return universalMeasureValue(val2);
+  return val2.slice(-1) === "%" ? percentageValue(val2) : universalMeasureValue(val2);
 };
 var eighthPointMeasureValue = unsignedDecimalNumber;
 var pointMeasureValue = unsignedDecimalNumber;
@@ -213582,11 +213680,11 @@ var BuilderElement = class extends XmlComponent {
   }
 };
 var AlignmentType = {
-  /** Align Start */
+  /** Align Start: the left in a left-to-right paragraph, and the right in a `bidirectional` (right-to-left) paragraph */
   START: "start",
   /** Align Center */
   CENTER: "center",
-  /** End */
+  /** Align End: the right in a left-to-right paragraph, and the left in a `bidirectional` (right-to-left) paragraph */
   END: "end",
   /** Justified */
   BOTH: "both",
@@ -213602,9 +213700,9 @@ var AlignmentType = {
   LOW_KASHIDA: "lowKashida",
   /** Thai Language Justification */
   THAI_DISTRIBUTE: "thaiDistribute",
-  /** Align Left */
+  /** Align Left: a paragraph stays on the left of the page even when it is `bidirectional` (right-to-left) */
   LEFT: "left",
-  /** Align Right */
+  /** Align Right: a paragraph stays on the right of the page even when it is `bidirectional` (right-to-left) */
   RIGHT: "right",
   /** Justified */
   JUSTIFIED: "both"
@@ -213616,27 +213714,268 @@ var createAlignment = (type) => new BuilderElement({
     value: type
   } }
 });
-var createBorderElement = (elementName, { color, size, space, style }) => new BuilderElement({
-  name: elementName,
-  attributes: {
-    style: {
-      key: "w:val",
-      value: style
-    },
-    color: {
-      key: "w:color",
-      value: color === void 0 ? void 0 : hexColorValue(color)
-    },
-    size: {
-      key: "w:sz",
-      value: size === void 0 ? void 0 : eighthPointMeasureValue(size)
-    },
-    space: {
-      key: "w:space",
-      value: space === void 0 ? void 0 : pointMeasureValue(space)
-    }
+var COLOR_OOXML_NAMES = {
+  dark1: "dk1",
+  light1: "lt1",
+  dark2: "dk2",
+  light2: "lt2",
+  accent1: "accent1",
+  accent2: "accent2",
+  accent3: "accent3",
+  accent4: "accent4",
+  accent5: "accent5",
+  accent6: "accent6",
+  hyperlink: "hlink",
+  followedHyperlink: "folHlink"
+};
+var OFFICE_COLORS = {
+  dark2: "44546A",
+  light2: "E7E6E6",
+  accent1: "4472C4",
+  accent2: "ED7D31",
+  accent3: "A5A5A5",
+  accent4: "FFC000",
+  accent5: "5B9BD5",
+  accent6: "70AD47",
+  hyperlink: "0563C1",
+  followedHyperlink: "954F72"
+};
+var OFFICE_SYSTEM_COLORS = {
+  dark1: {
+    value: "windowText",
+    lastColor: "000000"
+  },
+  light1: {
+    value: "window",
+    lastColor: "FFFFFF"
   }
+};
+var rgbColorValue = (name, color) => {
+  if (color === "auto") throw new Error(`Invalid theme color ${name} 'auto'. Expected 6 digit hex value`);
+  return hexColorValue(color);
+};
+var themeColorValues = (colors = {}) => Object.fromEntries(Object.keys(COLOR_OOXML_NAMES).map((name) => {
+  const color = colors[name];
+  const office = name === "dark1" || name === "light1" ? OFFICE_SYSTEM_COLORS[name].lastColor : OFFICE_COLORS[name];
+  return [name, color === void 0 ? office : rgbColorValue(name, color)];
+}));
+var createRgbColor = (name, color) => new BuilderElement({
+  name: "a:srgbClr",
+  attributes: { value: {
+    key: "val",
+    value: rgbColorValue(name, color)
+  } }
 });
+var createColor = (name, colors) => {
+  const color = colors[name];
+  const system = name === "dark1" || name === "light1" ? OFFICE_SYSTEM_COLORS[name] : void 0;
+  return new BuilderElement({
+    name: `a:${COLOR_OOXML_NAMES[name]}`,
+    children: [color === void 0 && system ? new BuilderElement({
+      name: "a:sysClr",
+      attributes: {
+        value: {
+          key: "val",
+          value: system.value
+        },
+        lastColor: {
+          key: "lastClr",
+          value: system.lastColor
+        }
+      }
+    }) : createRgbColor(name, color !== null && color !== void 0 ? color : OFFICE_COLORS[name])]
+  });
+};
+var createColorScheme = (name, colors = {}) => new BuilderElement({
+  name: "a:clrScheme",
+  attributes: { name: {
+    key: "name",
+    value: name
+  } },
+  children: Object.keys(COLOR_OOXML_NAMES).map((color) => createColor(color, colors))
+});
+var THEME_COLOR_NAMES = /* @__PURE__ */ new Set([
+  "dark1",
+  "light1",
+  "dark2",
+  "light2",
+  "accent1",
+  "accent2",
+  "accent3",
+  "accent4",
+  "accent5",
+  "accent6",
+  "hyperlink",
+  "followedHyperlink"
+]);
+var THEME_COLOR_SUGGESTIONS = /* @__PURE__ */ new Map([
+  ["dk1", "dark1"],
+  ["lt1", "light1"],
+  ["dk2", "dark2"],
+  ["lt2", "light2"],
+  ["hlink", "hyperlink"],
+  ["folHlink", "followedHyperlink"],
+  ["text1", "dark1"],
+  ["background1", "light1"],
+  ["text2", "dark2"],
+  ["background2", "light2"]
+]);
+var changeValue = (value, option) => {
+  if (!(value >= 0 && value <= 100)) throw new Error(`Invalid ${option} ${value}. Expected a number from 0 to 100`);
+  return Math.round(255 * (1 - value / 100));
+};
+var themeColorChange = ({ theme, lighter, darker }) => {
+  if (!THEME_COLOR_NAMES.has(theme)) {
+    const suggestion = THEME_COLOR_SUGGESTIONS.get(theme);
+    throw new Error(`Invalid theme color "${theme}". ${suggestion ? `Did you mean "${suggestion}"?` : `Expected one of ${[...THEME_COLOR_NAMES].join(", ")}`}`);
+  }
+  if (lighter !== void 0 && darker !== void 0) throw new Error("Invalid theme color. Expected lighter or darker, not both");
+  const tint = lighter === void 0 ? void 0 : changeValue(lighter, "lighter");
+  const shade = darker === void 0 ? void 0 : changeValue(darker, "darker");
+  return {
+    tint: tint === 255 ? void 0 : tint,
+    shade: shade === 255 ? void 0 : shade
+  };
+};
+var toHsl = (hex) => {
+  const [red, green, blue] = [
+    0,
+    2,
+    4
+  ].map((index2) => parseInt(hex.slice(index2, index2 + 2), 16) / 255);
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  const range = max - min;
+  if (range === 0) return {
+    hue: 0,
+    saturation: 0,
+    lightness
+  };
+  return {
+    hue: (max === red ? ((green - blue) / range + 6) % 6 : max === green ? (blue - red) / range + 2 : (red - green) / range + 4) * 60,
+    saturation: range / (1 - Math.abs(2 * lightness - 1)),
+    lightness
+  };
+};
+var toHex = ({ hue, saturation, lightness }) => {
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const second = chroma * (1 - Math.abs(hue / 60 % 2 - 1));
+  const [red, green, blue] = hue < 60 ? [
+    chroma,
+    second,
+    0
+  ] : hue < 120 ? [
+    second,
+    chroma,
+    0
+  ] : hue < 180 ? [
+    0,
+    chroma,
+    second
+  ] : hue < 240 ? [
+    0,
+    second,
+    chroma
+  ] : hue < 300 ? [
+    second,
+    0,
+    chroma
+  ] : [
+    chroma,
+    0,
+    second
+  ];
+  const lowest = lightness - chroma / 2;
+  return [
+    red,
+    green,
+    blue
+  ].map((value) => Math.floor((value + lowest) * 255 + 1e-9).toString(16).padStart(2, "0")).join("").toUpperCase();
+};
+var applyChange = (hex, { tint, shade }) => {
+  if (tint === void 0 && shade === void 0) return hex;
+  const hsl = toHsl(hex);
+  const lightness = tint === void 0 ? hsl.lightness * shade / 255 : hsl.lightness * tint / 255 + (1 - tint / 255);
+  return toHex(_objectSpread2(_objectSpread2({}, hsl), {}, { lightness }));
+};
+var hexByte = (value) => value === void 0 ? void 0 : value.toString(16).padStart(2, "0").toUpperCase();
+var checkColor = (color) => typeof color === "string" ? {
+  type: "hex",
+  value: hexColorValue(color)
+} : {
+  type: "theme",
+  color,
+  change: themeColorChange(color)
+};
+var colorValues = (checked, colors) => checked.type === "hex" ? { color: checked.value } : {
+  color: applyChange(colors[checked.color.theme], checked.change),
+  theme: checked.color.theme,
+  tint: hexByte(checked.change.tint),
+  shade: hexByte(checked.change.shade)
+};
+var OFFICE_THEME_COLORS = themeColorValues();
+var ColorAttributeComponent = class extends BaseXmlComponent {
+  /**
+  * @throws If a color isn't valid
+  */
+  constructor(attributes) {
+    super("_attr");
+    _defineProperty(this, "attributes", void 0);
+    this.attributes = attributes.map((attribute) => "keys" in attribute ? {
+      keys: attribute.keys,
+      color: attribute.color === void 0 ? void 0 : checkColor(attribute.color)
+    } : attribute);
+  }
+  prepForXml(context) {
+    var _context$file$Theme$C, _context$file;
+    const themeColors = (_context$file$Theme$C = (_context$file = context.file) === null || _context$file === void 0 || (_context$file = _context$file.Theme) === null || _context$file === void 0 ? void 0 : _context$file.Colors) !== null && _context$file$Theme$C !== void 0 ? _context$file$Theme$C : OFFICE_THEME_COLORS;
+    const entries = this.attributes.flatMap((attribute) => {
+      if (!("keys" in attribute)) return [[attribute.key, attribute.value]];
+      if (attribute.color === void 0) return [];
+      const { keys } = attribute;
+      const values = colorValues(attribute.color, themeColors);
+      return [
+        [keys.color, values.color],
+        [keys.theme, values.theme],
+        [keys.tint, values.tint],
+        [keys.shade, values.shade]
+      ];
+    });
+    return { _attr: Object.fromEntries(entries.filter(([, value]) => value !== void 0)) };
+  }
+};
+var ColorElement = class extends XmlComponent {
+  constructor(name, attributes) {
+    super(name);
+    this.root.push(new ColorAttributeComponent(attributes));
+  }
+};
+var createColorElement = (name, attributes) => new ColorElement(name, attributes);
+var COLOR_ATTRIBUTES = {
+  color: "w:color",
+  theme: "w:themeColor",
+  tint: "w:themeTint",
+  shade: "w:themeShade"
+};
+var createBorderElement = (elementName, { color, size, space, style }) => createColorElement(elementName, [
+  {
+    key: "w:val",
+    value: style
+  },
+  {
+    keys: COLOR_ATTRIBUTES,
+    color
+  },
+  {
+    key: "w:sz",
+    value: size === void 0 ? void 0 : eighthPointMeasureValue(size)
+  },
+  {
+    key: "w:space",
+    value: space === void 0 ? void 0 : pointMeasureValue(space)
+  }
+]);
 var BorderStyle = {
   /** a single line */
   SINGLE: "single",
@@ -213697,8 +214036,8 @@ var Border2 = class extends IgnoreIfEmptyXmlComponent {
   constructor(options) {
     super("w:pBdr");
     if (options.top) this.root.push(createBorderElement("w:top", options.top));
-    if (options.bottom) this.root.push(createBorderElement("w:bottom", options.bottom));
     if (options.left) this.root.push(createBorderElement("w:left", options.left));
+    if (options.bottom) this.root.push(createBorderElement("w:bottom", options.bottom));
     if (options.right) this.root.push(createBorderElement("w:right", options.right));
     if (options.between) this.root.push(createBorderElement("w:between", options.between));
   }
@@ -213768,6 +214107,31 @@ var createFieldChar = (type, dirty) => new BuilderElement({
   }
 });
 var createBegin = (dirty) => createFieldChar(FieldCharacterType.BEGIN, dirty);
+var dirtyWithoutPageNumbers = /* @__PURE__ */ new WeakSet();
+var BeginDirtyWithoutPageNumbers = class extends BuilderElement {
+  constructor() {
+    super({
+      name: "w:fldChar",
+      attributes: {
+        type: {
+          key: "w:fldCharType",
+          value: FieldCharacterType.BEGIN
+        },
+        dirty: {
+          key: "w:dirty",
+          value: true
+        }
+      }
+    });
+  }
+  prepForXml(context) {
+    const xml = super.prepForXml(context);
+    dirtyWithoutPageNumbers.add(xml);
+    return xml;
+  }
+};
+var createBeginDirtyWithoutPageNumbers = () => new BeginDirtyWithoutPageNumbers();
+var isDirtyWithoutPageNumbers = (element) => typeof element === "object" && element !== null && dirtyWithoutPageNumbers.has(element);
 var createSeparate = (dirty) => createFieldChar(FieldCharacterType.SEPARATE, dirty);
 var createEnd = (dirty) => createFieldChar(FieldCharacterType.END, dirty);
 var VerticalPositionAlign = {
@@ -213820,23 +214184,25 @@ var CurrentSection = class extends XmlComponent {
     this.root.push("SECTION");
   }
 };
-var createShading = ({ fill, color, type }) => new BuilderElement({
-  name: "w:shd",
-  attributes: {
-    fill: {
-      key: "w:fill",
-      value: fill === void 0 ? void 0 : hexColorValue(fill)
+var createShading = ({ fill, color, type }) => createColorElement("w:shd", [
+  {
+    keys: {
+      color: "w:fill",
+      theme: "w:themeFill",
+      tint: "w:themeFillTint",
+      shade: "w:themeFillShade"
     },
-    color: {
-      key: "w:color",
-      value: color === void 0 ? void 0 : hexColorValue(color)
-    },
-    type: {
-      key: "w:val",
-      value: type
-    }
+    color: fill
+  },
+  {
+    keys: COLOR_ATTRIBUTES,
+    color
+  },
+  {
+    key: "w:val",
+    value: type !== null && type !== void 0 ? type : ShadingType2.CLEAR
   }
-});
+]);
 var ShadingType2 = {
   /** Clear shading - no pattern, fill color only */
   CLEAR: "clear",
@@ -213927,18 +214293,15 @@ var CharacterSpacing = class extends XmlComponent {
 var Color2 = class extends XmlComponent {
   constructor(color) {
     super("w:color");
-    this.root.push(new Attributes2({ val: hexColorValue(color) }));
+    this.root.push(new ColorAttributeComponent([{
+      keys: _objectSpread2(_objectSpread2({}, COLOR_ATTRIBUTES), {}, { color: "w:val" }),
+      color
+    }]));
   }
 };
 var Highlight = class extends XmlComponent {
   constructor(color) {
     super("w:highlight");
-    this.root.push(new Attributes2({ val: color }));
-  }
-};
-var HighlightComplexScript = class extends XmlComponent {
-  constructor(color) {
-    super("w:highlightCs");
     this.root.push(new Attributes2({ val: color }));
   }
 };
@@ -213984,6 +214347,30 @@ var createRunFonts = (nameOrAttrs, hint) => {
         hint: {
           key: "w:hint",
           value: hint
+        }
+      }
+    });
+  }
+  if ("theme" in nameOrAttrs) {
+    const theme = nameOrAttrs.theme === "headings" ? "major" : "minor";
+    return new BuilderElement({
+      name: "w:rFonts",
+      attributes: {
+        ascii: {
+          key: "w:asciiTheme",
+          value: `${theme}HAnsi`
+        },
+        eastAsia: {
+          key: "w:eastAsiaTheme",
+          value: `${theme}EastAsia`
+        },
+        hAnsi: {
+          key: "w:hAnsiTheme",
+          value: `${theme}HAnsi`
+        },
+        cs: {
+          key: "w:cstheme",
+          value: `${theme}Bidi`
         }
       }
     });
@@ -214062,27 +214449,23 @@ var UnderlineType = {
   /** No underline */
   NONE: "none"
 };
-var createUnderline = (underlineType = UnderlineType.SINGLE, color) => new BuilderElement({
-  name: "w:u",
-  attributes: {
-    val: {
-      key: "w:val",
-      value: underlineType
-    },
-    color: {
-      key: "w:color",
-      value: color === void 0 ? void 0 : hexColorValue(color)
-    }
-  }
-});
+var createUnderline = (underlineType = UnderlineType.SINGLE, color) => createColorElement("w:u", [{
+  key: "w:val",
+  value: underlineType
+}, {
+  keys: COLOR_ATTRIBUTES,
+  color
+}]);
 var RunProperties = class extends IgnoreIfEmptyXmlComponent {
   constructor(options) {
     super("w:rPr");
     if (!options) return;
     if (options.style) this.push(new StringValueElement("w:rStyle", options.style));
-    if (options.font) if (typeof options.font === "string") this.push(createRunFonts(options.font));
-    else if ("name" in options.font) this.push(createRunFonts(options.font.name, options.font.hint));
-    else this.push(createRunFonts(options.font));
+    if (options.font) {
+      if (typeof options.font === "string") this.push(createRunFonts(options.font));
+      else if ("name" in options.font) this.push(createRunFonts(options.font.name, options.font.hint));
+      else this.push(createRunFonts(options.font));
+    }
     if (options.bold !== void 0) this.push(new OnOffElement("w:b", options.bold));
     if (options.boldComplexScript === void 0 && options.bold !== void 0 || options.boldComplexScript) {
       var _options$boldComplexS;
@@ -214101,7 +214484,7 @@ var RunProperties = class extends IgnoreIfEmptyXmlComponent {
     if (options.imprint !== void 0) this.push(new OnOffElement("w:imprint", options.imprint));
     if (options.noProof !== void 0) this.push(new OnOffElement("w:noProof", options.noProof));
     if (options.snapToGrid !== void 0) this.push(new OnOffElement("w:snapToGrid", options.snapToGrid));
-    if (options.vanish) this.push(new OnOffElement("w:vanish", options.vanish));
+    if (options.vanish !== void 0) this.push(new OnOffElement("w:vanish", options.vanish));
     if (options.color) this.push(new Color2(options.color));
     if (options.characterSpacing) this.push(new CharacterSpacing(options.characterSpacing));
     if (options.scale !== void 0) this.push(new NumberValueElement("w:w", options.scale));
@@ -214111,8 +214494,6 @@ var RunProperties = class extends IgnoreIfEmptyXmlComponent {
     const szCs = options.sizeComplexScript === void 0 || options.sizeComplexScript === true ? options.size : options.sizeComplexScript;
     if (szCs) this.push(new HpsMeasureElement("w:szCs", szCs));
     if (options.highlight) this.push(new Highlight(options.highlight));
-    const highlightCs = options.highlightComplexScript === void 0 || options.highlightComplexScript === true ? options.highlight : options.highlightComplexScript;
-    if (highlightCs) this.push(new HighlightComplexScript(highlightCs));
     if (options.underline) this.push(createUnderline(options.underline.type, options.underline.color));
     if (options.effect) this.push(new StringValueElement("w:effect", options.effect));
     if (options.border) this.push(createBorderElement("w:bdr", options.border));
@@ -214122,8 +214503,8 @@ var RunProperties = class extends IgnoreIfEmptyXmlComponent {
     if (options.rightToLeft !== void 0) this.push(new OnOffElement("w:rtl", options.rightToLeft));
     if (options.emphasisMark) this.push(createEmphasisMark(options.emphasisMark.type));
     if (options.language) this.push(createLanguageComponent(options.language));
-    if (options.specVanish) this.push(new OnOffElement("w:specVanish", options.vanish));
-    if (options.math) this.push(new OnOffElement("w:oMath", options.math));
+    if (options.specVanish !== void 0) this.push(new OnOffElement("w:specVanish", options.specVanish));
+    if (options.math !== void 0) this.push(new OnOffElement("w:oMath", options.math));
     if (options.revision) this.push(new RunPropertiesChange(options.revision));
   }
   push(item) {
@@ -214171,16 +214552,25 @@ var PageNumber = {
   /** Inserts the current section number */
   CURRENT_SECTION: "SECTION"
 };
-var Run = class extends XmlComponent {
+var Run = class Run2 extends XmlComponent {
   constructor(options) {
     super("w:r");
     _defineProperty(this, "properties", void 0);
+    _defineProperty(this, "following", []);
     this.properties = new RunProperties(options);
     this.root.push(this.properties);
     if (options.break) for (let i = 0; i < options.break; i++) this.root.push(createBreak());
-    if (options.children) for (const child of options.children) {
-      if (typeof child === "string") {
-        switch (child) {
+    if (options.children) for (const [index2, child2] of options.children.entries()) {
+      if (child2 instanceof Run2) {
+        const rest = options.children.slice(index2 + 1);
+        this.following = [child2, ...rest.length > 0 ? [new Run2(_objectSpread2(_objectSpread2({}, options), {}, {
+          break: void 0,
+          children: rest
+        }))] : []];
+        break;
+      }
+      if (typeof child2 === "string") {
+        switch (child2) {
           case PageNumber.CURRENT:
             this.root.push(createBegin());
             this.root.push(new Page2());
@@ -214206,14 +214596,19 @@ var Run = class extends XmlComponent {
             this.root.push(createEnd());
             break;
           default:
-            this.root.push(new Text2(child));
-            break;
+            this.root.push(new Text2(child2));
         }
         continue;
       }
-      this.root.push(child);
+      this.root.push(child2);
     }
     else if (options.text !== void 0) this.root.push(new Text2(options.text));
+  }
+  get writtenAs() {
+    return this.following.length > 0 ? [this, ...this.following.flatMap((run2) => {
+      var _run$writtenAs;
+      return (_run$writtenAs = run2.writtenAs) !== null && _run$writtenAs !== void 0 ? _run$writtenAs : run2;
+    })] : void 0;
   }
 };
 var TextRun = class extends Run {
@@ -214241,13 +214636,8 @@ var Symbol$1 = class extends XmlComponent {
 };
 var SymbolRun = class extends Run {
   constructor(options) {
-    if (typeof options === "string") {
-      super({});
-      this.root.push(new Symbol$1(options));
-      return this;
-    }
-    super(options);
-    this.root.push(new Symbol$1(options.char, options.symbolfont));
+    super(typeof options === "string" ? {} : options);
+    this.root.push(typeof options === "string" ? new Symbol$1(options) : new Symbol$1(options.char, options.symbolfont));
   }
 };
 var require_minimalistic_assert = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
@@ -214301,12 +214691,12 @@ var require_utils2 = /* @__PURE__ */ __commonJSMin(((exports2) => {
     return res;
   }
   exports2.toArray = toArray;
-  function toHex(msg) {
+  function toHex2(msg) {
     var res = "";
     for (var i = 0; i < msg.length; i++) res += zero2(msg[i].toString(16));
     return res;
   }
-  exports2.toHex = toHex;
+  exports2.toHex = toHex2;
   function htonl(w) {
     return (w >>> 24 | w >>> 8 & 65280 | w << 8 & 16711680 | (w & 255) << 24) >>> 0;
   }
@@ -215673,19 +216063,19 @@ var import_hash = /* @__PURE__ */ __toESM2((/* @__PURE__ */ __commonJSMin(((expo
   hash.sha512 = hash.sha.sha512;
   hash.ripemd160 = hash.ripemd.ripemd160;
 })))(), 1);
-var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
+var urlAlphabet = "57X6y3wQZNzYjJB2L_10pxbackgroundhimselfUTF-8DEMOGRAPHICSVqvt4KW9";
 var customAlphabet = (alphabet, defaultSize = 21) => {
   return (size = defaultSize) => {
     let id = "";
     let i = size | 0;
-    while (i--) id += alphabet[Math.random() * alphabet.length | 0];
+    while (i-- > 0) id += alphabet[Math.random() * alphabet.length | 0];
     return id;
   };
 };
 var nanoid = (size = 21) => {
   let id = "";
   let i = size | 0;
-  while (i--) id += urlAlphabet[Math.random() * 64 | 0];
+  while (i-- > 0) id += urlAlphabet[Math.random() * 64 | 0];
   return id;
 };
 var convertInchesToTwip = (inches) => Math.floor(inches * 72 * 20);
@@ -215696,7 +216086,9 @@ var uniqueNumericIdCreator = (initial = 0) => {
 var abstractNumUniqueNumericIdGen = () => uniqueNumericIdCreator();
 var concreteNumUniqueNumericIdGen = () => uniqueNumericIdCreator(1);
 var docPropertiesUniqueNumericIdGen = () => uniqueNumericIdCreator();
+var docPropertiesUniqueNumericId = docPropertiesUniqueNumericIdGen();
 var bookmarkUniqueNumericIdGen = () => uniqueNumericIdCreator();
+var bookmarkUniqueNumericId = bookmarkUniqueNumericIdGen();
 var uniqueId = () => nanoid().toLowerCase();
 var hashedId = (data) => import_hash.default.sha1().update(data instanceof ArrayBuffer ? new Uint8Array(data) : data).digest("hex");
 var generateUuidPart = (count) => customAlphabet("1234567890abcdef", count)();
@@ -215971,10 +216363,36 @@ var createSchemeColor = (options) => new BuilderElement({
     value: options.value
   } }
 });
-var createSolidFill = (options) => new BuilderElement({
+var createSolidFill$1 = (options) => new BuilderElement({
   name: "a:solidFill",
   children: [options.type === "rgb" ? createSolidRgbColor(options) : createSchemeColor(options)]
 });
+var LineCap = {
+  /** Round cap style */
+  ROUND: "rnd",
+  /** Square cap style */
+  SQUARE: "sq",
+  /** Flat cap style */
+  FLAT: "flat"
+};
+var CompoundLine = {
+  /** Single line */
+  SINGLE: "sng",
+  /** Double line */
+  DOUBLE: "dbl",
+  /** Thick-thin double line */
+  THICK_THIN: "thickThin",
+  /** Thin-thick double line */
+  THIN_THICK: "thinThick",
+  /** Triple line */
+  TRI: "tri"
+};
+var PenAlignment = {
+  /** Center alignment */
+  CENTER: "ctr",
+  /** Inset alignment */
+  INSET: "in"
+};
 var createOutline = (options) => new BuilderElement({
   name: "a:ln",
   attributes: {
@@ -215984,21 +216402,21 @@ var createOutline = (options) => new BuilderElement({
     },
     cap: {
       key: "cap",
-      value: options.cap
+      value: options.cap === void 0 ? void 0 : LineCap[options.cap]
     },
     compoundLine: {
       key: "cmpd",
-      value: options.compoundLine
+      value: options.compoundLine === void 0 ? void 0 : CompoundLine[options.compoundLine]
     },
     align: {
       key: "algn",
-      value: options.align
+      value: options.align === void 0 ? void 0 : PenAlignment[options.align]
     }
   },
-  children: [options.type === "noFill" ? createNoFill() : options.solidFillType === "rgb" ? createSolidFill({
+  children: [options.type === "noFill" ? createNoFill() : options.solidFillType === "rgb" ? createSolidFill$1({
     type: "rgb",
     value: options.value
-  }) : createSolidFill({
+  }) : createSolidFill$1({
     type: "scheme",
     value: options.value
   })]
@@ -216035,11 +216453,9 @@ var ShapeProperties = class extends XmlComponent {
     this.form = new Form(transform);
     this.root.push(this.form);
     this.root.push(new PresetGeometry());
-    if (outline) {
-      this.root.push(createNoFill());
-      this.root.push(createOutline(outline));
-    }
-    if (solidFill) this.root.push(createSolidFill(solidFill));
+    if (solidFill) this.root.push(createSolidFill$1(solidFill));
+    else if (outline) this.root.push(createNoFill());
+    if (outline) this.root.push(createOutline(outline));
   }
 };
 var createWpsShape = (options) => new BuilderElement({
@@ -216101,9 +216517,31 @@ var createBlip = (mediaData) => new BuilderElement({
   },
   children: mediaData.type === "svg" ? [createExtentionList(mediaData)] : []
 });
+var SourceRectangleAttributes = class extends XmlAttributeComponent {
+  constructor(..._args) {
+    super(..._args);
+    _defineProperty(this, "xmlKeys", {
+      left: "l",
+      top: "t",
+      right: "r",
+      bottom: "b"
+    });
+  }
+};
+var cropValue = (value, edge) => {
+  if (value === void 0) return;
+  if (!(value >= 0 && value <= 100)) throw new Error(`Invalid crop ${edge} ${value}. Expected a number from 0 to 100`);
+  return Math.round(value * 1e3);
+};
 var SourceRectangle = class extends XmlComponent {
-  constructor() {
+  constructor(crop) {
     super("a:srcRect");
+    if (crop) this.root.push(new SourceRectangleAttributes({
+      left: cropValue(crop.left, "left"),
+      top: cropValue(crop.top, "top"),
+      right: cropValue(crop.right, "right"),
+      bottom: cropValue(crop.bottom, "bottom")
+    }));
   }
 };
 var FillRectangle = class extends XmlComponent {
@@ -216118,10 +216556,10 @@ var Stretch = class extends XmlComponent {
   }
 };
 var BlipFill = class extends XmlComponent {
-  constructor(mediaData) {
+  constructor(mediaData, crop) {
     super("pic:blipFill");
     this.root.push(createBlip(mediaData));
-    this.root.push(new SourceRectangle());
+    this.root.push(new SourceRectangle(crop));
     this.root.push(new Stretch());
   }
 };
@@ -216149,16 +216587,6 @@ var ChildNonVisualProperties = class extends XmlComponent {
     this.root.push(new PicLocks());
   }
 };
-var createHyperlinkClick = (linkId, hasXmlNs) => new BuilderElement({
-  name: "a:hlinkClick",
-  attributes: _objectSpread2(_objectSpread2({}, hasXmlNs ? { xmlns: {
-    key: "xmlns:a",
-    value: "http://schemas.openxmlformats.org/drawingml/2006/main"
-  } } : {}), {}, { id: {
-    key: "r:id",
-    value: `rId${linkId}`
-  } })
-});
 var NonVisualPropertiesAttributes = class extends XmlAttributeComponent {
   constructor(..._args) {
     super(..._args);
@@ -216182,10 +216610,12 @@ var NonVisualProperties = class extends XmlComponent {
     for (let i = context.stack.length - 1; i >= 0; i--) {
       const element = context.stack[i];
       if (!(element instanceof ConcreteHyperlink)) continue;
-      this.root.push(createHyperlinkClick(element.linkId, false));
+      this.root.push(element.createDrawingClick(context, false));
       break;
     }
-    return super.prepForXml(context);
+    const result = super.prepForXml(context);
+    this.root.splice(1);
+    return result;
   }
 };
 var NonVisualPicProperties = class extends XmlComponent {
@@ -216202,35 +216632,88 @@ var PicAttributes = class extends XmlAttributeComponent {
   }
 };
 var Pic = class extends XmlComponent {
-  constructor({ mediaData, transform, outline }) {
+  constructor({ mediaData, transform, outline, solidFill, crop }) {
     super("pic:pic");
     this.root.push(new PicAttributes({ xmlns: "http://schemas.openxmlformats.org/drawingml/2006/picture" }));
     this.root.push(new NonVisualPicProperties());
-    this.root.push(new BlipFill(mediaData));
+    this.root.push(new BlipFill(mediaData, crop));
     this.root.push(new ShapeProperties({
       element: "pic",
       transform,
-      outline
+      outline,
+      solidFill
     }));
   }
 };
-var createGroupProperties = (transform) => new BuilderElement({
-  name: "wpg:grpSpPr",
-  children: [new Form(transform)]
-});
+var createGroupTransform = (transformation) => {
+  var _transformation$flip, _transformation$flip2, _transformation$offse, _transformation$offse2;
+  return new BuilderElement({
+    name: "a:xfrm",
+    attributes: {
+      flipVertical: {
+        key: "flipV",
+        value: (_transformation$flip = transformation.flip) === null || _transformation$flip === void 0 ? void 0 : _transformation$flip.vertical
+      },
+      flipHorizontal: {
+        key: "flipH",
+        value: (_transformation$flip2 = transformation.flip) === null || _transformation$flip2 === void 0 ? void 0 : _transformation$flip2.horizontal
+      },
+      rotation: {
+        key: "rot",
+        value: transformation.rotation
+      }
+    },
+    children: [
+      new Offset((_transformation$offse = transformation.offset) === null || _transformation$offse === void 0 || (_transformation$offse = _transformation$offse.emus) === null || _transformation$offse === void 0 ? void 0 : _transformation$offse.x, (_transformation$offse2 = transformation.offset) === null || _transformation$offse2 === void 0 || (_transformation$offse2 = _transformation$offse2.emus) === null || _transformation$offse2 === void 0 ? void 0 : _transformation$offse2.y),
+      new Extents(transformation.emus.x, transformation.emus.y),
+      new BuilderElement({
+        name: "a:chOff",
+        attributes: {
+          x: {
+            key: "x",
+            value: 0
+          },
+          y: {
+            key: "y",
+            value: 0
+          }
+        }
+      }),
+      new BuilderElement({
+        name: "a:chExt",
+        attributes: {
+          x: {
+            key: "cx",
+            value: transformation.emus.x
+          },
+          y: {
+            key: "cy",
+            value: transformation.emus.y
+          }
+        }
+      })
+    ]
+  });
+};
 var createNonVisualGroupProperties = () => new BuilderElement({ name: "wpg:cNvGrpSpPr" });
 var createWpgGroup = (options) => new BuilderElement({
   name: "wpg:wgp",
   children: [
     createNonVisualGroupProperties(),
-    createGroupProperties(options.transformation),
+    new BuilderElement({
+      name: "wpg:grpSpPr",
+      children: [createGroupTransform(options.transformation)]
+    }),
     ...options.children
   ]
 });
 var GraphicData = class extends XmlComponent {
-  constructor({ mediaData, transform, outline, solidFill }) {
+  constructor({ mediaData, transform, outline, solidFill, crop }) {
     super("a:graphicData");
-    if (mediaData.type === "wps") {
+    if (mediaData.type === "graphic") {
+      this.root.push(new GraphicDataAttributes({ uri: mediaData.uri }));
+      this.root.push(mediaData.content);
+    } else if (mediaData.type === "wps") {
       this.root.push(new GraphicDataAttributes({ uri: "http://schemas.microsoft.com/office/word/2010/wordprocessingShape" }));
       const wps = createWpsShape(_objectSpread2(_objectSpread2({}, mediaData.data), {}, {
         transformation: transform,
@@ -216241,16 +216724,17 @@ var GraphicData = class extends XmlComponent {
     } else if (mediaData.type === "wpg") {
       this.root.push(new GraphicDataAttributes({ uri: "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" }));
       const wpg = createWpgGroup({
-        children: mediaData.children.map((child) => {
-          if (child.type === "wps") return createWpsShape(_objectSpread2(_objectSpread2({}, child.data), {}, {
-            transformation: child.transformation,
-            outline: child.outline,
-            solidFill: child.solidFill
+        children: mediaData.children.map((child2) => {
+          if (child2.type === "wps") return createWpsShape(_objectSpread2(_objectSpread2({}, child2.data), {}, {
+            transformation: child2.transformation,
+            outline: child2.outline,
+            solidFill: child2.solidFill
           }));
           else return new Pic({
-            mediaData: child,
-            transform: child.transformation,
-            outline: child.outline
+            mediaData: child2,
+            transform: child2.transformation,
+            outline: child2.outline,
+            solidFill: child2.solidFill
           });
         }),
         transformation: transform
@@ -216261,7 +216745,9 @@ var GraphicData = class extends XmlComponent {
       const pic = new Pic({
         mediaData,
         transform,
-        outline
+        outline,
+        solidFill,
+        crop
       });
       this.root.push(pic);
     }
@@ -216274,7 +216760,7 @@ var GraphicAttributes = class extends XmlAttributeComponent {
   }
 };
 var Graphic = class extends XmlComponent {
-  constructor({ mediaData, transform, outline, solidFill }) {
+  constructor({ mediaData, transform, outline, solidFill, crop }) {
     super("a:graphic");
     _defineProperty(this, "data", void 0);
     this.root.push(new GraphicAttributes({ a: "http://schemas.openxmlformats.org/drawingml/2006/main" }));
@@ -216282,16 +216768,23 @@ var Graphic = class extends XmlComponent {
       mediaData,
       transform,
       outline,
-      solidFill
+      solidFill,
+      crop
     });
     this.root.push(this.data);
   }
 };
 var TextWrappingType = {
+  /** Text doesn't wrap around the drawing. It is drawn in front of or behind the text */
   NONE: 0,
+  /** Text wraps around the drawing's box */
   SQUARE: 1,
+  /** Text wraps closely around the drawing's outline */
   TIGHT: 2,
-  TOP_AND_BOTTOM: 3
+  /** Text sits above and below the drawing, not beside it */
+  TOP_AND_BOTTOM: 3,
+  /** Text wraps closely around the drawing's outline, and fills any open space inside it */
+  THROUGH: 4
 };
 var TextWrappingSide = {
   /** Text wraps on both sides of the drawing */
@@ -216334,22 +216827,72 @@ var createWrapSquare = (textWrapping, margins = {
     }
   }
 });
-var createWrapTight = (margins = {
-  top: 0,
-  bottom: 0
-}) => new BuilderElement({
-  name: "wp:wrapTight",
+var WRAP_POLYGON_SIZE = 21600;
+var createPoint = (name, { x, y }) => new BuilderElement({
+  name,
   attributes: {
-    distT: {
-      key: "distT",
-      value: margins.top
+    x: {
+      key: "x",
+      value: x
     },
-    distB: {
-      key: "distB",
-      value: margins.bottom
+    y: {
+      key: "y",
+      value: y
     }
   }
 });
+var createWrapPolygon = () => new BuilderElement({
+  name: "wp:wrapPolygon",
+  attributes: { edited: {
+    key: "edited",
+    value: false
+  } },
+  children: [
+    createPoint("wp:start", {
+      x: 0,
+      y: 0
+    }),
+    createPoint("wp:lineTo", {
+      x: 0,
+      y: WRAP_POLYGON_SIZE
+    }),
+    createPoint("wp:lineTo", {
+      x: WRAP_POLYGON_SIZE,
+      y: WRAP_POLYGON_SIZE
+    }),
+    createPoint("wp:lineTo", {
+      x: WRAP_POLYGON_SIZE,
+      y: 0
+    }),
+    createPoint("wp:lineTo", {
+      x: 0,
+      y: 0
+    })
+  ]
+});
+var createPolygonWrap = (name, margins = {}, textWrapping) => {
+  var _textWrapping$side;
+  return new BuilderElement({
+    name,
+    attributes: {
+      wrapText: {
+        key: "wrapText",
+        value: (_textWrapping$side = textWrapping === null || textWrapping === void 0 ? void 0 : textWrapping.side) !== null && _textWrapping$side !== void 0 ? _textWrapping$side : TextWrappingSide.BOTH_SIDES
+      },
+      distL: {
+        key: "distL",
+        value: margins.left
+      },
+      distR: {
+        key: "distR",
+        value: margins.right
+      }
+    },
+    children: [createWrapPolygon()]
+  });
+};
+var createWrapTight = (margins, textWrapping) => createPolygonWrap("wp:wrapTight", margins, textWrapping);
+var createWrapThrough = (margins, textWrapping) => createPolygonWrap("wp:wrapThrough", margins, textWrapping);
 var createWrapTopAndBottom = (margins = {
   top: 0,
   bottom: 0
@@ -216366,18 +216909,99 @@ var createWrapTopAndBottom = (margins = {
     }
   }
 });
+var TargetModeType = {
+  /** Target is external to the package (e.g., hyperlink to a URL) */
+  EXTERNAL: "External"
+};
+var createRelationship = (id, type, target, targetMode) => new BuilderElement({
+  name: "Relationship",
+  attributes: {
+    id: {
+      key: "Id",
+      value: id
+    },
+    type: {
+      key: "Type",
+      value: type
+    },
+    target: {
+      key: "Target",
+      value: target
+    },
+    targetMode: {
+      key: "TargetMode",
+      value: targetMode
+    }
+  }
+});
+var createHyperlinkClick = (linkId, hasXmlNs) => new BuilderElement({
+  name: "a:hlinkClick",
+  attributes: _objectSpread2(_objectSpread2({}, hasXmlNs ? { xmlns: {
+    key: "xmlns:a",
+    value: "http://schemas.openxmlformats.org/drawingml/2006/main"
+  } } : {}), {}, { id: {
+    key: "r:id",
+    value: `rId${linkId}`
+  } })
+});
+var DECORATIVE_EXTENSION_URI = "{C183D7F6-B498-43B3-948B-1728B52AA6E4}";
+var createDecorativeExtensionList = (declareNamespace) => new BuilderElement({
+  name: "a:extLst",
+  attributes: { namespace: {
+    key: "xmlns:a",
+    value: declareNamespace ? "http://schemas.openxmlformats.org/drawingml/2006/main" : void 0
+  } },
+  children: [new BuilderElement({
+    name: "a:ext",
+    attributes: { uri: {
+      key: "uri",
+      value: DECORATIVE_EXTENSION_URI
+    } },
+    children: [new BuilderElement({
+      name: "adec:decorative",
+      attributes: {
+        namespace: {
+          key: "xmlns:adec",
+          value: "http://schemas.microsoft.com/office/drawing/2017/decorative"
+        },
+        value: {
+          key: "val",
+          value: 1
+        }
+      }
+    })]
+  })]
+});
+var DrawingLink = class {
+  constructor(link) {
+    _defineProperty(this, "link", void 0);
+    _defineProperty(this, "linkId", uniqueId());
+    _defineProperty(this, "addedTo", /* @__PURE__ */ new WeakSet());
+    this.link = link;
+  }
+  createClick(declareNamespace) {
+    return createHyperlinkClick(this.linkId, declareNamespace);
+  }
+  addRelationship(context) {
+    const relationships = context.viewWrapper.Relationships;
+    if (this.addedTo.has(relationships)) return;
+    this.addedTo.add(relationships);
+    relationships.addRelationship(this.linkId, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", this.link, TargetModeType.EXTERNAL);
+  }
+};
 var DocProperties = class extends XmlComponent {
   constructor({ name, description, title, id } = {
     name: "",
     description: "",
     title: ""
-  }) {
+  }, { link, decorative } = {}) {
     super("wp:docPr");
-    _defineProperty(this, "docPropertiesUniqueNumericId", docPropertiesUniqueNumericIdGen());
+    _defineProperty(this, "link", void 0);
+    _defineProperty(this, "decorative", void 0);
     const attributes = {
       id: {
         key: "id",
-        value: id !== null && id !== void 0 ? id : this.docPropertiesUniqueNumericId()
+        value: id !== null && id !== void 0 ? id : docPropertiesUniqueNumericId()
       },
       name: {
         key: "name",
@@ -216393,15 +217017,23 @@ var DocProperties = class extends XmlComponent {
       value: title
     };
     this.root.push(new NextAttributeComponent(attributes));
+    this.link = link === void 0 ? void 0 : new DrawingLink(link);
+    this.decorative = decorative;
   }
   prepForXml(context) {
-    for (let i = context.stack.length - 1; i >= 0; i--) {
+    if (this.link) {
+      this.link.addRelationship(context);
+      this.root.push(this.link.createClick(true));
+    } else for (let i = context.stack.length - 1; i >= 0; i--) {
       const element = context.stack[i];
       if (!(element instanceof ConcreteHyperlink)) continue;
-      this.root.push(createHyperlinkClick(element.linkId, true));
+      this.root.push(element.createDrawingClick(context, true));
       break;
     }
-    return super.prepForXml(context);
+    if (this.decorative) this.root.push(createDecorativeExtensionList(true));
+    const result = super.prepForXml(context);
+    this.root.splice(1);
+    return result;
   }
 };
 var createEffectExtent = ({ top, right, bottom, left }) => new BuilderElement({
@@ -216425,16 +217057,22 @@ var createEffectExtent = ({ top, right, bottom, left }) => new BuilderElement({
     }
   }
 });
+var MAX_EXTENT = 2147483647;
+var EMUS_PER_PIXEL = 9525;
+var checkExtent = (dimension, value) => {
+  if (value !== void 0 && value > MAX_EXTENT) throw new Error(`Invalid drawing ${dimension} ${value} EMUs (${Math.round(value / EMUS_PER_PIXEL)} pixels). Word won't open a drawing with a ${dimension} over ${MAX_EXTENT} EMUs (${Math.floor(MAX_EXTENT / EMUS_PER_PIXEL)} pixels). Sizes such as an ImageRun's transformation are in pixels, not EMUs`);
+  return value;
+};
 var createExtent = ({ x, y }) => new BuilderElement({
   name: "wp:extent",
   attributes: {
     x: {
       key: "cx",
-      value: x
+      value: checkExtent("width", x)
     },
     y: {
       key: "cy",
-      value: y
+      value: checkExtent("height", y)
     }
   }
 });
@@ -216456,9 +217094,9 @@ var GraphicFrameLocks = class extends XmlComponent {
     }));
   }
 };
-var createGraphicFrameProperties = () => new BuilderElement({
+var createGraphicFrameProperties = (lockAspectRatio = true) => new BuilderElement({
   name: "wp:cNvGraphicFramePr",
-  children: [new GraphicFrameLocks()]
+  children: lockAspectRatio ? [new GraphicFrameLocks()] : []
 });
 var AnchorAttributes = class extends XmlAttributeComponent {
   constructor(..._args) {
@@ -216479,6 +217117,7 @@ var AnchorAttributes = class extends XmlAttributeComponent {
 };
 var Anchor = class extends XmlComponent {
   constructor({ mediaData, transform, drawingOptions }) {
+    var _drawingOptions$effec;
     super("wp:anchor");
     const floating = _objectSpread2({
       allowOverlap: true,
@@ -216507,7 +217146,7 @@ var Anchor = class extends XmlComponent {
       x: transform.emus.x,
       y: transform.emus.y
     }));
-    this.root.push(createEffectExtent({
+    this.root.push(createEffectExtent((_drawingOptions$effec = drawingOptions.effectExtent) !== null && _drawingOptions$effec !== void 0 ? _drawingOptions$effec : {
       top: 0,
       right: 0,
       bottom: 0,
@@ -216518,7 +217157,10 @@ var Anchor = class extends XmlComponent {
         this.root.push(createWrapSquare(drawingOptions.floating.wrap, drawingOptions.floating.margins));
         break;
       case TextWrappingType.TIGHT:
-        this.root.push(createWrapTight(drawingOptions.floating.margins));
+        this.root.push(createWrapTight(drawingOptions.floating.margins, drawingOptions.floating.wrap));
+        break;
+      case TextWrappingType.THROUGH:
+        this.root.push(createWrapThrough(drawingOptions.floating.margins, drawingOptions.floating.wrap));
         break;
       case TextWrappingType.TOP_AND_BOTTOM:
         this.root.push(createWrapTopAndBottom(drawingOptions.floating.margins));
@@ -216528,17 +217170,21 @@ var Anchor = class extends XmlComponent {
         this.root.push(createWrapNone());
     }
     else this.root.push(createWrapNone());
-    this.root.push(new DocProperties(drawingOptions.docProperties));
-    this.root.push(createGraphicFrameProperties());
+    this.root.push(new DocProperties(drawingOptions.docProperties, {
+      link: drawingOptions.link,
+      decorative: drawingOptions.decorative
+    }));
+    this.root.push(createGraphicFrameProperties(mediaData.type !== "graphic" || mediaData.lockAspectRatio !== false));
     this.root.push(new Graphic({
       mediaData,
       transform,
       outline: drawingOptions.outline,
-      solidFill: drawingOptions.solidFill
+      solidFill: drawingOptions.solidFill,
+      crop: drawingOptions.crop
     }));
   }
 };
-var createInline = ({ mediaData, transform, docProperties, outline, solidFill }) => {
+var createInline = ({ mediaData, transform, docProperties, outline, solidFill, crop, effectExtent, link, decorative }) => {
   var _outline$width, _outline$width2, _outline$width3, _outline$width4;
   return new BuilderElement({
     name: "wp:inline",
@@ -216565,7 +217211,7 @@ var createInline = ({ mediaData, transform, docProperties, outline, solidFill })
         x: transform.emus.x,
         y: transform.emus.y
       }),
-      createEffectExtent(outline ? {
+      createEffectExtent(effectExtent !== null && effectExtent !== void 0 ? effectExtent : outline ? {
         top: ((_outline$width = outline.width) !== null && _outline$width !== void 0 ? _outline$width : 9525) * 2,
         right: ((_outline$width2 = outline.width) !== null && _outline$width2 !== void 0 ? _outline$width2 : 9525) * 2,
         bottom: ((_outline$width3 = outline.width) !== null && _outline$width3 !== void 0 ? _outline$width3 : 9525) * 2,
@@ -216576,13 +217222,17 @@ var createInline = ({ mediaData, transform, docProperties, outline, solidFill })
         bottom: 0,
         left: 0
       }),
-      new DocProperties(docProperties),
-      createGraphicFrameProperties(),
+      new DocProperties(docProperties, {
+        link,
+        decorative
+      }),
+      createGraphicFrameProperties(mediaData.type !== "graphic" || mediaData.lockAspectRatio !== false),
       new Graphic({
         mediaData,
         transform,
         outline,
-        solidFill
+        solidFill,
+        crop
       })
     ]
   });
@@ -216595,7 +217245,11 @@ var Drawing = class extends XmlComponent {
       transform: imageData.transformation,
       docProperties: drawingOptions.docProperties,
       outline: drawingOptions.outline,
-      solidFill: drawingOptions.solidFill
+      solidFill: drawingOptions.solidFill,
+      crop: drawingOptions.crop,
+      effectExtent: drawingOptions.effectExtent,
+      link: drawingOptions.link,
+      decorative: drawingOptions.decorative
     }));
     else this.root.push(new Anchor({
       mediaData: imageData,
@@ -216626,36 +217280,56 @@ var createImageData = (options, key) => ({
     rotation: options.transformation.rotation ? options.transformation.rotation * 6e4 : void 0
   }
 });
+var createDeletion = ({ id, author, date }, run2) => new BuilderElement({
+  name: "w:del",
+  attributes: {
+    id: {
+      key: "w:id",
+      value: id
+    },
+    author: {
+      key: "w:author",
+      value: author
+    },
+    date: {
+      key: "w:date",
+      value: date
+    }
+  },
+  children: [run2]
+});
 var ImageRun = class extends XmlComponent {
   constructor(options) {
-    var _super = (..._args) => (super(..._args), _defineProperty(this, "imageData", void 0), this);
+    var _options$insertion;
     const key = `${hashedId(options.data)}.${options.type}`;
     const imageData = options.type === "svg" ? _objectSpread2(_objectSpread2({ type: options.type }, createImageData(options, key)), {}, { fallback: _objectSpread2({ type: options.fallback.type }, createImageData(_objectSpread2(_objectSpread2({}, options.fallback), {}, { transformation: options.transformation }), `${hashedId(options.fallback.data)}.${options.fallback.type}`)) }) : _objectSpread2({ type: options.type }, createImageData(options, key));
     const drawing = new Drawing(imageData, {
       floating: options.floating,
       docProperties: options.altText,
-      outline: options.outline
+      outline: options.outline,
+      solidFill: options.solidFill,
+      crop: options.crop,
+      link: options.link,
+      decorative: options.decorative
     });
-    const run2 = new Run({ children: [drawing] });
-    if (options.insertion) {
-      _super("w:ins");
+    const properties = new RunProperties(options.run);
+    const revision = (_options$insertion = options.insertion) !== null && _options$insertion !== void 0 ? _options$insertion : options.deletion;
+    const rootName = options.insertion ? "w:ins" : options.deletion ? "w:del" : "w:r";
+    super(rootName);
+    _defineProperty(this, "imageData", void 0);
+    if (revision) {
       this.root.push(new ChangeAttributes({
-        id: options.insertion.id,
-        author: options.insertion.author,
-        date: options.insertion.date
+        id: revision.id,
+        author: revision.author,
+        date: revision.date
       }));
-      this.addChildElement(run2);
-    } else if (options.deletion) {
-      _super("w:del");
-      this.root.push(new ChangeAttributes({
-        id: options.deletion.id,
-        author: options.deletion.author,
-        date: options.deletion.date
-      }));
-      this.addChildElement(run2);
+      const run2 = new BuilderElement({
+        name: "w:r",
+        children: [properties, drawing]
+      });
+      this.addChildElement(options.insertion && options.deletion ? createDeletion(options.deletion, run2) : run2);
     } else {
-      _super("w:r");
-      this.root.push(new RunProperties({}));
+      this.root.push(properties);
       this.root.push(drawing);
     }
     this.imageData = imageData;
@@ -216666,38 +217340,764 @@ var ImageRun = class extends XmlComponent {
     return super.prepForXml(context);
   }
 };
+var LARGEST_ROMAN = 32767;
+var LARGEST_LETTERS = 780;
+var ROMAN2 = [
+  [1e3, "M"],
+  [900, "CM"],
+  [500, "D"],
+  [400, "CD"],
+  [100, "C"],
+  [90, "XC"],
+  [50, "L"],
+  [40, "XL"],
+  [10, "X"],
+  [9, "IX"],
+  [5, "V"],
+  [4, "IV"],
+  [1, "I"]
+];
+var roman = (value) => value <= LARGEST_ROMAN ? ROMAN2.reduce(({ rest, text }, [amount, numeral]) => ({
+  rest: rest % amount,
+  text: text + numeral.repeat(Math.floor(rest / amount))
+}), {
+  rest: value,
+  text: ""
+}).text : void 0;
+var letters = (value) => value === 0 ? "" : value <= LARGEST_LETTERS ? String.fromCharCode(65 + (value - 1) % 26).repeat(Math.ceil(value / 26)) : void 0;
+var ordinal = (value) => {
+  var _ref;
+  return `${value}${value % 100 >= 11 && value % 100 <= 13 ? "th" : (_ref = [
+    "th",
+    "st",
+    "nd",
+    "rd"
+  ][value % 10]) !== null && _ref !== void 0 ? _ref : "th"}`;
+};
+var numberWriterOf = (format2) => {
+  const small = format2.charAt(0) !== format2.charAt(0).toUpperCase();
+  const inCase = (write) => (value) => {
+    var _write;
+    return small ? (_write = write(value)) === null || _write === void 0 ? void 0 : _write.toLowerCase() : write(value);
+  };
+  switch (format2.toLowerCase()) {
+    case "arabic":
+      return String;
+    case "roman":
+      return inCase(roman);
+    case "alphabetic":
+      return inCase(letters);
+    case "ordinal":
+      return (value) => value > 0 ? ordinal(value) : void 0;
+    case "arabicdash":
+      return (value) => `- ${value} -`;
+    default:
+      return;
+  }
+};
+var PLAIN_FORMATS = /* @__PURE__ */ new Set([
+  "mergeformat",
+  "charformat",
+  "mergeformatinet"
+]);
+var CASE_FORMATS = /* @__PURE__ */ new Set([
+  "upper",
+  "lower",
+  "firstcap",
+  "caps"
+]);
+var isNumberPicture = (picture) => /^[#0,]*[#0][#0,]*$/.test(picture);
+var inNumberPicture = (value, picture) => {
+  const zeros = [...picture].filter((character) => character === "0").length;
+  const places = zeros + [...picture].filter((character) => character === "#").length;
+  const digits = String(value).padStart(zeros, "0");
+  if (digits.length < places || zeros === 0 && value === 0) return;
+  return picture.includes(",") ? digits.replace(/\B(?=(\d{3})+$)/g, ",") : digits;
+};
+var inCapitals = (text, capitals) => {
+  switch (capitals) {
+    case "upper":
+      return text.toUpperCase();
+    case "lower":
+      return text.toLowerCase();
+    case "firstcap":
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    default:
+      return text;
+  }
+};
+var numberFieldOf = (instruction) => {
+  var _match;
+  const field = new RegExp("^\\s*(PAGEREF|NUMPAGES|SECTIONPAGES)\\b(.*)$", "is").exec(instruction);
+  const reference = (field === null || field === void 0 ? void 0 : field[1].toUpperCase()) === "PAGEREF" ? new RegExp('^\\s*("?)([^\\s"\\\\]+)\\1(.*)$', "s").exec(field[2]) : void 0;
+  if (!field || field[1].toUpperCase() === "PAGEREF" && !reference) return;
+  const parts = (_match = (reference ? reference[3] : field[2]).match(/"[^"]*"|\S+/g)) !== null && _match !== void 0 ? _match : [];
+  let numberFormat;
+  let picture;
+  const capitals = [];
+  let relative = false;
+  let written = true;
+  for (let index2 = 0; index2 < parts.length; index2++) {
+    const part = parts[index2];
+    const argument = () => {
+      var _parts$index;
+      return (part.length > 2 ? part.slice(2) : (_parts$index = parts[++index2]) !== null && _parts$index !== void 0 ? _parts$index : "").replace(/^"(.*)"$/, "$1");
+    };
+    if (/^\\p$/i.test(part)) relative = true;
+    else if (part.startsWith("\\#")) {
+      var _picture;
+      const value = argument();
+      written && (written = picture === void 0 && isNumberPicture(value));
+      (_picture = picture) !== null && _picture !== void 0 || (picture = value);
+    } else if (part.startsWith("\\*")) {
+      const name = argument();
+      const lower = name.toLowerCase();
+      if (CASE_FORMATS.has(lower)) capitals.push(lower);
+      else if (name !== "" && !PLAIN_FORMATS.has(lower)) {
+        var _numberFormat;
+        written && (written = numberFormat === void 0 && numberWriterOf(name) !== void 0);
+        (_numberFormat = numberFormat) !== null && _numberFormat !== void 0 || (numberFormat = name);
+      }
+    }
+  }
+  const own = _objectSpread2(_objectSpread2(_objectSpread2(_objectSpread2({}, numberFormat === void 0 ? {} : { numberFormat }), picture === void 0 ? {} : { picture }), capitals.length === 0 ? {} : { capitals: capitals[0] }), {}, { written: written && capitals.length <= 1 && capitals[0] !== "caps" && (numberFormat === void 0 || picture === void 0) });
+  return reference ? _objectSpread2({
+    type: "pageReference",
+    bookmark: reference[2],
+    relative
+  }, own) : _objectSpread2({
+    type: "pageCount",
+    scope: field[1].toUpperCase() === "NUMPAGES" ? "document" : "section"
+  }, own);
+};
+var prefixesPageNumbers = (instruction) => new RegExp("^\\s*TOC\\b.*\\\\s\\b", "is").test(instruction);
+var resultFrom = (instruction, { enclosing, within, inTextBox }, { estimate, sectionPageCount, blank, relativeTo }) => {
+  const field = numberFieldOf(instruction);
+  if (field === void 0) return;
+  const { bookmarks, pageCount, bookmarkPageNumbers } = estimate;
+  const { numberFormat, picture, capitals, written } = field;
+  const writesNumber = numberFormat !== void 0 || picture !== void 0;
+  const inFormat = (value) => value === void 0 ? void 0 : picture === void 0 ? numberWriterOf(numberFormat !== null && numberFormat !== void 0 ? numberFormat : "arabic")(value) : inNumberPicture(value, picture);
+  const position = field.type === "pageReference" && field.relative && within === "counted" && !inTextBox ? relativeTo === null || relativeTo === void 0 ? void 0 : relativeTo(field.bookmark) : void 0;
+  let result;
+  if (!written) result = void 0;
+  else if (field.type === "pageCount") result = inFormat(field.scope === "document" ? pageCount : sectionPageCount);
+  else if (enclosing.some(prefixesPageNumbers)) result = void 0;
+  else if (writesNumber) result = inFormat(bookmarkPageNumbers === null || bookmarkPageNumbers === void 0 ? void 0 : bookmarkPageNumbers.get(field.bookmark));
+  else result = field.relative ? position : bookmarks.get(field.bookmark);
+  return result === void 0 ? blank ? "" : void 0 : inCapitals(result, capitals);
+};
+var placeIn = (name, within) => name === "mc:Fallback" || within === "fallback" ? "fallback" : name === "w:del" || name === "w:moveFrom" ? "deleted" : within;
+var fillFields = (tree, elements, open3, filling, within = "counted", inTextBox = false) => {
+  for (let index2 = 0; index2 < elements.length; index2++) {
+    const element = elements[index2];
+    const name = tree.nameOf(element);
+    if (name === void 0) continue;
+    const current = open3[open3.length - 1];
+    if (name === "w:fldChar") {
+      const type = tree.attributeOf(element, "w:fldCharType");
+      if (type === "begin") open3.push({
+        begin: element,
+        instruction: "",
+        inResult: false
+      });
+      else if (type === "separate" && current) {
+        tree.writeClean(current.begin, current.instruction);
+        current.inResult = true;
+        current.result = filling.resultOf(current.instruction, {
+          within,
+          enclosing: open3.slice(0, -1).map((field) => field.instruction),
+          inTextBox
+        });
+        if (current.result !== void 0) {
+          elements.splice(index2 + 1, 0, tree.textElement(current.result));
+          index2++;
+        }
+      } else if (type === "end") open3.pop();
+    } else if (name === "w:instrText" && current && !current.inResult) current.instruction += tree.textOf(element);
+    else if ((name === "w:t" || name === "w:tab" || name === "w:br" || name === "w:cr") && (current === null || current === void 0 ? void 0 : current.result) !== void 0) {
+      elements.splice(index2, 1);
+      index2--;
+    } else if (name === "w:fldSimple") {
+      const result = filling.resultOf(String(tree.attributeOf(element, "w:instr")), {
+        within,
+        enclosing: open3.map((field) => field.instruction),
+        inTextBox
+      });
+      if (result === void 0) {
+        var _tree$contentOf;
+        fillFields(tree, (_tree$contentOf = tree.contentOf(element)) !== null && _tree$contentOf !== void 0 ? _tree$contentOf : [], [], filling, within, inTextBox);
+      } else tree.setSimpleFieldResult(element, result);
+    } else {
+      var _tree$contentOf2;
+      if (name === "w:p") {
+        var _filling$beforeParagr;
+        (_filling$beforeParagr = filling.beforeParagraph) === null || _filling$beforeParagr === void 0 || _filling$beforeParagr.call(filling, element);
+      }
+      fillFields(tree, (_tree$contentOf2 = tree.contentOf(element)) !== null && _tree$contentOf2 !== void 0 ? _tree$contentOf2 : [], open3, filling, placeIn(name, within), inTextBox || name === "w:txbxContent");
+      if (name === "w:p") filling.afterParagraph(element);
+    }
+  }
+};
+var sectionPropertiesIn = (tree, elements) => elements.flatMap((element) => {
+  var _tree$contentOf3;
+  const name = tree.nameOf(element);
+  if (name === void 0) return [];
+  return name === "w:sectPr" ? [element] : sectionPropertiesIn(tree, (_tree$contentOf3 = tree.contentOf(element)) !== null && _tree$contentOf3 !== void 0 ? _tree$contentOf3 : []);
+});
+var endsSection = (tree, paragraph) => {
+  var _tree$contentOf4;
+  return ((_tree$contentOf4 = tree.contentOf(paragraph)) !== null && _tree$contentOf4 !== void 0 ? _tree$contentOf4 : []).some((child2) => {
+    var _tree$contentOf5;
+    return tree.nameOf(child2) === "w:pPr" && ((_tree$contentOf5 = tree.contentOf(child2)) !== null && _tree$contentOf5 !== void 0 ? _tree$contentOf5 : []).some((part) => tree.nameOf(part) === "w:sectPr");
+  });
+};
+var partPageCountsOf = (tree, body, sectionPageCounts) => {
+  const countsOfParts = sectionPropertiesIn(tree, [body]).reduce((all, properties) => {
+    var _tree$contentOf6, _all;
+    const references = ((_tree$contentOf6 = tree.contentOf(properties)) !== null && _tree$contentOf6 !== void 0 ? _tree$contentOf6 : []).flatMap((child2) => {
+      const name = tree.nameOf(child2);
+      return name === "w:headerReference" || name === "w:footerReference" ? [[`${name} ${String(tree.attributeOf(child2, "w:type"))}`, String(tree.attributeOf(child2, "r:id"))]] : [];
+    });
+    return [...all, new Map([...(_all = all[all.length - 1]) !== null && _all !== void 0 ? _all : [], ...references])];
+  }, []).reduce((counts, parts, section2) => {
+    for (const id of parts.values()) {
+      var _counts$get;
+      counts.set(id, [...(_counts$get = counts.get(id)) !== null && _counts$get !== void 0 ? _counts$get : [], sectionPageCounts[section2]]);
+    }
+    return counts;
+  }, /* @__PURE__ */ new Map());
+  return new Map([...countsOfParts].flatMap(([id, [first, ...rest]]) => first !== void 0 && rest.every((count) => count === first) ? [[id, first]] : []));
+};
+var fillBodyFields = (tree, body, estimate, { blank }) => {
+  const { sectionPageCounts = [], relativePositions } = estimate;
+  let section2 = 0;
+  const relativeCounts = /* @__PURE__ */ new Map();
+  const relativeTo = (bookmark2) => {
+    var _relativeCounts$get, _relativePositions$ge;
+    const count = (_relativeCounts$get = relativeCounts.get(bookmark2)) !== null && _relativeCounts$get !== void 0 ? _relativeCounts$get : 0;
+    relativeCounts.set(bookmark2, count + 1);
+    return relativePositions === null || relativePositions === void 0 || (_relativePositions$ge = relativePositions.get(bookmark2)) === null || _relativePositions$ge === void 0 ? void 0 : _relativePositions$ge[count];
+  };
+  fillFields(tree, [body], [], {
+    resultOf: (instruction, place) => resultFrom(instruction, place, {
+      estimate,
+      sectionPageCount: sectionPageCounts[section2],
+      blank,
+      relativeTo
+    }),
+    afterParagraph: (paragraph) => {
+      section2 += endsSection(tree, paragraph) ? 1 : 0;
+    }
+  });
+  return partPageCountsOf(tree, body, sectionPageCounts);
+};
+var fillPartFields = (tree, part, estimate, { blank, sectionPageCount, notes = false }) => {
+  const onPage = (bookmark2) => {
+    const page = estimate.bookmarks.get(bookmark2);
+    return page === void 0 ? void 0 : `on page ${page}`;
+  };
+  fillFields(tree, [part], [], {
+    resultOf: (instruction, place) => resultFrom(instruction, place, _objectSpread2({
+      estimate,
+      sectionPageCount,
+      blank
+    }, notes ? { relativeTo: onPage } : {})),
+    afterParagraph: () => void 0
+  });
+};
+var fillSequenceFields = (tree, body, { beforeParagraph, resultOf }) => fillFields(tree, [body], [], {
+  resultOf: (instruction, { within }) => resultOf(instruction, within),
+  beforeParagraph,
+  afterParagraph: () => void 0
+});
+var FieldInstruction = class extends XmlComponent {
+  constructor(properties = {}) {
+    super("w:instrText");
+    _defineProperty(this, "properties", void 0);
+    this.properties = properties;
+    this.root.push(new TextAttributes({ space: SpaceType.PRESERVE }));
+    let instruction = "TOC";
+    if (this.properties.captionLabel) instruction = `${instruction} \\a "${this.properties.captionLabel}"`;
+    if (this.properties.entriesFromBookmark) instruction = `${instruction} \\b "${this.properties.entriesFromBookmark}"`;
+    if (this.properties.captionLabelIncludingNumbers) instruction = `${instruction} \\c "${this.properties.captionLabelIncludingNumbers}"`;
+    if (this.properties.sequenceAndPageNumbersSeparator) instruction = `${instruction} \\d "${this.properties.sequenceAndPageNumbersSeparator}"`;
+    if (this.properties.tcFieldIdentifier) instruction = `${instruction} \\f "${this.properties.tcFieldIdentifier}"`;
+    if (this.properties.hyperlink) instruction = `${instruction} \\h`;
+    if (this.properties.tcFieldLevelRange) instruction = `${instruction} \\l "${this.properties.tcFieldLevelRange}"`;
+    if (this.properties.pageNumbersEntryLevelsRange) instruction = `${instruction} \\n "${this.properties.pageNumbersEntryLevelsRange}"`;
+    if (this.properties.headingStyleRange) instruction = `${instruction} \\o "${this.properties.headingStyleRange}"`;
+    if (this.properties.entryAndPageNumberSeparator) instruction = `${instruction} \\p "${this.properties.entryAndPageNumberSeparator}"`;
+    if (this.properties.seqFieldIdentifierForPrefix) instruction = `${instruction} \\s "${this.properties.seqFieldIdentifierForPrefix}"`;
+    if (this.properties.stylesWithLevels && this.properties.stylesWithLevels.length) {
+      const styles = this.properties.stylesWithLevels.map((sl) => `${sl.styleName},${sl.level}`).join(",");
+      instruction = `${instruction} \\t "${styles}"`;
+    }
+    if (this.properties.useAppliedParagraphOutlineLevel) instruction = `${instruction} \\u`;
+    if (this.properties.preserveTabInEntries) instruction = `${instruction} \\w`;
+    if (this.properties.preserveNewLineInEntries) instruction = `${instruction} \\x`;
+    if (this.properties.hideTabAndPageNumbersInWebView) instruction = `${instruction} \\z`;
+    this.root.push(instruction);
+  }
+};
+var StructuredDocumentTagContent = class extends XmlComponent {
+  constructor() {
+    super("w:sdtContent");
+  }
+};
+var beginOf = (beginDirty) => beginDirty === void 0 ? createBeginDirtyWithoutPageNumbers() : createBegin(beginDirty);
+var writtenTables = /* @__PURE__ */ new WeakMap();
+var HeadingBookmarkIds = class {
+  constructor() {
+    _defineProperty(this, "ids", []);
+  }
+  get(index2) {
+    var _this$ids, _this$ids$index;
+    (_this$ids$index = (_this$ids = this.ids)[index2]) !== null && _this$ids$index !== void 0 || (_this$ids[index2] = bookmarkUniqueNumericId());
+    return this.ids[index2];
+  }
+};
+var nameOf$3 = (element) => typeof element === "object" && element !== null ? Object.keys(element)[0] : void 0;
+var childrenOf2 = (element) => {
+  const name = nameOf$3(element);
+  const content = name === void 0 ? void 0 : element[name];
+  return Array.isArray(content) ? content : content === void 0 ? [] : [content];
+};
+var childOf = (element, name) => childrenOf2(element).find((child2) => nameOf$3(child2) === name);
+var attributeOf = (element, attribute) => {
+  var _childOf;
+  return (_childOf = childOf(element, "_attr")) === null || _childOf === void 0 || (_childOf = _childOf._attr) === null || _childOf === void 0 ? void 0 : _childOf[attribute];
+};
+var numberAttributeOf = (element, attribute) => {
+  const value = attributeOf(element, attribute);
+  return value === void 0 ? void 0 : Number(value);
+};
+var BLOCK_CONTAINERS = /* @__PURE__ */ new Set([
+  "w:tbl",
+  "w:tr",
+  "w:tc",
+  "w:sdt",
+  "w:sdtContent",
+  "w:customXml"
+]);
+var blocksOf = (elements) => elements.flatMap((element) => {
+  const name = nameOf$3(element);
+  if (name === "w:p" || writtenTables.has(element)) return [element];
+  return name !== void 0 && BLOCK_CONTAINERS.has(name) ? blocksOf(childrenOf2(element)) : [];
+});
+var TEXT_CONTAINERS = /* @__PURE__ */ new Set([
+  "w:r",
+  "w:hyperlink",
+  "w:ins",
+  "w:moveTo",
+  "w:smartTag",
+  "w:customXml",
+  "w:sdt",
+  "w:sdtContent",
+  "w:fldSimple",
+  "w:dir",
+  "w:bdo"
+]);
+var textOfRunContent = (element) => {
+  switch (nameOf$3(element)) {
+    case "w:t":
+      return childrenOf2(element).filter((child2) => typeof child2 === "string").join("");
+    case "w:tab":
+      return "	";
+    case "w:br":
+      return [void 0, "textWrapping"].includes(attributeOf(element, "w:type")) ? "\n" : "";
+    case "w:cr":
+      return "\n";
+    case "w:noBreakHyphen":
+      return "-";
+    default:
+      return "";
+  }
+};
+var textOf3 = (paragraph) => {
+  const fields = [];
+  const read = (element) => {
+    const name = nameOf$3(element);
+    if (name !== void 0 && TEXT_CONTAINERS.has(name)) return childrenOf2(element).map(read).join("");
+    if (name === "w:fldChar") {
+      const type = attributeOf(element, "w:fldCharType");
+      if (type === "begin") fields.push(false);
+      else if (type === "separate") fields[fields.length - 1] = true;
+      else fields.pop();
+      return "";
+    }
+    return fields.every(Boolean) ? textOfRunContent(element) : "";
+  };
+  return childrenOf2(paragraph).map(read).join("");
+};
+var bookmarkMarksOf = (element) => {
+  const name = nameOf$3(element);
+  if (name === "w:bookmarkStart") return [{
+    start: true,
+    id: attributeOf(element, "w:id"),
+    name: attributeOf(element, "w:name")
+  }];
+  if (name === "w:bookmarkEnd") return [{
+    start: false,
+    id: attributeOf(element, "w:id")
+  }];
+  return name === void 0 || name === "_attr" ? [] : childrenOf2(element).flatMap(bookmarkMarksOf);
+};
+var bookmarksOf = (paragraphs) => {
+  const open3 = /* @__PURE__ */ new Map();
+  return paragraphs.map((paragraph) => {
+    const marks = bookmarkMarksOf(paragraph);
+    const names = /* @__PURE__ */ new Set([...open3.values(), ...marks.flatMap((mark) => mark.start ? [mark.name] : [])]);
+    for (const mark of marks) if (mark.start) open3.set(mark.id, mark.name);
+    else open3.delete(mark.id);
+    return names;
+  });
+};
+var paragraphDetailsOf = (paragraphs, followBookmarks) => {
+  const bookmarks = followBookmarks ? bookmarksOf(paragraphs) : [];
+  return paragraphs.map((element, index2) => {
+    var _bookmarks$index;
+    const properties = childOf(element, "w:pPr");
+    return {
+      element,
+      styleId: attributeOf(childOf(properties, "w:pStyle"), "w:val"),
+      outlineLevel: numberAttributeOf(childOf(properties, "w:outlineLvl"), "w:val"),
+      text: textOf3(element),
+      bookmarks: (_bookmarks$index = bookmarks[index2]) !== null && _bookmarks$index !== void 0 ? _bookmarks$index : /* @__PURE__ */ new Set()
+    };
+  });
+};
+var stylesOf = (context) => {
+  var _context$file;
+  const styles = (_context$file = context.file) === null || _context$file === void 0 || (_context$file = _context$file.Styles) === null || _context$file === void 0 ? void 0 : _context$file.prepForXml(context);
+  return new Map(childrenOf2(styles).filter((style) => nameOf$3(style) === "w:style" && ["paragraph", void 0].includes(attributeOf(style, "w:type"))).map((style) => [attributeOf(style, "w:styleId"), {
+    name: attributeOf(childOf(style, "w:name"), "w:val"),
+    basedOn: attributeOf(childOf(style, "w:basedOn"), "w:val"),
+    outlineLevel: numberAttributeOf(childOf(childOf(style, "w:pPr"), "w:outlineLvl"), "w:val")
+  }]));
+};
+var parseRange = (range) => {
+  const match = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(range);
+  return match ? [Number(match[1]), Number(match[2])] : void 0;
+};
+var isWithin = (level, [from, to]) => level >= from && level <= to;
+var headingLevelOf2 = (styleId, styles) => {
+  var _styles$get$name, _styles$get;
+  if (styleId === void 0) return;
+  const match = /^heading ?([1-9])$/i.exec((_styles$get$name = (_styles$get = styles.get(styleId)) === null || _styles$get === void 0 ? void 0 : _styles$get.name) !== null && _styles$get$name !== void 0 ? _styles$get$name : styleId);
+  return match ? Number(match[1]) : void 0;
+};
+var styleOutlineLevelOf = (styleId, styles, depth = 0) => {
+  var _style$outlineLevel;
+  if (styleId === void 0 || depth > styles.size) return;
+  const style = styles.get(styleId);
+  const heading = headingLevelOf2(styleId, styles);
+  return (_style$outlineLevel = style === null || style === void 0 ? void 0 : style.outlineLevel) !== null && _style$outlineLevel !== void 0 ? _style$outlineLevel : heading === void 0 ? styleOutlineLevelOf(style === null || style === void 0 ? void 0 : style.basedOn, styles, depth + 1) : heading - 1;
+};
+var headingLevels = (context) => {
+  const styles = stylesOf(context);
+  return (paragraph) => {
+    const properties = childOf(paragraph, "w:pPr");
+    const styleId = attributeOf(childOf(properties, "w:pStyle"), "w:val");
+    const heading = headingLevelOf2(styleId, styles);
+    const outlineLevel = outlineLevelOf({
+      styleId,
+      outlineLevel: numberAttributeOf(childOf(properties, "w:outlineLvl"), "w:val")
+    }, styles);
+    const outline = outlineLevel === void 0 || outlineLevel >= 9 ? void 0 : outlineLevel + 1;
+    if (heading !== void 0 && (outline === void 0 || outline === heading)) return heading;
+    return outline === void 0 ? void 0 : "unclear";
+  };
+};
+var outlineLevelOf = (paragraph, styles) => {
+  var _paragraph$outlineLev;
+  return (_paragraph$outlineLev = paragraph.outlineLevel) !== null && _paragraph$outlineLev !== void 0 ? _paragraph$outlineLev : styleOutlineLevelOf(paragraph.styleId, styles);
+};
+var levelIn = (properties, paragraph, styles) => {
+  var _styles$get2;
+  const { entriesFromBookmark, headingStyleRange, stylesWithLevels = [], useAppliedParagraphOutlineLevel } = properties;
+  if (paragraph.text.trim() === "" || entriesFromBookmark && !paragraph.bookmarks.has(entriesFromBookmark)) return;
+  const names = [paragraph.styleId, paragraph.styleId === void 0 ? void 0 : (_styles$get2 = styles.get(paragraph.styleId)) === null || _styles$get2 === void 0 ? void 0 : _styles$get2.name].filter((name) => name !== void 0).map((name) => name.toLowerCase());
+  const listed = stylesWithLevels.find((style) => names.includes(style.styleName.toLowerCase()));
+  if (listed) return listed.level;
+  const namesItsEntries = Boolean(headingStyleRange) || stylesWithLevels.length > 0 || Boolean(useAppliedParagraphOutlineLevel) || Boolean(properties.tcFieldIdentifier) || Boolean(properties.tcFieldLevelRange) || Boolean(properties.captionLabel) || Boolean(properties.captionLabelIncludingNumbers);
+  const headingRange = headingStyleRange ? parseRange(headingStyleRange) : namesItsEntries ? void 0 : [1, 9];
+  const heading = headingLevelOf2(paragraph.styleId, styles);
+  if (headingRange && heading !== void 0 && isWithin(heading, headingRange)) return heading;
+  const outlineLevel = useAppliedParagraphOutlineLevel ? outlineLevelOf(paragraph, styles) : void 0;
+  return outlineLevel !== void 0 && isWithin(outlineLevel + 1, headingRange !== null && headingRange !== void 0 ? headingRange : [1, 9]) ? outlineLevel + 1 : void 0;
+};
+var titleRunsOf = (title, properties) => {
+  const text = properties.preserveTabInEntries ? title : title.replace(/\t/g, " ");
+  return (properties.preserveNewLineInEntries ? text.split("\n") : [text.replace(/\n/g, " ")]).map((line, index2) => new TextRun({
+    break: index2 > 0 ? 1 : void 0,
+    children: line.split("	").flatMap((part, partIndex) => [...partIndex > 0 ? [new Tab()] : [], ...part === "" ? [] : [part]])
+  }));
+};
+var entryStyleOf = (level, styles) => {
+  var _find;
+  const named = (_find = [...styles].find(([, style]) => {
+    var _style$name;
+    return ((_style$name = style.name) === null || _style$name === void 0 ? void 0 : _style$name.toLowerCase()) === `toc ${level}`;
+  })) === null || _find === void 0 ? void 0 : _find[0];
+  const id = named !== null && named !== void 0 ? named : `TOC${level}`;
+  return named !== void 0 || styles.has(id) || level === 1 ? { id } : {
+    id,
+    indent: (level - 1) * 220
+  };
+};
+var contentOf = ({ properties, beginDirty, textWidth }, entries, styles, context) => {
+  var _parseRange;
+  const withoutPageNumbers = properties.pageNumbersEntryLevelsRange ? (_parseRange = parseRange(properties.pageNumbersEntryLevelsRange)) !== null && _parseRange !== void 0 ? _parseRange : [1, 9] : void 0;
+  const content = new StructuredDocumentTagContent();
+  entries.forEach((entry, index2) => {
+    const hasPageNumber = withoutPageNumbers === void 0 || !isWithin(entry.level, withoutPageNumbers);
+    const children2 = [...titleRunsOf(entry.title, properties), ...hasPageNumber ? [new TextRun({ children: [properties.entryAndPageNumberSeparator || new Tab()] }), new PageReference(entry.bookmark, { hyperlink: properties.hyperlink })] : []];
+    const style = entryStyleOf(entry.level, styles);
+    content.addChildElement(new Paragraph({
+      style: style.id,
+      indent: style.indent === void 0 ? void 0 : { left: style.indent },
+      tabStops: [{
+        type: "right",
+        position: textWidth,
+        leader: "dot"
+      }],
+      children: [...index2 === 0 ? [new Run({ children: [
+        beginOf(beginDirty),
+        new FieldInstruction(properties),
+        createSeparate()
+      ] })] : [], ...properties.hyperlink ? [new InternalHyperlink({
+        anchor: entry.bookmark,
+        children: children2
+      })] : children2]
+    }));
+  });
+  content.addChildElement(new Paragraph({ children: [new Run({ children: [createEnd()] })] }));
+  return content.prepForXml(context);
+};
+var bookmark = (paragraph, name, id, context) => {
+  const children2 = childrenOf2(paragraph);
+  const start = children2.findIndex((child2) => nameOf$3(child2) === "w:pPr") + 1;
+  paragraph["w:p"] = [
+    ...children2.slice(0, start),
+    new BookmarkStart(name, id).prepForXml(context),
+    ...children2.slice(start),
+    new BookmarkEnd(id).prepForXml(context)
+  ];
+};
+var fillTablesOfContents = (body, context, bookmarkIds) => {
+  const blocks = blocksOf(childrenOf2(body));
+  const tables = blocks.flatMap((block) => {
+    const options = writtenTables.get(block);
+    return options ? [[block, options]] : [];
+  });
+  if (tables.length === 0) return;
+  const styles = stylesOf(context);
+  const followBookmarks = tables.some(([, { properties }]) => Boolean(properties.entriesFromBookmark));
+  const headings = paragraphDetailsOf(blocks.filter((block) => nameOf$3(block) === "w:p"), followBookmarks).map((paragraph) => ({
+    paragraph,
+    levels: tables.map(([, { properties }]) => levelIn(properties, paragraph, styles))
+  })).filter(({ levels }) => levels.some((level) => level !== void 0)).map((heading, index2) => _objectSpread2(_objectSpread2({}, heading), {}, { id: bookmarkIds.get(index2) }));
+  for (const { paragraph, id } of headings) bookmark(paragraph.element, `_Toc${id}`, id, context);
+  tables.forEach(([table, options], index2) => {
+    const entries = headings.flatMap(({ paragraph, levels, id }) => {
+      const level = levels[index2];
+      return level === void 0 ? [] : [{
+        title: paragraph.text,
+        level,
+        bookmark: `_Toc${id}`
+      }];
+    });
+    if (entries.length === 0) return;
+    table["w:sdt"] = childrenOf2(table).map((child2) => nameOf$3(child2) === "w:sdtContent" ? contentOf(options, entries, styles, context) : child2);
+  });
+};
+var IDENTIFIER = new RegExp("^\\p{L}[\\p{L}\\p{N}_]*$", "u");
+var sequenceOf = (switches) => {
+  var _step, _format;
+  let step;
+  let hidden = false;
+  let format2;
+  let caseFormat = false;
+  let picture = false;
+  for (let index2 = 0; index2 < switches.length; index2++) {
+    var _switches, _next;
+    const name = switches[index2];
+    const argument = (_switches = switches[index2 + 1]) !== null && _switches !== void 0 ? _switches : "";
+    let next;
+    if (index2 === 0 && !name.startsWith("\\")) next = { type: "bookmark" };
+    else if (name === "\\c" || name === "\\n") next = { type: name === "\\c" ? "repeat" : "next" };
+    else if ((name === "\\r" || name === "\\s") && /^\d+$/.test(argument)) {
+      index2++;
+      next = name === "\\r" ? {
+        type: "reset",
+        to: Number(argument)
+      } : {
+        type: "heading",
+        level: Number(argument)
+      };
+    } else if (name === "\\h") hidden = true;
+    else if (name === "\\#" && index2 + 1 < switches.length) {
+      index2++;
+      picture = true;
+    } else if (name === "\\*" && index2 + 1 < switches.length) {
+      const value = switches[++index2];
+      if (CASE_FORMATS.has(value.toLowerCase())) caseFormat = true;
+      else if (!PLAIN_FORMATS.has(value.toLowerCase())) {
+        if (format2 !== void 0) return;
+        format2 = value;
+      }
+    } else return;
+    if (next && step) return;
+    step = (_next = next) !== null && _next !== void 0 ? _next : step;
+  }
+  if ((step === null || step === void 0 ? void 0 : step.type) === "bookmark" && switches.length > 1) return;
+  const written = !picture && !(caseFormat && format2 !== void 0 && format2.toLowerCase() !== "arabic");
+  return {
+    step: (_step = step) !== null && _step !== void 0 ? _step : { type: "next" },
+    hidden: hidden && format2 === void 0,
+    format: written ? (_format = format2) !== null && _format !== void 0 ? _format : "ARABIC" : ""
+  };
+};
+var sequenceFieldOf = (instruction) => {
+  var _match$1$match;
+  const match = new RegExp("^\\s*SEQ\\b(.*)$", "is").exec(instruction);
+  if (!match) return;
+  const [written, ...switches] = (_match$1$match = match[1].match(/"[^"]*"|\S+/g)) !== null && _match$1$match !== void 0 ? _match$1$match : [];
+  if (written === void 0) return {};
+  const identifier = written.replace(/^"(.*)"$/, "$1");
+  return IDENTIFIER.test(identifier) ? {
+    identifier,
+    sequence: sequenceOf(switches)
+  } : { identifier };
+};
+var isSequenceField = (instruction) => sequenceFieldOf(instruction) !== void 0;
+var identifiersIn = (element) => {
+  if (typeof element !== "object" || element === null) return [];
+  if (Array.isArray(element)) return element.flatMap(identifiersIn);
+  return Object.entries(element).flatMap(([name, content]) => {
+    return [...(name === "w:instrText" && Array.isArray(content) ? content : name === "_attr" ? [content["w:instr"]] : []).flatMap((instruction) => {
+      const field = typeof instruction === "string" ? sequenceFieldOf(instruction) : void 0;
+      return (field === null || field === void 0 ? void 0 : field.identifier) === void 0 ? [] : [field.identifier.toLowerCase()];
+    }), ...identifiersIn(content)];
+  });
+};
+var identifiersInCommentsOf = (context) => {
+  var _context$file;
+  const comments = (_context$file = context.file) === null || _context$file === void 0 ? void 0 : _context$file.Comments;
+  if (!comments) return /* @__PURE__ */ new Set();
+  const wrapper = {
+    View: comments,
+    Relationships: comments.Relationships
+  };
+  return new Set(identifiersIn(comments.prepForXml(_objectSpread2(_objectSpread2({}, context), {}, {
+    viewWrapper: wrapper,
+    stack: []
+  }))));
+};
+var sequenceNumbering = (context) => {
+  const levelOf = headingLevels(context);
+  const numbers = /* @__PURE__ */ new Map();
+  const counted = /* @__PURE__ */ new Map();
+  const headingsAt = [];
+  let unclearAt = -1;
+  let paragraph = -1;
+  let unknown;
+  const afterHeading = (key, level) => {
+    var _counted$get;
+    const headingAt = Math.max(-1, ...headingsAt.slice(1, level + 1).filter((at) => at !== void 0));
+    const since = ((_counted$get = counted.get(key)) !== null && _counted$get !== void 0 ? _counted$get : []).filter((field) => field.paragraph >= headingAt);
+    const followed = since.every(({ step }) => (step === null || step === void 0 ? void 0 : step.type) === "next" || (step === null || step === void 0 ? void 0 : step.type) === "heading" && step.level === level);
+    if (unclearAt > headingAt || !followed) return;
+    return since.length + 1;
+  };
+  return {
+    startParagraph: (element) => {
+      paragraph++;
+      const level = levelOf(element);
+      if (level === "unclear") unclearAt = paragraph;
+      else if (level !== void 0) headingsAt[level] = paragraph;
+    },
+    numberOf: (instruction, place) => {
+      var _unknown, _counted$get2, _numberWriterOf;
+      const { identifier, sequence } = sequenceFieldOf(instruction);
+      if (identifier === void 0 || place === "fallback") return;
+      (_unknown = unknown) !== null && _unknown !== void 0 || (unknown = identifiersInCommentsOf(context));
+      const key = identifier.toLowerCase();
+      if ((sequence === null || sequence === void 0 ? void 0 : sequence.step.type) === "bookmark" && place === "counted" && !unknown.has(key)) return;
+      const before = numbers.has(key) ? numbers.get(key) : 0;
+      const step = unknown.has(key) || place === "deleted" ? void 0 : sequence === null || sequence === void 0 ? void 0 : sequence.step;
+      const value = (step === null || step === void 0 ? void 0 : step.type) === "reset" ? step.to : (step === null || step === void 0 ? void 0 : step.type) === "repeat" ? before : (step === null || step === void 0 ? void 0 : step.type) === "heading" ? afterHeading(key, step.level) : (step === null || step === void 0 ? void 0 : step.type) === "next" && before !== void 0 ? before + 1 : void 0;
+      numbers.set(key, value);
+      counted.set(key, [...(_counted$get2 = counted.get(key)) !== null && _counted$get2 !== void 0 ? _counted$get2 : [], _objectSpread2({ paragraph }, value === void 0 ? {} : { step })]);
+      return value === void 0 || sequence === void 0 ? void 0 : sequence.hidden ? "" : (_numberWriterOf = numberWriterOf(sequence.format)) === null || _numberWriterOf === void 0 ? void 0 : _numberWriterOf(value);
+    }
+  };
+};
+var nameOf$2 = (element) => {
+  const name = typeof element === "object" && element !== null && !Array.isArray(element) ? Object.keys(element)[0] : void 0;
+  return name === "_attr" ? void 0 : name;
+};
+var textElement = (text) => ({ "w:t": [{ _attr: { "xml:space": "preserve" } }, text] });
+var FORMATTED = {
+  nameOf: nameOf$2,
+  contentOf: (element) => {
+    const content = element[nameOf$2(element)];
+    return Array.isArray(content) ? content : void 0;
+  },
+  attributeOf: (element, attribute) => {
+    var _holder$_attr;
+    const content = element[nameOf$2(element)];
+    const holder = Array.isArray(content) ? content.find((child2) => typeof child2 === "object" && child2 !== null && "_attr" in child2) : content;
+    return holder === null || holder === void 0 || (_holder$_attr = holder._attr) === null || _holder$_attr === void 0 ? void 0 : _holder$_attr[attribute];
+  },
+  textOf: (element) => FORMATTED.contentOf(element).filter((part) => typeof part === "string").join(""),
+  textElement,
+  writeClean: (begin) => {
+    if (isDirtyWithoutPageNumbers(begin)) {
+      const attributes = begin["w:fldChar"]._attr;
+      begin["w:fldChar"] = { _attr: Object.fromEntries(Object.entries(attributes).filter(([key]) => key !== "w:dirty")) };
+    }
+  },
+  setSimpleFieldResult: (element, text) => {
+    const content = element["w:fldSimple"];
+    element["w:fldSimple"] = [...(Array.isArray(content) ? content : [content]).filter((child2) => typeof child2 === "object" && child2 !== null && "_attr" in child2), { "w:r": [textElement(text)] }];
+  }
+};
+var estimates = /* @__PURE__ */ new WeakMap();
+var fillSequenceNumbers = (body, context) => {
+  const { startParagraph, numberOf } = sequenceNumbering(context);
+  fillSequenceFields(FORMATTED, body, {
+    beforeParagraph: (paragraph) => startParagraph(paragraph),
+    resultOf: (instruction, within) => isSequenceField(instruction) ? numberOf(instruction, within) : void 0
+  });
+};
+var fillPageNumbers = (body, context, estimator) => {
+  const estimate = estimator(body, context);
+  const partPageCounts = fillBodyFields(FORMATTED, body, estimate, { blank: false });
+  if (context.file) estimates.set(context.file, {
+    estimate,
+    partPageCounts
+  });
+};
+var fillPartPageNumbers = (part, context, referenceId) => {
+  const written = context.file && estimates.get(context.file);
+  if (!part || !written) return;
+  const sectionPageCount = referenceId === void 0 ? void 0 : written.partPageCounts.get(`rId${referenceId}`);
+  const notes = "w:footnotes" in part || "w:endnotes" in part;
+  fillPartFields(FORMATTED, part, written.estimate, {
+    blank: false,
+    sectionPageCount,
+    notes
+  });
+};
 var RelationshipsAttributes = class extends XmlAttributeComponent {
   constructor(..._args) {
     super(..._args);
     _defineProperty(this, "xmlKeys", { xmlns: "xmlns" });
   }
 };
-var TargetModeType = {
-  /** Target is external to the package (e.g., hyperlink to a URL) */
-  EXTERNAL: "External"
-};
-var createRelationship = (id, type, target, targetMode) => new BuilderElement({
-  name: "Relationship",
-  attributes: {
-    id: {
-      key: "Id",
-      value: id
-    },
-    type: {
-      key: "Type",
-      value: type
-    },
-    target: {
-      key: "Target",
-      value: target
-    },
-    targetMode: {
-      key: "TargetMode",
-      value: targetMode
-    }
-  }
-});
-var Relationships = class extends XmlComponent {
+var Relationships = class Relationships2 extends XmlComponent {
   constructor() {
     super("Relationships");
     this.root.push(new RelationshipsAttributes({ xmlns: "http://schemas.openxmlformats.org/package/2006/relationships" }));
@@ -216712,6 +218112,20 @@ var Relationships = class extends XmlComponent {
   */
   addRelationship(id, type, target, targetMode) {
     this.root.push(createRelationship(`rId${id}`, type, target, targetMode));
+  }
+  /**
+  * Creates a copy of the relationships given. Relationships added to the copy aren't added to them, so the compiler
+  * adds the ones it writes for a part, such as to its images, to a copy, and packing a document again doesn't add
+  * them a second time.
+  *
+  * Static, as `IContext` is public and has `Relationships`, so a new instance member would change the public API.
+  *
+  * @param relationships - The relationships to copy
+  */
+  static copy(relationships) {
+    const copy = new Relationships2();
+    copy.root.push(...relationships.root.slice(1));
+    return copy;
   }
   /**
   * Gets the count of relationships in this collection.
@@ -216736,6 +218150,7 @@ var RootCommentsAttributes = class extends XmlAttributeComponent {
   constructor(..._args3) {
     super(..._args3);
     _defineProperty(this, "xmlKeys", {
+      "xmlns:wpc": "xmlns:wpc",
       "xmlns:cx": "xmlns:cx",
       "xmlns:cx1": "xmlns:cx1",
       "xmlns:cx2": "xmlns:cx2",
@@ -216766,7 +218181,8 @@ var RootCommentsAttributes = class extends XmlAttributeComponent {
       "xmlns:wpg": "xmlns:wpg",
       "xmlns:wpi": "xmlns:wpi",
       "xmlns:wne": "xmlns:wne",
-      "xmlns:wps": "xmlns:wps"
+      "xmlns:wps": "xmlns:wps",
+      "mc:Ignorable": "mc:Ignorable"
     });
   }
 };
@@ -216781,7 +218197,7 @@ var Comment2 = class extends XmlComponent {
       author,
       date: date.toISOString()
     }));
-    for (const child of children2) this.root.push(child);
+    for (const child2 of children2) this.root.push(child2);
   }
   /**
   * Serializes this comment to XML, injecting w14:paraId and w14:textId into the last
@@ -216794,9 +218210,9 @@ var Comment2 = class extends XmlComponent {
     const commentChildren = result["w:comment"];
     if (!Array.isArray(commentChildren)) return result;
     for (let i = commentChildren.length - 1; i >= 0; i--) {
-      const child = commentChildren[i];
-      if (child && typeof child === "object" && "w:p" in child) {
-        const pChildren = child["w:p"];
+      const child2 = commentChildren[i];
+      if (child2 && typeof child2 === "object" && "w:p" in child2) {
+        const pChildren = child2["w:p"];
         if (Array.isArray(pChildren)) pChildren.unshift({ _attr: {
           "w14:paraId": this.paraId,
           "w14:textId": this.paraId
@@ -216813,7 +218229,11 @@ var Comments = class extends XmlComponent {
     super("w:comments");
     _defineProperty(this, "relationships", void 0);
     _defineProperty(this, "threadData", void 0);
+    _defineProperty(this, "commentIdsData", void 0);
+    _defineProperty(this, "isEmpty", void 0);
+    this.isEmpty = children2.length === 0;
     this.root.push(new RootCommentsAttributes({
+      "xmlns:wpc": "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas",
       "xmlns:cx": "http://schemas.microsoft.com/office/drawing/2014/chartex",
       "xmlns:cx1": "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
       "xmlns:cx2": "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex",
@@ -216844,17 +218264,27 @@ var Comments = class extends XmlComponent {
       "xmlns:wpg": "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
       "xmlns:wpi": "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
       "xmlns:wne": "http://schemas.microsoft.com/office/word/2006/wordml",
-      "xmlns:wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+      "xmlns:wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+      "mc:Ignorable": "w14 w15 wp14"
     }));
-    if (children2.some((child) => child.parentId !== void 0)) {
-      const idToParaId = new Map(children2.map((child) => [child.id, commentIdToParaId(child.id)]));
-      for (const child of children2) this.root.push(new Comment2(child, idToParaId.get(child.id)));
-      this.threadData = children2.map((child) => ({
-        paraId: idToParaId.get(child.id),
-        parentParaId: child.parentId !== void 0 ? idToParaId.get(child.parentId) : void 0,
-        done: child.resolved
+    const hasThreading = children2.some((child2) => child2.parentId !== void 0);
+    const hasDurableIds = children2.some((child2) => child2.durableId !== void 0);
+    if (hasThreading || hasDurableIds) {
+      const idToParaId = new Map(children2.map((child2) => [child2.id, commentIdToParaId(child2.id)]));
+      for (const child2 of children2) this.root.push(new Comment2(child2, idToParaId.get(child2.id)));
+      if (hasThreading) this.threadData = children2.map((child2) => ({
+        paraId: idToParaId.get(child2.id),
+        parentParaId: child2.parentId !== void 0 ? idToParaId.get(child2.parentId) : void 0,
+        done: child2.resolved
       }));
-    } else for (const child of children2) this.root.push(new Comment2(child));
+      if (hasDurableIds) this.commentIdsData = children2.map((child2) => {
+        var _child$durableId;
+        return {
+          paraId: idToParaId.get(child2.id),
+          durableId: (_child$durableId = child2.durableId) !== null && _child$durableId !== void 0 ? _child$durableId : idToParaId.get(child2.id)
+        };
+      });
+    } else for (const child2 of children2) this.root.push(new Comment2(child2));
     this.relationships = new Relationships();
   }
   get Relationships() {
@@ -216863,6 +218293,23 @@ var Comments = class extends XmlComponent {
   /** Thread data for commentsExtended.xml, or undefined when no comments use parentId. */
   get ThreadData() {
     return this.threadData;
+  }
+  /** Comment id data for commentsIds.xml, or undefined when no comments carry a durableId. */
+  get CommentIdsData() {
+    return this.commentIdsData;
+  }
+  /** Whether there are no comments, in which case the document has no comments.xml part. */
+  get IsEmpty() {
+    return this.isEmpty;
+  }
+  /**
+  * Formats the comments, with the page numbers worked out for their document written into their fields, when the
+  * document's body is written with an estimate of its pages.
+  */
+  prepForXml(context) {
+    const xml = super.prepForXml(context);
+    fillPartPageNumbers(xml, context);
+    return xml;
   }
 };
 var CommentsExtendedAttributes = class extends XmlAttributeComponent {
@@ -216908,6 +218355,45 @@ var CommentsExtended = class extends XmlComponent {
     for (const data of threadData) this.root.push(new CommentEx(data));
   }
 };
+var CommentIdAttributes = class extends XmlAttributeComponent {
+  constructor(..._args3) {
+    super(..._args3);
+    _defineProperty(this, "xmlKeys", {
+      paraId: "w16cid:paraId",
+      durableId: "w16cid:durableId"
+    });
+  }
+};
+var CommentId = class extends XmlComponent {
+  constructor(options) {
+    super("w16cid:commentId");
+    this.root.push(new CommentIdAttributes({
+      paraId: options.paraId,
+      durableId: options.durableId
+    }));
+  }
+};
+var CommentsIdsAttributes = class extends XmlAttributeComponent {
+  constructor(..._args4) {
+    super(..._args4);
+    _defineProperty(this, "xmlKeys", {
+      "xmlns:w16cid": "xmlns:w16cid",
+      "xmlns:mc": "xmlns:mc",
+      "mc:Ignorable": "mc:Ignorable"
+    });
+  }
+};
+var CommentsIds = class extends XmlComponent {
+  constructor(commentIdsData) {
+    super("w16cid:commentsIds");
+    this.root.push(new CommentsIdsAttributes({
+      "xmlns:w16cid": "http://schemas.microsoft.com/office/word/2016/wordml/cid",
+      "xmlns:mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "mc:Ignorable": "w16cid"
+    }));
+    for (const data of commentIdsData) this.root.push(new CommentId(data));
+  }
+};
 var EndnoteReference = class extends EmptyElement {
   constructor() {
     super("w:endnoteRef");
@@ -216944,9 +218430,9 @@ var PageBreakBefore = class extends XmlComponent {
 var LineRuleType = {
   /** Line spacing is at least the specified value */
   AT_LEAST: "atLeast",
-  /** Line spacing is exactly the specified value */
+  /** Writes `exactly`, which isn't a value the schema allows, so Word ignores it. Use {@link LineRuleType.EXACT} for an exact line height. */
   EXACTLY: "exactly",
-  /** Line spacing is exactly the specified value (alias for EXACTLY) */
+  /** Line spacing is exactly the specified value */
   EXACT: "exact",
   /** Line spacing is automatically determined based on content */
   AUTO: "auto"
@@ -217032,7 +218518,7 @@ var createTabStopItem = ({ type, position, leader }) => new BuilderElement({
     },
     pos: {
       key: "w:pos",
-      value: position
+      value: signedTwipsMeasureValue(position)
     },
     leader: {
       key: "w:leader",
@@ -217086,19 +218572,43 @@ var HyperlinkAttributes = class extends XmlAttributeComponent {
   }
 };
 var ConcreteHyperlink = class extends XmlComponent {
-  constructor(children2, relationshipId, anchor) {
+  /**
+  * @param children - Inline content of the hyperlink
+  * @param relationshipId - Id of the external relationship, without the rId prefix
+  * @param anchor - Bookmark name or external URL fragment
+  * @param externalLink - The full address of an external hyperlink, so the relationship id is kept alongside its anchor
+  */
+  constructor(children2, relationshipId, anchor, externalLink) {
     super("w:hyperlink");
     _defineProperty(this, "linkId", void 0);
+    _defineProperty(this, "drawingLink", void 0);
     this.linkId = relationshipId;
+    this.drawingLink = anchor && externalLink !== void 0 ? new DrawingLink(externalLink) : void 0;
     const attributes = new HyperlinkAttributes({
       history: 1,
       anchor: anchor ? anchor : void 0,
-      id: !anchor ? `rId${this.linkId}` : void 0
+      id: !anchor || externalLink !== void 0 ? `rId${this.linkId}` : void 0
     });
     this.root.push(attributes);
-    children2.forEach((child) => {
-      this.root.push(child);
+    children2.forEach((child2) => {
+      this.root.push(child2);
     });
+  }
+  /**
+  * Creates the `a:hlinkClick` of a picture in the hyperlink, which links to the same address.
+  *
+  * The hyperlink decides which relationship its pictures use, rather than the pictures reading `linkId`, because only it
+  * knows whether that relationship has lost the fragment to `w:anchor`. The picture's relationship is added as the
+  * picture is written, through the context's relationships, so it lands in the part the picture is in, both when
+  * packing and when patching.
+  *
+  * @param context - The context the picture is written in, whose relationships get the picture's link if it has its own
+  * @param declareNamespace - Declares the DrawingML namespace, for elements outside `a:graphic` such as `wp:docPr`
+  */
+  createDrawingClick(context, declareNamespace) {
+    if (!this.drawingLink) return createHyperlinkClick(this.linkId, declareNamespace);
+    this.drawingLink.addRelationship(context);
+    return this.drawingLink.createClick(declareNamespace);
   }
 };
 var InternalHyperlink = class extends ConcreteHyperlink {
@@ -217128,16 +218638,28 @@ var BookmarkEndAttributes = class extends XmlAttributeComponent {
     _defineProperty(this, "xmlKeys", { id: "w:id" });
   }
 };
-var Bookmark = class {
+var Bookmark = class Bookmark2 {
   constructor(options) {
-    _defineProperty(this, "bookmarkUniqueNumericId", bookmarkUniqueNumericIdGen());
     _defineProperty(this, "start", void 0);
     _defineProperty(this, "children", void 0);
     _defineProperty(this, "end", void 0);
-    const linkId = this.bookmarkUniqueNumericId();
+    const linkId = bookmarkUniqueNumericId();
     this.start = new BookmarkStart(options.id, linkId);
     this.children = options.children;
     this.end = new BookmarkEnd(linkId);
+  }
+  /**
+  * The components written in this bookmark's place: its start, its children and its end. A bookmark in its
+  * children is written the same way, so one bookmark can hold another.
+  *
+  * @internal
+  */
+  get writtenAs() {
+    return [
+      this.start,
+      ...this.children.flatMap((child2) => child2 instanceof Bookmark2 ? child2.writtenAs : [child2]),
+      this.end
+    ];
   }
 };
 var BookmarkStart = class extends XmlComponent {
@@ -217164,6 +218686,35 @@ var createOutlineLevel = (level) => new BuilderElement({
     value: level
   } }
 });
+var PageReferenceFieldInstruction = class extends XmlComponent {
+  constructor(bookmarkId, options = {}) {
+    super("w:instrText");
+    this.root.push(new TextAttributes({ space: SpaceType.PRESERVE }));
+    let instruction = `PAGEREF ${bookmarkId}`;
+    if (options.hyperlink) instruction = `${instruction} \\h`;
+    if (options.useRelativePosition) instruction = `${instruction} \\p`;
+    this.root.push(instruction);
+  }
+};
+var PageReference = class extends Run {
+  constructor(bookmarkId, options = {}) {
+    super({ children: [
+      createBeginDirtyWithoutPageNumbers(),
+      new PageReferenceFieldInstruction(bookmarkId, options),
+      createSeparate(),
+      createEnd()
+    ] });
+  }
+};
+var MAX_ANCHOR_LENGTH = 255;
+var externalHyperlinkTarget = (link) => {
+  const index2 = link.indexOf("#");
+  const fragmentLength = link.length - index2 - 1;
+  return index2 > 0 && fragmentLength > 0 && fragmentLength <= MAX_ANCHOR_LENGTH ? {
+    target: link.slice(0, index2),
+    anchor: link.slice(index2 + 1)
+  } : { target: link };
+};
 var createFontRelationship = ({ id, fontKey, subsetted }, name) => new BuilderElement({
   name,
   attributes: _objectSpread2({ id: {
@@ -217171,7 +218722,7 @@ var createFontRelationship = ({ id, fontKey, subsetted }, name) => new BuilderEl
     value: id
   } }, fontKey ? { fontKey: {
     key: "w:fontKey",
-    value: `{${fontKey}}`
+    value: `{${fontKey.toUpperCase()}}`
   } } : {}),
   children: [...subsetted ? [new OnOffElement("w:subsetted", subsetted)] : []]
 });
@@ -217223,7 +218774,7 @@ var createFont = ({ name, altName, panose1, charset, family, notTrueType, pitch,
     ...embedBoldItalic ? [createFontRelationship(embedBoldItalic, "w:embedBoldItalic")] : []
   ]
 });
-var createRegularFont = ({ name, index: index2, fontKey, characterSet }) => createFont({
+var createEmbeddedFont = ({ name, characterSet, embedRegular, embedBold, embedItalic, embedBoldItalic }) => createFont({
   name,
   sig: {
     usb0: "E0002AFF",
@@ -217236,10 +218787,10 @@ var createRegularFont = ({ name, index: index2, fontKey, characterSet }) => crea
   charset: characterSet,
   family: "auto",
   pitch: "variable",
-  embedRegular: {
-    fontKey,
-    id: `rId${index2}`
-  }
+  embedRegular,
+  embedBold,
+  embedItalic,
+  embedBoldItalic
 });
 var createFontTable = (fonts) => new BuilderElement({
   name: "w:fonts",
@@ -217289,24 +218840,76 @@ var createFontTable = (fonts) => new BuilderElement({
       value: "w14 w15 w16se w16cid w16 w16cex w16sdtdh"
     }
   },
-  children: fonts.map((font, i) => createRegularFont({
-    name: font.name,
-    index: i + 1,
-    fontKey: font.fontKey,
-    characterSet: font.characterSet
-  }))
+  children: fonts.map(createEmbeddedFont)
 });
+var FACES = [
+  {
+    option: "data",
+    element: "embedRegular",
+    bold: false,
+    italic: false
+  },
+  {
+    option: "bold",
+    element: "embedBold",
+    bold: true,
+    italic: false
+  },
+  {
+    option: "italic",
+    element: "embedItalic",
+    bold: false,
+    italic: true
+  },
+  {
+    option: "boldItalic",
+    element: "embedBoldItalic",
+    bold: true,
+    italic: true
+  }
+];
 var FontWrapper = class {
   constructor(options) {
     _defineProperty(this, "options", void 0);
     _defineProperty(this, "fontTable", void 0);
     _defineProperty(this, "relationships", void 0);
-    _defineProperty(this, "fontOptionsWithKey", []);
+    _defineProperty(
+      this,
+      /** @deprecated Use `files`, which has the file and key of each face a font embeds, not only the regular face's key */
+      "fontOptionsWithKey",
+      []
+    );
+    _defineProperty(
+      this,
+      /** The files of the faces the fonts embed, in order: the Nth is `fonts/font<N>.odttf`, with the relationship `rId<N>` */
+      "files",
+      []
+    );
     this.options = options;
-    this.fontOptionsWithKey = options.map((o) => _objectSpread2(_objectSpread2({}, o), {}, { fontKey: uniqueUuid() }));
-    this.fontTable = createFontTable(this.fontOptionsWithKey);
+    const faces = options.map((font) => FACES.flatMap(({ option, element, bold, italic }) => {
+      const data = font[option];
+      return data ? [{
+        element,
+        file: {
+          name: font.name,
+          data,
+          bold,
+          italic,
+          fontKey: uniqueUuid()
+        }
+      }] : [];
+    }));
+    this.files = faces.flatMap((ofFont) => ofFont.map(({ file }) => file));
+    this.fontOptionsWithKey = options.map((font, index2) => _objectSpread2(_objectSpread2({}, font), {}, { fontKey: faces[index2][0].file.fontKey }));
+    this.fontTable = createFontTable(options.map((font, index2) => _objectSpread2({
+      name: font.name,
+      characterSet: font.characterSet
+    }, Object.fromEntries(faces[index2].map(({ element, file }) => [element, {
+      id: `rId${this.files.indexOf(file) + 1}`,
+      fontKey: file.fontKey
+    }])))));
     this.relationships = new Relationships();
-    for (let i = 0; i < options.length; i++) this.relationships.addRelationship(i + 1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font", `fonts/font${i + 1}.odttf`);
+    for (let i = 0; i < this.files.length; i++) this.relationships.addRelationship(i + 1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font", `fonts/font${i + 1}.odttf`);
   }
   get View() {
     return this.fontTable;
@@ -217390,17 +218993,25 @@ var createFrameProperties = (options) => {
     }
   });
 };
+var RIGHT_TO_LEFT_ALIGNMENTS = {
+  left: "right",
+  right: "left"
+};
 var ParagraphProperties = class extends IgnoreIfEmptyXmlComponent {
-  constructor(options) {
+  /**
+  * Creates paragraph properties.
+  *
+  * @param options - The paragraph formatting to emit
+  * @param config - Controls how the element is assembled; see {@link IParagraphPropertiesConfig}
+  */
+  constructor(options, { implicitListParagraphStyle = true } = {}) {
     super("w:pPr", options === null || options === void 0 ? void 0 : options.includeIfEmpty);
     _defineProperty(this, "numberingReferences", []);
     if (!options) return this;
     if (options.heading) this.push(createParagraphStyle(options.heading));
-    if (options.bullet) this.push(createParagraphStyle("ListParagraph"));
-    if (options.numbering) {
-      if (!options.style && !options.heading) {
-        if (!options.numbering.custom) this.push(createParagraphStyle("ListParagraph"));
-      }
+    if (implicitListParagraphStyle) {
+      if (options.bullet) this.push(createParagraphStyle("ListParagraph"));
+      if (options.numbering && !options.numbering.custom && !options.style && !options.heading) this.push(createParagraphStyle("ListParagraph"));
     }
     if (options.style) this.push(createParagraphStyle(options.style));
     if (options.keepNext !== void 0) this.push(new OnOffElement("w:keepNext", options.keepNext));
@@ -217410,12 +219021,14 @@ var ParagraphProperties = class extends IgnoreIfEmptyXmlComponent {
     if (options.widowControl !== void 0) this.push(new OnOffElement("w:widowControl", options.widowControl));
     if (options.bullet) this.push(new NumberProperties(1, options.bullet.level));
     if (options.numbering) {
-      var _options$numbering$in, _options$numbering$in2;
+      const { reference: list, instance = 0, level } = options.numbering;
+      const reference = typeof list === "string" ? list : list.reference;
       this.numberingReferences.push({
-        reference: options.numbering.reference,
-        instance: (_options$numbering$in = options.numbering.instance) !== null && _options$numbering$in !== void 0 ? _options$numbering$in : 0
+        reference,
+        instance,
+        definition: typeof list === "string" ? void 0 : list
       });
-      this.push(new NumberProperties(`${options.numbering.reference}-${(_options$numbering$in2 = options.numbering.instance) !== null && _options$numbering$in2 !== void 0 ? _options$numbering$in2 : 0}`, options.numbering.level));
+      this.push(new NumberProperties(`${reference}-${instance}`, level));
     } else if (options.numbering === false) this.push(new NumberProperties(0, 0));
     if (options.border) this.push(new Border2(options.border));
     if (options.thematicBreak) this.push(new ThematicBreak());
@@ -217438,7 +219051,7 @@ var ParagraphProperties = class extends IgnoreIfEmptyXmlComponent {
     if (options.spacing) this.push(createSpacing(options.spacing));
     if (options.indent) this.push(createIndent(options.indent));
     if (options.contextualSpacing !== void 0) this.push(new OnOffElement("w:contextualSpacing", options.contextualSpacing));
-    if (options.alignment) this.push(createAlignment(options.alignment));
+    if (options.alignment) this.push(createAlignment(options.bidirectional && RIGHT_TO_LEFT_ALIGNMENTS[options.alignment] || options.alignment));
     if (options.outlineLevel !== void 0) this.push(createOutlineLevel(options.outlineLevel));
     if (options.suppressLineNumbers !== void 0) this.push(new OnOffElement("w:suppressLineNumbers", options.suppressLineNumbers));
     if (options.autoSpaceEastAsianText !== void 0) this.push(new OnOffElement("w:autoSpaceDN", options.autoSpaceEastAsianText));
@@ -217454,6 +219067,31 @@ var ParagraphProperties = class extends IgnoreIfEmptyXmlComponent {
     this.root.push(item);
   }
   /**
+  * Adds the section properties (`w:sectPr`) of the section this paragraph ends.
+  *
+  * They go after the paragraph's run properties and before its revision (`w:pPrChange`),
+  * the order CT_PPr gives them.
+  *
+  * @param sectionProperties - The properties of the section the paragraph ends
+  */
+  addSectionProperties(sectionProperties) {
+    const revisionIndex = this.root.findIndex((item) => item instanceof ParagraphPropertiesChange);
+    if (revisionIndex === -1) {
+      this.root.push(sectionProperties);
+      return;
+    }
+    this.root.splice(revisionIndex, 0, sectionProperties);
+  }
+  /**
+  * Removes the section properties added with {@link addSectionProperties}.
+  *
+  * @param sectionProperties - The properties of the section to remove
+  */
+  removeSectionProperties(sectionProperties) {
+    const index2 = this.root.indexOf(sectionProperties);
+    if (index2 !== -1) this.root.splice(index2, 1);
+  }
+  /**
   * Prepares the paragraph properties for XML serialization.
   *
   * This method creates concrete numbering instances for any numbering references
@@ -217463,7 +219101,7 @@ var ParagraphProperties = class extends IgnoreIfEmptyXmlComponent {
   * @returns The prepared XML object, or undefined if the component should be ignored
   */
   prepForXml(context) {
-    if (!(context.viewWrapper instanceof FontWrapper)) for (const reference of this.numberingReferences) context.file.Numbering.createConcreteNumberingInstance(reference.reference, reference.instance);
+    if (!(context.viewWrapper instanceof FontWrapper)) for (const { reference, instance, definition } of this.numberingReferences) context.file.Numbering.createConcreteNumberingInstance(reference, instance, definition);
     return super.prepForXml(context);
   }
 };
@@ -217491,29 +219129,698 @@ var Paragraph = class extends FileChild {
     this.properties = new ParagraphProperties(options);
     this.root.push(this.properties);
     if (options.text) this.root.push(new TextRun(options.text));
-    if (options.children) for (const child of options.children) {
-      if (child instanceof Bookmark) {
-        this.root.push(child.start);
-        for (const textRun of child.children) this.root.push(textRun);
-        this.root.push(child.end);
+    if (options.children) for (const child2 of options.children) {
+      if (child2 instanceof Bookmark) {
+        this.root.push(...child2.writtenAs);
         continue;
       }
-      this.root.push(child);
+      this.root.push(child2);
     }
   }
   prepForXml(context) {
     for (const element of this.root) if (element instanceof ExternalHyperlink) {
       const index2 = this.root.indexOf(element);
-      const concreteHyperlink = new ConcreteHyperlink(element.options.children, uniqueId());
-      context.viewWrapper.Relationships.addRelationship(concreteHyperlink.linkId, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", element.options.link, TargetModeType.EXTERNAL);
+      const { target, anchor } = externalHyperlinkTarget(element.options.link);
+      const concreteHyperlink = new ConcreteHyperlink(element.options.children, uniqueId(), anchor, element.options.link);
+      context.viewWrapper.Relationships.addRelationship(concreteHyperlink.linkId, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", target, TargetModeType.EXTERNAL);
       this.root[index2] = concreteHyperlink;
     }
     return super.prepForXml(context);
+  }
+  /**
+  * Ends a section at this paragraph by adding the section's properties to the paragraph's properties,
+  * as Word does with the last paragraph of each section but the last.
+  *
+  * The body adds them only while it is written and removes them afterwards with
+  * {@link removeSectionProperties}, so the same paragraph can be used in other documents.
+  *
+  * @internal
+  * @param sectionProperties - The properties of the section the paragraph ends
+  */
+  addSectionProperties(sectionProperties) {
+    this.properties.addSectionProperties(sectionProperties);
+  }
+  /**
+  * Removes the section properties added with {@link addSectionProperties}.
+  *
+  * @internal
+  * @param sectionProperties - The properties of the section to remove
+  */
+  removeSectionProperties(sectionProperties) {
+    this.properties.removeSectionProperties(sectionProperties);
   }
   addRunToFront(run2) {
     this.root.splice(1, 0, run2);
     return this;
   }
+};
+function _objectWithoutPropertiesLoose(r, e) {
+  if (null == r) return {};
+  var t = {};
+  for (var n in r) if ({}.hasOwnProperty.call(r, n)) {
+    if (e.includes(n)) continue;
+    t[n] = r[n];
+  }
+  return t;
+}
+function _objectWithoutProperties(e, t) {
+  if (null == e) return {};
+  var o, r, i = _objectWithoutPropertiesLoose(e, t);
+  if (Object.getOwnPropertySymbols) {
+    var s = Object.getOwnPropertySymbols(e);
+    for (r = 0; r < s.length; r++) o = s[r], t.includes(o) || {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]);
+  }
+  return i;
+}
+var VerticalAlignTable = {
+  TOP: "top",
+  CENTER: "center",
+  BOTTOM: "bottom"
+};
+var VerticalAlignSection = _objectSpread2(_objectSpread2({}, VerticalAlignTable), {}, { BOTH: "both" });
+var VerticalAlign = VerticalAlignSection;
+var createVerticalAlign = (value) => new BuilderElement({
+  name: "w:vAlign",
+  attributes: { verticalAlign: {
+    key: "w:val",
+    value
+  } }
+});
+var createColumns = ({ space, count, separate, equalWidth, children: children2 }) => new BuilderElement({
+  name: "w:cols",
+  attributes: {
+    space: {
+      key: "w:space",
+      value: space === void 0 ? void 0 : twipsMeasureValue(space)
+    },
+    count: {
+      key: "w:num",
+      value: count === void 0 ? void 0 : decimalNumber(count)
+    },
+    separate: {
+      key: "w:sep",
+      value: separate
+    },
+    equalWidth: {
+      key: "w:equalWidth",
+      value: equalWidth
+    }
+  },
+  children: !equalWidth && children2 ? children2 : void 0
+});
+var createDocumentGrid = ({ type, linePitch, charSpace }) => new BuilderElement({
+  name: "w:docGrid",
+  attributes: {
+    type: {
+      key: "w:type",
+      value: type
+    },
+    linePitch: {
+      key: "w:linePitch",
+      value: decimalNumber(linePitch)
+    },
+    charSpace: {
+      key: "w:charSpace",
+      value: charSpace ? decimalNumber(charSpace) : void 0
+    }
+  }
+});
+var HeaderFooterReferenceType = {
+  /** Specifies that this header or footer shall appear on every page in this section which is not overridden with a specific `even` or `first` page header/footer. In a section with all three types specified, this type shall be used on all odd numbered pages (counting from the `first` page in the section, not the section numbering). */
+  DEFAULT: "default",
+  /** Specifies that this header or footer shall appear on the first page in this section. The appearance of this header or footer is contingent on the setting of the `titlePg` element (§2.10.6). */
+  FIRST: "first",
+  /** Specifies that this header or footer shall appear on all even numbered pages in this section (counting from the first page in the section, not the section numbering). The appearance of this header or footer is contingent on the setting of the `evenAndOddHeaders` element (§2.10.1). */
+  EVEN: "even"
+};
+var HeaderFooterType = {
+  HEADER: "w:headerReference",
+  FOOTER: "w:footerReference"
+};
+var createHeaderFooterReference = (type, options) => new BuilderElement({
+  name: type,
+  attributes: {
+    type: {
+      key: "w:type",
+      value: options.type || HeaderFooterReferenceType.DEFAULT
+    },
+    id: {
+      key: "r:id",
+      value: `rId${options.id}`
+    }
+  }
+});
+var createLineNumberType = ({ countBy, start, restart, distance }) => new BuilderElement({
+  name: "w:lnNumType",
+  attributes: {
+    countBy: {
+      key: "w:countBy",
+      value: countBy === void 0 ? void 0 : decimalNumber(countBy)
+    },
+    start: {
+      key: "w:start",
+      value: start === void 0 ? void 0 : decimalNumber(start)
+    },
+    restart: {
+      key: "w:restart",
+      value: restart
+    },
+    distance: {
+      key: "w:distance",
+      value: distance === void 0 ? void 0 : twipsMeasureValue(distance)
+    }
+  }
+});
+var createNoteProperties = ({ name, position, numberFormat, start, restart }) => new BuilderElement({
+  name,
+  children: [
+    ...position === void 0 ? [] : [new BuilderElement({
+      name: "w:pos",
+      attributes: { val: {
+        key: "w:val",
+        value: position
+      } }
+    })],
+    ...numberFormat ? [new BuilderElement({
+      name: "w:numFmt",
+      attributes: {
+        val: {
+          key: "w:val",
+          value: numberFormat.type
+        },
+        format: {
+          key: "w:format",
+          value: numberFormat.format
+        }
+      }
+    })] : [],
+    ...start === void 0 ? [] : [new BuilderElement({
+      name: "w:numStart",
+      attributes: { val: {
+        key: "w:val",
+        value: decimalNumber(start)
+      } }
+    })],
+    ...restart === void 0 ? [] : [new BuilderElement({
+      name: "w:numRestart",
+      attributes: { val: {
+        key: "w:val",
+        value: restart
+      } }
+    })]
+  ]
+});
+var createFootnoteProperties = (options) => createNoteProperties(_objectSpread2({ name: "w:footnotePr" }, options));
+var createEndnoteProperties = (options) => createNoteProperties(_objectSpread2({ name: "w:endnotePr" }, options));
+var PageBordersAttributes = class extends XmlAttributeComponent {
+  constructor(..._args) {
+    super(..._args);
+    _defineProperty(this, "xmlKeys", {
+      display: "w:display",
+      offsetFrom: "w:offsetFrom",
+      zOrder: "w:zOrder"
+    });
+  }
+};
+var PageBorders = class extends IgnoreIfEmptyXmlComponent {
+  constructor(options) {
+    super("w:pgBorders");
+    if (!options) return this;
+    if (options.pageBorders) this.root.push(new PageBordersAttributes({
+      display: options.pageBorders.display,
+      offsetFrom: options.pageBorders.offsetFrom,
+      zOrder: options.pageBorders.zOrder
+    }));
+    else this.root.push(new PageBordersAttributes({}));
+    if (options.pageBorderTop) this.root.push(createBorderElement("w:top", options.pageBorderTop));
+    if (options.pageBorderLeft) this.root.push(createBorderElement("w:left", options.pageBorderLeft));
+    if (options.pageBorderBottom) this.root.push(createBorderElement("w:bottom", options.pageBorderBottom));
+    if (options.pageBorderRight) this.root.push(createBorderElement("w:right", options.pageBorderRight));
+  }
+};
+var createPageMargin = (top, right, bottom, left, header, footer, gutter) => new BuilderElement({
+  name: "w:pgMar",
+  attributes: {
+    top: {
+      key: "w:top",
+      value: signedTwipsMeasureValue(top)
+    },
+    right: {
+      key: "w:right",
+      value: twipsMeasureValue(right)
+    },
+    bottom: {
+      key: "w:bottom",
+      value: signedTwipsMeasureValue(bottom)
+    },
+    left: {
+      key: "w:left",
+      value: twipsMeasureValue(left)
+    },
+    header: {
+      key: "w:header",
+      value: twipsMeasureValue(header)
+    },
+    footer: {
+      key: "w:footer",
+      value: twipsMeasureValue(footer)
+    },
+    gutter: {
+      key: "w:gutter",
+      value: twipsMeasureValue(gutter)
+    }
+  }
+});
+var PageNumberSeparator = {
+  /** Hyphen separator (-) */
+  HYPHEN: "hyphen",
+  /** Period separator (.) */
+  PERIOD: "period",
+  /** Colon separator (:) */
+  COLON: "colon",
+  /** Em dash separator (—) */
+  EM_DASH: "emDash",
+  /** En dash separator (–), written as `enDash` */
+  EN_DASH: "endash"
+};
+var createPageNumberType = ({ start, formatType, separator, chapterHeadingLevel }) => new BuilderElement({
+  name: "w:pgNumType",
+  attributes: {
+    start: {
+      key: "w:start",
+      value: start === void 0 ? void 0 : decimalNumber(start)
+    },
+    formatType: {
+      key: "w:fmt",
+      value: formatType
+    },
+    separator: {
+      key: "w:chapSep",
+      value: separator === PageNumberSeparator.EN_DASH ? "enDash" : separator
+    },
+    chapterHeadingLevel: {
+      key: "w:chapStyle",
+      value: chapterHeadingLevel === void 0 ? void 0 : decimalNumber(chapterHeadingLevel)
+    }
+  }
+});
+var PageOrientation = {
+  /**
+  * ## Portrait Mode
+  *
+  * Specifies that pages in this section shall be printed in portrait mode.
+  */
+  PORTRAIT: "portrait",
+  /**
+  * ## Landscape Mode
+  *
+  * Specifies that pages in this section shall be printed in landscape mode, which prints the page contents with a 90 degree rotation with respect to the normal page orientation.
+  */
+  LANDSCAPE: "landscape"
+};
+var createPageSize = ({ width, height, orientation, code }) => {
+  const widthTwips = twipsMeasureValue(width);
+  const heightTwips = twipsMeasureValue(height);
+  return new BuilderElement({
+    name: "w:pgSz",
+    attributes: {
+      width: {
+        key: "w:w",
+        value: orientation === PageOrientation.LANDSCAPE ? heightTwips : widthTwips
+      },
+      height: {
+        key: "w:h",
+        value: orientation === PageOrientation.LANDSCAPE ? widthTwips : heightTwips
+      },
+      orientation: {
+        key: "w:orient",
+        value: orientation
+      },
+      code: {
+        key: "w:code",
+        value: code
+      }
+    }
+  });
+};
+var PageTextDirectionAttributes = class extends XmlAttributeComponent {
+  constructor(..._args) {
+    super(..._args);
+    _defineProperty(this, "xmlKeys", { val: "w:val" });
+  }
+};
+var PageTextDirection = class extends XmlComponent {
+  constructor(value) {
+    super("w:textDirection");
+    this.root.push(new PageTextDirectionAttributes({ val: value }));
+  }
+};
+var createSectionType = (value) => new BuilderElement({
+  name: "w:type",
+  attributes: { val: {
+    key: "w:val",
+    value
+  } }
+});
+var sectionMarginDefaults = {
+  /** Top margin: 1440 twips (1 inch) */
+  TOP: 1440,
+  /** Right margin: 1440 twips (1 inch) */
+  RIGHT: 1440,
+  /** Bottom margin: 1440 twips (1 inch) */
+  BOTTOM: 1440,
+  /** Left margin: 1440 twips (1 inch) */
+  LEFT: 1440,
+  /** Header margin from top: 708 twips (0.5 inches) */
+  HEADER: 708,
+  /** Footer margin from bottom: 708 twips (0.5 inches) */
+  FOOTER: 708,
+  /** Gutter margin for binding: 0 twips */
+  GUTTER: 0
+};
+var sectionPageSizeDefaults = {
+  /** Page width: 11906 twips (8.27 inches, 210mm) */
+  WIDTH: 11906,
+  /** Page height: 16838 twips (11.69 inches, 297mm) */
+  HEIGHT: 16838,
+  /** Page orientation: portrait */
+  ORIENTATION: PageOrientation.PORTRAIT
+};
+var SectionProperties = class SectionProperties2 extends XmlComponent {
+  constructor({ page: { size: { width = sectionPageSizeDefaults.WIDTH, height = sectionPageSizeDefaults.HEIGHT, orientation = sectionPageSizeDefaults.ORIENTATION, code } = {}, margin: { top = sectionMarginDefaults.TOP, right = sectionMarginDefaults.RIGHT, bottom = sectionMarginDefaults.BOTTOM, left = sectionMarginDefaults.LEFT, header = sectionMarginDefaults.HEADER, footer = sectionMarginDefaults.FOOTER, gutter = sectionMarginDefaults.GUTTER } = {}, pageNumbers = {}, borders, textDirection } = {}, grid: { linePitch = 360, charSpace, type: gridType } = {}, headerWrapperGroup = {}, footerWrapperGroup = {}, lineNumbers, titlePage, verticalAlign, column, type, footnoteProperties, endnoteProperties, revision } = {}) {
+    super("w:sectPr");
+    _defineProperty(
+      this,
+      /**
+      * Width, in twips, available to block-level content in this section.
+      *
+      * This is the page width (accounting for orientation) minus the left and right
+      * margins and the gutter. When the section is laid out in several columns, it is
+      * the width of a single column. Percentage table widths are resolved against it.
+      */
+      "availableTextWidth",
+      void 0
+    );
+    this.availableTextWidth = SectionProperties2.calculateAvailableTextWidth({
+      pageWidth: orientation === PageOrientation.LANDSCAPE ? height : width,
+      left,
+      right,
+      gutter,
+      column
+    });
+    this.addHeaderFooterGroup(HeaderFooterType.HEADER, headerWrapperGroup);
+    this.addHeaderFooterGroup(HeaderFooterType.FOOTER, footerWrapperGroup);
+    if (footnoteProperties) this.root.push(createFootnoteProperties(footnoteProperties));
+    if (endnoteProperties) this.root.push(createEndnoteProperties(endnoteProperties));
+    if (type) this.root.push(createSectionType(type));
+    this.root.push(createPageSize({
+      width,
+      height,
+      orientation,
+      code
+    }));
+    this.root.push(createPageMargin(top, right, bottom, left, header, footer, gutter));
+    if (borders) this.root.push(new PageBorders(borders));
+    if (lineNumbers) this.root.push(createLineNumberType(lineNumbers));
+    this.root.push(createPageNumberType(pageNumbers));
+    if (column) this.root.push(createColumns(column));
+    if (verticalAlign) this.root.push(createVerticalAlign(verticalAlign));
+    if (titlePage !== void 0) this.root.push(new OnOffElement("w:titlePg", titlePage));
+    if (textDirection) this.root.push(new PageTextDirection(textDirection));
+    this.root.push(createDocumentGrid({
+      linePitch,
+      charSpace,
+      type: gridType
+    }));
+    if (revision) this.root.push(new SectionPropertiesChange(revision));
+  }
+  /**
+  * Width, in twips, available to block-level content (paragraphs and tables) in this section.
+  *
+  * Page width minus the left and right margins and the gutter, divided among the
+  * section's columns when there is more than one. Tables use this to resolve
+  * percentage widths into the absolute twip grid that Google Docs, Apple Pages and
+  * other consumers lay tables out from.
+  *
+  * @example
+  * ```typescript
+  * // A4 portrait with 1 inch margins
+  * new SectionProperties().AvailableTextWidth; // 11906 - 1440 - 1440 = 9026
+  * ```
+  */
+  get AvailableTextWidth() {
+    return this.availableTextWidth;
+  }
+  static calculateAvailableTextWidth({ pageWidth, left, right, gutter, column }) {
+    var _column$count, _column$space;
+    const textWidth = universalMeasureToTwips(pageWidth) - universalMeasureToTwips(left) - universalMeasureToTwips(right) - universalMeasureToTwips(gutter);
+    const columnCount = (_column$count = column === null || column === void 0 ? void 0 : column.count) !== null && _column$count !== void 0 ? _column$count : 1;
+    if (columnCount <= 1) return textWidth;
+    return (textWidth - universalMeasureToTwips((_column$space = column === null || column === void 0 ? void 0 : column.space) !== null && _column$space !== void 0 ? _column$space : 720) * (columnCount - 1)) / columnCount;
+  }
+  addHeaderFooterGroup(type, group) {
+    if (group.default) this.root.push(createHeaderFooterReference(type, {
+      type: HeaderFooterReferenceType.DEFAULT,
+      id: group.default.View.ReferenceId
+    }));
+    if (group.first) this.root.push(createHeaderFooterReference(type, {
+      type: HeaderFooterReferenceType.FIRST,
+      id: group.first.View.ReferenceId
+    }));
+    if (group.even) this.root.push(createHeaderFooterReference(type, {
+      type: HeaderFooterReferenceType.EVEN,
+      id: group.even.View.ReferenceId
+    }));
+  }
+};
+var SectionPropertiesChange = class extends XmlComponent {
+  constructor(options) {
+    super("w:sectPrChange");
+    this.root.push(new ChangeAttributes({
+      id: options.id,
+      author: options.author,
+      date: options.date
+    }));
+    this.root.push(new SectionProperties(options));
+  }
+};
+var Body2 = class extends XmlComponent {
+  constructor({ pageNumbers } = {}) {
+    super("w:body");
+    _defineProperty(this, "sections", []);
+    _defineProperty(
+      this,
+      /**
+      * Section properties that were moved into a paragraph at the end of their section
+      * by {@link addSection}, keyed by that paragraph. Used to find the section that
+      * governs a given child of the body, and to write each section's properties into
+      * its paragraph while the body is written.
+      */
+      "sectionParagraphs",
+      /* @__PURE__ */ new Map()
+    );
+    _defineProperty(this, "headingBookmarkIds", new HeadingBookmarkIds());
+    _defineProperty(this, "pageNumbers", void 0);
+    this.pageNumbers = pageNumbers;
+  }
+  /**
+  * Finds the section properties that govern a top-level child of the body.
+  *
+  * A section's properties are stored after its content (either in the closing
+  * paragraph of the section or, for the last section, at the end of the body), so
+  * the governing section is the first one found at or after the child. When no
+  * child is given (or it is not a direct child of the body), the first section is
+  * returned.
+  *
+  * @param child - A direct child of the body (paragraph, table, etc.)
+  * @returns The governing section properties, or undefined if the body has no sections
+  */
+  getSectionPropertiesFor(child2) {
+    const start = child2 ? Math.max(this.root.indexOf(child2), 0) : 0;
+    for (let i = start; i < this.root.length; i++) {
+      const component = this.root[i];
+      if (component instanceof SectionProperties) return component;
+      const section2 = this.sectionParagraphs.get(component);
+      if (section2) return section2;
+    }
+    return this.sections[this.sections.length - 1];
+  }
+  /**
+  * Adds new section properties to the document body.
+  *
+  * Creates a new section by moving the previous section's properties into the last
+  * paragraph of that section, and then adding the new section as the current section.
+  * When that section doesn't end with a paragraph of its own (it ends with a table, or
+  * it is empty), an empty paragraph is added to hold its properties.
+  *
+  * According to the OOXML specification:
+  * - Section properties for all sections except the last must be stored in a paragraph's
+  *   properties (pPr/sectPr) at the end of each section
+  * - The last section's properties are stored as a direct child of the body element (w:body/w:sectPr)
+  *
+  * @param options - Section properties configuration (page size, margins, headers, footers, etc.)
+  */
+  addSection(options) {
+    const currentSection = this.sections.pop();
+    const lastParagraph = this.lastParagraphOfSection();
+    if (currentSection && lastParagraph) this.sectionParagraphs.set(lastParagraph, currentSection);
+    else {
+      const sectionParagraph = this.createSectionParagraph();
+      this.root.push(sectionParagraph);
+      if (currentSection) this.sectionParagraphs.set(sectionParagraph, currentSection);
+    }
+    this.sections.push(new SectionProperties(options));
+  }
+  /**
+  * Prepares the body element for XML serialization.
+  *
+  * Ensures that the last section's properties are placed as a direct child of the body
+  * element, as required by the OOXML specification. Once the body is written, its tables
+  * of contents are filled in from its headings, and, when the body has a page number
+  * estimator, its page references are given their page numbers. Its SEQ fields are given
+  * their numbers after the tables of contents are filled in, as Word leaves a heading's SEQ
+  * number out of its entry.
+  *
+  * @param context - The XML serialization context
+  * @returns The prepared XML object or undefined
+  */
+  prepForXml(context) {
+    if (this.sections.length === 1) {
+      this.root.splice(0, 1);
+      this.root.push(this.sections.pop());
+    }
+    for (const [paragraph, section2] of this.sectionParagraphs) paragraph.addSectionProperties(section2);
+    let xml;
+    try {
+      xml = super.prepForXml(context);
+    } finally {
+      for (const [paragraph, section2] of this.sectionParagraphs) paragraph.removeSectionProperties(section2);
+    }
+    fillTablesOfContents(xml, context, this.headingBookmarkIds);
+    if (this.pageNumbers) {
+      fillSequenceNumbers(xml, context);
+      fillPageNumbers(xml, context, this.pageNumbers);
+    }
+    return xml;
+  }
+  /**
+  * Adds a block-level component to the body.
+  *
+  * This method is used internally by the Document class to add paragraphs,
+  * tables, and other block-level elements to the document body.
+  *
+  * @param component - The XML component to add (paragraph, table, etc.)
+  */
+  push(component) {
+    const section2 = component instanceof Paragraph ? this.sectionParagraphs.get(component) : void 0;
+    if (section2) {
+      const sectionParagraph = this.createSectionParagraph();
+      this.root.splice(this.root.indexOf(component) + 1, 0, sectionParagraph);
+      this.sectionParagraphs.delete(component);
+      this.sectionParagraphs.set(sectionParagraph, section2);
+    }
+    this.root.push(component);
+  }
+  /**
+  * The paragraph the current section ends with, which can hold its properties.
+  *
+  * There is none when the section ends with something other than a paragraph, or is empty:
+  * its last child is then the placeholder at the start of the body (removed when the body is
+  * written) or the paragraph that ends the section before, which has properties of its own.
+  */
+  lastParagraphOfSection() {
+    const last = this.root[this.root.length - 1];
+    return last instanceof Paragraph && last !== this.root[0] && !this.sectionParagraphs.has(last) && this.root.indexOf(last) === this.root.length - 1 ? last : void 0;
+  }
+  /**
+  * An empty paragraph to end a section that has no paragraph of its own to end it. The section's
+  * properties are written into it with the others, when the body is written.
+  */
+  createSectionParagraph() {
+    return new Paragraph({});
+  }
+};
+var WidthType = {
+  /** Auto. */
+  AUTO: "auto",
+  /** Value is in twentieths of a point */
+  DXA: "dxa",
+  /** No (empty) value. */
+  NIL: "nil",
+  /** Value is in percentage. */
+  PERCENTAGE: "pct"
+};
+var createTableWidthElement = (name, { type = WidthType.AUTO, size }) => {
+  let tableWidthValue = size;
+  if (type === WidthType.PERCENTAGE && typeof size === "number") tableWidthValue = Math.round(size * 50);
+  return new BuilderElement({
+    name,
+    attributes: {
+      type: {
+        key: "w:type",
+        value: type
+      },
+      size: {
+        key: "w:w",
+        value: measurementOrPercentValue(tableWidthValue)
+      }
+    }
+  });
+};
+var DEFAULT_AVAILABLE_WIDTH = sectionPageSizeDefaults.WIDTH - sectionMarginDefaults.LEFT - sectionMarginDefaults.RIGHT - sectionMarginDefaults.GUTTER;
+var columnSpanOf = (cell) => cell.options.columnSpan || 1;
+var resolvePreferredWidth = (width, referenceWidth) => {
+  if (!width) return;
+  const { type = WidthType.AUTO, size } = width;
+  if (type !== WidthType.PERCENTAGE && type !== WidthType.DXA) return;
+  const twips = typeof size === "number" ? type === WidthType.PERCENTAGE ? size / 100 * referenceWidth : size : size.endsWith("%") ? Number(size.slice(0, -1)) / 100 * referenceWidth : universalMeasureToTwips(size);
+  return twips > 0 ? twips : void 0;
+};
+var resolveTableWidth = (width, availableWidth) => {
+  var _resolvePreferredWidt;
+  return (_resolvePreferredWidt = resolvePreferredWidth(width, availableWidth)) !== null && _resolvePreferredWidt !== void 0 ? _resolvePreferredWidt : availableWidth;
+};
+var countGridColumns = (rows) => Math.max(0, ...rows.map((row) => row.cells.reduce((count, cell) => count + columnSpanOf(cell), 0)));
+var resolveColumnWidths = ({ rows, width, availableWidth }) => {
+  const columnCount = countGridColumns(rows);
+  if (columnCount === 0) return [];
+  const tableWidth = resolveTableWidth(width, availableWidth);
+  const widths = Array.from({ length: columnCount }, () => void 0);
+  const spanningCells = [];
+  for (const row of rows) {
+    let column = 0;
+    for (const cell of row.cells) {
+      const span = columnSpanOf(cell);
+      const cellWidth = resolvePreferredWidth(cell.options.width, tableWidth);
+      if (cellWidth !== void 0) {
+        if (span === 1) {
+          var _column, _widths$_column;
+          (_widths$_column = widths[_column = column]) !== null && _widths$_column !== void 0 || (widths[_column] = cellWidth);
+        } else spanningCells.push({
+          start: column,
+          span,
+          width: cellWidth
+        });
+      }
+      column += span;
+    }
+  }
+  for (const { start, span, width: cellWidth } of spanningCells) {
+    const columns = Array.from({ length: span }, (_, i) => start + i).filter((column) => column < columnCount);
+    const unresolvedSpanColumns = columns.filter((column) => widths[column] === void 0);
+    const remaining = cellWidth - columns.reduce((sum, column) => {
+      var _widths$column;
+      return sum + ((_widths$column = widths[column]) !== null && _widths$column !== void 0 ? _widths$column : 0);
+    }, 0);
+    if (unresolvedSpanColumns.length > 0 && remaining > 0) for (const column of unresolvedSpanColumns) widths[column] = remaining / unresolvedSpanColumns.length;
+  }
+  const unresolvedColumns = widths.flatMap((columnWidth, column) => columnWidth === void 0 ? [column] : []);
+  if (unresolvedColumns.length > 0) {
+    const remaining = tableWidth - widths.reduce((sum, columnWidth) => sum + (columnWidth !== null && columnWidth !== void 0 ? columnWidth : 0), 0);
+    const share = remaining > 0 ? remaining / unresolvedColumns.length : tableWidth / columnCount;
+    for (const column of unresolvedColumns) widths[column] = share;
+  }
+  return widths.map((columnWidth) => Math.round(columnWidth));
 };
 var createGridCol = (width) => new BuilderElement({
   name: "w:gridCol",
@@ -217600,20 +219907,6 @@ var CellMerge = class extends XmlComponent {
     this.root.push(new CellMergeAttributes(options));
   }
 };
-var VerticalAlignTable = {
-  TOP: "top",
-  CENTER: "center",
-  BOTTOM: "bottom"
-};
-var VerticalAlignSection = _objectSpread2(_objectSpread2({}, VerticalAlignTable), {}, { BOTH: "both" });
-var VerticalAlign = VerticalAlignSection;
-var createVerticalAlign = (value) => new BuilderElement({
-  name: "w:vAlign",
-  attributes: { verticalAlign: {
-    key: "w:val",
-    value
-  } }
-});
 var buildMarginChildren = ({ marginUnitType = WidthType.DXA, top, left, bottom, right }) => [
   {
     name: "w:top",
@@ -217649,33 +219942,6 @@ var createCellMargin = (options) => {
   return new BuilderElement({
     name: "w:tcMar",
     children: children2
-  });
-};
-var WidthType = {
-  /** Auto. */
-  AUTO: "auto",
-  /** Value is in twentieths of a point */
-  DXA: "dxa",
-  /** No (empty) value. */
-  NIL: "nil",
-  /** Value is in percentage. */
-  PERCENTAGE: "pct"
-};
-var createTableWidthElement = (name, { type = WidthType.AUTO, size }) => {
-  let tableWidthValue = size;
-  if (type === WidthType.PERCENTAGE && typeof size === "number") tableWidthValue = `${size}%`;
-  return new BuilderElement({
-    name,
-    attributes: {
-      type: {
-        key: "w:type",
-        value: type
-      },
-      size: {
-        key: "w:w",
-        value: measurementOrPercentValue(tableWidthValue)
-      }
-    }
   });
 };
 var TableCellBorders = class extends IgnoreIfEmptyXmlComponent {
@@ -217740,6 +220006,9 @@ var TDirection = class extends XmlComponent {
 var TableCellProperties = class extends IgnoreIfEmptyXmlComponent {
   constructor(options) {
     super("w:tcPr", options.includeIfEmpty);
+    _defineProperty(this, "hasWidth", void 0);
+    _defineProperty(this, "hasColumnWidth", false);
+    this.hasWidth = options.width !== void 0;
     if (options.width) this.root.push(createTableWidthElement("w:tcW", options.width));
     if (options.columnSpan) this.root.push(new GridSpan(options.columnSpan));
     if (options.verticalMerge) this.root.push(new VerticalMerge(options.verticalMerge));
@@ -217754,8 +220023,21 @@ var TableCellProperties = class extends IgnoreIfEmptyXmlComponent {
     if (options.verticalAlign) this.root.push(createVerticalAlign(options.verticalAlign));
     if (options.insertion) this.root.push(new InsertedTableCell(options.insertion));
     if (options.deletion) this.root.push(new DeletedTableCell(options.deletion));
-    if (options.revision) this.root.push(new TableCellPropertiesChange(options.revision));
     if (options.cellMerge) this.root.push(new CellMerge(options.cellMerge));
+    if (options.revision) this.root.push(new TableCellPropertiesChange(options.revision));
+  }
+  /**
+  * Gives a cell without a width of its own the width of the table's columns it spans, in twips.
+  *
+  * @internal
+  */
+  setColumnWidth(twips) {
+    if (this.hasWidth) return;
+    this.root.splice(0, this.hasColumnWidth ? 1 : 0, createTableWidthElement("w:tcW", {
+      size: twips,
+      type: WidthType.DXA
+    }));
+    this.hasColumnWidth = true;
   }
 };
 var TableCellPropertiesChange = class extends XmlComponent {
@@ -217772,16 +220054,37 @@ var TableCellPropertiesChange = class extends XmlComponent {
 var TableCell = class extends XmlComponent {
   constructor(options) {
     super("w:tc");
-    _defineProperty(this, "options", void 0);
+    _defineProperty(
+      this,
+      /**
+      * The options the cell was created with.
+      *
+      * Its borders and shading are declared with hex colors, as they were before they took colors of the document's
+      * theme, so that code reading them still compiles. A cell given a theme color has it here as it was given.
+      */
+      "options",
+      void 0
+    );
+    _defineProperty(this, "properties", void 0);
     this.options = options;
-    this.root.push(new TableCellProperties(options));
-    for (const child of options.children) this.root.push(child);
+    this.properties = new TableCellProperties(options);
+    this.root.push(this.properties);
+    for (const child2 of options.children) this.root.push(child2);
+  }
+  /**
+  * Gives the cell, unless it has a width of its own, the width of the table's columns it spans, in twips.
+  *
+  * @internal
+  */
+  setColumnWidth(twips) {
+    this.properties.setColumnWidth(twips);
   }
   prepForXml(context) {
     if (!(this.root[this.root.length - 1] instanceof Paragraph)) this.root.push(new Paragraph({}));
     return super.prepForXml(context);
   }
 };
+var createOnOffOnlyElement = (name, value) => value ? new OnOffElement(name) : new StringValueElement(name, "off");
 var NONE_BORDER = {
   style: BorderStyle.NONE,
   size: 0,
@@ -217812,14 +220115,7 @@ _defineProperty(TableBorders, "NONE", {
   insideHorizontal: NONE_BORDER,
   insideVertical: NONE_BORDER
 });
-var createOverlapElement = (overlap) => new BuilderElement({
-  name: "w:tblOverlap",
-  attributes: { val: {
-    key: "w:val",
-    value: overlap
-  } }
-});
-var createTableFloatProperties = ({ horizontalAnchor, verticalAnchor, absoluteHorizontalPosition, relativeHorizontalPosition, absoluteVerticalPosition, relativeVerticalPosition, bottomFromText, topFromText, leftFromText, rightFromText, overlap }) => new BuilderElement({
+var createTableFloatProperties = ({ horizontalAnchor, verticalAnchor, absoluteHorizontalPosition, relativeHorizontalPosition, absoluteVerticalPosition, relativeVerticalPosition, bottomFromText, topFromText, leftFromText, rightFromText }) => new BuilderElement({
   name: "w:tblpPr",
   attributes: {
     leftFromText: {
@@ -217862,8 +220158,7 @@ var createTableFloatProperties = ({ horizontalAnchor, verticalAnchor, absoluteHo
       key: "w:vertAnchor",
       value: verticalAnchor
     }
-  },
-  children: overlap ? [createOverlapElement(overlap)] : void 0
+  }
 });
 var TableLayoutType = {
   /** Auto-fit layout - column widths are adjusted based on content */
@@ -217926,14 +220221,24 @@ var createTableLook = ({ firstRow, lastRow, firstColumn, lastColumn, noHBand, no
     }
   }
 });
+var createTableOverlap = (overlap) => new BuilderElement({
+  name: "w:tblOverlap",
+  attributes: { val: {
+    key: "w:val",
+    value: overlap
+  } }
+});
 var TableProperties = class extends IgnoreIfEmptyXmlComponent {
   constructor(options) {
+    var _options$float;
     super("w:tblPr", options.includeIfEmpty);
     if (options.style) this.root.push(new StringValueElement("w:tblStyle", options.style));
     if (options.float) this.root.push(createTableFloatProperties(options.float));
-    if (options.visuallyRightToLeft !== void 0) this.root.push(new OnOffElement("w:bidiVisual", options.visuallyRightToLeft));
+    if ((_options$float = options.float) === null || _options$float === void 0 ? void 0 : _options$float.overlap) this.root.push(createTableOverlap(options.float.overlap));
+    if (options.visuallyRightToLeft !== void 0) this.root.push(createOnOffOnlyElement("w:bidiVisual", options.visuallyRightToLeft));
     if (options.width) this.root.push(createTableWidthElement("w:tblW", options.width));
     if (options.alignment) this.root.push(createAlignment(options.alignment));
+    if (options.cellSpacing) this.root.push(createTableCellSpacing(options.cellSpacing));
     if (options.indent) this.root.push(createTableWidthElement("w:tblInd", options.indent));
     if (options.borders) this.root.push(new TableBorders(options.borders));
     if (options.shading) this.root.push(createShading(options.shading));
@@ -217943,7 +220248,6 @@ var TableProperties = class extends IgnoreIfEmptyXmlComponent {
       if (cellMargin) this.root.push(cellMargin);
     }
     if (options.tableLook) this.root.push(createTableLook(options.tableLook));
-    if (options.cellSpacing) this.root.push(createTableCellSpacing(options.cellSpacing));
     if (options.revision) this.root.push(new TablePropertiesChange(options.revision));
   }
 };
@@ -217956,44 +220260,6 @@ var TablePropertiesChange = class extends XmlComponent {
       date: options.date
     }));
     this.root.push(new TableProperties(_objectSpread2(_objectSpread2({}, options), {}, { includeIfEmpty: true })));
-  }
-};
-var Table = class extends FileChild {
-  constructor({ rows, width, columnWidths = Array(Math.max(...rows.map((row) => row.CellCount))).fill(100), columnWidthsRevision, margins, indent, float, layout, style, borders, alignment, visuallyRightToLeft, tableLook, cellSpacing, revision }) {
-    super("w:tbl");
-    this.root.push(new TableProperties({
-      borders: borders !== null && borders !== void 0 ? borders : {},
-      width: width !== null && width !== void 0 ? width : { size: 100 },
-      indent,
-      float,
-      layout,
-      style,
-      alignment,
-      cellMargin: margins,
-      visuallyRightToLeft,
-      tableLook,
-      cellSpacing,
-      revision
-    }));
-    this.root.push(new TableGrid(columnWidths, columnWidthsRevision));
-    for (const row of rows) this.root.push(row);
-    rows.forEach((row, rowIndex) => {
-      if (rowIndex === rows.length - 1) return;
-      let columnIndex2 = 0;
-      row.cells.forEach((cell) => {
-        if (cell.options.rowSpan && cell.options.rowSpan > 1) {
-          const continueCell = new TableCell({
-            rowSpan: cell.options.rowSpan - 1,
-            columnSpan: cell.options.columnSpan,
-            borders: cell.options.borders,
-            children: [],
-            verticalMerge: VerticalMergeType.CONTINUE
-          });
-          rows[rowIndex + 1].addCellToColumnIndex(continueCell, columnIndex2);
-        }
-        columnIndex2 += cell.options.columnSpan || 1;
-      });
-    });
   }
 };
 var HeightRule = {
@@ -218020,8 +220286,8 @@ var createTableRowHeight = (value, rule) => new BuilderElement({
 var TableRowProperties = class extends IgnoreIfEmptyXmlComponent {
   constructor(options) {
     super("w:trPr", options.includeIfEmpty);
-    if (options.cantSplit !== void 0) this.root.push(new OnOffElement("w:cantSplit", options.cantSplit));
-    if (options.tableHeader !== void 0) this.root.push(new OnOffElement("w:tblHeader", options.tableHeader));
+    if (options.cantSplit !== void 0) this.root.push(createOnOffOnlyElement("w:cantSplit", options.cantSplit));
+    if (options.tableHeader !== void 0) this.root.push(createOnOffOnlyElement("w:tblHeader", options.tableHeader));
     if (options.height) this.root.push(createTableRowHeight(options.height.value, options.height.rule));
     if (options.cellSpacing) this.root.push(createTableCellSpacing(options.cellSpacing));
     if (options.insertion) this.root.push(new InsertedTableRow(options.insertion));
@@ -218046,7 +220312,7 @@ var TableRow = class extends XmlComponent {
     _defineProperty(this, "options", void 0);
     this.options = options;
     this.root.push(new TableRowProperties(options));
-    for (const child of options.children) this.root.push(child);
+    for (const child2 of options.children) this.root.push(child2);
   }
   get CellCount() {
     return this.options.children.length;
@@ -218075,13 +220341,167 @@ var TableRow = class extends XmlComponent {
     let colIdx = 0;
     let rootIdx = 1;
     while (colIdx <= columnIndex2) {
-      if (rootIdx >= this.root.length) if (allowEndNewCell) return this.root.length;
-      else throw new Error(`cell 'columnIndex' should not great than ${colIdx - 1}`);
+      if (rootIdx >= this.root.length) {
+        if (allowEndNewCell) return this.root.length;
+        else throw new Error(`cell 'columnIndex' should not great than ${colIdx - 1}`);
+      }
       const cell = this.root[rootIdx];
       rootIdx += 1;
       colIdx += cell && cell.options.columnSpan || 1;
     }
     return rootIdx - 1;
+  }
+};
+var Table = class Table2 extends FileChild {
+  constructor({ rows, width, columnWidths, columnWidthsRevision, margins, indent, float, layout, style, borders, alignment, visuallyRightToLeft, tableLook, cellSpacing, revision }) {
+    super("w:tbl");
+    _defineProperty(this, "rows", void 0);
+    _defineProperty(this, "width", void 0);
+    _defineProperty(this, "columnWidths", void 0);
+    _defineProperty(this, "columnWidthsRevision", void 0);
+    _defineProperty(
+      this,
+      /**
+      * Grid column widths in twips: the explicit `columnWidths`, or the widths derived
+      * from the table and cell widths (re-resolved against the actual page or parent
+      * cell every time the table is serialized).
+      */
+      "resolvedColumnWidths",
+      void 0
+    );
+    this.rows = rows;
+    this.width = width !== null && width !== void 0 ? width : { size: 100 };
+    this.columnWidths = columnWidths;
+    this.columnWidthsRevision = columnWidthsRevision;
+    rows.forEach((row, rowIndex) => {
+      if (rowIndex === rows.length - 1) return;
+      let columnIndex2 = 0;
+      row.cells.forEach((cell) => {
+        if (cell.options.rowSpan && cell.options.rowSpan > 1) {
+          const continueCell = new TableCell({
+            rowSpan: cell.options.rowSpan - 1,
+            columnSpan: cell.options.columnSpan,
+            borders: cell.options.borders,
+            children: [],
+            verticalMerge: VerticalMergeType.CONTINUE
+          });
+          rows[rowIndex + 1].addCellToColumnIndex(continueCell, columnIndex2);
+        }
+        columnIndex2 += cell.options.columnSpan || 1;
+      });
+    });
+    this.setCellWidths(DEFAULT_AVAILABLE_WIDTH);
+    this.resolvedColumnWidths = columnWidths !== null && columnWidths !== void 0 ? columnWidths : resolveColumnWidths({
+      rows,
+      width: this.width,
+      availableWidth: DEFAULT_AVAILABLE_WIDTH
+    });
+    this.root.push(new TableProperties({
+      borders: borders !== null && borders !== void 0 ? borders : {},
+      width: this.width,
+      indent,
+      float,
+      layout,
+      style,
+      alignment,
+      cellMargin: margins,
+      visuallyRightToLeft,
+      tableLook,
+      cellSpacing,
+      revision
+    }));
+    this.root.push(new TableGrid(this.resolvedColumnWidths, columnWidthsRevision));
+    for (const row of rows) this.root.push(row);
+  }
+  /**
+  * Widths of the grid columns in twips, as they will be written to `w:tblGrid`.
+  *
+  * These are the explicit `columnWidths` when given, otherwise the widths derived
+  * from the table and cell widths. Derived widths are resolved against the page (or
+  * the parent cell for nested tables) during serialization, so before that they
+  * reflect the default page size.
+  */
+  get ColumnWidths() {
+    return this.resolvedColumnWidths;
+  }
+  /**
+  * Width in twips, according to the grid, of a cell in one of this table's rows.
+  *
+  * Used by nested tables to resolve their own widths against the cell they sit in.
+  *
+  * @param row - A row of this table
+  * @param cell - A cell of that row
+  * @returns The summed width of the grid columns the cell spans, or undefined if the cell cannot be located on the grid
+  */
+  getCellWidth(row, cell) {
+    const { cells } = row;
+    const cellIndex = cells.indexOf(cell);
+    if (cellIndex === -1) return;
+    const start = cells.slice(0, cellIndex).reduce((column, previous) => column + (previous.options.columnSpan || 1), 0);
+    const columns = this.resolvedColumnWidths.slice(start, start + (cell.options.columnSpan || 1));
+    return columns.length === 0 ? void 0 : columns.reduce((sum, columnWidth) => sum + columnWidth, 0);
+  }
+  /**
+  * Resolves derived grid column widths against the width actually available to the
+  * table (the section's text width, or the parent cell for nested tables) before
+  * serializing.
+  */
+  prepForXml(context) {
+    this.setCellWidths(this.resolveAvailableWidth(context));
+    if (this.columnWidths === void 0) {
+      this.resolvedColumnWidths = resolveColumnWidths({
+        rows: this.rows,
+        width: this.width,
+        availableWidth: this.resolveAvailableWidth(context)
+      });
+      const gridIndex = this.root.findIndex((component) => component instanceof TableGrid);
+      this.root[gridIndex] = new TableGrid(this.resolvedColumnWidths, this.columnWidthsRevision);
+    }
+    return super.prepForXml(context);
+  }
+  /**
+  * Gives each cell without a width of its own the width of the `columnWidths` it spans, as Word sizes the columns of
+  * cells without a width to their content, whatever the grid says. When the table's width is wider than the columns
+  * add up to, they are scaled up to fill it, as Word and LibreOffice lay them out, so columns given as proportions
+  * keep them.
+  */
+  setCellWidths(availableWidth) {
+    var _resolvePreferredWidt;
+    if (this.columnWidths === void 0) return;
+    const total = this.columnWidths.reduce((sum, columnWidth) => sum + columnWidth, 0);
+    const tableWidth = (_resolvePreferredWidt = resolvePreferredWidth(this.width, availableWidth)) !== null && _resolvePreferredWidt !== void 0 ? _resolvePreferredWidt : 0;
+    const scale = total > 0 && tableWidth > total ? tableWidth / total : 1;
+    for (const row of this.rows) {
+      let column = 0;
+      for (const cell of row.cells) {
+        const span = cell.options.columnSpan || 1;
+        const spanned = this.columnWidths.slice(column, column + span);
+        const cellWidth = Math.round(spanned.reduce((sum, columnWidth) => sum + columnWidth, 0) * scale);
+        if (spanned.length === span && cellWidth > 0) cell.setColumnWidth(cellWidth);
+        column += span;
+      }
+    }
+  }
+  /**
+  * Finds the width in twips available to this table from the serialization context:
+  * the parent cell for a nested table, otherwise the text width of the section the
+  * table belongs to (the first section for headers, footers and other parts). Falls
+  * back to the default page when the context carries no document.
+  */
+  resolveAvailableWidth(context) {
+    var _context$file, _stack, _section$AvailableTex;
+    const { stack } = context;
+    const cell = stack[stack.length - 1];
+    const row = stack[stack.length - 2];
+    const parentTable = stack[stack.length - 3];
+    if (cell instanceof TableCell && row instanceof TableRow && parentTable instanceof Table2) {
+      const cellWidth = parentTable.getCellWidth(row, cell);
+      if (cellWidth !== void 0) return cellWidth;
+    }
+    const bodyIndex = stack.findIndex((component) => component instanceof Body2);
+    const documentBody = (_context$file = context.file) === null || _context$file === void 0 || (_context$file = _context$file.Document) === null || _context$file === void 0 ? void 0 : _context$file.View.Body;
+    const section2 = bodyIndex >= 0 ? stack[bodyIndex].getSectionPropertiesFor((_stack = stack[bodyIndex + 1]) !== null && _stack !== void 0 ? _stack : this) : documentBody === null || documentBody === void 0 ? void 0 : documentBody.getSectionPropertiesFor();
+    return (_section$AvailableTex = section2 === null || section2 === void 0 ? void 0 : section2.AvailableTextWidth) !== null && _section$AvailableTex !== void 0 ? _section$AvailableTex : DEFAULT_AVAILABLE_WIDTH;
   }
 };
 var AppPropertiesAttributes = class extends XmlAttributeComponent {
@@ -218156,8 +220576,14 @@ var ContentTypes = class extends XmlComponent {
     this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml", "/word/footnotes.xml"));
     this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml", "/word/endnotes.xml"));
     this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml", "/word/settings.xml"));
-    this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml", "/word/comments.xml"));
     this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml", "/word/fontTable.xml"));
+    this.root.push(createOverride("application/vnd.openxmlformats-officedocument.theme+xml", "/word/theme/theme1.xml"));
+  }
+  /**
+  * Registers the comments part in the content types.
+  */
+  addComments() {
+    this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml", "/word/comments.xml"));
   }
   /**
   * Registers the commentsExtended part in the content types.
@@ -218166,12 +220592,27 @@ var ContentTypes = class extends XmlComponent {
     this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml", "/word/commentsExtended.xml"));
   }
   /**
+  * Registers the commentsIds part in the content types.
+  */
+  addCommentsIds() {
+    this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml", "/word/commentsIds.xml"));
+  }
+  /**
   * Registers a footer part in the content types.
   *
   * @param index - Footer index number (e.g., 1 for footer1.xml)
   */
   addFooter(index2) {
     this.root.push(createOverride("application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml", `/word/footer${index2}.xml`));
+  }
+  /**
+  * Registers a part by its name, such as a chart or an embedded workbook that a drawing adds to the package.
+  *
+  * @param contentType - The part's content type
+  * @param partName - The part's name, from the root of the package, such as "/word/charts/chart1.xml"
+  */
+  addOverride(contentType, partName) {
+    this.root.push(createOverride(contentType, partName));
   }
   /**
   * Registers a header part in the content types.
@@ -218310,387 +220751,38 @@ var CustomProperties = class extends XmlComponent {
     for (const property of properties) this.addCustomProperty(property);
   }
   prepForXml(context) {
-    this.properties.forEach((x) => this.root.push(x));
+    this.root.splice(1, this.root.length - 1, ...this.properties);
     return super.prepForXml(context);
   }
   addCustomProperty(property) {
     this.properties.push(new CustomProperty(this.nextId++, property));
   }
 };
-var createColumns = ({ space, count, separate, equalWidth, children: children2 }) => new BuilderElement({
-  name: "w:cols",
-  attributes: {
-    space: {
-      key: "w:space",
-      value: space === void 0 ? void 0 : twipsMeasureValue(space)
-    },
-    count: {
-      key: "w:num",
-      value: count === void 0 ? void 0 : decimalNumber(count)
-    },
-    separate: {
-      key: "w:sep",
-      value: separate
-    },
-    equalWidth: {
-      key: "w:equalWidth",
-      value: equalWidth
-    }
-  },
-  children: !equalWidth && children2 ? children2 : void 0
-});
-var createDocumentGrid = ({ type, linePitch, charSpace }) => new BuilderElement({
-  name: "w:docGrid",
-  attributes: {
-    type: {
-      key: "w:type",
-      value: type
-    },
-    linePitch: {
-      key: "w:linePitch",
-      value: decimalNumber(linePitch)
-    },
-    charSpace: {
-      key: "w:charSpace",
-      value: charSpace ? decimalNumber(charSpace) : void 0
-    }
-  }
-});
-var HeaderFooterReferenceType = {
-  /** Specifies that this header or footer shall appear on every page in this section which is not overridden with a specific `even` or `first` page header/footer. In a section with all three types specified, this type shall be used on all odd numbered pages (counting from the `first` page in the section, not the section numbering). */
-  DEFAULT: "default",
-  /** Specifies that this header or footer shall appear on the first page in this section. The appearance of this header or footer is contingent on the setting of the `titlePg` element (§2.10.6). */
-  FIRST: "first",
-  /** Specifies that this header or footer shall appear on all even numbered pages in this section (counting from the first page in the section, not the section numbering). The appearance of this header or footer is contingent on the setting of the `evenAndOddHeaders` element (§2.10.1). */
-  EVEN: "even"
-};
-var HeaderFooterType = {
-  HEADER: "w:headerReference",
-  FOOTER: "w:footerReference"
-};
-var createHeaderFooterReference = (type, options) => new BuilderElement({
-  name: type,
-  attributes: {
-    type: {
-      key: "w:type",
-      value: options.type || HeaderFooterReferenceType.DEFAULT
-    },
-    id: {
-      key: "r:id",
-      value: `rId${options.id}`
-    }
-  }
-});
-var createLineNumberType = ({ countBy, start, restart, distance }) => new BuilderElement({
-  name: "w:lnNumType",
-  attributes: {
-    countBy: {
-      key: "w:countBy",
-      value: countBy === void 0 ? void 0 : decimalNumber(countBy)
-    },
-    start: {
-      key: "w:start",
-      value: start === void 0 ? void 0 : decimalNumber(start)
-    },
-    restart: {
-      key: "w:restart",
-      value: restart
-    },
-    distance: {
-      key: "w:distance",
-      value: distance === void 0 ? void 0 : twipsMeasureValue(distance)
-    }
-  }
-});
-var PageBordersAttributes = class extends XmlAttributeComponent {
-  constructor(..._args) {
-    super(..._args);
-    _defineProperty(this, "xmlKeys", {
-      display: "w:display",
-      offsetFrom: "w:offsetFrom",
-      zOrder: "w:zOrder"
-    });
-  }
-};
-var PageBorders = class extends IgnoreIfEmptyXmlComponent {
-  constructor(options) {
-    super("w:pgBorders");
-    if (!options) return this;
-    if (options.pageBorders) this.root.push(new PageBordersAttributes({
-      display: options.pageBorders.display,
-      offsetFrom: options.pageBorders.offsetFrom,
-      zOrder: options.pageBorders.zOrder
-    }));
-    else this.root.push(new PageBordersAttributes({}));
-    if (options.pageBorderTop) this.root.push(createBorderElement("w:top", options.pageBorderTop));
-    if (options.pageBorderLeft) this.root.push(createBorderElement("w:left", options.pageBorderLeft));
-    if (options.pageBorderBottom) this.root.push(createBorderElement("w:bottom", options.pageBorderBottom));
-    if (options.pageBorderRight) this.root.push(createBorderElement("w:right", options.pageBorderRight));
-  }
-};
-var createPageMargin = (top, right, bottom, left, header, footer, gutter) => new BuilderElement({
-  name: "w:pgMar",
-  attributes: {
-    top: {
-      key: "w:top",
-      value: signedTwipsMeasureValue(top)
-    },
-    right: {
-      key: "w:right",
-      value: twipsMeasureValue(right)
-    },
-    bottom: {
-      key: "w:bottom",
-      value: signedTwipsMeasureValue(bottom)
-    },
-    left: {
-      key: "w:left",
-      value: twipsMeasureValue(left)
-    },
-    header: {
-      key: "w:header",
-      value: twipsMeasureValue(header)
-    },
-    footer: {
-      key: "w:footer",
-      value: twipsMeasureValue(footer)
-    },
-    gutter: {
-      key: "w:gutter",
-      value: twipsMeasureValue(gutter)
-    }
-  }
-});
-var createPageNumberType = ({ start, formatType, separator }) => new BuilderElement({
-  name: "w:pgNumType",
-  attributes: {
-    start: {
-      key: "w:start",
-      value: start === void 0 ? void 0 : decimalNumber(start)
-    },
-    formatType: {
-      key: "w:fmt",
-      value: formatType
-    },
-    separator: {
-      key: "w:chapSep",
-      value: separator
-    }
-  }
-});
-var PageOrientation = {
-  /**
-  * ## Portrait Mode
-  *
-  * Specifies that pages in this section shall be printed in portrait mode.
-  */
-  PORTRAIT: "portrait",
-  /**
-  * ## Landscape Mode
-  *
-  * Specifies that pages in this section shall be printed in landscape mode, which prints the page contents with a 90 degree rotation with respect to the normal page orientation.
-  */
-  LANDSCAPE: "landscape"
-};
-var createPageSize = ({ width, height, orientation, code }) => {
-  const widthTwips = twipsMeasureValue(width);
-  const heightTwips = twipsMeasureValue(height);
-  return new BuilderElement({
-    name: "w:pgSz",
-    attributes: {
-      width: {
-        key: "w:w",
-        value: orientation === PageOrientation.LANDSCAPE ? heightTwips : widthTwips
-      },
-      height: {
-        key: "w:h",
-        value: orientation === PageOrientation.LANDSCAPE ? widthTwips : heightTwips
-      },
-      orientation: {
-        key: "w:orient",
-        value: orientation
-      },
-      code: {
-        key: "w:code",
-        value: code
-      }
-    }
-  });
-};
-var PageTextDirectionAttributes = class extends XmlAttributeComponent {
-  constructor(..._args) {
-    super(..._args);
-    _defineProperty(this, "xmlKeys", { val: "w:val" });
-  }
-};
-var PageTextDirection = class extends XmlComponent {
-  constructor(value) {
-    super("w:textDirection");
-    this.root.push(new PageTextDirectionAttributes({ val: value }));
-  }
-};
-var createSectionType = (value) => new BuilderElement({
-  name: "w:type",
-  attributes: { val: {
-    key: "w:val",
-    value
-  } }
-});
-var sectionMarginDefaults = {
-  /** Top margin: 1440 twips (1 inch) */
-  TOP: 1440,
-  /** Right margin: 1440 twips (1 inch) */
-  RIGHT: 1440,
-  /** Bottom margin: 1440 twips (1 inch) */
-  BOTTOM: 1440,
-  /** Left margin: 1440 twips (1 inch) */
-  LEFT: 1440,
-  /** Header margin from top: 708 twips (0.5 inches) */
-  HEADER: 708,
-  /** Footer margin from bottom: 708 twips (0.5 inches) */
-  FOOTER: 708,
-  /** Gutter margin for binding: 0 twips */
-  GUTTER: 0
-};
-var sectionPageSizeDefaults = {
-  /** Page width: 11906 twips (8.27 inches, 210mm) */
-  WIDTH: 11906,
-  /** Page height: 16838 twips (11.69 inches, 297mm) */
-  HEIGHT: 16838,
-  /** Page orientation: portrait */
-  ORIENTATION: PageOrientation.PORTRAIT
-};
-var SectionProperties = class extends XmlComponent {
-  constructor({ page: { size: { width = sectionPageSizeDefaults.WIDTH, height = sectionPageSizeDefaults.HEIGHT, orientation = sectionPageSizeDefaults.ORIENTATION, code } = {}, margin: { top = sectionMarginDefaults.TOP, right = sectionMarginDefaults.RIGHT, bottom = sectionMarginDefaults.BOTTOM, left = sectionMarginDefaults.LEFT, header = sectionMarginDefaults.HEADER, footer = sectionMarginDefaults.FOOTER, gutter = sectionMarginDefaults.GUTTER } = {}, pageNumbers = {}, borders, textDirection } = {}, grid: { linePitch = 360, charSpace, type: gridType } = {}, headerWrapperGroup = {}, footerWrapperGroup = {}, lineNumbers, titlePage, verticalAlign, column, type, revision } = {}) {
-    super("w:sectPr");
-    this.addHeaderFooterGroup(HeaderFooterType.HEADER, headerWrapperGroup);
-    this.addHeaderFooterGroup(HeaderFooterType.FOOTER, footerWrapperGroup);
-    if (type) this.root.push(createSectionType(type));
-    this.root.push(createPageSize({
-      width,
-      height,
-      orientation,
-      code
-    }));
-    this.root.push(createPageMargin(top, right, bottom, left, header, footer, gutter));
-    if (borders) this.root.push(new PageBorders(borders));
-    if (lineNumbers) this.root.push(createLineNumberType(lineNumbers));
-    this.root.push(createPageNumberType(pageNumbers));
-    if (column) this.root.push(createColumns(column));
-    if (verticalAlign) this.root.push(createVerticalAlign(verticalAlign));
-    if (titlePage !== void 0) this.root.push(new OnOffElement("w:titlePg", titlePage));
-    if (textDirection) this.root.push(new PageTextDirection(textDirection));
-    if (revision) this.root.push(new SectionPropertiesChange(revision));
-    this.root.push(createDocumentGrid({
-      linePitch,
-      charSpace,
-      type: gridType
-    }));
-  }
-  addHeaderFooterGroup(type, group) {
-    if (group.default) this.root.push(createHeaderFooterReference(type, {
-      type: HeaderFooterReferenceType.DEFAULT,
-      id: group.default.View.ReferenceId
-    }));
-    if (group.first) this.root.push(createHeaderFooterReference(type, {
-      type: HeaderFooterReferenceType.FIRST,
-      id: group.first.View.ReferenceId
-    }));
-    if (group.even) this.root.push(createHeaderFooterReference(type, {
-      type: HeaderFooterReferenceType.EVEN,
-      id: group.even.View.ReferenceId
-    }));
-  }
-};
-var SectionPropertiesChange = class extends XmlComponent {
-  constructor(options) {
-    super("w:sectPrChange");
-    this.root.push(new ChangeAttributes({
-      id: options.id,
-      author: options.author,
-      date: options.date
-    }));
-    this.root.push(new SectionProperties(options));
-  }
-};
-var Body2 = class extends XmlComponent {
-  constructor() {
-    super("w:body");
-    _defineProperty(this, "sections", []);
-  }
-  /**
-  * Adds new section properties to the document body.
-  *
-  * Creates a new section by moving the previous section's properties into a paragraph
-  * at the end of that section, and then adding the new section as the current section.
-  *
-  * According to the OOXML specification:
-  * - Section properties for all sections except the last must be stored in a paragraph's
-  *   properties (pPr/sectPr) at the end of each section
-  * - The last section's properties are stored as a direct child of the body element (w:body/w:sectPr)
-  *
-  * @param options - Section properties configuration (page size, margins, headers, footers, etc.)
-  */
-  addSection(options) {
-    const currentSection = this.sections.pop();
-    this.root.push(this.createSectionParagraph(currentSection));
-    this.sections.push(new SectionProperties(options));
-  }
-  /**
-  * Prepares the body element for XML serialization.
-  *
-  * Ensures that the last section's properties are placed as a direct child of the body
-  * element, as required by the OOXML specification.
-  *
-  * @param context - The XML serialization context
-  * @returns The prepared XML object or undefined
-  */
-  prepForXml(context) {
-    if (this.sections.length === 1) {
-      this.root.splice(0, 1);
-      this.root.push(this.sections.pop());
-    }
-    return super.prepForXml(context);
-  }
-  /**
-  * Adds a block-level component to the body.
-  *
-  * This method is used internally by the Document class to add paragraphs,
-  * tables, and other block-level elements to the document body.
-  *
-  * @param component - The XML component to add (paragraph, table, etc.)
-  */
-  push(component) {
-    this.root.push(component);
-  }
-  createSectionParagraph(section2) {
-    const paragraph = new Paragraph({});
-    const properties = new ParagraphProperties({});
-    properties.push(section2);
-    paragraph.addChildElement(properties);
-    return paragraph;
-  }
-};
-var DocumentBackgroundAttributes = class extends XmlAttributeComponent {
-  constructor(..._args) {
-    super(..._args);
-    _defineProperty(this, "xmlKeys", {
-      color: "w:color",
-      themeColor: "w:themeColor",
-      themeShade: "w:themeShade",
-      themeTint: "w:themeTint"
-    });
-  }
-};
 var DocumentBackground = class extends XmlComponent {
-  constructor(options) {
+  /**
+  * @throws If a color isn't valid, or `color` is a theme color and `themeColor`, `themeShade` or `themeTint` is given
+  */
+  constructor({ color, themeColor, themeShade, themeTint }) {
     super("w:background");
-    this.root.push(new DocumentBackgroundAttributes({
-      color: options.color === void 0 ? void 0 : hexColorValue(options.color),
-      themeColor: options.themeColor,
-      themeShade: options.themeShade === void 0 ? void 0 : uCharHexNumber(options.themeShade),
-      themeTint: options.themeTint === void 0 ? void 0 : uCharHexNumber(options.themeTint)
-    }));
+    if (typeof color === "object" && (themeColor !== void 0 || themeShade !== void 0 || themeTint !== void 0)) throw new Error("Invalid background. Expected a theme color in color, or themeColor, themeShade and themeTint, not both");
+    this.root.push(new ColorAttributeComponent([
+      {
+        keys: COLOR_ATTRIBUTES,
+        color
+      },
+      {
+        key: "w:themeColor",
+        value: themeColor
+      },
+      {
+        key: "w:themeShade",
+        value: themeShade === void 0 ? void 0 : uCharHexNumber(themeShade)
+      },
+      {
+        key: "w:themeTint",
+        value: themeTint === void 0 ? void 0 : uCharHexNumber(themeTint)
+      }
+    ]));
   }
 };
 var Document = class extends XmlComponent {
@@ -218731,14 +220823,14 @@ var Document = class extends XmlComponent {
       "w16sdtdh",
       "w16se"
     ], "w14 w15 wp14"));
-    this.body = new Body2();
+    this.body = new Body2({ pageNumbers: options.pageNumbers });
     if (options.background) this.root.push(new DocumentBackground(options.background));
     this.root.push(this.body);
   }
   /**
   * Adds a block-level element to the document body.
   *
-  * @param item - The element to add (paragraph, table, table of contents, or hyperlink)
+  * @param item - The element to add (paragraph, table, table of contents, hyperlink, or any other file child)
   * @returns The Document instance for method chaining
   */
   add(item) {
@@ -218792,6 +220884,25 @@ var EndnotesAttributes = class extends XmlAttributeComponent {
     });
   }
 };
+var FirstNoteParagraph = class extends XmlComponent {
+  constructor(paragraph, mark) {
+    super("w:p");
+    _defineProperty(this, "paragraph", void 0);
+    _defineProperty(this, "mark", void 0);
+    this.paragraph = paragraph;
+    this.mark = mark;
+  }
+  prepForXml(context) {
+    const content = this.paragraph.prepForXml(context)["w:p"];
+    const children2 = Array.isArray(content) ? content : [];
+    const index2 = children2.length > 0 && "w:pPr" in children2[0] ? 1 : 0;
+    return { "w:p": [
+      ...children2.slice(0, index2),
+      this.mark.prepForXml(context),
+      ...children2.slice(index2)
+    ] };
+  }
+};
 var EndnoteAttributes = class extends XmlAttributeComponent {
   constructor(..._args) {
     super(..._args);
@@ -218818,11 +220929,7 @@ var Endnote = class extends XmlComponent {
       type: options.type,
       id: options.id
     }));
-    for (let i = 0; i < options.children.length; i++) {
-      const child = options.children[i];
-      if (i === 0) child.addRunToFront(new EndnoteRefRun());
-      this.root.push(child);
-    }
+    for (const [index2, child2] of options.children.entries()) this.root.push(index2 === 0 ? new FirstNoteParagraph(child2, new EndnoteRefRun()) : child2);
   }
 };
 var ContinuationSeperator = class extends XmlComponent {
@@ -218850,6 +220957,8 @@ var SeperatorRun = class extends Run {
 var Endnotes = class extends XmlComponent {
   constructor() {
     super("w:endnotes");
+    _defineProperty(this, "ownNotes", /* @__PURE__ */ new Map());
+    _defineProperty(this, "highestId", 0);
     this.root.push(new EndnotesAttributes({
       wpc: "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas",
       mc: "http://schemas.openxmlformats.org/markup-compatibility/2006",
@@ -218902,6 +221011,36 @@ var Endnotes = class extends XmlComponent {
       children: paragraph
     });
     this.root.push(endnote);
+    if (Number.isFinite(id)) this.highestId = Math.max(this.highestId, Math.floor(id));
+  }
+  /**
+  * The id of the endnote that a reference run brings with it, which is added to the endnotes the first time the run
+  * is written, with an id no other endnote has. Word has endnotes only in a document's body, so a run written
+  * anywhere else, such as in a header, has none, and its endnote isn't added.
+  *
+  * @internal
+  * @param reference - The run, which has the same endnote each time it is written
+  * @param endnote - The endnote's content
+  * @param context - The context the run is written in
+  * @returns The endnote's id, or undefined outside the document's body
+  */
+  idOf(reference, endnote, context) {
+    if (context.viewWrapper !== context.file.Document) return;
+    const existing = this.ownNotes.get(reference);
+    if (existing !== void 0) return existing;
+    const id = this.highestId + 1;
+    this.createEndnote(id, endnote.children);
+    this.ownNotes.set(reference, id);
+    return id;
+  }
+  /**
+  * Formats the endnotes, with the page numbers worked out for their document written into their fields, when the
+  * document's body is written with an estimate of its pages.
+  */
+  prepForXml(context) {
+    const xml = super.prepForXml(context);
+    fillPartPageNumbers(xml, context);
+    return xml;
   }
 };
 var EndnotesWrapper = class {
@@ -218977,6 +221116,15 @@ var Footer$1 = class extends InitializableXmlComponent {
   add(item) {
     this.root.push(item);
   }
+  /**
+  * Formats the footer, with the page numbers worked out for its document written into its fields, when the document's
+  * body is written with an estimate of its pages.
+  */
+  prepForXml(context) {
+    const xml = super.prepForXml(context);
+    fillPartPageNumbers(xml, context, this.refId);
+    return xml;
+  }
 };
 var FooterWrapper = class {
   constructor(media, referenceId, initContent) {
@@ -219036,11 +221184,7 @@ var Footnote = class extends XmlComponent {
       type: options.type,
       id: options.id
     }));
-    for (let i = 0; i < options.children.length; i++) {
-      const child = options.children[i];
-      if (i === 0) child.addRunToFront(new FootnoteRefRun());
-      this.root.push(child);
-    }
+    for (const [index2, child2] of options.children.entries()) this.root.push(index2 === 0 ? new FirstNoteParagraph(child2, new FootnoteRefRun()) : child2);
   }
 };
 var FootnotesAttributes = class extends XmlAttributeComponent {
@@ -219070,6 +221214,8 @@ var FootnotesAttributes = class extends XmlAttributeComponent {
 var FootNotes = class extends XmlComponent {
   constructor() {
     super("w:footnotes");
+    _defineProperty(this, "ownNotes", /* @__PURE__ */ new Map());
+    _defineProperty(this, "highestId", 0);
     this.root.push(new FootnotesAttributes({
       wpc: "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas",
       mc: "http://schemas.openxmlformats.org/markup-compatibility/2006",
@@ -219128,6 +221274,36 @@ var FootNotes = class extends XmlComponent {
       children: paragraph
     });
     this.root.push(footnote);
+    if (Number.isFinite(id)) this.highestId = Math.max(this.highestId, Math.floor(id));
+  }
+  /**
+  * The id of the footnote that a reference run brings with it, which is added to the footnotes the first time the
+  * run is written, with an id no other footnote has. Word has footnotes only in a document's body, so a run written
+  * anywhere else, such as in a header, has none, and its footnote isn't added.
+  *
+  * @internal
+  * @param reference - The run, which has the same footnote each time it is written
+  * @param footnote - The footnote's content
+  * @param context - The context the run is written in
+  * @returns The footnote's id, or undefined outside the document's body
+  */
+  idOf(reference, footnote, context) {
+    if (context.viewWrapper !== context.file.Document) return;
+    const existing = this.ownNotes.get(reference);
+    if (existing !== void 0) return existing;
+    const id = this.highestId + 1;
+    this.createFootNote(id, footnote.children);
+    this.ownNotes.set(reference, id);
+    return id;
+  }
+  /**
+  * Formats the footnotes, with the page numbers worked out for their document written into their fields, when the
+  * document's body is written with an estimate of its pages.
+  */
+  prepForXml(context) {
+    const xml = super.prepForXml(context);
+    fillPartPageNumbers(xml, context);
+    return xml;
   }
 };
 var FootnotesWrapper = class {
@@ -219224,6 +221400,15 @@ var Header$1 = class extends InitializableXmlComponent {
   }
   add(item) {
     this.root.push(item);
+  }
+  /**
+  * Formats the header, with the page numbers worked out for its document written into its fields, when the document's
+  * body is written with an estimate of its pages.
+  */
+  prepForXml(context) {
+    const xml = super.prepForXml(context);
+    fillPartPageNumbers(xml, context, this.refId);
+    return xml;
   }
 };
 var HeaderWrapper = class {
@@ -219408,7 +221593,7 @@ var LevelAttributes = class extends XmlAttributeComponent {
     super(..._args);
     _defineProperty(this, "xmlKeys", {
       ilvl: "w:ilvl",
-      tentative: "w15:tentative"
+      tentative: "w:tentative"
     });
   }
 };
@@ -219424,10 +221609,21 @@ var LevelText = class extends XmlComponent {
     this.root.push(new Attributes2({ val: value }));
   }
 };
+var levelAlignment = (value) => {
+  switch (value) {
+    case AlignmentType.CENTER:
+      return "center";
+    case AlignmentType.END:
+    case AlignmentType.RIGHT:
+      return "right";
+    default:
+      return "left";
+  }
+};
 var LevelJc = class extends XmlComponent {
   constructor(value) {
     super("w:lvlJc");
-    this.root.push(new Attributes2({ val: value }));
+    this.root.push(new Attributes2({ val: levelAlignment(value) }));
   }
 };
 var LevelSuffix = {
@@ -219462,13 +221658,17 @@ var LevelBase = class extends XmlComponent {
     _defineProperty(this, "runProperties", void 0);
     this.root.push(new NumberValueElement("w:start", decimalNumber(start)));
     if (format2) this.root.push(new NumberFormat$1(format2));
-    if (suffix) this.root.push(new Suffix(suffix));
+    if (style === null || style === void 0 ? void 0 : style.style) this.root.push(createParagraphStyle(style.style));
     if (isLegalNumberingStyle) this.root.push(new IsLegalNumberingStyle());
+    if (suffix) this.root.push(new Suffix(suffix));
     if (text) this.root.push(new LevelText(text));
     this.root.push(new LevelJc(alignment));
-    if (style === null || style === void 0 ? void 0 : style.style) this.root.push(createParagraphStyle(style.style));
-    this.paragraphProperties = new ParagraphProperties(style && style.paragraph);
-    this.runProperties = new RunProperties(style && style.run);
+    this.paragraphProperties = new ParagraphProperties(style && style.paragraph, { implicitListParagraphStyle: false });
+    this.runProperties = new RunProperties((style === null || style === void 0 ? void 0 : style.run) && _objectSpread2(_objectSpread2({}, style.run), {}, {
+      highlight: void 0,
+      math: void 0,
+      revision: void 0
+    }));
     this.root.push(this.paragraphProperties);
     this.root.push(this.runProperties);
     if (level > 9) throw new Error("Level cannot be greater than 9. Read more here: https://answers.microsoft.com/en-us/msoffice/forum/all/does-word-support-more-than-9-list-levels/d130fdcd-1781-446d-8c84-c6c79124e4d7");
@@ -219757,8 +221957,7 @@ var Numbering = class extends XmlComponent {
   * @returns The prepared XML object
   */
   prepForXml(context) {
-    for (const numbering of this.abstractNumberingMap.values()) this.root.push(numbering);
-    for (const numbering of this.concreteNumberingMap.values()) this.root.push(numbering);
+    this.root.splice(1, this.root.length - 1, ...this.abstractNumberingMap.values(), ...this.concreteNumberingMap.values());
     return super.prepForXml(context);
   }
   /**
@@ -219770,8 +221969,15 @@ var Numbering = class extends XmlComponent {
   *
   * @param reference - The reference name of the abstract numbering definition
   * @param instance - The instance number for this concrete numbering
+  * @param definition - The list's definition, for a list a paragraph gives its own definition of. It is added with
+  * its reference, unless the numbering already has a list with that reference, such as one of the document's
+  * `numbering` option, which is kept
   */
-  createConcreteNumberingInstance(reference, instance) {
+  createConcreteNumberingInstance(reference, instance, definition) {
+    if (definition && !this.abstractNumberingMap.has(definition.reference)) {
+      this.abstractNumberingMap.set(definition.reference, new AbstractNumbering(this.abstractNumUniqueNumericId(), definition.levels));
+      this.referenceConfigMap.set(definition.reference, definition.levels);
+    }
     const abstractNumbering = this.abstractNumberingMap.get(reference);
     if (!abstractNumbering) return;
     const fullReference = `${reference}-${instance}`;
@@ -219810,6 +222016,69 @@ var Numbering = class extends XmlComponent {
     return Array.from(this.referenceConfigMap.values());
   }
 };
+var PackageParts = class {
+  /**
+  * @param contentTypes - Where each part's content type is added
+  * @param existingPaths - The paths under word/ of the parts the package already has, such as a template's charts,
+  * which new parts don't take
+  */
+  constructor(contentTypes, existingPaths = /* @__PURE__ */ new Set()) {
+    _defineProperty(this, "contentTypes", void 0);
+    _defineProperty(this, "existingPaths", void 0);
+    _defineProperty(this, "paths", /* @__PURE__ */ new Map());
+    _defineProperty(this, "folders", /* @__PURE__ */ new WeakMap());
+    this.contentTypes = contentTypes;
+    this.existingPaths = existingPaths;
+  }
+  /**
+  * Adds a part, and its content type, once.
+  *
+  * @returns The part's path under word/, such as "charts/chart1.xml"
+  */
+  add(part) {
+    const added = this.paths.get(part);
+    if (added !== void 0) return added;
+    const { folder, name, extension, contentType } = part.options;
+    const taken = /* @__PURE__ */ new Set([...this.existingPaths, ...this.paths.values()]);
+    let index2 = 1;
+    while (taken.has(`${folder}/${name}${index2}.${extension}`)) index2++;
+    const path = `${folder}/${name}${index2}.${extension}`;
+    this.paths.set(part, path);
+    this.contentTypes.addOverride(contentType, `/word/${path}`);
+    return path;
+  }
+  /**
+  * Each part added, with its path under word/, in the order they were added.
+  */
+  get Array() {
+    return [...this.paths].map(([part, path]) => ({
+      part,
+      path
+    }));
+  }
+  /**
+  * Creates the relationships of a part whose XML is being written, so the parts its XML refers to are found from its
+  * folder.
+  *
+  * @param path - The part's path under word/
+  */
+  createRelationships(path) {
+    const relationships = new Relationships();
+    this.folders.set(relationships, path.slice(0, path.indexOf("/")));
+    return relationships;
+  }
+  /**
+  * The target of a relationship to a part, relative to the part the relationships are from. The document, headers,
+  * footers, footnotes, endnotes and comments are all in word/.
+  *
+  * @param path - The part's path under word/
+  */
+  getTarget(relationships, path) {
+    const from = this.folders.get(relationships);
+    if (from === void 0) return path;
+    return path.startsWith(`${from}/`) ? path.slice(from.length + 1) : `../${path}`;
+  }
+};
 var createCompatibilitySetting = (version2) => new BuilderElement({
   name: "w:compatSetting",
   attributes: {
@@ -219830,7 +222099,6 @@ var createCompatibilitySetting = (version2) => new BuilderElement({
 var Compatibility = class extends XmlComponent {
   constructor(options) {
     super("w:compat");
-    if (options.version) this.root.push(createCompatibilitySetting(options.version));
     if (options.useSingleBorderforContiguousCells) this.root.push(new OnOffElement("w:useSingleBorderforContiguousCells", options.useSingleBorderforContiguousCells));
     if (options.wordPerfectJustification) this.root.push(new OnOffElement("w:wpJustification", options.wordPerfectJustification));
     if (options.noTabStopForHangingIndent) this.root.push(new OnOffElement("w:noTabHangInd", options.noTabStopForHangingIndent));
@@ -219896,6 +222164,7 @@ var Compatibility = class extends XmlComponent {
     if (options.ignoreVerticalAlignmentInTextboxes) this.root.push(new OnOffElement("w:doNotVertAlignInTxbx", options.ignoreVerticalAlignmentInTextboxes));
     if (options.useAnsiKerningPairs) this.root.push(new OnOffElement("w:useAnsiKerningPairs", options.useAnsiKerningPairs));
     if (options.cachedColumnBalance) this.root.push(new OnOffElement("w:cachedColBalance", options.cachedColumnBalance));
+    if (options.version) this.root.push(createCompatibilitySetting(options.version));
   }
 };
 var SettingsAttributes = class extends XmlAttributeComponent {
@@ -219946,14 +222215,15 @@ var Settings = class extends XmlComponent {
       Ignorable: "w14 w15 wp14"
     }));
     this.root.push(new OnOffElement("w:displayBackgroundShape", true));
+    if (options.embedFonts !== void 0) this.root.push(new OnOffElement("w:embedTrueTypeFonts", options.embedFonts));
     if (options.trackRevisions !== void 0) this.root.push(new OnOffElement("w:trackRevisions", options.trackRevisions));
-    if (options.evenAndOddHeaders !== void 0) this.root.push(new OnOffElement("w:evenAndOddHeaders", options.evenAndOddHeaders));
-    if (options.updateFields !== void 0) this.root.push(new OnOffElement("w:updateFields", options.updateFields));
     if (options.defaultTabStop !== void 0) this.root.push(new NumberValueElement("w:defaultTabStop", options.defaultTabStop));
     if (((_options$hyphenation = options.hyphenation) === null || _options$hyphenation === void 0 ? void 0 : _options$hyphenation.autoHyphenation) !== void 0) this.root.push(new OnOffElement("w:autoHyphenation", options.hyphenation.autoHyphenation));
-    if (((_options$hyphenation2 = options.hyphenation) === null || _options$hyphenation2 === void 0 ? void 0 : _options$hyphenation2.hyphenationZone) !== void 0) this.root.push(new NumberValueElement("w:hyphenationZone", options.hyphenation.hyphenationZone));
-    if (((_options$hyphenation3 = options.hyphenation) === null || _options$hyphenation3 === void 0 ? void 0 : _options$hyphenation3.consecutiveHyphenLimit) !== void 0) this.root.push(new NumberValueElement("w:consecutiveHyphenLimit", options.hyphenation.consecutiveHyphenLimit));
+    if (((_options$hyphenation2 = options.hyphenation) === null || _options$hyphenation2 === void 0 ? void 0 : _options$hyphenation2.consecutiveHyphenLimit) !== void 0) this.root.push(new NumberValueElement("w:consecutiveHyphenLimit", options.hyphenation.consecutiveHyphenLimit));
+    if (((_options$hyphenation3 = options.hyphenation) === null || _options$hyphenation3 === void 0 ? void 0 : _options$hyphenation3.hyphenationZone) !== void 0) this.root.push(new NumberValueElement("w:hyphenationZone", options.hyphenation.hyphenationZone));
     if (((_options$hyphenation4 = options.hyphenation) === null || _options$hyphenation4 === void 0 ? void 0 : _options$hyphenation4.doNotHyphenateCaps) !== void 0) this.root.push(new OnOffElement("w:doNotHyphenateCaps", options.hyphenation.doNotHyphenateCaps));
+    if (options.evenAndOddHeaders !== void 0) this.root.push(new OnOffElement("w:evenAndOddHeaders", options.evenAndOddHeaders));
+    if (options.updateFields !== void 0) this.root.push(new OnOffElement("w:updateFields", options.updateFields));
     this.root.push(new Compatibility(_objectSpread2(_objectSpread2({}, (_options$compatibilit = options.compatibility) !== null && _options$compatibilit !== void 0 ? _options$compatibilit : {}), {}, { version: (_ref = (_options$compatibilit2 = (_options$compatibilit3 = options.compatibility) === null || _options$compatibilit3 === void 0 ? void 0 : _options$compatibilit3.version) !== null && _options$compatibilit2 !== void 0 ? _options$compatibilit2 : options.compatibilityModeVersion) !== null && _ref !== void 0 ? _ref : 15 })));
   }
 };
@@ -220008,7 +222278,7 @@ var StyleForParagraph = class extends Style {
     }, options);
     _defineProperty(this, "paragraphProperties", void 0);
     _defineProperty(this, "runProperties", void 0);
-    this.paragraphProperties = new ParagraphProperties(options.paragraph);
+    this.paragraphProperties = new ParagraphProperties(options.paragraph, { implicitListParagraphStyle: false });
     this.runProperties = new RunProperties(options.run);
     this.root.push(this.paragraphProperties);
     this.root.push(this.runProperties);
@@ -220208,6 +222478,51 @@ var HyperlinkStyle = class extends StyleForCharacter {
     }, options));
   }
 };
+var NormalTableStyle = class extends Style {
+  constructor() {
+    super({
+      type: "table",
+      styleId: "TableNormal",
+      default: true
+    }, {
+      name: "Normal Table",
+      uiPriority: 99,
+      semiHidden: true,
+      unhideWhenUsed: true
+    });
+    this.root.push(new TableProperties({
+      indent: {
+        size: 0,
+        type: WidthType.DXA
+      },
+      cellMargin: {
+        top: 0,
+        left: 108,
+        bottom: 0,
+        right: 108
+      }
+    }));
+  }
+};
+var nameOf$1 = (child2) => typeof child2 === "object" ? Object.keys(child2)[0] : void 0;
+var attributesOf = (style) => {
+  var _flat$find;
+  return (_flat$find = [style["w:style"]].flat().find((part) => part._attr)) === null || _flat$find === void 0 ? void 0 : _flat$find._attr;
+};
+var styleIdOf = (style) => {
+  var _attributesOf;
+  return (_attributesOf = attributesOf(style)) === null || _attributesOf === void 0 ? void 0 : _attributesOf["w:styleId"];
+};
+var isDefaultParagraphStyle = (style) => {
+  var _attributes$wType;
+  const attributes = attributesOf(style);
+  return ((_attributes$wType = attributes === null || attributes === void 0 ? void 0 : attributes["w:type"]) !== null && _attributes$wType !== void 0 ? _attributes$wType : "paragraph") === "paragraph" && (attributes === null || attributes === void 0 ? void 0 : attributes["w:default"]) !== void 0 && ![
+    "0",
+    "false",
+    "off"
+  ].includes(String(attributes["w:default"]));
+};
+var markedAsDefault = (style) => ({ "w:style": [style["w:style"]].flat().map((part) => part._attr ? { _attr: _objectSpread2(_objectSpread2({}, part._attr), {}, { "w:default": "1" }) } : part) });
 var Styles = class extends XmlComponent {
   constructor(options) {
     super("w:styles");
@@ -220216,11 +222531,40 @@ var Styles = class extends XmlComponent {
     if (options.paragraphStyles) for (const style of options.paragraphStyles) this.root.push(new StyleForParagraph(style));
     if (options.characterStyles) for (const style of options.characterStyles) this.root.push(new StyleForCharacter(style));
   }
+  /**
+  * Writes the styles in the schema's order: the document defaults, the latent styles, then the styles. A style id
+  * can only be used once, so a style replaces an earlier one with its id. That way external styles replace docx's
+  * default styles, and paragraph and character styles replace the default and imported ones. Of several document
+  * defaults, or several latent styles, the last is kept. Normal is marked as the default paragraph style when no
+  * style is.
+  */
+  prepForXml(context) {
+    const xml = super.prepForXml(context);
+    const children2 = xml["w:styles"];
+    if (!Array.isArray(children2)) return xml;
+    const named = (name) => children2.filter((child2) => nameOf$1(child2) === name);
+    const ids = children2.map((child2) => nameOf$1(child2) === "w:style" ? styleIdOf(child2) : void 0);
+    const kept = children2.filter((child2, index2) => ![
+      "_attr",
+      "w:docDefaults",
+      "w:latentStyles"
+    ].includes(nameOf$1(child2)) && (ids[index2] === void 0 || ids.lastIndexOf(ids[index2]) === index2));
+    const styles = kept.some((child2) => nameOf$1(child2) === "w:style" && isDefaultParagraphStyle(child2)) ? kept : kept.map((child2) => {
+      var _attributesOf$wType, _attributesOf2;
+      return nameOf$1(child2) === "w:style" && styleIdOf(child2) === "Normal" && ((_attributesOf$wType = (_attributesOf2 = attributesOf(child2)) === null || _attributesOf2 === void 0 ? void 0 : _attributesOf2["w:type"]) !== null && _attributesOf$wType !== void 0 ? _attributesOf$wType : "paragraph") === "paragraph" ? markedAsDefault(child2) : child2;
+    });
+    return { "w:styles": [
+      ...named("_attr"),
+      ...named("w:docDefaults").slice(-1),
+      ...named("w:latentStyles").slice(-1),
+      ...styles
+    ] };
+  }
 };
 var ParagraphPropertiesDefaults = class extends XmlComponent {
   constructor(options) {
     super("w:pPrDefault");
-    this.root.push(new ParagraphProperties(options));
+    this.root.push(new ParagraphProperties(options, { implicitListParagraphStyle: false }));
   }
 };
 var RunPropertiesDefaults = class extends XmlComponent {
@@ -220278,9 +222622,48 @@ var ExternalStylesFactory = class {
     };
   }
 };
+var createDefaultStyles = (options = {}) => {
+  var _options$document;
+  return {
+    normal: new StyleForParagraph({
+      id: "Normal",
+      name: "Normal",
+      quickFormat: true
+    }),
+    normalTable: new NormalTableStyle(),
+    document: new DocumentDefaults((_options$document = options.document) !== null && _options$document !== void 0 ? _options$document : {}),
+    title: new TitleStyle(_objectSpread2({ run: { size: 56 } }, options.title)),
+    heading1: new Heading1Style(_objectSpread2({ run: {
+      color: "2E74B5",
+      size: 32
+    } }, options.heading1)),
+    heading2: new Heading2Style(_objectSpread2({ run: {
+      color: "2E74B5",
+      size: 26
+    } }, options.heading2)),
+    heading3: new Heading3Style(_objectSpread2({ run: {
+      color: "1F4D78",
+      size: 24
+    } }, options.heading3)),
+    heading4: new Heading4Style(_objectSpread2({ run: {
+      color: "2E74B5",
+      italics: true
+    } }, options.heading4)),
+    heading5: new Heading5Style(_objectSpread2({ run: { color: "2E74B5" } }, options.heading5)),
+    heading6: new Heading6Style(_objectSpread2({ run: { color: "1F4D78" } }, options.heading6)),
+    strong: new StrongStyle(_objectSpread2({ run: { bold: true } }, options.strong)),
+    listParagraph: new ListParagraph(options.listParagraph || {}),
+    hyperlink: new HyperlinkStyle(options.hyperlink || {}),
+    footnoteReference: new FootnoteReferenceStyle(options.footnoteReference || {}),
+    footnoteText: new FootnoteText(options.footnoteText || {}),
+    footnoteTextChar: new FootnoteTextChar(options.footnoteTextChar || {}),
+    endnoteReference: new EndnoteReferenceStyle(options.endnoteReference || {}),
+    endnoteText: new EndnoteText(options.endnoteText || {}),
+    endnoteTextChar: new EndnoteTextChar(options.endnoteTextChar || {})
+  };
+};
 var DefaultStylesFactory = class {
   newInstance(options = {}) {
-    var _options$document;
     return {
       initialStyles: new DocumentAttributes([
         "mc",
@@ -220289,43 +222672,405 @@ var DefaultStylesFactory = class {
         "w14",
         "w15"
       ], "w14 w15"),
-      importedStyles: [
-        new DocumentDefaults((_options$document = options.document) !== null && _options$document !== void 0 ? _options$document : {}),
-        new TitleStyle(_objectSpread2({ run: { size: 56 } }, options.title)),
-        new Heading1Style(_objectSpread2({ run: {
-          color: "2E74B5",
-          size: 32
-        } }, options.heading1)),
-        new Heading2Style(_objectSpread2({ run: {
-          color: "2E74B5",
-          size: 26
-        } }, options.heading2)),
-        new Heading3Style(_objectSpread2({ run: {
-          color: "1F4D78",
-          size: 24
-        } }, options.heading3)),
-        new Heading4Style(_objectSpread2({ run: {
-          color: "2E74B5",
-          italics: true
-        } }, options.heading4)),
-        new Heading5Style(_objectSpread2({ run: { color: "2E74B5" } }, options.heading5)),
-        new Heading6Style(_objectSpread2({ run: { color: "1F4D78" } }, options.heading6)),
-        new StrongStyle(_objectSpread2({ run: { bold: true } }, options.strong)),
-        new ListParagraph(options.listParagraph || {}),
-        new HyperlinkStyle(options.hyperlink || {}),
-        new FootnoteReferenceStyle(options.footnoteReference || {}),
-        new FootnoteText(options.footnoteText || {}),
-        new FootnoteTextChar(options.footnoteTextChar || {}),
-        new EndnoteReferenceStyle(options.endnoteReference || {}),
-        new EndnoteText(options.endnoteText || {}),
-        new EndnoteTextChar(options.endnoteTextChar || {})
-      ]
+      importedStyles: Object.values(createDefaultStyles(options))
     };
+  }
+};
+var OFFICE_FONTS = {
+  headings: {
+    latin: "Calibri Light",
+    panose: "020F0302020204030204"
+  },
+  body: {
+    latin: "Calibri",
+    panose: "020F0502020204030204"
+  }
+};
+var OFFICE_SCRIPT_FONTS = [
+  [
+    "Jpan",
+    "\u6E38\u30B4\u30B7\u30C3\u30AF Light",
+    "\u6E38\u660E\u671D"
+  ],
+  ["Hang", "\uB9D1\uC740 \uACE0\uB515"],
+  [
+    "Hans",
+    "\u7B49\u7EBF Light",
+    "\u7B49\u7EBF"
+  ],
+  ["Hant", "\u65B0\u7D30\u660E\u9AD4"],
+  [
+    "Arab",
+    "Times New Roman",
+    "Arial"
+  ],
+  [
+    "Hebr",
+    "Times New Roman",
+    "Arial"
+  ],
+  [
+    "Thai",
+    "Angsana New",
+    "Cordia New"
+  ],
+  ["Ethi", "Nyala"],
+  ["Beng", "Vrinda"],
+  ["Gujr", "Shruti"],
+  [
+    "Khmr",
+    "MoolBoran",
+    "DaunPenh"
+  ],
+  ["Knda", "Tunga"],
+  ["Guru", "Raavi"],
+  ["Cans", "Euphemia"],
+  ["Cher", "Plantagenet Cherokee"],
+  ["Yiii", "Microsoft Yi Baiti"],
+  ["Tibt", "Microsoft Himalaya"],
+  ["Thaa", "MV Boli"],
+  ["Deva", "Mangal"],
+  ["Telu", "Gautami"],
+  ["Taml", "Latha"],
+  ["Syrc", "Estrangelo Edessa"],
+  ["Orya", "Kalinga"],
+  ["Mlym", "Kartika"],
+  ["Laoo", "DokChampa"],
+  ["Sinh", "Iskoola Pota"],
+  ["Mong", "Mongolian Baiti"],
+  [
+    "Viet",
+    "Times New Roman",
+    "Arial"
+  ],
+  ["Uigh", "Microsoft Uighur"],
+  ["Geor", "Sylfaen"],
+  ["Armn", "Arial"],
+  ["Bugi", "Leelawadee UI"],
+  ["Bopo", "Microsoft JhengHei"],
+  ["Java", "Javanese Text"],
+  ["Lisu", "Segoe UI"],
+  ["Mymr", "Myanmar Text"],
+  ["Nkoo", "Ebrima"],
+  ["Olck", "Nirmala UI"],
+  ["Osma", "Ebrima"],
+  ["Phag", "Phagspa"],
+  ["Syrn", "Estrangelo Edessa"],
+  ["Syrj", "Estrangelo Edessa"],
+  ["Syre", "Estrangelo Edessa"],
+  ["Sora", "Nirmala UI"],
+  ["Tale", "Microsoft Tai Le"],
+  ["Talu", "Microsoft New Tai Lue"],
+  ["Tfng", "Ebrima"]
+];
+var createTextFont = (name, typeface, panose) => new BuilderElement({
+  name,
+  attributes: {
+    typeface: {
+      key: "typeface",
+      value: typeface
+    },
+    panose: {
+      key: "panose",
+      value: panose
+    }
+  }
+});
+var themeLatinFont = (use, fonts) => {
+  const font = fonts[use];
+  const latin = typeof font === "string" ? font : font === null || font === void 0 ? void 0 : font.latin;
+  return latin !== null && latin !== void 0 ? latin : OFFICE_FONTS[use].latin;
+};
+var createFontCollection = (use, fonts) => {
+  const font = fonts[use];
+  const { eastAsia = "", complexScript = "" } = typeof font === "object" ? font : {};
+  const latin = themeLatinFont(use, fonts);
+  const office = OFFICE_FONTS[use];
+  return new BuilderElement({
+    name: use === "headings" ? "a:majorFont" : "a:minorFont",
+    children: [
+      createTextFont("a:latin", latin, latin === office.latin ? office.panose : void 0),
+      createTextFont("a:ea", eastAsia),
+      createTextFont("a:cs", complexScript),
+      ...OFFICE_SCRIPT_FONTS.map(([script, headings, body = headings]) => new BuilderElement({
+        name: "a:font",
+        attributes: {
+          script: {
+            key: "script",
+            value: script
+          },
+          typeface: {
+            key: "typeface",
+            value: use === "headings" ? headings : body
+          }
+        }
+      }))
+    ]
+  });
+};
+var createFontScheme = (name, fonts = {}) => new BuilderElement({
+  name: "a:fontScheme",
+  attributes: { name: {
+    key: "name",
+    value: name
+  } },
+  children: [createFontCollection("headings", fonts), createFontCollection("body", fonts)]
+});
+var createStyleColor = (changes = []) => new BuilderElement({
+  name: "a:schemeClr",
+  attributes: { value: {
+    key: "val",
+    value: "phClr"
+  } },
+  children: changes.map(([name, value]) => new BuilderElement({
+    name: `a:${name}`,
+    attributes: { value: {
+      key: "val",
+      value
+    } }
+  }))
+});
+var createSolidFill = (changes) => new BuilderElement({
+  name: "a:solidFill",
+  children: [createStyleColor(changes)]
+});
+var createGradientFill = (stops) => new BuilderElement({
+  name: "a:gradFill",
+  attributes: { rotateWithShape: {
+    key: "rotWithShape",
+    value: true
+  } },
+  children: [new BuilderElement({
+    name: "a:gsLst",
+    children: stops.map((changes, index2) => new BuilderElement({
+      name: "a:gs",
+      attributes: { position: {
+        key: "pos",
+        value: index2 * 5e4
+      } },
+      children: [createStyleColor(changes)]
+    }))
+  }), new BuilderElement({
+    name: "a:lin",
+    attributes: {
+      angle: {
+        key: "ang",
+        value: 54e5
+      },
+      scaled: {
+        key: "scaled",
+        value: false
+      }
+    }
+  })]
+});
+var createLine2 = (width) => new BuilderElement({
+  name: "a:ln",
+  attributes: {
+    width: {
+      key: "w",
+      value: width
+    },
+    cap: {
+      key: "cap",
+      value: "flat"
+    },
+    compound: {
+      key: "cmpd",
+      value: "sng"
+    },
+    alignment: {
+      key: "algn",
+      value: "ctr"
+    }
+  },
+  children: [
+    createSolidFill(),
+    new BuilderElement({
+      name: "a:prstDash",
+      attributes: { value: {
+        key: "val",
+        value: "solid"
+      } }
+    }),
+    new BuilderElement({
+      name: "a:miter",
+      attributes: { limit: {
+        key: "lim",
+        value: 8e5
+      } }
+    })
+  ]
+});
+var createEffectStyle = (effects) => new BuilderElement({
+  name: "a:effectStyle",
+  children: [new BuilderElement({
+    name: "a:effectLst",
+    children: effects
+  })]
+});
+var createShadow = () => new BuilderElement({
+  name: "a:outerShdw",
+  attributes: {
+    blurRadius: {
+      key: "blurRad",
+      value: 57150
+    },
+    distance: {
+      key: "dist",
+      value: 19050
+    },
+    direction: {
+      key: "dir",
+      value: 54e5
+    },
+    alignment: {
+      key: "algn",
+      value: "ctr"
+    },
+    rotateWithShape: {
+      key: "rotWithShape",
+      value: false
+    }
+  },
+  children: [new BuilderElement({
+    name: "a:srgbClr",
+    attributes: { value: {
+      key: "val",
+      value: "000000"
+    } },
+    children: [new BuilderElement({
+      name: "a:alpha",
+      attributes: { value: {
+        key: "val",
+        value: 63e3
+      } }
+    })]
+  })]
+});
+var createFormatScheme = () => new BuilderElement({
+  name: "a:fmtScheme",
+  attributes: { name: {
+    key: "name",
+    value: "Office"
+  } },
+  children: [
+    new BuilderElement({
+      name: "a:fillStyleLst",
+      children: [
+        createSolidFill(),
+        createGradientFill([
+          [
+            ["lumMod", 11e4],
+            ["satMod", 105e3],
+            ["tint", 67e3]
+          ],
+          [
+            ["lumMod", 105e3],
+            ["satMod", 103e3],
+            ["tint", 73e3]
+          ],
+          [
+            ["lumMod", 105e3],
+            ["satMod", 109e3],
+            ["tint", 81e3]
+          ]
+        ]),
+        createGradientFill([
+          [
+            ["satMod", 103e3],
+            ["lumMod", 102e3],
+            ["tint", 94e3]
+          ],
+          [
+            ["satMod", 11e4],
+            ["lumMod", 1e5],
+            ["shade", 1e5]
+          ],
+          [
+            ["lumMod", 99e3],
+            ["satMod", 12e4],
+            ["shade", 78e3]
+          ]
+        ])
+      ]
+    }),
+    new BuilderElement({
+      name: "a:lnStyleLst",
+      children: [
+        createLine2(6350),
+        createLine2(12700),
+        createLine2(19050)
+      ]
+    }),
+    new BuilderElement({
+      name: "a:effectStyleLst",
+      children: [
+        createEffectStyle([]),
+        createEffectStyle([]),
+        createEffectStyle([createShadow()])
+      ]
+    }),
+    new BuilderElement({
+      name: "a:bgFillStyleLst",
+      children: [
+        createSolidFill(),
+        createSolidFill([["tint", 95e3], ["satMod", 17e4]]),
+        createGradientFill([
+          [
+            ["tint", 93e3],
+            ["satMod", 15e4],
+            ["shade", 98e3],
+            ["lumMod", 102e3]
+          ],
+          [
+            ["tint", 98e3],
+            ["satMod", 13e4],
+            ["shade", 9e4],
+            ["lumMod", 103e3]
+          ],
+          [["shade", 63e3], ["satMod", 12e4]]
+        ])
+      ]
+    })
+  ]
+});
+var Theme = class extends XmlComponent {
+  constructor({ name = "Office Theme", colors, fonts } = {}) {
+    super("a:theme");
+    _defineProperty(this, "colors", void 0);
+    this.colors = themeColorValues(colors);
+    this.root.push(new NextAttributeComponent({
+      namespace: {
+        key: "xmlns:a",
+        value: "http://schemas.openxmlformats.org/drawingml/2006/main"
+      },
+      name: {
+        key: "name",
+        value: name
+      }
+    }));
+    this.root.push(new BuilderElement({
+      name: "a:themeElements",
+      children: [
+        createColorScheme(colors ? name : "Office", colors),
+        createFontScheme(fonts ? name : "Office", fonts),
+        createFormatScheme()
+      ]
+    }));
+    this.root.push(new BuilderElement({ name: "a:objectDefaults" }));
+    this.root.push(new BuilderElement({ name: "a:extraClrSchemeLst" }));
+  }
+  /**
+  * The hex color of each of the theme's colors. The system's window text and window colors are black and white.
+  */
+  get Colors() {
+    return this.colors;
   }
 };
 var File2 = class {
   constructor(options) {
-    var _options$creator, _options$revision, _options$lastModified, _options$comments, _options$customProper, _options$features, _options$features2, _options$hyphenation, _options$hyphenation2, _options$hyphenation3, _options$hyphenation4, _options$fonts;
+    var _options$creator, _options$revision, _options$lastModified, _options$comments, _options$customProper, _options$features, _options$features2, _options$fonts, _options$hyphenation, _options$hyphenation2, _options$hyphenation3, _options$hyphenation4, _options$fonts2;
     _defineProperty(this, "currentRelationshipId", 1);
     _defineProperty(this, "documentWrapper", void 0);
     _defineProperty(this, "headers", []);
@@ -220348,7 +223093,15 @@ var File2 = class {
       "commentsExtended",
       void 0
     );
+    _defineProperty(
+      this,
+      /** Durable comment id mapping (word/commentsIds.xml). */
+      "commentsIds",
+      void 0
+    );
     _defineProperty(this, "fontWrapper", void 0);
+    _defineProperty(this, "theme", void 0);
+    _defineProperty(this, "packageParts", void 0);
     this.coreProperties = new CoreProperties(_objectSpread2(_objectSpread2({}, options), {}, {
       creator: (_options$creator = options.creator) !== null && _options$creator !== void 0 ? _options$creator : "Un-named",
       revision: (_options$revision = options.revision) !== null && _options$revision !== void 0 ? _options$revision : 1,
@@ -220357,19 +223110,25 @@ var File2 = class {
     this.numbering = new Numbering(options.numbering ? options.numbering : { config: [] });
     this.comments = new Comments((_options$comments = options.comments) !== null && _options$comments !== void 0 ? _options$comments : { children: [] });
     if (this.comments.ThreadData) this.commentsExtended = new CommentsExtended(this.comments.ThreadData);
+    if (this.comments.CommentIdsData) this.commentsIds = new CommentsIds(this.comments.CommentIdsData);
     this.fileRelationships = new Relationships();
     this.customProperties = new CustomProperties((_options$customProper = options.customProperties) !== null && _options$customProper !== void 0 ? _options$customProper : []);
     this.appProperties = new AppProperties();
     this.footnotesWrapper = new FootnotesWrapper();
     this.endnotesWrapper = new EndnotesWrapper();
     this.contentTypes = new ContentTypes();
-    this.documentWrapper = new DocumentWrapper({ background: options.background });
+    this.packageParts = new PackageParts(this.contentTypes);
+    this.documentWrapper = new DocumentWrapper({
+      background: options.background,
+      pageNumbers: options.pageNumbers
+    });
     this.settings = new Settings({
       compatibilityModeVersion: options.compatabilityModeVersion,
       compatibility: options.compatibility,
       evenAndOddHeaders: options.evenAndOddHeaderAndFooters ? true : false,
       trackRevisions: (_options$features = options.features) === null || _options$features === void 0 ? void 0 : _options$features.trackRevisions,
       updateFields: (_options$features2 = options.features) === null || _options$features2 === void 0 ? void 0 : _options$features2.updateFields,
+      embedFonts: ((_options$fonts = options.fonts) === null || _options$fonts === void 0 ? void 0 : _options$fonts.length) ? true : void 0,
       defaultTabStop: options.defaultTabStop,
       hyphenation: {
         autoHyphenation: (_options$hyphenation = options.hyphenation) === null || _options$hyphenation === void 0 ? void 0 : _options$hyphenation.autoHyphenation,
@@ -220380,10 +223139,20 @@ var File2 = class {
     });
     this.media = new Media();
     if (options.externalStyles !== void 0) {
-      var _options$styles;
-      const defaultStyles = new DefaultStylesFactory().newInstance((_options$styles = options.styles) === null || _options$styles === void 0 ? void 0 : _options$styles.default);
+      var _options$styles$defau, _options$styles, _options$styles2, _options$styles3;
+      const given = (_options$styles$defau = (_options$styles = options.styles) === null || _options$styles === void 0 ? void 0 : _options$styles.default) !== null && _options$styles$defau !== void 0 ? _options$styles$defau : {};
+      const defaultStyles = Object.entries(createDefaultStyles(given));
+      const isGiven = ([key]) => given[key] !== void 0;
       const externalStyles = new ExternalStylesFactory().newInstance(options.externalStyles);
-      this.styles = new Styles(_objectSpread2(_objectSpread2({}, externalStyles), {}, { importedStyles: [...defaultStyles.importedStyles, ...externalStyles.importedStyles] }));
+      this.styles = new Styles(_objectSpread2(_objectSpread2({}, externalStyles), {}, {
+        paragraphStyles: (_options$styles2 = options.styles) === null || _options$styles2 === void 0 ? void 0 : _options$styles2.paragraphStyles,
+        characterStyles: (_options$styles3 = options.styles) === null || _options$styles3 === void 0 ? void 0 : _options$styles3.characterStyles,
+        importedStyles: [
+          ...defaultStyles.filter((entry) => !isGiven(entry)).map(([, style]) => style),
+          ...externalStyles.importedStyles,
+          ...defaultStyles.filter(isGiven).map(([, style]) => style)
+        ]
+      }));
     } else if (options.styles) {
       const defaultStyles = new DefaultStylesFactory().newInstance(options.styles.default);
       this.styles = new Styles(_objectSpread2(_objectSpread2({}, defaultStyles), options.styles));
@@ -220395,7 +223164,9 @@ var File2 = class {
     for (const section2 of options.sections) this.addSection(section2);
     if (options.footnotes) for (const key in options.footnotes) this.footnotesWrapper.View.createFootNote(parseFloat(key), options.footnotes[key].children);
     if (options.endnotes) for (const key in options.endnotes) this.endnotesWrapper.View.createEndnote(parseFloat(key), options.endnotes[key].children);
-    this.fontWrapper = new FontWrapper((_options$fonts = options.fonts) !== null && _options$fonts !== void 0 ? _options$fonts : []);
+    this.fontWrapper = new FontWrapper((_options$fonts2 = options.fonts) !== null && _options$fonts2 !== void 0 ? _options$fonts2 : []);
+    this.theme = new Theme(options.theme);
+    this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme", "theme/theme1.xml");
   }
   addSection({ headers = {}, footers = {}, children: children2, properties }) {
     this.documentWrapper.View.Body.addSection(_objectSpread2(_objectSpread2({}, properties), {}, {
@@ -220410,17 +223181,17 @@ var File2 = class {
         even: footers.even ? this.createFooter(footers.even) : void 0
       }
     }));
-    for (const child of children2) this.documentWrapper.View.add(child);
+    for (const child2 of children2) this.documentWrapper.View.add(child2);
   }
   createHeader(header) {
     const wrapper = new HeaderWrapper(this.media, this.currentRelationshipId++);
-    for (const child of header.options.children) wrapper.add(child);
+    for (const child2 of header.options.children) wrapper.add(child2);
     this.addHeaderToDocument(wrapper);
     return wrapper;
   }
   createFooter(footer) {
     const wrapper = new FooterWrapper(this.media, this.currentRelationshipId++);
-    for (const child of footer.options.children) wrapper.add(child);
+    for (const child2 of footer.options.children) wrapper.add(child2);
     this.addFooterToDocument(wrapper);
     return wrapper;
   }
@@ -220450,10 +223221,17 @@ var File2 = class {
     this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes", "footnotes.xml");
     this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes", "endnotes.xml");
     this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings", "settings.xml");
-    this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments", "comments.xml");
+    if (!this.comments.IsEmpty) {
+      this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments", "comments.xml");
+      this.contentTypes.addComments();
+    }
     if (this.commentsExtended) {
       this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.microsoft.com/office/2011/relationships/commentsExtended", "commentsExtended.xml");
       this.contentTypes.addCommentsExtended();
+    }
+    if (this.commentsIds) {
+      this.documentWrapper.Relationships.addRelationship(this.currentRelationshipId++, "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds", "commentsIds.xml");
+      this.contentTypes.addCommentsIds();
     }
   }
   get Document() {
@@ -220505,13 +223283,20 @@ var File2 = class {
   get CommentsExtended() {
     return this.commentsExtended;
   }
+  /** Durable comment id part. Undefined when no comment carries a durableId. */
+  get CommentsIds() {
+    return this.commentsIds;
+  }
   get FontTable() {
     return this.fontWrapper;
   }
-};
-var StructuredDocumentTagContent = class extends XmlComponent {
-  constructor() {
-    super("w:sdtContent");
+  /** The document's theme (word/theme/theme1.xml). */
+  get Theme() {
+    return this.theme;
+  }
+  /** The parts that drawings, such as charts, add to the package when it is written. */
+  get PackageParts() {
+    return this.packageParts;
   }
 };
 var StructuredDocumentTagProperties = class extends XmlComponent {
@@ -220912,7 +223697,7 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
             return e2;
           };
         }
-        (n.prototype = e("./object")).loadAsync = e("./load"), n.support = e("./support"), n.defaults = e("./defaults"), n.version = "3.10.1", n.loadAsync = function(e2, t2) {
+        (n.prototype = e("./object")).loadAsync = e("./load"), n.support = e("./support"), n.defaults = e("./defaults"), n.version = "3.10.2", n.loadAsync = function(e2, t2) {
           return new n().loadAsync(e2, t2);
         }, n.external = e("./external"), t.exports = n;
       }, {
@@ -221269,7 +224054,7 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           n.call(this, e2);
         }
         e("../utils").inherits(i, n), i.prototype.readData = function(e2) {
-          if (this.checkOffset(e2), 0 === e2) return new Uint8Array(0);
+          if (this.checkOffset(e2), 0 === e2) return /* @__PURE__ */ new Uint8Array(0);
           var t2 = this.data.subarray(this.zero + this.index, this.zero + this.index + e2);
           return this.index += e2, t2;
         }, t.exports = i;
@@ -221683,7 +224468,7 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           applyCanBeUsed: {
             uint8array: (function() {
               try {
-                return o.uint8array && 1 === String.fromCharCode.apply(null, new Uint8Array(1)).length;
+                return o.uint8array && 1 === String.fromCharCode.apply(null, /* @__PURE__ */ new Uint8Array(1)).length;
               } catch (e2) {
                 return false;
               }
@@ -221787,7 +224572,9 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           }
           return r2.join("/");
         }, a.getTypeOf = function(e2) {
-          return "string" == typeof e2 ? "string" : "[object Array]" === Object.prototype.toString.call(e2) ? "array" : o.nodebuffer && r.isBuffer(e2) ? "nodebuffer" : o.uint8array && e2 instanceof Uint8Array ? "uint8array" : o.arraybuffer && e2 instanceof ArrayBuffer ? "arraybuffer" : void 0;
+          if ("string" == typeof e2) return "string";
+          var t2 = Object.prototype.toString.call(e2);
+          return "[object Array]" === t2 ? "array" : o.nodebuffer && r.isBuffer(e2) ? "nodebuffer" : o.uint8array && "[object Uint8Array]" === t2 ? "uint8array" : o.arraybuffer && "[object ArrayBuffer]" === t2 ? "arraybuffer" : void 0;
         }, a.checkSupport = function(e2) {
           if (!o[e2.toLowerCase()]) throw new Error(e2 + " is not supported by this platform");
         }, a.MAX_VALUE_16BITS = 65535, a.MAX_VALUE_32BITS = -1, a.pretty = function(e2) {
@@ -221808,14 +224595,14 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           return r2;
         }, a.prepareContent = function(r2, e2, n2, i2, s2) {
           return u.Promise.resolve(e2).then(function(n3) {
-            return o.blob && (n3 instanceof Blob || -1 !== ["[object File]", "[object Blob]"].indexOf(Object.prototype.toString.call(n3))) && "undefined" != typeof FileReader ? new u.Promise(function(t2, r3) {
+            return o.blob && (n3 instanceof Blob || -1 !== ["[object File]", "[object Blob]"].indexOf(Object.prototype.toString.call(n3))) ? void 0 !== Blob.prototype.arrayBuffer ? n3.arrayBuffer() : "undefined" != typeof FileReader ? new u.Promise(function(t2, r3) {
               var e3 = new FileReader();
               e3.onload = function(e4) {
                 t2(e4.target.result);
               }, e3.onerror = function(e4) {
                 r3(e4.target.error);
               }, e3.readAsArrayBuffer(n3);
-            }) : n3;
+            }) : u.Promise.reject(/* @__PURE__ */ new Error(r2 + " is a Blob, but we have no way of reading it.")) : n3;
           }).then(function(e3) {
             var t2 = a.getTypeOf(e3);
             return t2 ? ("arraybuffer" === t2 ? e3 = a.transformTo("uint8array", e3) : "string" === t2 && (s2 ? e3 = h.decode(e3) : n2 && true !== i2 && (e3 = (function(e4) {
@@ -221867,8 +224654,8 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
             if (this.diskWithZip64CentralDirStart = this.reader.readInt(4), this.relativeOffsetEndOfZip64CentralDir = this.reader.readInt(8), this.disksCount = this.reader.readInt(4), 1 < this.disksCount) throw new Error("Multi-volumes zip are not supported");
           },
           readLocalFiles: function() {
-            var e2, t2;
-            for (e2 = 0; e2 < this.files.length; e2++) t2 = this.files[e2], this.reader.setIndex(t2.localHeaderOffset), this.checkSignature(s.LOCAL_FILE_HEADER), t2.readLocalPart(this.reader), t2.handleUTF8(), t2.processAttributes();
+            var e2 = 0, t2;
+            for (; e2 < this.files.length; e2++) t2 = this.files[e2], this.reader.setIndex(t2.localHeaderOffset), this.checkSignature(s.LOCAL_FILE_HEADER), t2.readLocalPart(this.reader), t2.handleUTF8(), t2.processAttributes();
           },
           readCentralDir: function() {
             var e2;
@@ -222248,8 +225035,8 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           var r2 = a.deflateInit2(this.strm, t2.level, t2.method, t2.windowBits, t2.memLevel, t2.strategy);
           if (r2 !== l) throw new Error(i[r2]);
           if (t2.header && a.deflateSetHeader(this.strm, t2.header), t2.dictionary) {
-            var n2;
-            if (n2 = "string" == typeof t2.dictionary ? h.string2buf(t2.dictionary) : "[object ArrayBuffer]" === u.call(t2.dictionary) ? new Uint8Array(t2.dictionary) : t2.dictionary, (r2 = a.deflateSetDictionary(this.strm, n2)) !== l) throw new Error(i[r2]);
+            var n2 = "string" == typeof t2.dictionary ? h.string2buf(t2.dictionary) : "[object ArrayBuffer]" === u.call(t2.dictionary) ? new Uint8Array(t2.dictionary) : t2.dictionary;
+            if ((r2 = a.deflateSetDictionary(this.strm, n2)) !== l) throw new Error(i[r2]);
             this._dict_set = true;
           }
         }
@@ -222350,8 +225137,8 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
             else for (var s2 = 0; s2 < n2; s2++) e2[i2 + s2] = t2[r2 + s2];
           },
           flattenChunks: function(e2) {
-            var t2, r2, n2, i2, s2, a;
-            for (t2 = n2 = 0, r2 = e2.length; t2 < r2; t2++) n2 += e2[t2].length;
+            var t2 = n2 = 0, r2 = e2.length, n2, i2, s2, a;
+            for (; t2 < r2; t2++) n2 += e2[t2].length;
             for (a = new Uint8Array(n2), t2 = i2 = 0, r2 = e2.length; t2 < r2; t2++) s2 = e2[t2], a.set(s2, i2), i2 += s2.length;
             return a;
           }
@@ -222376,7 +225163,7 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           i = false;
         }
         try {
-          String.fromCharCode.apply(null, new Uint8Array(1));
+          String.fromCharCode.apply(null, /* @__PURE__ */ new Uint8Array(1));
         } catch (e2) {
           s = false;
         }
@@ -223190,7 +225977,6 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
               break e;
             case 31:
               return -4;
-            case 32:
             default:
               return U;
           }
@@ -223537,8 +226323,8 @@ var require_jszip_min = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           }
         }
         function W(e2) {
-          var t2;
-          for (t2 = 0; t2 < l; t2++) e2.dyn_ltree[2 * t2] = 0;
+          var t2 = 0;
+          for (; t2 < l; t2++) e2.dyn_ltree[2 * t2] = 0;
           for (t2 = 0; t2 < f; t2++) e2.dyn_dtree[2 * t2] = 0;
           for (t2 = 0; t2 < c; t2++) e2.bl_tree[2 * t2] = 0;
           e2.dyn_ltree[2 * m] = 1, e2.opt_len = e2.static_len = 0, e2.last_lit = e2.matches = 0;
@@ -223858,9 +226644,10 @@ var require_xml = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
           isStringContent = false;
           content.push("");
           values.forEach(function(value) {
-            if (typeof value == "object") if (Object.keys(value)[0] == "_attr") get_attributes(value._attr);
-            else content.push(resolve4(value, indent, indent_count + 1));
-            else {
+            if (typeof value == "object") {
+              if (Object.keys(value)[0] == "_attr") get_attributes(value._attr);
+              else content.push(resolve4(value, indent, indent_count + 1));
+            } else {
               content.pop();
               isStringContent = true;
               content.push(escapeForXML(value));
@@ -223992,6 +226779,56 @@ var NumberingReplacer = class {
     return currentXmlData;
   }
 };
+var formatter$4 = new Formatter();
+var xmlifyPart = (file, content, prettify2, relationships, standalone = true) => (0, import_xml3.default)(formatter$4.format(content, {
+  viewWrapper: {
+    View: content,
+    Relationships: relationships
+  },
+  file,
+  stack: []
+}), {
+  indent: prettify2,
+  declaration: standalone ? {
+    standalone: "yes",
+    encoding: "UTF-8"
+  } : { encoding: "UTF-8" }
+});
+var xmlifyPackagePart = (file, part, path, prettify2) => {
+  const { content } = part.options;
+  if (content instanceof Uint8Array) return [{
+    data: content,
+    path: `word/${path}`
+  }];
+  if ("files" in content) {
+    const embedded = new import_jszip_min.default();
+    for (const { path: filePath, content: fileContent } of content.files) embedded.file(filePath, fileContent instanceof Uint8Array ? fileContent : encodeUtf8(xmlifyPart(file, fileContent, prettify2, new Relationships())));
+    return [{
+      data: embedded.generateAsync({
+        type: "uint8array",
+        compression: "DEFLATE"
+      }),
+      path: `word/${path}`
+    }];
+  }
+  const relationships = file.PackageParts.createRelationships(path);
+  const data = xmlifyPart(file, content, prettify2, relationships);
+  const folder = path.slice(0, path.lastIndexOf("/"));
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return [{
+    data,
+    path: `word/${path}`
+  }, ...relationships.RelationshipCount > 0 ? [{
+    data: xmlifyPart(file, relationships, prettify2, relationships, false),
+    path: `word/${folder}/_rels/${name}.rels`
+  }] : []];
+};
+var xmlifyPackageParts = (file, prettify2, from = 0) => {
+  const parts = file.PackageParts.Array.slice(from);
+  if (parts.length === 0) return [];
+  return [...parts.flatMap(({ part, path }) => xmlifyPackagePart(file, part, path, prettify2)), ...xmlifyPackageParts(file, prettify2, from + parts.length)];
+};
+var _excluded = ["PackageParts"];
 var Compiler = class {
   /**
   * Creates a new Compiler instance.
@@ -224023,21 +226860,21 @@ var Compiler = class {
   */
   compile(file, prettifyXml, overrides = []) {
     const zip = new import_jszip_min.default();
-    const xmlifiedFileMapping = this.xmlifyFile(file, prettifyXml);
+    const _this$xmlifyFile = this.xmlifyFile(file, prettifyXml), { PackageParts: packageParts } = _this$xmlifyFile, xmlifiedFileMapping = _objectWithoutProperties(_this$xmlifyFile, _excluded);
     const map = new Map(Object.entries(xmlifiedFileMapping));
     for (const [, obj] of map) if (Array.isArray(obj)) for (const subFile of obj) zip.file(subFile.path, encodeUtf8(subFile.data));
     else zip.file(obj.path, encodeUtf8(obj.data));
+    for (const { path, data } of packageParts) zip.file(path, typeof data === "string" ? encodeUtf8(data) : data);
     for (const subFile of overrides) zip.file(subFile.path, encodeUtf8(subFile.data));
     for (const data of file.Media.Array) if (data.type !== "svg") zip.file(`word/media/${data.fileName}`, data.data);
     else {
       zip.file(`word/media/${data.fileName}`, data.data);
       zip.file(`word/media/${data.fallback.fileName}`, data.fallback.data);
     }
-    for (const [i, { data: buffer, fontKey }] of file.FontTable.fontOptionsWithKey.entries()) zip.file(`word/fonts/font${i + 1}.odttf`, obfuscate(buffer, fontKey));
+    for (const [i, { data: buffer, fontKey }] of file.FontTable.files.entries()) zip.file(`word/fonts/font${i + 1}.odttf`, obfuscate(buffer, fontKey));
     return zip;
   }
   xmlifyFile(file, prettify2) {
-    const documentRelationshipCount = file.Document.Relationships.RelationshipCount + 1;
     const documentXmlData = (0, import_xml3.default)(this.formatter.format(file.Document.View, {
       viewWrapper: file.Document,
       file,
@@ -224049,7 +226886,6 @@ var Compiler = class {
         encoding: "UTF-8"
       }
     });
-    const commentRelationshipCount = file.Comments.Relationships.RelationshipCount + 1;
     const commentXmlData = (0, import_xml3.default)(this.formatter.format(file.Comments, {
       viewWrapper: {
         View: file.Comments,
@@ -224064,7 +226900,6 @@ var Compiler = class {
         encoding: "UTF-8"
       }
     });
-    const footnoteRelationshipCount = file.FootNotes.Relationships.RelationshipCount + 1;
     const footnoteXmlData = (0, import_xml3.default)(this.formatter.format(file.FootNotes.View, {
       viewWrapper: file.FootNotes,
       file,
@@ -224076,17 +226911,31 @@ var Compiler = class {
         encoding: "UTF-8"
       }
     });
+    const endnoteXmlData = (0, import_xml3.default)(this.formatter.format(file.Endnotes.View, {
+      viewWrapper: file.Endnotes,
+      file,
+      stack: []
+    }), {
+      indent: prettify2,
+      declaration: { encoding: "UTF-8" }
+    });
+    const documentRelationshipCount = file.Document.Relationships.RelationshipCount + 1;
+    const commentRelationshipCount = file.Comments.Relationships.RelationshipCount + 1;
+    const footnoteRelationshipCount = file.FootNotes.Relationships.RelationshipCount + 1;
+    const endnoteRelationshipCount = file.Endnotes.Relationships.RelationshipCount + 1;
     const documentMediaDatas = this.imageReplacer.getMediaData(documentXmlData, file.Media);
     const commentMediaDatas = this.imageReplacer.getMediaData(commentXmlData, file.Media);
     const footnoteMediaDatas = this.imageReplacer.getMediaData(footnoteXmlData, file.Media);
-    return _objectSpread2(_objectSpread2({
+    const endnoteMediaDatas = this.imageReplacer.getMediaData(endnoteXmlData, file.Media);
+    return _objectSpread2(_objectSpread2(_objectSpread2(_objectSpread2({
       Relationships: {
         data: (() => {
+          const relationships = Relationships.copy(file.Document.Relationships);
           documentMediaDatas.forEach((mediaData, i) => {
-            file.Document.Relationships.addRelationship(documentRelationshipCount + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
+            relationships.addRelationship(documentRelationshipCount + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
           });
-          file.Document.Relationships.addRelationship(file.Document.Relationships.RelationshipCount + 1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable", "fontTable.xml");
-          return (0, import_xml3.default)(this.formatter.format(file.Document.Relationships, {
+          relationships.addRelationship(relationships.RelationshipCount + 1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable", "fontTable.xml");
+          return (0, import_xml3.default)(this.formatter.format(relationships, {
             viewWrapper: file.Document,
             file,
             stack: []
@@ -224135,20 +226984,6 @@ var Compiler = class {
         }),
         path: "docProps/core.xml"
       },
-      Numbering: {
-        data: (0, import_xml3.default)(this.formatter.format(file.Numbering, {
-          viewWrapper: file.Document,
-          file,
-          stack: []
-        }), {
-          indent: prettify2,
-          declaration: {
-            standalone: "yes",
-            encoding: "UTF-8"
-          }
-        }),
-        path: "word/numbering.xml"
-      },
       FileRelationships: {
         data: (0, import_xml3.default)(this.formatter.format(file.FileRelationships, {
           viewWrapper: file.Document,
@@ -224169,11 +227004,13 @@ var Compiler = class {
           indent: prettify2,
           declaration: { encoding: "UTF-8" }
         });
-        this.imageReplacer.getMediaData(xmlData, file.Media).forEach((mediaData, i) => {
-          headerWrapper.Relationships.addRelationship(i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
+        const mediaDatas = this.imageReplacer.getMediaData(xmlData, file.Media);
+        const relationships = Relationships.copy(headerWrapper.Relationships);
+        mediaDatas.forEach((mediaData, i) => {
+          relationships.addRelationship(i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
         });
         return {
-          data: (0, import_xml3.default)(this.formatter.format(headerWrapper.Relationships, {
+          data: (0, import_xml3.default)(this.formatter.format(relationships, {
             viewWrapper: headerWrapper,
             file,
             stack: []
@@ -224193,11 +227030,13 @@ var Compiler = class {
           indent: prettify2,
           declaration: { encoding: "UTF-8" }
         });
-        this.imageReplacer.getMediaData(xmlData, file.Media).forEach((mediaData, i) => {
-          footerWrapper.Relationships.addRelationship(i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
+        const mediaDatas = this.imageReplacer.getMediaData(xmlData, file.Media);
+        const relationships = Relationships.copy(footerWrapper.Relationships);
+        mediaDatas.forEach((mediaData, i) => {
+          relationships.addRelationship(i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
         });
         return {
-          data: (0, import_xml3.default)(this.formatter.format(footerWrapper.Relationships, {
+          data: (0, import_xml3.default)(this.formatter.format(relationships, {
             viewWrapper: footerWrapper,
             file,
             stack: []
@@ -224240,17 +227079,6 @@ var Compiler = class {
           path: `word/footer${index2 + 1}.xml`
         };
       }),
-      ContentTypes: {
-        data: (0, import_xml3.default)(this.formatter.format(file.ContentTypes, {
-          viewWrapper: file.Document,
-          file,
-          stack: []
-        }), {
-          indent: prettify2,
-          declaration: { encoding: "UTF-8" }
-        }),
-        path: "[Content_Types].xml"
-      },
       CustomProperties: {
         data: (0, import_xml3.default)(this.formatter.format(file.CustomProperties, {
           viewWrapper: file.Document,
@@ -224288,10 +227116,11 @@ var Compiler = class {
       },
       FootNotesRelationships: {
         data: (() => {
+          const relationships = Relationships.copy(file.FootNotes.Relationships);
           footnoteMediaDatas.forEach((mediaData, i) => {
-            file.FootNotes.Relationships.addRelationship(footnoteRelationshipCount + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
+            relationships.addRelationship(footnoteRelationshipCount + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
           });
-          return (0, import_xml3.default)(this.formatter.format(file.FootNotes.Relationships, {
+          return (0, import_xml3.default)(this.formatter.format(relationships, {
             viewWrapper: file.FootNotes,
             file,
             stack: []
@@ -224303,25 +227132,27 @@ var Compiler = class {
         path: "word/_rels/footnotes.xml.rels"
       },
       Endnotes: {
-        data: (0, import_xml3.default)(this.formatter.format(file.Endnotes.View, {
-          viewWrapper: file.Endnotes,
-          file,
-          stack: []
-        }), {
-          indent: prettify2,
-          declaration: { encoding: "UTF-8" }
-        }),
+        data: (() => {
+          const xmlData = this.imageReplacer.replace(endnoteXmlData, endnoteMediaDatas, endnoteRelationshipCount);
+          return this.numberingReplacer.replace(xmlData, file.Numbering.ConcreteNumbering);
+        })(),
         path: "word/endnotes.xml"
       },
       EndnotesRelationships: {
-        data: (0, import_xml3.default)(this.formatter.format(file.Endnotes.Relationships, {
-          viewWrapper: file.Endnotes,
-          file,
-          stack: []
-        }), {
-          indent: prettify2,
-          declaration: { encoding: "UTF-8" }
-        }),
+        data: (() => {
+          const relationships = Relationships.copy(file.Endnotes.Relationships);
+          endnoteMediaDatas.forEach((mediaData, i) => {
+            relationships.addRelationship(endnoteRelationshipCount + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
+          });
+          return (0, import_xml3.default)(this.formatter.format(relationships, {
+            viewWrapper: file.Endnotes,
+            file,
+            stack: []
+          }), {
+            indent: prettify2,
+            declaration: { encoding: "UTF-8" }
+          });
+        })(),
         path: "word/_rels/endnotes.xml.rels"
       },
       Settings: {
@@ -224337,7 +227168,8 @@ var Compiler = class {
           }
         }),
         path: "word/settings.xml"
-      },
+      }
+    }, file.Comments.IsEmpty ? {} : {
       Comments: {
         data: (() => {
           const xmlData = this.imageReplacer.replace(commentXmlData, commentMediaDatas, commentRelationshipCount);
@@ -224347,10 +227179,11 @@ var Compiler = class {
       },
       CommentsRelationships: {
         data: (() => {
+          const relationships = Relationships.copy(file.Comments.Relationships);
           commentMediaDatas.forEach((mediaData, i) => {
-            file.Comments.Relationships.addRelationship(commentRelationshipCount + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
+            relationships.addRelationship(commentRelationshipCount + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${mediaData.fileName}`);
           });
-          return (0, import_xml3.default)(this.formatter.format(file.Comments.Relationships, {
+          return (0, import_xml3.default)(this.formatter.format(relationships, {
             viewWrapper: {
               View: file.Comments,
               Relationships: file.Comments.Relationships
@@ -224364,7 +227197,7 @@ var Compiler = class {
         })(),
         path: "word/_rels/comments.xml.rels"
       }
-    }, file.CommentsExtended ? { CommentsExtended: {
+    }), file.CommentsExtended ? { CommentsExtended: {
       data: (0, import_xml3.default)(this.formatter.format(file.CommentsExtended, {
         viewWrapper: {
           View: file.CommentsExtended,
@@ -224380,6 +227213,22 @@ var Compiler = class {
         }
       }),
       path: "word/commentsExtended.xml"
+    } } : {}), file.CommentsIds ? { CommentsIds: {
+      data: (0, import_xml3.default)(this.formatter.format(file.CommentsIds, {
+        viewWrapper: {
+          View: file.CommentsIds,
+          Relationships: file.Comments.Relationships
+        },
+        file,
+        stack: []
+      }), {
+        indent: prettify2,
+        declaration: {
+          standalone: "yes",
+          encoding: "UTF-8"
+        }
+      }),
+      path: "word/commentsIds.xml"
     } } : {}), {}, {
       FontTable: {
         data: (0, import_xml3.default)(this.formatter.format(file.FontTable.View, {
@@ -224396,7 +227245,47 @@ var Compiler = class {
         path: "word/fontTable.xml"
       },
       FontTableRelationships: {
-        data: (0, import_xml3.default)(this.formatter.format(file.FontTable.Relationships, {
+        data: (() => (0, import_xml3.default)(this.formatter.format(file.FontTable.Relationships, {
+          viewWrapper: file.Document,
+          file,
+          stack: []
+        }), {
+          indent: prettify2,
+          declaration: { encoding: "UTF-8" }
+        }))(),
+        path: "word/_rels/fontTable.xml.rels"
+      },
+      Theme: {
+        data: (0, import_xml3.default)(this.formatter.format(file.Theme, {
+          viewWrapper: file.Document,
+          file,
+          stack: []
+        }), {
+          indent: prettify2,
+          declaration: {
+            standalone: "yes",
+            encoding: "UTF-8"
+          }
+        }),
+        path: "word/theme/theme1.xml"
+      },
+      PackageParts: xmlifyPackageParts(file, prettify2),
+      Numbering: {
+        data: (0, import_xml3.default)(this.formatter.format(file.Numbering, {
+          viewWrapper: file.Document,
+          file,
+          stack: []
+        }), {
+          indent: prettify2,
+          declaration: {
+            standalone: "yes",
+            encoding: "UTF-8"
+          }
+        }),
+        path: "word/numbering.xml"
+      },
+      ContentTypes: {
+        data: (0, import_xml3.default)(this.formatter.format(file.ContentTypes, {
           viewWrapper: file.Document,
           file,
           stack: []
@@ -224404,7 +227293,7 @@ var Compiler = class {
           indent: prettify2,
           declaration: { encoding: "UTF-8" }
         }),
-        path: "word/_rels/fontTable.xml.rels"
+        path: "[Content_Types].xml"
       }
     });
   }
@@ -224541,7 +227430,37 @@ var Packer = class Packer2 {
   }
 };
 _defineProperty(Packer, "compiler", new Compiler());
-var formatter$1 = new Formatter();
+var bookmarkIdOf = (element) => {
+  var _element$attributes;
+  if (element.name !== "w:bookmarkStart" && element.name !== "w:bookmarkEnd") return;
+  const id = Number((_element$attributes = element.attributes) === null || _element$attributes === void 0 ? void 0 : _element$attributes["w:id"]);
+  return Number.isInteger(id) ? id : void 0;
+};
+var findBookmarkIds = (element) => {
+  var _element$elements;
+  const id = bookmarkIdOf(element);
+  return [...id === void 0 ? [] : [id], ...((_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : []).flatMap(findBookmarkIds)];
+};
+var renumberBookmarksAvoiding = (idsInDocument) => {
+  const usedIds = new Set(idsInDocument);
+  const newIds = /* @__PURE__ */ new Map();
+  let highestId = idsInDocument.reduce((highest, id) => Math.max(highest, id), 0);
+  const newIdFor = (id) => {
+    const knownId = newIds.get(id);
+    if (knownId !== void 0) return knownId;
+    const newId = usedIds.has(id) ? highestId + 1 : id;
+    highestId = Math.max(highestId, newId);
+    usedIds.add(newId);
+    newIds.set(id, newId);
+    return newId;
+  };
+  const renumber = (element) => {
+    const id = bookmarkIdOf(element);
+    return _objectSpread2(_objectSpread2(_objectSpread2({}, element), id === void 0 ? {} : { attributes: _objectSpread2(_objectSpread2({}, element.attributes), {}, { "w:id": String(newIdFor(id)) }) }), element.elements === void 0 ? {} : { elements: element.elements.map(renumber) });
+  };
+  return (elements) => elements.map(renumber);
+};
+var formatter$3 = new Formatter();
 var toJson = (xmlData) => {
   return (0, import_lib.xml2js)(xmlData, {
     compact: false,
@@ -224550,12 +227469,15 @@ var toJson = (xmlData) => {
 };
 var createTextElementContents = (text) => {
   var _textJson$elements$0$;
-  return (_textJson$elements$0$ = toJson((0, import_xml3.default)(formatter$1.format(new Text2({ text })))).elements[0].elements) !== null && _textJson$elements$0$ !== void 0 ? _textJson$elements$0$ : [];
+  return (_textJson$elements$0$ = toJson((0, import_xml3.default)(formatter$3.format(new Text2({ text })))).elements[0].elements) !== null && _textJson$elements$0$ !== void 0 ? _textJson$elements$0$ : [];
 };
 var patchSpaceAttribute = (element) => _objectSpread2(_objectSpread2({}, element), {}, { attributes: { "xml:space": "preserve" } });
 var getFirstLevelElements = (relationships, id) => {
-  var _relationships$elemen, _relationships$elemen2;
-  return (_relationships$elemen = (_relationships$elemen2 = relationships.elements) === null || _relationships$elemen2 === void 0 ? void 0 : _relationships$elemen2.filter((e) => e.name === id)[0].elements) !== null && _relationships$elemen !== void 0 ? _relationships$elemen : [];
+  var _relationships$elemen, _parent$elements;
+  const parent = (_relationships$elemen = relationships.elements) === null || _relationships$elemen === void 0 ? void 0 : _relationships$elemen.find((e) => e.name === id);
+  if (parent === void 0) return [];
+  (_parent$elements = parent.elements) !== null && _parent$elements !== void 0 || (parent.elements = []);
+  return parent.elements;
 };
 var appendContentType = (element, contentType, extension) => {
   const relationshipElements = getFirstLevelElements(element, "Types");
@@ -224571,6 +227493,101 @@ var appendContentType = (element, contentType, extension) => {
     name: "Default",
     type: "element"
   });
+};
+var appendContentTypeOverride = (element, contentType, partName) => {
+  const contentTypeElements = getFirstLevelElements(element, "Types");
+  if (contentTypeElements.some((el) => {
+    var _el$attributes3;
+    return el.type === "element" && el.name === "Override" && ((_el$attributes3 = el.attributes) === null || _el$attributes3 === void 0 ? void 0 : _el$attributes3.PartName) === partName;
+  })) return;
+  contentTypeElements.push({
+    attributes: {
+      ContentType: contentType,
+      PartName: partName
+    },
+    name: "Override",
+    type: "element"
+  });
+};
+var removeContentTypeOverride = (element, partName) => {
+  var _element$elements;
+  const types2 = (_element$elements = element.elements) === null || _element$elements === void 0 ? void 0 : _element$elements.find((el) => el.name === "Types");
+  if ((types2 === null || types2 === void 0 ? void 0 : types2.elements) === void 0) return;
+  types2.elements = types2.elements.filter((el) => {
+    var _el$attributes$PartNa, _el$attributes4;
+    return !(el.name === "Override" && String((_el$attributes$PartNa = (_el$attributes4 = el.attributes) === null || _el$attributes4 === void 0 ? void 0 : _el$attributes4.PartName) !== null && _el$attributes$PartNa !== void 0 ? _el$attributes$PartNa : "").toLowerCase() === partName.toLowerCase());
+  });
+};
+var DRAWINGS = /* @__PURE__ */ new Set(["wp:inline", "wp:anchor"]);
+var ID_ELEMENTS = /* @__PURE__ */ new Set([
+  "wp:docPr",
+  "wps:cNvPr",
+  "wpg:cNvPr"
+]);
+var REFERENCE_ELEMENTS = /* @__PURE__ */ new Set(["a:stCxn", "a:endCxn"]);
+var idOf$1 = (element, names) => {
+  var _element$name, _element$attributes;
+  if (!names.has((_element$name = element.name) !== null && _element$name !== void 0 ? _element$name : "")) return;
+  const id = Number((_element$attributes = element.attributes) === null || _element$attributes === void 0 ? void 0 : _element$attributes.id);
+  return Number.isInteger(id) ? id : void 0;
+};
+var findDrawingIds = (element) => {
+  var _element$elements;
+  const id = idOf$1(element, ID_ELEMENTS);
+  return [...id === void 0 ? [] : [id], ...((_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : []).flatMap(findDrawingIds)];
+};
+var ownIdsOf = (drawing) => {
+  const idsIn = (element) => {
+    var _element$elements2;
+    const id = idOf$1(element, ID_ELEMENTS);
+    return [...id === void 0 ? [] : [id], ...((_element$elements2 = element.elements) !== null && _element$elements2 !== void 0 ? _element$elements2 : []).flatMap((child2) => {
+      var _child$name;
+      return DRAWINGS.has((_child$name = child2.name) !== null && _child$name !== void 0 ? _child$name : "") ? [] : idsIn(child2);
+    })];
+  };
+  return idsIn(drawing);
+};
+var renumberDrawingsAvoiding = (idsInDocument) => {
+  const usedIds = new Set(idsInDocument);
+  let highestId = idsInDocument.reduce((highest, id) => Math.max(highest, id), 0);
+  const newIdFor = (id) => {
+    const newId = usedIds.has(id) ? highestId + 1 : id;
+    highestId = Math.max(highestId, newId);
+    usedIds.add(newId);
+    return newId;
+  };
+  const renumberDrawing = (drawing) => {
+    const newIds = new Map([...new Set(ownIdsOf(drawing))].map((id) => [id, newIdFor(id)]));
+    const renumberIn = (element) => {
+      var _element$name2, _idOf;
+      if (element !== drawing && DRAWINGS.has((_element$name2 = element.name) !== null && _element$name2 !== void 0 ? _element$name2 : "")) return renumberDrawing(element);
+      const id = (_idOf = idOf$1(element, ID_ELEMENTS)) !== null && _idOf !== void 0 ? _idOf : idOf$1(element, REFERENCE_ELEMENTS);
+      const newId = id === void 0 ? void 0 : newIds.get(id);
+      return _objectSpread2(_objectSpread2(_objectSpread2({}, element), newId === void 0 ? {} : { attributes: _objectSpread2(_objectSpread2({}, element.attributes), {}, { id: String(newId) }) }), element.elements === void 0 ? {} : { elements: element.elements.map(renumberIn) });
+    };
+    return renumberIn(drawing);
+  };
+  const renumber = (element) => {
+    var _element$name3;
+    return DRAWINGS.has((_element$name3 = element.name) !== null && _element$name3 !== void 0 ? _element$name3 : "") ? renumberDrawing(element) : _objectSpread2(_objectSpread2({}, element), element.elements === void 0 ? {} : { elements: element.elements.map(renumber) });
+  };
+  return (elements) => elements.map(renumber);
+};
+var PatchType = {
+  /** Replace entire file-level elements (e.g., whole paragraphs) */
+  DOCUMENT: "file",
+  /** Replace content within paragraphs (inline replacement) */
+  PARAGRAPH: "paragraph",
+  /**
+  * Repeat the rows of a table that hold the placeholder's fields, such as `{{items.name}}`, once for each row of
+  * data. See {@link TableRowsPatch}
+  */
+  TABLE_ROWS: "tableRows",
+  /**
+  * Change a drawing whose alt text holds the placeholder, and the parts it refers to, such as the data of a chart made
+  * in Word. See {@link DrawingPatch}
+  */
+  DRAWING: "drawing"
 };
 var getIdFromRelationshipId = (relationshipId) => {
   const output = parseInt(relationshipId.substring(3), 10);
@@ -224596,6 +227613,518 @@ var appendRelationship = (relationships, id, type, target, targetMode) => {
   });
   return relationshipElements;
 };
+var createRelationshipFile = () => ({
+  declaration: { attributes: {
+    version: "1.0",
+    encoding: "UTF-8",
+    standalone: "yes"
+  } },
+  elements: [{
+    type: "element",
+    name: "Relationships",
+    attributes: { xmlns: "http://schemas.openxmlformats.org/package/2006/relationships" },
+    elements: []
+  }]
+});
+var DRAWING_PROPERTIES = /* @__PURE__ */ new Map([
+  ["wp:inline", "wp:docPr"],
+  ["wp:anchor", "wp:docPr"],
+  ["wpg:graphicFrame", "wpg:cNvPr"],
+  ["wpc:graphicFrame", "wpg:cNvPr"]
+]);
+var findDrawings = (element) => {
+  var _element$elements;
+  return ((_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : []).flatMap((child2) => {
+    var _child$elements;
+    const name = child2.name === void 0 ? void 0 : DRAWING_PROPERTIES.get(child2.name);
+    const properties = name === void 0 ? void 0 : (_child$elements = child2.elements) === null || _child$elements === void 0 ? void 0 : _child$elements.find((e) => e.name === name);
+    return [...properties ? [{
+      element: child2,
+      properties
+    }] : [], ...findDrawings(child2)];
+  });
+};
+var altTextOf = (properties) => {
+  var _properties$attribute, _properties$attribute2;
+  return [(_properties$attribute = properties.attributes) === null || _properties$attribute === void 0 ? void 0 : _properties$attribute.descr, (_properties$attribute2 = properties.attributes) === null || _properties$attribute2 === void 0 ? void 0 : _properties$attribute2.title].flatMap((text) => text === void 0 ? [] : [String(text)]);
+};
+var relationshipsPathOf = (path) => {
+  const slash = path.lastIndexOf("/");
+  return `${path.slice(0, slash + 1)}_rels/${path.slice(slash + 1)}.rels`;
+};
+var sourceOfRelationships = (path) => path.replace(/(^|\/)_rels\/([^/]*)\.rels$/, "$1$2");
+var folderOf = (path) => path.slice(0, path.lastIndexOf("/") + 1);
+var resolveTarget2 = (from, target) => {
+  const normalized = target.replace(/\\/g, "/");
+  return (normalized.startsWith("/") ? normalized : `${folderOf(from)}${normalized}`).split("/").reduce((segments, segment) => {
+    if (segment === "" || segment === ".") return segments;
+    return segment === ".." ? segments.slice(0, -1) : [...segments, segment];
+  }, []).join("/");
+};
+var relativeTarget = (from, to) => {
+  const folders = folderOf(from).split("/").filter(Boolean);
+  const segments = to.split("/");
+  const common = folders.findIndex((folder, index2) => index2 >= segments.length - 1 || segments[index2] !== folder);
+  const shared = common === -1 ? folders.length : common;
+  return [...folders.slice(shared).map(() => ".."), ...segments.slice(shared)].join("/");
+};
+var CONTENT_TYPES = "[Content_Types].xml";
+var relationshipsIn = (relationships) => {
+  var _relationships$elemen;
+  if (!((_relationships$elemen = relationships.elements) === null || _relationships$elemen === void 0 ? void 0 : _relationships$elemen.some((element) => element.name === "Relationships"))) {
+    var _relationships$elemen2;
+    relationships.elements = [...(_relationships$elemen2 = relationships.elements) !== null && _relationships$elemen2 !== void 0 ? _relationships$elemen2 : [], ...createRelationshipFile().elements];
+  }
+  return getFirstLevelElements(relationships, "Relationships");
+};
+var createTemplatePackage = (parts, binaryParts, file, context) => {
+  const formatter2 = new Formatter();
+  const has = (path) => parts.has(path) || binaryParts.has(path);
+  const findPath = (path) => {
+    if (has(path)) return path;
+    const decoded = (() => {
+      try {
+        return decodeURI(path);
+      } catch (_unused) {
+        return;
+      }
+    })();
+    if (decoded !== void 0 && has(decoded)) return decoded;
+    const lower = path.toLowerCase();
+    return [...parts.keys(), ...binaryParts.keys()].find((key) => key.toLowerCase() === lower);
+  };
+  const findRelationship = (from, id) => {
+    const relationships = parts.get(relationshipsPathOf(from));
+    return relationships === void 0 ? void 0 : getFirstLevelElements(relationships, "Relationships").find((relationship) => {
+      var _relationship$attribu;
+      return relationship.name === "Relationship" && ((_relationship$attribu = relationship.attributes) === null || _relationship$attribu === void 0 ? void 0 : _relationship$attribu.Id) === id;
+    });
+  };
+  const pathOf = (from, relationship) => {
+    var _relationship$attribu2, _relationship$attribu3;
+    const target = (_relationship$attribu2 = relationship.attributes) === null || _relationship$attribu2 === void 0 ? void 0 : _relationship$attribu2.Target;
+    return ((_relationship$attribu3 = relationship.attributes) === null || _relationship$attribu3 === void 0 ? void 0 : _relationship$attribu3.TargetMode) === "External" || target === void 0 ? void 0 : findPath(resolveTarget2(from, String(target)));
+  };
+  const isReferenced = (path) => [...parts].some(([relationshipsPath, relationships]) => relationshipsPath.endsWith(".rels") && getFirstLevelElements(relationships, "Relationships").some((relationship) => pathOf(sourceOfRelationships(relationshipsPath), relationship) === path));
+  const removePart = (path) => {
+    parts.delete(path);
+    binaryParts.delete(path);
+    parts.delete(relationshipsPathOf(path));
+    const contentTypes = parts.get(CONTENT_TYPES);
+    if (contentTypes !== void 0) removeContentTypeOverride(contentTypes, `/${path}`);
+  };
+  return {
+    getRelatedPart: (from, relationshipId) => {
+      const relationship = findRelationship(from.path, relationshipId);
+      const path = relationship === void 0 ? void 0 : pathOf(from.path, relationship);
+      return path === void 0 ? void 0 : {
+        path,
+        xml: parts.get(path)
+      };
+    },
+    replaceRelatedPart: (from, relationshipId, part) => {
+      const path = `word/${file.PackageParts.add(part)}`;
+      const { relationshipType } = part.options;
+      const target = relativeTarget(from.path, path);
+      const relationship = relationshipId === void 0 ? void 0 : findRelationship(from.path, relationshipId);
+      if (relationship === void 0) {
+        var _parts$get;
+        const relationshipsPath = relationshipsPathOf(from.path);
+        const relationships = (_parts$get = parts.get(relationshipsPath)) !== null && _parts$get !== void 0 ? _parts$get : createRelationshipFile();
+        parts.set(relationshipsPath, relationships);
+        const id = relationshipId !== null && relationshipId !== void 0 ? relationshipId : `rId${getNextRelationshipIndex(relationships)}`;
+        relationshipsIn(relationships).push({
+          type: "element",
+          name: "Relationship",
+          attributes: {
+            Id: id,
+            Type: relationshipType,
+            Target: target
+          }
+        });
+        return id;
+      }
+      const previous = pathOf(from.path, relationship);
+      relationship.attributes = _objectSpread2(_objectSpread2({}, Object.fromEntries(Object.entries(relationship.attributes).filter(([name]) => name !== "TargetMode"))), {}, {
+        Type: relationshipType,
+        Target: target
+      });
+      if (previous !== void 0 && previous !== from.path && previous !== CONTENT_TYPES && !previous.endsWith(".rels") && !isReferenced(previous)) removePart(previous);
+      return String(relationship.attributes.Id);
+    },
+    format: (content) => toJson((0, import_xml3.default)(formatter2.format(content, context))).elements[0]
+  };
+};
+var patchDrawings = ({ parts, binaryParts, file, patches, delimiters }, createContext) => {
+  const placeholders = patches.map(([key, patch]) => ({
+    placeholder: `${delimiters.start}${key}${delimiters.end}`,
+    patch
+  }));
+  const found = [...parts].filter(([path]) => path.startsWith("word/") && !path.endsWith(".rels")).flatMap(([path, xmlPart]) => findDrawings(xmlPart).flatMap((drawing) => {
+    const altText = altTextOf(drawing.properties);
+    const matches2 = placeholders.filter(({ placeholder }) => altText.some((text) => text.includes(placeholder)));
+    if (matches2.length > 1) {
+      var _drawing$properties$a, _drawing$properties$a2;
+      throw new Error(`The drawing "${(_drawing$properties$a = (_drawing$properties$a2 = drawing.properties.attributes) === null || _drawing$properties$a2 === void 0 ? void 0 : _drawing$properties$a2.name) !== null && _drawing$properties$a !== void 0 ? _drawing$properties$a : ""}" in ${path} has the placeholders ${matches2.map(({ placeholder }) => placeholder).join(" and ")} in its alt text. A drawing can only be patched once`);
+    }
+    return matches2.map(({ placeholder, patch }) => ({
+      drawing: _objectSpread2(_objectSpread2({ placeholder }, drawing), {}, { part: {
+        path,
+        xml: xmlPart
+      } }),
+      patch
+    }));
+  }));
+  for (const { drawing, patch } of found) patch.patch(drawing, createTemplatePackage(parts, binaryParts, file, createContext(drawing.part.path)));
+};
+var formatter$2 = new Formatter();
+var DOCUMENT_PATH$1 = "word/document.xml";
+var FOOTNOTES = {
+  path: "word/footnotes.xml",
+  rootName: "w:footnotes",
+  noteName: "w:footnote",
+  referenceName: "w:footnoteReference",
+  contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml",
+  relationshipType: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
+  create: {
+    part: () => new FootNotes(),
+    mark: () => new FootnoteRefRun(),
+    styles: () => [
+      new FootnoteText({}),
+      new FootnoteTextChar({}),
+      new FootnoteReferenceStyle({})
+    ]
+  }
+};
+var ENDNOTES = {
+  path: "word/endnotes.xml",
+  rootName: "w:endnotes",
+  noteName: "w:endnote",
+  referenceName: "w:endnoteReference",
+  contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml",
+  relationshipType: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
+  create: {
+    part: () => new Endnotes(),
+    mark: () => new EndnoteRefRun(),
+    styles: () => [
+      new EndnoteText({}),
+      new EndnoteTextChar({}),
+      new EndnoteReferenceStyle({})
+    ]
+  }
+};
+var formatElement$1 = (component, context) => toJson((0, import_xml3.default)(formatter$2.format(component, context))).elements[0];
+var findIds = (element, names) => {
+  var _element$name, _element$attributes, _element$elements;
+  const id = names.includes((_element$name = element.name) !== null && _element$name !== void 0 ? _element$name : "") ? Number((_element$attributes = element.attributes) === null || _element$attributes === void 0 ? void 0 : _element$attributes["w:id"]) : NaN;
+  return [...Number.isInteger(id) ? [id] : [], ...((_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : []).flatMap((child2) => findIds(child2, names))];
+};
+var withMark = (paragraph, mark) => {
+  var _paragraph$elements, _elements$;
+  const elements = (_paragraph$elements = paragraph.elements) !== null && _paragraph$elements !== void 0 ? _paragraph$elements : [];
+  const index2 = ((_elements$ = elements[0]) === null || _elements$ === void 0 ? void 0 : _elements$.name) === "w:pPr" ? 1 : 0;
+  return _objectSpread2(_objectSpread2({}, paragraph), {}, { elements: [
+    ...elements.slice(0, index2),
+    mark,
+    ...elements.slice(index2)
+  ] });
+};
+var patchNotesOfKind = (kind, notes, parts, { createContext, addContentTypeOverride, renumberBookmarks, renumberDrawings, renumberLists, useStyles }) => {
+  const givenNotes = new Map(Object.entries(notes).map(([id, note]) => [Number(id), note]));
+  const carriedIds = /* @__PURE__ */ new Map();
+  let highestGivenId = [...givenNotes.keys()].filter(Number.isFinite).reduce((highest, id) => Math.max(highest, Math.floor(id)), 0);
+  const noteOfId = /* @__PURE__ */ new Map();
+  let highestId;
+  const renumber = (element) => {
+    var _element$attributes2, _highestId;
+    const note = element.name === kind.referenceName ? givenNotes.get(Number((_element$attributes2 = element.attributes) === null || _element$attributes2 === void 0 ? void 0 : _element$attributes2["w:id"])) : void 0;
+    if (note === void 0) return element.elements === void 0 ? element : _objectSpread2(_objectSpread2({}, element), {}, { elements: element.elements.map(renumber) });
+    highestId = ((_highestId = highestId) !== null && _highestId !== void 0 ? _highestId : [...parts.values()].flatMap((part) => findIds(part, [kind.noteName, kind.referenceName])).reduce((highest, id) => Math.max(highest, id), 0)) + 1;
+    noteOfId.set(highestId, note);
+    return _objectSpread2(_objectSpread2({}, element), {}, { attributes: _objectSpread2(_objectSpread2({}, element.attributes), {}, { "w:id": String(highestId) }) });
+  };
+  const findOrAddPart = () => {
+    var _parts$get;
+    const relationship = getFirstLevelElements((_parts$get = parts.get(relationshipsPathOf(DOCUMENT_PATH$1))) !== null && _parts$get !== void 0 ? _parts$get : {}, "Relationships").find((element) => {
+      var _element$attributes3;
+      return ((_element$attributes3 = element.attributes) === null || _element$attributes3 === void 0 ? void 0 : _element$attributes3.Type) === kind.relationshipType;
+    });
+    const path = relationship ? resolveTarget2(DOCUMENT_PATH$1, String(relationship.attributes.Target)) : kind.path;
+    if (!parts.has(path)) {
+      parts.set(path, {
+        declaration: { attributes: {
+          version: "1.0",
+          encoding: "UTF-8",
+          standalone: "yes"
+        } },
+        elements: [formatElement$1(kind.create.part(), createContext(path))]
+      });
+      addContentTypeOverride(kind.contentType, `/${path}`);
+    }
+    if (!relationship) createContext(DOCUMENT_PATH$1).viewWrapper.Relationships.addRelationship(uniqueId(), kind.relationshipType, relativeTarget(DOCUMENT_PATH$1, path));
+    return path;
+  };
+  const write = () => {
+    if (noteOfId.size === 0) return;
+    const path = findOrAddPart();
+    const context = createContext(path);
+    const contentOfNote = new Map([...new Set(noteOfId.values())].map((note) => {
+      const mark = formatElement$1(kind.create.mark(), context);
+      return [note, useStyles(renumberLists(renumberBookmarks(note.children.map((paragraph) => formatElement$1(paragraph, context)).map((paragraph, index2) => index2 === 0 ? withMark(paragraph, mark) : paragraph))))];
+    }));
+    getFirstLevelElements(parts.get(path), kind.rootName).push(...[...noteOfId].map(([id, note]) => ({
+      type: "element",
+      name: kind.noteName,
+      attributes: { "w:id": String(id) },
+      elements: [...renumberDrawings(contentOfNote.get(note))]
+    })));
+    const stylesPart = parts.get("word/styles.xml");
+    if (stylesPart) {
+      const styles = getFirstLevelElements(stylesPart, "w:styles");
+      const styleIds = new Set(styles.map((style) => {
+        var _style$attributes;
+        return (_style$attributes = style.attributes) === null || _style$attributes === void 0 ? void 0 : _style$attributes["w:styleId"];
+      }));
+      styles.push(...kind.create.styles().map((style) => formatElement$1(style, context)).filter((style) => {
+        var _style$attributes2;
+        return !styleIds.has((_style$attributes2 = style.attributes) === null || _style$attributes2 === void 0 ? void 0 : _style$attributes2["w:styleId"]);
+      }));
+    }
+  };
+  const carry = (reference, note) => {
+    const existing = carriedIds.get(reference);
+    if (existing !== void 0) return existing;
+    highestGivenId++;
+    givenNotes.set(highestGivenId, note);
+    carriedIds.set(reference, highestGivenId);
+    return highestGivenId;
+  };
+  return {
+    renumber: (elements) => elements.map(renumber),
+    write,
+    carry
+  };
+};
+var patchNotes = ({ footnotes = {}, endnotes = {} }, parts, helpers) => {
+  const patchers = {
+    footnotes: patchNotesOfKind(FOOTNOTES, footnotes, parts, helpers),
+    endnotes: patchNotesOfKind(ENDNOTES, endnotes, parts, helpers)
+  };
+  return {
+    carry: (kind, reference, note) => patchers[kind].carry(reference, note),
+    renumber: (elements) => Object.values(patchers).reduce((renumbered, patcher) => patcher.renumber(renumbered), elements),
+    write: () => {
+      for (const patcher of Object.values(patchers)) patcher.write();
+    }
+  };
+};
+var formatter$1 = new Formatter();
+var DOCUMENT_PATH = "word/document.xml";
+var NUMBERING_PATH = "word/numbering.xml";
+var NUMBERING_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml";
+var NUMBERING_RELATIONSHIP = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+var BULLET_REFERENCE = "default-bullet-numbering";
+var BULLET_NUM_ID = "1";
+var formatElement = (component, context) => toJson((0, import_xml3.default)(formatter$1.format(component, context))).elements[0];
+var highestOf = (ids) => ids.reduce((highest, id) => Math.max(highest, id), 0);
+var patchNumbering = (numbering, parts, { createContext, addContentTypeOverride }) => {
+  const newNumIds = /* @__PURE__ */ new Map();
+  let highestNumId;
+  const numberingRelationship = () => {
+    var _parts$get;
+    return getFirstLevelElements((_parts$get = parts.get(relationshipsPathOf(DOCUMENT_PATH))) !== null && _parts$get !== void 0 ? _parts$get : {}, "Relationships").find((element) => {
+      var _element$attributes;
+      return ((_element$attributes = element.attributes) === null || _element$attributes === void 0 ? void 0 : _element$attributes.Type) === NUMBERING_RELATIONSHIP;
+    });
+  };
+  const numberingPath = (relationship = numberingRelationship()) => relationship ? resolveTarget2(DOCUMENT_PATH, String(relationship.attributes.Target)) : NUMBERING_PATH;
+  const idsInTemplate = (name, attribute) => {
+    var _parts$get2;
+    return getFirstLevelElements((_parts$get2 = parts.get(numberingPath())) !== null && _parts$get2 !== void 0 ? _parts$get2 : {}, "w:numbering").filter((element) => element.name === name).map((element) => Number(element.attributes[attribute]));
+  };
+  const listOf = (numId) => {
+    if (numId === BULLET_NUM_ID) return numbering.ConcreteNumbering.find(({ reference }) => reference === BULLET_REFERENCE);
+    if (!numId.startsWith("{")) return;
+    const list = numbering.ConcreteNumbering.find(({ reference, instance }) => numId === `{${reference}-${instance}}`);
+    if (!list) {
+      const reference = numId.slice(1, -1).replace(/-\d+$/, "");
+      throw new Error(`A paragraph in a patch uses the numbering "${reference}", which isn't in the numbering option of patchDocument. Add it there with its levels, as in a Document`);
+    }
+    return list;
+  };
+  const newNumIdOf = (list) => {
+    var _highestNumId;
+    const knownId = newNumIds.get(list.numId);
+    if (knownId !== void 0) return knownId;
+    highestNumId = ((_highestNumId = highestNumId) !== null && _highestNumId !== void 0 ? _highestNumId : highestOf(idsInTemplate("w:num", "w:numId"))) + 1;
+    newNumIds.set(list.numId, highestNumId);
+    return highestNumId;
+  };
+  const renumber = (element) => {
+    const list = element.name === "w:numId" ? listOf(String(element.attributes["w:val"])) : void 0;
+    if (list === void 0) return element.elements === void 0 ? element : _objectSpread2(_objectSpread2({}, element), {}, { elements: element.elements.map(renumber) });
+    return _objectSpread2(_objectSpread2({}, element), {}, { attributes: _objectSpread2(_objectSpread2({}, element.attributes), {}, { "w:val": String(newNumIdOf(list)) }) });
+  };
+  const findOrAddPart = (written) => {
+    const relationship = numberingRelationship();
+    const path = numberingPath(relationship);
+    if (!parts.has(path)) {
+      parts.set(path, {
+        declaration: { attributes: {
+          version: "1.0",
+          encoding: "UTF-8",
+          standalone: "yes"
+        } },
+        elements: [_objectSpread2(_objectSpread2({}, written), {}, { elements: [] })]
+      });
+      addContentTypeOverride(NUMBERING_CONTENT_TYPE, `/${path}`);
+    }
+    if (!relationship) createContext(DOCUMENT_PATH).viewWrapper.Relationships.addRelationship(uniqueId(), NUMBERING_RELATIONSHIP, relativeTarget(DOCUMENT_PATH, path));
+    return path;
+  };
+  const write = () => {
+    var _root$attributes$mcI, _root$attributes;
+    if (newNumIds.size === 0) return;
+    const written = formatElement(numbering, createContext(numberingPath()));
+    const abstractNumIdOf = (list) => Number(list.elements.find((element) => element.name === "w:abstractNumId").attributes["w:val"]);
+    const lists = written.elements.filter((element) => element.name === "w:num" && newNumIds.has(Number(element.attributes["w:numId"])));
+    const highestAbstractNumId = highestOf(idsInTemplate("w:abstractNum", "w:abstractNumId"));
+    const newAbstractNumIds = new Map([...new Set(lists.map(abstractNumIdOf))].map((id, index2) => [id, highestAbstractNumId + index2 + 1]));
+    const abstractLists = written.elements.flatMap((element) => {
+      const newId = element.name === "w:abstractNum" ? newAbstractNumIds.get(Number(element.attributes["w:abstractNumId"])) : void 0;
+      return newId === void 0 ? [] : [_objectSpread2(_objectSpread2({}, element), {}, { attributes: _objectSpread2(_objectSpread2({}, element.attributes), {}, { "w:abstractNumId": String(newId) }) })];
+    });
+    const path = findOrAddPart(written);
+    const root = parts.get(path).elements.find((element) => element.name === "w:numbering");
+    root.attributes = _objectSpread2(_objectSpread2(_objectSpread2({}, Object.fromEntries(Object.entries(written.attributes).filter(([name]) => name.startsWith("xmlns:")))), root.attributes), {}, { "mc:Ignorable": [.../* @__PURE__ */ new Set([...String((_root$attributes$mcI = (_root$attributes = root.attributes) === null || _root$attributes === void 0 ? void 0 : _root$attributes["mc:Ignorable"]) !== null && _root$attributes$mcI !== void 0 ? _root$attributes$mcI : "").split(" "), ...String(written.attributes["mc:Ignorable"]).split(" ")])].filter((prefix) => prefix !== "").join(" ") });
+    const elements = getFirstLevelElements(parts.get(path), "w:numbering");
+    const firstIndexOf = (names) => {
+      const index2 = elements.findIndex((element) => names.includes(element.name));
+      return index2 === -1 ? elements.length : index2;
+    };
+    elements.splice(firstIndexOf(["w:num", "w:numIdMacAtCleanup"]), 0, ...abstractLists);
+    elements.splice(firstIndexOf(["w:numIdMacAtCleanup"]), 0, ...lists.map((list) => _objectSpread2(_objectSpread2({}, list), {}, {
+      attributes: _objectSpread2(_objectSpread2({}, list.attributes), {}, { "w:numId": String(newNumIds.get(Number(list.attributes["w:numId"]))) }),
+      elements: list.elements.map((element) => element.name === "w:abstractNumId" ? _objectSpread2(_objectSpread2({}, element), {}, { attributes: { "w:val": String(newAbstractNumIds.get(abstractNumIdOf(list))) } }) : element)
+    })));
+  };
+  return {
+    renumber: (elements) => elements.map(renumber),
+    write
+  };
+};
+var PARSED = {
+  nameOf: (element) => element.type === "element" ? element.name : void 0,
+  contentOf: (element) => element.elements,
+  attributeOf: (element, attribute) => {
+    var _element$attributes;
+    return (_element$attributes = element.attributes) === null || _element$attributes === void 0 ? void 0 : _element$attributes[attribute];
+  },
+  textOf: (element) => {
+    var _element$elements;
+    return ((_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : []).filter(({ type }) => type === "text").map(({ text }) => String(text)).join("");
+  },
+  textElement: (text) => ({
+    type: "element",
+    name: "w:t",
+    attributes: { "xml:space": "preserve" },
+    elements: [{
+      type: "text",
+      text
+    }]
+  }),
+  writeClean: (begin, instruction) => {
+    var _begin$attributes;
+    if (/^\s*(PAGEREF|TOC)\b/i.test(instruction) && ((_begin$attributes = begin.attributes) === null || _begin$attributes === void 0 ? void 0 : _begin$attributes["w:dirty"]) !== void 0) begin.attributes = Object.fromEntries(Object.entries(begin.attributes).filter(([key]) => key !== "w:dirty"));
+  },
+  setSimpleFieldResult: (element, text) => {
+    element.elements = [{
+      type: "element",
+      name: "w:r",
+      elements: [PARSED.textElement(text)]
+    }];
+  }
+};
+var DOCUMENT = "word/document.xml";
+var IMPORT = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
+var ZIP = [
+  80,
+  75,
+  3,
+  4
+];
+var readPackage = (function() {
+  var _ref = _asyncToGenerator(function* (data) {
+    if (!ZIP.every((byte, index2) => data[index2] === byte)) return;
+    try {
+      const zip = yield import_jszip_min.default.loadAsync(data);
+      const parts = /* @__PURE__ */ new Map();
+      const binaryParts = /* @__PURE__ */ new Map();
+      for (const [path, file] of Object.entries(zip.files)) {
+        if (file.dir) continue;
+        if (/\.(xml|rels)$/.test(path)) parts.set(path, toJson(yield file.async("text")));
+        else binaryParts.set(path, yield file.async("uint8array"));
+      }
+      const importedDocuments = yield readImportedDocuments(parts, binaryParts);
+      return _objectSpread2({
+        parts,
+        binaryParts
+      }, importedDocuments.size > 0 ? { importedDocuments } : {});
+    } catch (_unused) {
+      return;
+    }
+  });
+  return function readPackage2(_x) {
+    return _ref.apply(this, arguments);
+  };
+})();
+var readImportedDocuments = (function() {
+  var _ref2 = _asyncToGenerator(function* (parts, binaryParts) {
+    const imported = /* @__PURE__ */ new Map();
+    for (const [path, relationships] of parts) {
+      var _rootOf$elements, _rootOf;
+      if (!path.endsWith(".rels")) continue;
+      for (const { attributes = {} } of (_rootOf$elements = (_rootOf = rootOf(relationships)) === null || _rootOf === void 0 ? void 0 : _rootOf.elements) !== null && _rootOf$elements !== void 0 ? _rootOf$elements : []) {
+        const target = resolveTarget2(sourceOfRelationships(path), String(attributes.Target));
+        const data = binaryParts.get(target);
+        const read = attributes.Type === IMPORT && attributes.TargetMode !== "External" && data ? yield readPackage(data) : void 0;
+        if (read) imported.set(target, read);
+      }
+    }
+    return imported;
+  });
+  return function readImportedDocuments2(_x2, _x3) {
+    return _ref2.apply(this, arguments);
+  };
+})();
+var rootOf = (part) => {
+  var _part$elements;
+  return part === null || part === void 0 || (_part$elements = part.elements) === null || _part$elements === void 0 ? void 0 : _part$elements.find(({ type }) => type === "element");
+};
+var fillTemplatePageNumbers = (function() {
+  var _ref3 = _asyncToGenerator(function* (parts, estimator, binaryParts = /* @__PURE__ */ new Map()) {
+    var _rootOf$elements2, _rootOf2;
+    const document2 = rootOf(parts.get(DOCUMENT));
+    if (!document2) return;
+    const importedDocuments = yield readImportedDocuments(parts, binaryParts);
+    const estimate = estimator(_objectSpread2({
+      parts,
+      binaryParts
+    }, importedDocuments.size > 0 ? { importedDocuments } : {}));
+    const partPageCounts = fillBodyFields(PARSED, document2, estimate, { blank: true });
+    const relationships = (_rootOf$elements2 = (_rootOf2 = rootOf(parts.get(relationshipsPathOf(DOCUMENT)))) === null || _rootOf2 === void 0 ? void 0 : _rootOf2.elements) !== null && _rootOf$elements2 !== void 0 ? _rootOf$elements2 : [];
+    for (const { attributes = {} } of relationships) {
+      const part = /\/(header|footer)$/.test(String(attributes.Type)) ? rootOf(parts.get(resolveTarget2(DOCUMENT, String(attributes.Target)))) : void 0;
+      if (part) fillPartFields(PARSED, part, estimate, {
+        blank: true,
+        sectionPageCount: partPageCounts.get(String(attributes.Id))
+      });
+    }
+  });
+  return function fillTemplatePageNumbers2(_x4, _x5) {
+    return _ref3.apply(this, arguments);
+  };
+})();
 var TokenNotFoundError = class extends Error {
   constructor(token) {
     super(`Token ${token} not found`);
@@ -224608,8 +228137,8 @@ var findRunElementIndexWithToken = (paragraphElement, token) => {
     const element = paragraphElement.elements[i];
     if (element.type === "element" && element.name === "w:r") {
       var _element$elements;
-      const textElement = ((_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : []).filter((e) => e.type === "element" && e.name === "w:t");
-      for (const text of textElement) {
+      const textElement2 = ((_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : []).filter((e) => e.type === "element" && e.name === "w:t");
+      for (const text of textElement2) {
         var _text$elements, _text$elements$0$text;
         if (!((_text$elements = text.elements) === null || _text$elements === void 0 ? void 0 : _text$elements[0])) continue;
         if ((_text$elements$0$text = text.elements[0].text) === null || _text$elements$0$text === void 0 ? void 0 : _text$elements$0$text.includes(token)) return i;
@@ -224644,8 +228173,8 @@ var ReplaceMode = {
   /** Reached the end of the replacement text */
   END: 2
 };
-var replaceTokenInParagraphElement = ({ paragraphElement, renderedParagraph, originalText, replacementText }) => {
-  const startIndex = renderedParagraph.text.indexOf(originalText);
+var replaceTokenInParagraphElement = ({ paragraphElement, renderedParagraph, originalText, replacementText, fromIndex = 0 }) => {
+  const startIndex = renderedParagraph.text.indexOf(originalText, fromIndex);
   const endIndex = startIndex + originalText.length - 1;
   let replaceMode = ReplaceMode.START;
   for (const run2 of renderedParagraph.runs) for (const { text, index: index2, start, end } of run2.parts) switch (replaceMode) {
@@ -224653,9 +228182,8 @@ var replaceTokenInParagraphElement = ({ paragraphElement, renderedParagraph, ori
       if (startIndex >= start && startIndex <= end) {
         const offsetStartIndex = startIndex - start;
         const offsetEndIndex = Math.min(endIndex, end) - start;
-        const partToReplace = run2.text.substring(offsetStartIndex, offsetEndIndex + 1);
-        if (partToReplace === "") continue;
-        const firstPart = text.replace(partToReplace, replacementText);
+        if (text.substring(offsetStartIndex, offsetEndIndex + 1) === "") continue;
+        const firstPart = text.substring(0, offsetStartIndex) + replacementText + text.substring(offsetEndIndex + 1);
         patchTextElement(paragraphElement.elements[run2.index].elements[index2], firstPart);
         replaceMode = ReplaceMode.MIDDLE;
         continue;
@@ -224669,8 +228197,6 @@ var replaceTokenInParagraphElement = ({ paragraphElement, renderedParagraph, ori
         paragraphElement.elements[run2.index].elements[index2] = patchSpaceAttribute(currentElement);
         replaceMode = ReplaceMode.END;
       } else patchTextElement(paragraphElement.elements[run2.index].elements[index2], "");
-      break;
-    default:
   }
   return paragraphElement;
 };
@@ -224713,23 +228239,23 @@ var renderRunNode = (node, index2, currentRunStringIndex) => {
   let currentTextStringIndex = currentRunStringIndex;
   const parts = node.elements.map((element, i) => {
     var _element$elements$0$t, _element$elements$0$t2;
-    return element.name === "w:t" && element.elements && element.elements.length > 0 ? {
-      text: (_element$elements$0$t = (_element$elements$0$t2 = element.elements[0].text) === null || _element$elements$0$t2 === void 0 ? void 0 : _element$elements$0$t2.toString()) !== null && _element$elements$0$t !== void 0 ? _element$elements$0$t : "",
+    if (element.name !== "w:t" || !element.elements || element.elements.length === 0) return;
+    const partText = (_element$elements$0$t = (_element$elements$0$t2 = element.elements[0].text) === null || _element$elements$0$t2 === void 0 ? void 0 : _element$elements$0$t2.toString()) !== null && _element$elements$0$t !== void 0 ? _element$elements$0$t : "";
+    const start = currentTextStringIndex;
+    currentTextStringIndex += partText.length;
+    return {
+      text: partText,
       index: i,
-      start: currentTextStringIndex,
-      end: (() => {
-        var _element$elements$0$t3, _element$elements$0$t4;
-        currentTextStringIndex += ((_element$elements$0$t3 = (_element$elements$0$t4 = element.elements[0].text) === null || _element$elements$0$t4 === void 0 ? void 0 : _element$elements$0$t4.toString()) !== null && _element$elements$0$t3 !== void 0 ? _element$elements$0$t3 : "").length - 1;
-        return currentTextStringIndex;
-      })()
-    } : void 0;
+      start,
+      end: start + partText.length - 1
+    };
   }).filter((e) => !!e).map((e) => e);
   return {
     text: parts.reduce((acc, curr) => acc + curr.text, ""),
     parts,
     index: index2,
     start: currentRunStringIndex,
-    end: currentTextStringIndex
+    end: parts.length > 0 ? parts[parts.length - 1].end : currentRunStringIndex
   };
 };
 var buildNodePath = (node) => node.parent ? [...buildNodePath(node.parent), node.index] : [node.index];
@@ -224757,48 +228283,50 @@ var traverse = (node) => {
   return renderedParagraphs;
 };
 var findLocationOfText = (node, text) => traverse(node).filter((p) => p.text.includes(text));
-var formatter = new Formatter();
-var SPLIT_TOKEN = "\u0275";
-var replacer = ({ json, patch, patchText, context, keepOriginalStyles = true }) => {
+var SPLIT_TOKEN = "\uFFFF";
+var replacer = ({ json, patch, patchText, context, keepOriginalStyles = true, recursive = true, renumberIds = (elements) => elements }) => {
   const renderedParagraphs = findLocationOfText(json, patchText);
   if (renderedParagraphs.length === 0) return {
     element: json,
     didFindOccurrence: false
   };
-  for (const renderedParagraph of renderedParagraphs) {
-    const textJson = patch.children.map((c) => toJson((0, import_xml3.default)(formatter.format(c, context)))).map((c) => c.elements[0]);
-    switch (patch.type) {
-      case PatchType.DOCUMENT: {
-        const parentElement = goToParentElementFromPath(json, renderedParagraph.pathToParagraph);
-        const elementIndex = getLastElementIndexFromPath(renderedParagraph.pathToParagraph);
-        parentElement.elements.splice(elementIndex, 1, ...textJson);
-        break;
-      }
-      case PatchType.PARAGRAPH:
-      default: {
-        const paragraphElement = goToElementFromPath(json, renderedParagraph.pathToParagraph);
-        replaceTokenInParagraphElement({
+  const paragraphsInPatchOrder = [...renderedParagraphs].reverse();
+  const paragraphsToPatch = patch.type === PatchType.DOCUMENT ? withoutNestedParagraphs(paragraphsInPatchOrder) : paragraphsInPatchOrder;
+  for (const renderedParagraph of paragraphsToPatch) switch (patch.type) {
+    case PatchType.DOCUMENT: {
+      var _children2;
+      const parentElement = goToParentElementFromPath(json, renderedParagraph.pathToParagraph);
+      const elementIndex = getLastElementIndexFromPath(renderedParagraph.pathToParagraph);
+      const children2 = formatChildren(patch, context, renumberIds);
+      const endParagraph = parentElement.name === "w:tc" && elementIndex === parentElement.elements.length - 1 && ((_children2 = children2[children2.length - 1]) === null || _children2 === void 0 ? void 0 : _children2.name) !== "w:p" ? [{
+        type: "element",
+        name: "w:p"
+      }] : [];
+      parentElement.elements.splice(elementIndex, 1, ...children2, ...endParagraph);
+      break;
+    }
+    case PatchType.PARAGRAPH:
+    default: {
+      const paragraphElement = goToElementFromPath(json, renderedParagraph.pathToParagraph);
+      let paragraph = renderedParagraph;
+      let fromIndex = 0;
+      do {
+        const nextRunIndex = replaceOccurrenceInParagraph({
           paragraphElement,
-          renderedParagraph,
-          originalText: patchText,
-          replacementText: SPLIT_TOKEN
+          renderedParagraph: paragraph,
+          patchText,
+          fromIndex,
+          children: formatChildren(patch, context, renumberIds),
+          keepOriginalStyles
         });
-        const index2 = findRunElementIndexWithToken(paragraphElement, SPLIT_TOKEN);
-        const runElementToBeReplaced = paragraphElement.elements[index2];
-        const { left, right } = splitRunElement(runElementToBeReplaced, SPLIT_TOKEN);
-        let newRunElements = textJson;
-        let patchedRightElement = right;
-        if (keepOriginalStyles) {
-          const runElementNonTextualElements = runElementToBeReplaced.elements.filter((e) => e.type === "element" && e.name === "w:rPr");
-          newRunElements = textJson.map((e) => {
-            var _e$elements;
-            return _objectSpread2(_objectSpread2({}, e), {}, { elements: [...runElementNonTextualElements, ...(_e$elements = e.elements) !== null && _e$elements !== void 0 ? _e$elements : []] });
-          });
-          patchedRightElement = _objectSpread2(_objectSpread2({}, right), {}, { elements: [...runElementNonTextualElements, ...right.elements] });
-        }
-        paragraphElement.elements.splice(index2, 1, left, ...newRunElements, patchedRightElement);
-        break;
-      }
+        paragraph = renderParagraphNode({
+          element: paragraphElement,
+          index: renderedParagraph.index,
+          parent: void 0
+        });
+        fromIndex = paragraph.runs.filter((run2) => run2.index < nextRunIndex).reduce((length, run2) => length + run2.text.length, 0);
+      } while (recursive && paragraph.text.includes(patchText, fromIndex));
+      break;
     }
   }
   return {
@@ -224806,6 +228334,107 @@ var replacer = ({ json, patch, patchText, context, keepOriginalStyles = true }) 
     didFindOccurrence: true
   };
 };
+var formatChildren = (patch, context, renumberIds) => renumberIds(patch.children.flatMap((c) => {
+  var _c$writtenAs;
+  return (_c$writtenAs = c.writtenAs) !== null && _c$writtenAs !== void 0 ? _c$writtenAs : c;
+}).flatMap((c) => {
+  const formatted = c.prepForXml(context);
+  return formatted ? [toJson((0, import_xml3.default)(formatted)).elements[0]] : [];
+}));
+var replaceOccurrenceInParagraph = ({ paragraphElement, renderedParagraph, patchText, fromIndex, children: children2, keepOriginalStyles }) => {
+  replaceTokenInParagraphElement({
+    paragraphElement,
+    renderedParagraph,
+    originalText: patchText,
+    replacementText: SPLIT_TOKEN,
+    fromIndex
+  });
+  const index2 = findRunElementIndexWithToken(paragraphElement, SPLIT_TOKEN);
+  const runElementToBeReplaced = paragraphElement.elements[index2];
+  const { left, right } = splitRunElement(runElementToBeReplaced, SPLIT_TOKEN);
+  const runProperties = runElementToBeReplaced.elements.find((e) => e.type === "element" && e.name === "w:rPr");
+  const newRunElements = keepOriginalStyles && runProperties ? children2.map((e) => withRunPropertiesOnRuns(e, runProperties)) : children2;
+  const patchedRightElement = runProperties ? _objectSpread2(_objectSpread2({}, right), {}, { elements: [runProperties, ...right.elements] }) : right;
+  paragraphElement.elements.splice(index2, 1, left, ...newRunElements, patchedRightElement);
+  return index2 + 1 + newRunElements.length;
+};
+var withRunPropertiesOnRuns = (element, originalRunProperties) => {
+  if (element.name === "w:r") return withRunProperties(element, originalRunProperties);
+  return element.elements ? _objectSpread2(_objectSpread2({}, element), {}, { elements: element.elements.map((e) => withRunPropertiesOnRuns(e, originalRunProperties)) }) : element;
+};
+var withRunProperties = (runElement, originalRunProperties) => {
+  const ownRunProperties = childElementsOf(runElement).find((e) => e.type === "element" && e.name === "w:rPr");
+  if (!ownRunProperties) return _objectSpread2(_objectSpread2({}, runElement), {}, { elements: [originalRunProperties, ...childElementsOf(runElement)] });
+  const ownPropertyNames = new Set(childElementsOf(ownRunProperties).map((e) => e.name));
+  const properties = [...childElementsOf(originalRunProperties).filter((e) => !ownPropertyNames.has(e.name)), ...childElementsOf(ownRunProperties)];
+  const mergedRunProperties = _objectSpread2(_objectSpread2({}, ownRunProperties), {}, { elements: [...properties].sort((a, b) => runPropertyRank(a) - runPropertyRank(b)) });
+  return _objectSpread2(_objectSpread2({}, runElement), {}, { elements: childElementsOf(runElement).map((e) => e === ownRunProperties ? mergedRunProperties : e) });
+};
+var RUN_PROPERTY_ORDER = [
+  "w:rStyle",
+  "w:rFonts",
+  "w:b",
+  "w:bCs",
+  "w:i",
+  "w:iCs",
+  "w:caps",
+  "w:smallCaps",
+  "w:strike",
+  "w:dstrike",
+  "w:outline",
+  "w:shadow",
+  "w:emboss",
+  "w:imprint",
+  "w:noProof",
+  "w:snapToGrid",
+  "w:vanish",
+  "w:webHidden",
+  "w:color",
+  "w:spacing",
+  "w:w",
+  "w:kern",
+  "w:position",
+  "w:sz",
+  "w:szCs",
+  "w:highlight",
+  "w:u",
+  "w:effect",
+  "w:bdr",
+  "w:shd",
+  "w:fitText",
+  "w:vertAlign",
+  "w:rtl",
+  "w:cs",
+  "w:em",
+  "w:lang",
+  "w:eastAsianLayout",
+  "w:specVanish",
+  "w:oMath",
+  "w14:glow",
+  "w14:shadow",
+  "w14:reflection",
+  "w14:textOutline",
+  "w14:textFill",
+  "w14:scene3d",
+  "w14:props3d",
+  "w14:ligatures",
+  "w14:numForm",
+  "w14:numSpacing",
+  "w14:stylisticSets",
+  "w14:cntxtAlts"
+];
+var runPropertyRank = (element) => {
+  var _element$name;
+  if (element.name === "w:rPrChange") return RUN_PROPERTY_ORDER.length + 1;
+  const index2 = RUN_PROPERTY_ORDER.indexOf((_element$name = element.name) !== null && _element$name !== void 0 ? _element$name : "");
+  return index2 === -1 ? RUN_PROPERTY_ORDER.length : index2;
+};
+var childElementsOf = (element) => {
+  var _element$elements;
+  return (_element$elements = element.elements) !== null && _element$elements !== void 0 ? _element$elements : [];
+};
+var isInsideElementAtPath = (path, ancestorPath) => path.length > ancestorPath.length && ancestorPath.every((index2, i) => path[i] === index2);
+var withoutNestedParagraphs = (paragraphs) => paragraphs.filter((paragraph) => !paragraphs.some((other) => isInsideElementAtPath(paragraph.pathToParagraph, other.pathToParagraph)));
 var goToElementFromPath = (json, path) => {
   let element = json;
   for (let i = 1; i < path.length; i++) {
@@ -224816,11 +228445,242 @@ var goToElementFromPath = (json, path) => {
 };
 var goToParentElementFromPath = (json, path) => goToElementFromPath(json, path.slice(0, path.length - 1));
 var getLastElementIndexFromPath = (path) => path[path.length - 1];
-var PatchType = {
-  /** Replace entire file-level elements (e.g., whole paragraphs) */
-  DOCUMENT: "file",
-  /** Replace content within paragraphs (inline replacement) */
-  PARAGRAPH: "paragraph"
+var formatter = new Formatter();
+var STYLES_PATH = "word/styles.xml";
+var REFERENCES = /* @__PURE__ */ new Set([
+  "w:pStyle",
+  "w:rStyle",
+  "w:tblStyle",
+  "w:basedOn",
+  "w:next",
+  "w:link"
+]);
+var idOf = (style) => {
+  var _style$attributes;
+  return String((_style$attributes = style.attributes) === null || _style$attributes === void 0 ? void 0 : _style$attributes["w:styleId"]);
+};
+var nameOf2 = (style) => {
+  var _style$elements;
+  const name = (_style$elements = style.elements) === null || _style$elements === void 0 || (_style$elements = _style$elements.find((element) => element.name === "w:name")) === null || _style$elements === void 0 || (_style$elements = _style$elements.attributes) === null || _style$elements === void 0 ? void 0 : _style$elements["w:val"];
+  return name === void 0 ? void 0 : String(name).toLowerCase();
+};
+var formatDefaultStyles = (context) => new Map(Object.values(createDefaultStyles()).map((style) => toJson((0, import_xml3.default)(formatter.format(style, context))).elements[0]).filter((style) => style.name === "w:style").map((style) => [idOf(style), style]));
+var patchStyles = (parts, createContext) => {
+  var _parts$get;
+  const templateStyles = getFirstLevelElements((_parts$get = parts.get(STYLES_PATH)) !== null && _parts$get !== void 0 ? _parts$get : {}, "w:styles").filter((element) => element.name === "w:style");
+  const templateIds = new Set(templateStyles.map(idOf));
+  let defaultStyles;
+  const defaultStyleOf = (id) => {
+    var _defaultStyles;
+    (_defaultStyles = defaultStyles) !== null && _defaultStyles !== void 0 || (defaultStyles = formatDefaultStyles(createContext(STYLES_PATH)));
+    return defaultStyles.get(id);
+  };
+  const missingIds = /* @__PURE__ */ new Set();
+  const idsInDocument = /* @__PURE__ */ new Map();
+  const findIdInDocument = (id) => {
+    const style = templateIds.has(id) ? void 0 : defaultStyleOf(id);
+    if (style === void 0) return id;
+    const sameStyle2 = templateStyles.find((templateStyle) => {
+      var _templateStyle$attrib, _style$attributes2;
+      return ((_templateStyle$attrib = templateStyle.attributes) === null || _templateStyle$attrib === void 0 ? void 0 : _templateStyle$attrib["w:type"]) === ((_style$attributes2 = style.attributes) === null || _style$attributes2 === void 0 ? void 0 : _style$attributes2["w:type"]) && nameOf2(templateStyle) === nameOf2(style);
+    });
+    if (sameStyle2 !== void 0) return idOf(sameStyle2);
+    missingIds.add(id);
+    return id;
+  };
+  const idInDocument = (id) => {
+    if (!idsInDocument.has(id)) idsInDocument.set(id, findIdInDocument(id));
+    return idsInDocument.get(id);
+  };
+  const withIdsInDocument = (element) => {
+    var _element$name;
+    if (REFERENCES.has((_element$name = element.name) !== null && _element$name !== void 0 ? _element$name : "")) return _objectSpread2(_objectSpread2({}, element), {}, { attributes: _objectSpread2(_objectSpread2({}, element.attributes), {}, { "w:val": idInDocument(String(element.attributes["w:val"])) }) });
+    return element.elements === void 0 ? element : _objectSpread2(_objectSpread2({}, element), {}, { elements: element.elements.map(withIdsInDocument) });
+  };
+  const write = () => {
+    const stylesPart = parts.get(STYLES_PATH);
+    if (!stylesPart) return;
+    const styles = getFirstLevelElements(stylesPart, "w:styles");
+    const ids = new Set(styles.map(idOf));
+    for (const id of missingIds) if (!ids.has(id)) {
+      ids.add(id);
+      styles.push(withIdsInDocument(defaultStyleOf(id)));
+    }
+  };
+  return {
+    use: (elements) => elements.map(withIdsInDocument),
+    write
+  };
+};
+var EMPTY = {
+  type: PatchType.PARAGRAPH,
+  children: []
+};
+var patchTableRows = ({ json, key, patch, delimiters: { start, end }, patchPlaceholder, renumberDrawings }) => {
+  const fieldStart = `${start}${key}.`;
+  for (const rows of findRowsToRepeat(json, fieldStart)) {
+    const fields = fieldsIn(rows.elements, fieldStart, end);
+    const copies = patch.rows.flatMap((row, index2) => {
+      const copy = {
+        type: "element",
+        name: "w:tbl",
+        elements: [...index2 === 0 ? rows.elements.map(copyOf) : renumberDrawings(withoutIds(rows.elements))]
+      };
+      const fieldPatches = new Map(Object.entries(row).flatMap(([field, p]) => p === void 0 ? [] : [[field, p]]));
+      for (const [field, fieldPatch] of fieldPatches) patchPlaceholder(copy, `${key}.${field}`, fieldPatch);
+      for (const field of fields.filter((f) => !fieldPatches.has(f))) patchPlaceholder(copy, `${key}.${field}`, EMPTY);
+      return copy.elements;
+    });
+    rows.parent.elements.splice(rows.parent.elements.indexOf(rows.elements[0]), rows.elements.length, ...copies);
+    if (rows.table && !hasRows(rows.table.element)) rows.table.parent.elements.splice(rows.table.parent.elements.indexOf(rows.table.element), 1);
+  }
+};
+var findRowsToRepeat = (json, fieldStart) => {
+  const found = findLocationOfText(json, fieldStart).flatMap((paragraph) => {
+    const row = rowHolding(json, paragraph.pathToParagraph);
+    return row ? [row] : [];
+  });
+  const rows = found.filter((row) => !found.some((other) => isInside(row.path, other.path))).filter((row, index2, all) => all.findIndex((other) => other.row === row.row) === index2);
+  return [...new Set(rows.map((row) => row.parent))].flatMap((parent) => {
+    const siblingRows = parent.elements.filter((e) => e.name === "w:tr");
+    const positions = rows.filter((row) => row.parent === parent).map((row) => siblingRows.indexOf(row.row)).sort((a, b) => a - b);
+    const { table } = rows.find((row) => row.parent === parent);
+    return positions.reduce((all, position) => {
+      const previous = all[all.length - 1];
+      return (previous === null || previous === void 0 ? void 0 : previous[previous.length - 1]) === position - 1 ? [...all.slice(0, -1), [...previous, position]] : [...all, [position]];
+    }, []).map((group) => {
+      const first = parent.elements.indexOf(siblingRows[group[0]]);
+      const last = parent.elements.indexOf(siblingRows[group[group.length - 1]]);
+      return {
+        parent,
+        table,
+        elements: parent.elements.slice(first, last + 1)
+      };
+    });
+  });
+};
+var rowHolding = (json, pathToParagraph) => {
+  let element = json;
+  let row;
+  let table;
+  for (let i = 1; i < pathToParagraph.length; i++) {
+    const child2 = element.elements[pathToParagraph[i]];
+    if (child2.name === "w:tbl") table = {
+      element: child2,
+      parent: element
+    };
+    if (child2.name === "w:tr") row = {
+      parent: element,
+      table,
+      row: child2,
+      path: pathToParagraph.slice(0, i + 1)
+    };
+    element = child2;
+  }
+  return row;
+};
+var isInside = (path, ancestorPath) => path.length > ancestorPath.length && ancestorPath.every((index2, i) => path[i] === index2);
+var hasRows = (table) => {
+  var _table$elements;
+  return ((_table$elements = table.elements) !== null && _table$elements !== void 0 ? _table$elements : []).some((e) => e.name === "w:tr" || e.name !== "w:tblPr" && e.name !== "w:tblGrid" && hasRows(e));
+};
+var fieldsIn = (elements, fieldStart, end) => {
+  const fields = findLocationOfText({ elements: [...elements] }, fieldStart).flatMap(({ text }) => text.split(fieldStart).slice(1).flatMap((after) => {
+    const fieldEnd = after.indexOf(end);
+    return fieldEnd > 0 ? [after.slice(0, fieldEnd)] : [];
+  }));
+  return [...new Set(fields)];
+};
+var copyOf = (element) => JSON.parse(JSON.stringify(element));
+var ATTRIBUTES_TO_REMOVE = ["w14:paraId", "w14:textId"];
+var ELEMENTS_TO_REMOVE = ["w:bookmarkStart", "w:bookmarkEnd"];
+var withoutIds = (elements, parent) => elements.filter((e) => {
+  var _e$name;
+  return !ELEMENTS_TO_REMOVE.includes((_e$name = e.name) !== null && _e$name !== void 0 ? _e$name : "") && !((parent === null || parent === void 0 ? void 0 : parent.name) === "w:sdtPr" && e.name === "w:id");
+}).map((e) => _objectSpread2(_objectSpread2(_objectSpread2({}, e), e.attributes === void 0 ? {} : { attributes: Object.fromEntries(Object.entries(e.attributes).filter(([name]) => !ATTRIBUTES_TO_REMOVE.includes(name))) }), e.elements === void 0 ? {} : { elements: [...withoutIds(e.elements, e)] }));
+var THEME_RELATIONSHIP_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme";
+var COLOR_NAMES = /* @__PURE__ */ new Map([
+  ["dk1", "dark1"],
+  ["lt1", "light1"],
+  ["dk2", "dark2"],
+  ["lt2", "light2"],
+  ["accent1", "accent1"],
+  ["accent2", "accent2"],
+  ["accent3", "accent3"],
+  ["accent4", "accent4"],
+  ["accent5", "accent5"],
+  ["accent6", "accent6"],
+  ["hlink", "hyperlink"],
+  ["folHlink", "followedHyperlink"]
+]);
+var localName = (element) => {
+  var _element$name;
+  return (_element$name = element.name) === null || _element$name === void 0 ? void 0 : _element$name.slice(element.name.indexOf(":") + 1);
+};
+var child = (element, name) => {
+  var _element$elements;
+  return element === null || element === void 0 || (_element$elements = element.elements) === null || _element$elements === void 0 ? void 0 : _element$elements.find((item) => localName(item) === name);
+};
+var hexValue = (color) => {
+  var _color$elements;
+  const value = (_color$elements = color.elements) === null || _color$elements === void 0 ? void 0 : _color$elements.map((item) => {
+    var _item$attributes, _item$attributes2;
+    return localName(item) === "srgbClr" ? (_item$attributes = item.attributes) === null || _item$attributes === void 0 ? void 0 : _item$attributes.val : localName(item) === "sysClr" ? (_item$attributes2 = item.attributes) === null || _item$attributes2 === void 0 ? void 0 : _item$attributes2.lastClr : void 0;
+  }).find((item) => item !== void 0);
+  return typeof value === "string" && /^[0-9A-Fa-f]{6}$/.test(value) ? value.toUpperCase() : void 0;
+};
+var isUtf16 = (bytes) => bytes[0] === 255 && bytes[1] === 254 || bytes[0] === 254 && bytes[1] === 255;
+var readPart = (function() {
+  var _ref = _asyncToGenerator(function* (zip, path) {
+    const part = zip.file(path);
+    if (part === null) return;
+    return isUtf16(yield part.async("uint8array")) ? void 0 : toJson(yield part.async("text"));
+  });
+  return function readPart2(_x, _x2) {
+    return _ref.apply(this, arguments);
+  };
+})();
+var readTheme = (function() {
+  var _ref2 = _asyncToGenerator(function* (zip) {
+    var _child, _theme$attributes;
+    const theme = (_child = child(yield readPart(zip, "word/_rels/document.xml.rels"), "Relationships")) === null || _child === void 0 || (_child = _child.elements) === null || _child === void 0 ? void 0 : _child.find((item) => {
+      var _item$attributes3;
+      return ((_item$attributes3 = item.attributes) === null || _item$attributes3 === void 0 ? void 0 : _item$attributes3.Type) === THEME_RELATIONSHIP_TYPE;
+    });
+    const target = theme === null || theme === void 0 || (_theme$attributes = theme.attributes) === null || _theme$attributes === void 0 ? void 0 : _theme$attributes.Target;
+    return typeof target === "string" ? readPart(zip, resolveTarget2("word/document.xml", target)) : void 0;
+  });
+  return function readTheme2(_x3) {
+    return _ref2.apply(this, arguments);
+  };
+})();
+var readThemeColors2 = (function() {
+  var _ref3 = _asyncToGenerator(function* (zip) {
+    var _scheme$elements;
+    const theme = yield readTheme(zip);
+    if (theme === void 0) return;
+    const scheme = child(child(child(theme, "theme"), "themeElements"), "clrScheme");
+    const colors = ((_scheme$elements = scheme === null || scheme === void 0 ? void 0 : scheme.elements) !== null && _scheme$elements !== void 0 ? _scheme$elements : []).flatMap((color) => {
+      var _localName;
+      const name = COLOR_NAMES.get((_localName = localName(color)) !== null && _localName !== void 0 ? _localName : "");
+      const value = hexValue(color);
+      return name && value ? [[name, value]] : [];
+    });
+    return themeColorValues(Object.fromEntries(colors));
+  });
+  return function readThemeColors3(_x4) {
+    return _ref3.apply(this, arguments);
+  };
+})();
+var assertValidPatch = (key, patch, { inTableRow }) => {
+  if ((patch === null || patch === void 0 ? void 0 : patch.type) === PatchType.TABLE_ROWS && Array.isArray(patch.rows)) {
+    for (const row of patch.rows) {
+      if (typeof row !== "object" || row === null) throw new Error(`Invalid patch "${key}". Expected each of its rows to be an object of patches, by the name of their field`);
+      for (const [field, fieldPatch] of Object.entries(row)) if (fieldPatch !== void 0) assertValidPatch(`${key}.${field}`, fieldPatch, { inTableRow: true });
+    }
+    return;
+  }
+  if (!((patch === null || patch === void 0 ? void 0 : patch.type) === PatchType.DRAWING ? !inTableRow && typeof patch.patch === "function" : (patch === null || patch === void 0 ? void 0 : patch.type) !== PatchType.TABLE_ROWS && Array.isArray(patch === null || patch === void 0 ? void 0 : patch.children))) throw new Error(`Invalid patch "${key}". Expected { type: PatchType.PARAGRAPH or PatchType.DOCUMENT, children: [...] }, ${inTableRow ? "or { type: PatchType.TABLE_ROWS, rows: [...] }" : "{ type: PatchType.TABLE_ROWS, rows: [...] }, or a drawing patch such as ChartDataPatch from docx/charts"}`);
 };
 var imageReplacer = new ImageReplacer();
 var UTF16LE = new Uint8Array([255, 254]);
@@ -224834,15 +228694,30 @@ var patchDocument = (function() {
   var _ref = _asyncToGenerator(function* ({ outputType, data, patches, keepOriginalStyles, placeholderDelimiters = {
     start: "{{",
     end: "}}"
-  }, recursive = true }) {
+  }, recursive = true, footnotes, endnotes, numbering = { config: [] }, pageNumbers }) {
     const zipContent = data instanceof import_jszip_min.default ? data : yield import_jszip_min.default.loadAsync(data);
     const contexts = /* @__PURE__ */ new Map();
-    const file = { Media: new Media() };
+    const themeColors = yield readThemeColors2(zipContent);
+    const contentTypeOverrides = [];
+    const file = {
+      Media: new Media(),
+      Numbering: new Numbering(numbering),
+      Theme: themeColors && { Colors: themeColors },
+      FootNotes: { View: { idOf: (reference, note, context) => carryNote("footnotes", reference, note, context) } },
+      Endnotes: { View: { idOf: (reference, note, context) => carryNote("endnotes", reference, note, context) } },
+      PackageParts: new PackageParts({ addOverride: (contentType, partName) => contentTypeOverrides.push({
+        contentType,
+        partName
+      }) }, new Set(Object.keys(zipContent.files).filter((path) => path.startsWith("word/")).map((path) => path.slice(5))))
+    };
     const map = /* @__PURE__ */ new Map();
     const imageRelationshipAdditions = [];
-    const hyperlinkRelationshipAdditions = [];
+    const relationshipAdditions = [];
     let hasMedia = false;
     const binaryContentMap = /* @__PURE__ */ new Map();
+    if (!(placeholderDelimiters === null || placeholderDelimiters === void 0 ? void 0 : placeholderDelimiters.start.trim()) || !(placeholderDelimiters === null || placeholderDelimiters === void 0 ? void 0 : placeholderDelimiters.end.trim())) throw new Error("Both start and end delimiters must be non-empty strings.");
+    const { start, end } = placeholderDelimiters;
+    for (const [key, patch] of Object.entries(patches)) assertValidPatch(key, patch, { inTableRow: false });
     for (const [key, value] of Object.entries(zipContent.files)) {
       const binaryValue = yield value.async("uint8array");
       const startBytes = binaryValue.slice(0, 2);
@@ -224869,62 +228744,129 @@ var patchDocument = (function() {
           document2.attributes["mc:Ignorable"] = `${document2.attributes["mc:Ignorable"] || ""} w15`.trim();
         }
       }
-      if (key.startsWith("word/") && !key.endsWith(".xml.rels")) {
-        const context = {
-          file,
-          viewWrapper: { Relationships: { addRelationship: (linkId, _, target, __) => {
-            hyperlinkRelationshipAdditions.push({
-              key,
-              hyperlink: {
-                id: linkId,
-                link: target
-              }
-            });
-          } } },
-          stack: []
-        };
-        contexts.set(key, context);
-        if (!(placeholderDelimiters === null || placeholderDelimiters === void 0 ? void 0 : placeholderDelimiters.start.trim()) || !(placeholderDelimiters === null || placeholderDelimiters === void 0 ? void 0 : placeholderDelimiters.end.trim())) throw new Error("Both start and end delimiters must be non-empty strings.");
-        const { start, end } = placeholderDelimiters;
-        for (const [patchKey, patchValue] of Object.entries(patches)) {
-          const patchText = `${start}${patchKey}${end}`;
-          while (true) {
-            const { didFindOccurrence } = replacer({
-              json,
-              patch: _objectSpread2(_objectSpread2({}, patchValue), {}, { children: patchValue.children.map((element) => {
-                if (element instanceof ExternalHyperlink) {
-                  const concreteHyperlink = new ConcreteHyperlink(element.options.children, uniqueId());
-                  hyperlinkRelationshipAdditions.push({
-                    key,
-                    hyperlink: {
-                      id: concreteHyperlink.linkId,
-                      link: element.options.link
-                    }
-                  });
-                  return concreteHyperlink;
-                } else return element;
-              }) }),
-              patchText,
-              context,
-              keepOriginalStyles
-            });
-            if (!recursive || !didFindOccurrence) break;
-          }
-        }
-        const mediaDatas = imageReplacer.getMediaData(JSON.stringify(json), context.file.Media);
-        if (mediaDatas.length > 0) {
-          hasMedia = true;
-          imageRelationshipAdditions.push({
-            key,
-            mediaDatas
-          });
-        }
-      }
       map.set(key, json);
+    }
+    const renumberBookmarks = renumberBookmarksAvoiding([...map.values()].flatMap(findBookmarkIds));
+    const renumberDrawings = renumberDrawingsAvoiding([...map.values()].flatMap(findDrawingIds));
+    const viewWrappers = /* @__PURE__ */ new Map();
+    const viewWrapperOf = (key) => {
+      const existing = viewWrappers.get(key);
+      if (existing) return existing;
+      const viewWrapper = { Relationships: { addRelationship: (id, type, target, targetMode) => {
+        relationshipAdditions.push({
+          key,
+          id,
+          type,
+          target,
+          targetMode
+        });
+      } } };
+      viewWrappers.set(key, viewWrapper);
+      return viewWrapper;
+    };
+    const createContext = (key) => ({
+      file,
+      viewWrapper: viewWrapperOf(key),
+      stack: []
+    });
+    const addContentTypeOverride = (contentType, partName) => {
+      contentTypeOverrides.push({
+        contentType,
+        partName
+      });
+    };
+    const styles = patchStyles(map, createContext);
+    const lists = patchNumbering(file.Numbering, map, {
+      createContext,
+      addContentTypeOverride
+    });
+    const notes = patchNotes({
+      footnotes,
+      endnotes
+    }, map, {
+      createContext,
+      addContentTypeOverride,
+      renumberBookmarks,
+      renumberDrawings,
+      renumberLists: lists.renumber,
+      useStyles: styles.use
+    });
+    const carryNote = (kind, reference, note, context) => context.viewWrapper === viewWrapperOf("word/document.xml") ? notes.carry(kind, reference, note) : void 0;
+    patchDrawings({
+      parts: map,
+      binaryParts: binaryContentMap,
+      file,
+      patches: Object.entries(patches).flatMap(([key, patch]) => patch.type === PatchType.DRAWING ? [[key, patch]] : []),
+      delimiters: {
+        start,
+        end
+      }
+    }, createContext);
+    const textPatches = Object.entries(patches).flatMap(([key, patch]) => patch.type === PatchType.DRAWING ? [] : [[key, patch]]);
+    const patchesInOrder = [...textPatches.filter(([, patch]) => patch.type === PatchType.TABLE_ROWS), ...textPatches.filter(([, patch]) => patch.type !== PatchType.TABLE_ROWS)];
+    for (const [key, json] of [...map]) {
+      if (!key.startsWith("word/") || key.endsWith(".xml.rels")) continue;
+      const context = createContext(key);
+      contexts.set(key, context);
+      const patchPlaceholder = (element, patchKey, patchValue) => {
+        if (patchValue.type === PatchType.TABLE_ROWS) {
+          patchTableRows({
+            json: element,
+            key: patchKey,
+            patch: patchValue,
+            delimiters: {
+              start,
+              end
+            },
+            patchPlaceholder,
+            renumberDrawings
+          });
+          return;
+        }
+        const hyperlinkRelationships = [];
+        const { didFindOccurrence } = replacer({
+          json: element,
+          patch: _objectSpread2(_objectSpread2({}, patchValue), {}, { children: patchValue.children.flatMap((child2) => child2 instanceof Bookmark ? child2.writtenAs : [child2]).map((child2) => {
+            if (child2 instanceof ExternalHyperlink) {
+              const { target, anchor } = externalHyperlinkTarget(child2.options.link);
+              const concreteHyperlink = new ConcreteHyperlink(child2.options.children, uniqueId(), anchor, child2.options.link);
+              hyperlinkRelationships.push({
+                key,
+                id: concreteHyperlink.linkId,
+                type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+                target,
+                targetMode: TargetModeType.EXTERNAL
+              });
+              return concreteHyperlink;
+            } else return child2;
+          }) }),
+          patchText: `${start}${patchKey}${end}`,
+          context,
+          keepOriginalStyles,
+          recursive,
+          renumberIds: (elements) => styles.use(lists.renumber(notes.renumber(renumberBookmarks(renumberDrawings(elements)))))
+        });
+        if (didFindOccurrence) relationshipAdditions.push(...hyperlinkRelationships);
+      };
+      for (const [patchKey, patchValue] of patchesInOrder) patchPlaceholder(json, patchKey, patchValue);
+    }
+    notes.write();
+    lists.write();
+    styles.write();
+    for (const [key, json] of map) {
+      if (!key.startsWith("word/") || key.endsWith(".xml.rels")) continue;
+      const mediaDatas = imageReplacer.getMediaData(JSON.stringify(json), file.Media);
+      if (mediaDatas.length > 0) {
+        hasMedia = true;
+        imageRelationshipAdditions.push({
+          key,
+          mediaDatas
+        });
+      }
     }
     for (const { key, mediaDatas } of imageRelationshipAdditions) {
       var _map$get;
-      const relationshipKey = `word/_rels/${key.split("/").pop()}.rels`;
+      const relationshipKey = relationshipsPathOf(key);
       const relationshipsJson = (_map$get = map.get(relationshipKey)) !== null && _map$get !== void 0 ? _map$get : createRelationshipFile();
       map.set(relationshipKey, relationshipsJson);
       const index2 = getNextRelationshipIndex(relationshipsJson);
@@ -224935,22 +228877,27 @@ var patchDocument = (function() {
         appendRelationship(relationshipsJson, index2 + i, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", `media/${fileName}`);
       }
     }
-    for (const { key, hyperlink } of hyperlinkRelationshipAdditions) {
+    for (const { key, id, type, target, targetMode } of relationshipAdditions) {
       var _map$get2;
-      const relationshipKey = `word/_rels/${key.split("/").pop()}.rels`;
+      const relationshipKey = relationshipsPathOf(key);
       const relationshipsJson = (_map$get2 = map.get(relationshipKey)) !== null && _map$get2 !== void 0 ? _map$get2 : createRelationshipFile();
       map.set(relationshipKey, relationshipsJson);
-      appendRelationship(relationshipsJson, hyperlink.id, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", hyperlink.link, TargetModeType.EXTERNAL);
+      appendRelationship(relationshipsJson, id, type, target, targetMode);
     }
-    if (hasMedia) {
+    if (pageNumbers) yield fillTemplatePageNumbers(map, pageNumbers, binaryContentMap);
+    const packageParts = xmlifyPackageParts(file, void 0);
+    if (hasMedia || contentTypeOverrides.length > 0) {
       const contentTypesJson = map.get("[Content_Types].xml");
       if (!contentTypesJson) throw new Error("Could not find content types file");
-      appendContentType(contentTypesJson, "image/png", "png");
-      appendContentType(contentTypesJson, "image/jpeg", "jpeg");
-      appendContentType(contentTypesJson, "image/jpeg", "jpg");
-      appendContentType(contentTypesJson, "image/bmp", "bmp");
-      appendContentType(contentTypesJson, "image/gif", "gif");
-      appendContentType(contentTypesJson, "image/svg+xml", "svg");
+      if (hasMedia) {
+        appendContentType(contentTypesJson, "image/png", "png");
+        appendContentType(contentTypesJson, "image/jpeg", "jpeg");
+        appendContentType(contentTypesJson, "image/jpeg", "jpg");
+        appendContentType(contentTypesJson, "image/bmp", "bmp");
+        appendContentType(contentTypesJson, "image/gif", "gif");
+        appendContentType(contentTypesJson, "image/svg+xml", "svg");
+      }
+      for (const { contentType, partName } of contentTypeOverrides) appendContentTypeOverride(contentTypesJson, contentType, partName);
     }
     const zip = new import_jszip_min.default();
     for (const [key, value] of map) {
@@ -224959,6 +228906,7 @@ var patchDocument = (function() {
     }
     for (const [key, value] of binaryContentMap) zip.file(key, value);
     for (const { data: stream, fileName } of file.Media.Array) zip.file(`word/media/${fileName}`, stream);
+    for (const { path, data: partData } of packageParts) zip.file(path, typeof partData === "string" ? encodeUtf8(partData) : partData);
     return zip.generateAsync({
       type: outputType,
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -224969,29 +228917,20 @@ var patchDocument = (function() {
     return _ref.apply(this, arguments);
   };
 })();
+var withAmpersandsEscaped = (element) => _objectSpread2(_objectSpread2(_objectSpread2({}, element), element.attributes === void 0 ? {} : { attributes: Object.fromEntries(Object.entries(element.attributes).map(([key, value]) => [key, value === void 0 ? value : String(value).replace(/&/g, "&amp;")])) }), element.elements === void 0 ? {} : { elements: element.elements.map((child2) => child2.type === "text" ? _objectSpread2(_objectSpread2({}, child2), {}, { text: String(child2.text).replace(/&/g, "&amp;") }) : withAmpersandsEscaped(child2)) });
 var toXml = (jsonObj) => {
-  return (0, import_lib.js2xml)(jsonObj, { attributeValueFn: (str) => String(str).replace(/&(?!amp;|lt;|gt;|quot;|apos;)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;") });
+  return (0, import_lib.js2xml)(withAmpersandsEscaped(jsonObj), { attributeValueFn: (str) => String(str).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;") });
 };
-var createRelationshipFile = () => ({
-  declaration: { attributes: {
-    version: "1.0",
-    encoding: "UTF-8",
-    standalone: "yes"
-  } },
-  elements: [{
-    type: "element",
-    name: "Relationships",
-    attributes: { xmlns: "http://schemas.openxmlformats.org/package/2006/relationships" },
-    elements: []
-  }]
-});
 var patchDetector = (function() {
   var _ref = _asyncToGenerator(function* ({ data }) {
     const zipContent = data instanceof import_jszip_min.default ? data : yield import_jszip_min.default.loadAsync(data);
     const patches = /* @__PURE__ */ new Set();
     for (const [key, value] of Object.entries(zipContent.files)) {
       if (!key.endsWith(".xml") && !key.endsWith(".rels")) continue;
-      if (key.startsWith("word/") && !key.endsWith(".xml.rels")) traverse(toJson(yield value.async("text"))).forEach((p) => findPatchKeys(p.text).forEach((patch) => patches.add(patch)));
+      if (key.startsWith("word/") && !key.endsWith(".xml.rels")) {
+        const json = toJson(yield value.async("text"));
+        [...traverse(json).map((p) => p.text), ...findDrawings(json).flatMap(({ properties }) => altTextOf(properties))].forEach((text) => findPatchKeys(text).forEach((patch) => patches.add(patch)));
+      }
     }
     return Array.from(patches);
   });
@@ -225001,7 +228940,7 @@ var patchDetector = (function() {
 })();
 var findPatchKeys = (text) => {
   var _text$match;
-  const pattern = /* @__PURE__ */ new RegExp("(?<=\\{\\{).+?(?=\\}\\})", "gs");
+  const pattern = new RegExp("(?<=\\{\\{).+?(?=\\}\\})", "gs");
   return (_text$match = text.match(pattern)) !== null && _text$match !== void 0 ? _text$match : [];
 };
 
@@ -225832,7 +229771,7 @@ function renderTable(generator, node, depth) {
     const cellHasText = (cell, depth2 = 0) => {
       if (depth2 > 3 || !cell || typeof cell !== "object") return false;
       if ((cell.runs || []).some((run2) => (run2.text || "").trim().length >= 2)) return true;
-      return (cell.children || []).some((child) => cellHasText(child, depth2 + 1));
+      return (cell.children || []).some((child2) => cellHasText(child2, depth2 + 1));
     };
     const TEXT_COL_FLOOR_DXA = 800;
     for (const row of node.rows) {
@@ -226040,28 +229979,28 @@ function cardShouldFlatten(node, depth) {
   !Array.isArray(node.children) || node.children.length <= 1 || node.border || !isLightShading(node.shading)) {
     return false;
   }
-  if (node.children.some((child) => child.type === "table" || child.type === "kpirow")) {
+  if (node.children.some((child2) => child2.type === "table" || child2.type === "kpirow")) {
     return true;
   }
-  return node.children.every((child) => FLOW_CHILD_TYPES.has(child.type));
+  return node.children.every((child2) => FLOW_CHILD_TYPES.has(child2.type));
 }
 function cardOverlays(generator, node) {
   return (node.children || []).filter(
-    (child) => child?.type === "floatimg" && child.inParent && generator.images[child.shotId]
+    (child2) => child2?.type === "floatimg" && child2.inParent && generator.images[child2.shotId]
   );
 }
-function withCardShading(child, shading, borderLeft = null) {
-  switch (child.type) {
+function withCardShading(child2, shading, borderLeft = null) {
+  switch (child2.type) {
     case "spacer":
       return {
-        ...child,
-        shading: child.shading ?? shading,
-        borderLeft: child.borderLeft ?? borderLeft
+        ...child2,
+        shading: child2.shading ?? shading,
+        borderLeft: child2.borderLeft ?? borderLeft
       };
     case "list":
       return {
-        ...child,
-        items: (child.items || []).map(
+        ...child2,
+        items: (child2.items || []).map(
           (item) => Array.isArray(item) ? { runs: item, style: { shading, borderLeft } } : {
             ...item,
             style: {
@@ -226074,21 +230013,21 @@ function withCardShading(child, shading, borderLeft = null) {
       };
     case "kpirow":
       return {
-        ...child,
+        ...child2,
         ambientShading: shading,
-        gapShading: child.gapShading ?? shading,
-        cells: (child.cells || []).map((cell) => ({
+        gapShading: child2.gapShading ?? shading,
+        cells: (child2.cells || []).map((cell) => ({
           ...cell,
           shading: cell.shading ?? shading
         }))
       };
     case "table":
-      return { ...child, ambientShading: shading, shading: child.shading ?? shading };
+      return { ...child2, ambientShading: shading, shading: child2.shading ?? shading };
     case "card":
     case "hr":
-      return { ...child, ambientShading: shading };
+      return { ...child2, ambientShading: shading };
     default:
-      return child;
+      return child2;
   }
 }
 function renderCardFlattened(generator, node, depth) {
@@ -226107,18 +230046,18 @@ function renderCardFlattened(generator, node, depth) {
   }, 0);
   const padTopCapPx = pad.top > 2 ? Math.min(pad.top, Math.max(24, overlayPadNeed)) : 0;
   const railBorder = node.borderLeft || null;
-  const children2 = node.children.filter((child) => !overlays.includes(child)).flatMap((child) => {
-    if (child.type === "para" || child.type === "heading") {
+  const children2 = node.children.filter((child2) => !overlays.includes(child2)).flatMap((child2) => {
+    if (child2.type === "para" || child2.type === "heading") {
       const style = {
-        ...child.style,
-        shading: child.style?.shading ?? shading ?? void 0,
-        indentLeftPx: (child.style?.indentLeftPx || 0) + insetPx
+        ...child2.style,
+        shading: child2.style?.shading ?? shading ?? void 0,
+        indentLeftPx: (child2.style?.indentLeftPx || 0) + insetPx
       };
       if (railBorder) {
         style.borderLeft = style.borderLeft ?? railBorder;
         style.borderLeftSpacePx = style.borderLeftSpacePx ?? Math.min(24, pad.left ?? 8);
       }
-      if (!shading && !railBorder) return [{ ...child, style }];
+      if (!shading && !railBorder) return [{ ...child2, style }];
       const out = [];
       if (style.spacingBeforePx) {
         out.push({ type: "spacer", px: style.spacingBeforePx, shading, borderLeft: railBorder });
@@ -226126,11 +230065,11 @@ function renderCardFlattened(generator, node, depth) {
       }
       const trailing = style.spacingAfterPx;
       style.spacingAfterPx = 0;
-      out.push({ ...child, style });
+      out.push({ ...child2, style });
       if (trailing) out.push({ type: "spacer", px: trailing, shading, borderLeft: railBorder });
       return out;
     }
-    return [shading || railBorder ? withCardShading(child, shading, railBorder) : child];
+    return [shading || railBorder ? withCardShading(child2, shading, railBorder) : child2];
   });
   const output = [];
   if (node.spacingBeforePx) output.push(spacerParagraph(context, node.spacingBeforePx));
@@ -226188,7 +230127,7 @@ function renderCard(generator, node, depth) {
   if (cardShouldFlatten(node, depth)) return renderCardFlattened(generator, node, depth);
   const overlays = cardOverlays(generator, node);
   if (overlays.length) {
-    node = { ...node, children: node.children.filter((child) => !overlays.includes(child)) };
+    node = { ...node, children: node.children.filter((child2) => !overlays.includes(child2)) };
   }
   const output = [];
   const spacingBefore = (node.heightPx || 0) > 700 && !node.allowSplit ? Math.min(node.spacingBeforePx || 0, 8) : node.spacingBeforePx;
@@ -226479,9 +230418,9 @@ function renderKpiRow(generator, node, depth) {
     if (track.gap || !track.cell) return 0;
     const needPx = Math.max(
       0,
-      ...(track.cell.children || []).map((child) => child.style?.oneLineWidthPx || 0)
+      ...(track.cell.children || []).map((child2) => child2.style?.oneLineWidthPx || 0)
     );
-    const cellText2 = (track.cell.children || []).flatMap((child) => child.runs || []).map((run2) => run2.text || "").join("").trim();
+    const cellText2 = (track.cell.children || []).flatMap((child2) => child2.runs || []).map((run2) => run2.text || "").join("").trim();
     const marginAllowance = cellText2.length > 0 && cellText2.length <= 5 ? 420 : 260;
     return needPx ? context.pxToTwips(Math.round(needPx * 1.1)) + marginAllowance : 0;
   };
@@ -227456,9 +231395,9 @@ async function convertHtmlToDocx(input, driver, options = {}) {
       if (pageBgShotIds.has(id)) {
         await driver.evaluate((shotId) => {
           const backdrop = document.querySelector(`[data-h2d-id="${shotId}"]`);
-          for (const child of document.body.children) {
-            child.setAttribute("data-h2d-old-visibility", child.style.visibility || "");
-            child.style.visibility = child === backdrop ? "visible" : "hidden";
+          for (const child2 of document.body.children) {
+            child2.setAttribute("data-h2d-old-visibility", child2.style.visibility || "");
+            child2.style.visibility = child2 === backdrop ? "visible" : "hidden";
           }
           backdrop.setAttribute("data-h2d-old-style", backdrop.getAttribute("style") || "");
           Object.assign(backdrop.style, {
@@ -227576,9 +231515,9 @@ async function convertHtmlToDocx(input, driver, options = {}) {
               backdrop.setAttribute("style", backdrop.getAttribute("data-h2d-old-style") || "");
               backdrop.removeAttribute("data-h2d-old-style");
             }
-            for (const child of document.body.children) {
-              child.style.visibility = child.getAttribute("data-h2d-old-visibility") || "";
-              child.removeAttribute("data-h2d-old-visibility");
+            for (const child2 of document.body.children) {
+              child2.style.visibility = child2.getAttribute("data-h2d-old-visibility") || "";
+              child2.removeAttribute("data-h2d-old-visibility");
             }
           }, id);
         } catch (e) {
@@ -230011,7 +233950,7 @@ function managedCodexRoot(platform, env) {
   const localAppData = env.LOCALAPPDATA ?? env.LocalAppData;
   return localAppData ? (0, import_node_path11.join)(localAppData, "OpenAI", "Codex", "bin") : void 0;
 }
-function isInside(path, root, platform) {
+function isInside2(path, root, platform) {
   const normalizedPath = (0, import_node_path11.resolve)(path);
   const normalizedRoot = (0, import_node_path11.resolve)(root);
   const pathValue = platform === "win32" ? normalizedPath.toLowerCase() : normalizedPath;
@@ -230095,7 +234034,7 @@ async function resolveCodexCliPath(configuredPath, options = {}) {
   const configured = cleanCliPath(configuredPath);
   if (configured) {
     const configuredExecutable = (0, import_node_path11.isAbsolute)(configured) && (await (0, import_promises5.stat)(configured).catch(() => null))?.isDirectory() ? (0, import_node_path11.join)(configured, platform === "win32" ? "codex.exe" : "codex") : configured;
-    const managed = managedRoot && (0, import_node_path11.isAbsolute)(configuredExecutable) ? isInside(configuredExecutable, managedRoot, platform) : false;
+    const managed = managedRoot && (0, import_node_path11.isAbsolute)(configuredExecutable) ? isInside2(configuredExecutable, managedRoot, platform) : false;
     if (!managed) {
       if (!(0, import_node_path11.isAbsolute)(configuredExecutable)) return configuredExecutable;
       if (await fileExists(configuredExecutable)) return configuredExecutable;
@@ -236877,7 +240816,7 @@ docx/dist/index.mjs:
 docx/dist/index.mjs:
   (*!
   
-  JSZip v3.10.1 - A JavaScript class for generating and reading zip files
+  JSZip v3.10.2 - A JavaScript class for generating and reading zip files
   <http://stuartk.com/jszip>
   
   (c) 2009-2016 Stuart Knightley <stuart [at] stuartk.com>

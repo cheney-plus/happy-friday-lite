@@ -10541,10 +10541,10 @@ var require_bidi = __commonJS({
   }
 });
 
-// asset-file:/Users/cheney/Documents/trae_projects/happy-friday-lite/vendor/happyoffice/node_modules/harfbuzzjs/dist/harfbuzz.wasm
+// asset-file:/Users/cheney/Documents/trae_projects/happy-friday-lite/vendor/happyoffice/apps/slides/node_modules/harfbuzzjs/dist/harfbuzz.wasm
 var require_harfbuzz = __commonJS({
-  "asset-file:/Users/cheney/Documents/trae_projects/happy-friday-lite/vendor/happyoffice/node_modules/harfbuzzjs/dist/harfbuzz.wasm"(exports2, module2) {
-    module2.exports = require("path").join(__dirname, "..", "assets", "7c15e352ec60.wasm");
+  "asset-file:/Users/cheney/Documents/trae_projects/happy-friday-lite/vendor/happyoffice/apps/slides/node_modules/harfbuzzjs/dist/harfbuzz.wasm"(exports2, module2) {
+    module2.exports = require("path").join(__dirname, "..", "assets", "74301eb4ac95.wasm");
   }
 });
 
@@ -212112,7 +212112,7 @@ var ProjectStore = class _ProjectStore {
 // vendor/happyoffice/apps/slides/src/main/shaped-metrics.ts
 var import_node_fs7 = require("node:fs");
 
-// vendor/happyoffice/node_modules/harfbuzzjs/dist/harfbuzz.js
+// vendor/happyoffice/apps/slides/node_modules/harfbuzzjs/dist/harfbuzz.js
 async function createHarfBuzz(moduleArg = {}) {
   var moduleRtn;
   var Module = moduleArg;
