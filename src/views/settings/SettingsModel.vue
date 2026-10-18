@@ -5,17 +5,17 @@
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
     </button>
-    <h1 class="page-title">模型设置</h1>
+    <h1 class="page-title">{{ t('settings.modelSettings') }}</h1>
 
     <div class="settings-content">
       <div class="settings-group">
         <div class="group-content">
           <div class="setting-item">
-            <span class="item-label">首选模型</span>
+            <span class="item-label">{{ t('settings.preferredModel') }}</span>
             <div class="model-select-wrapper" ref="modelSelectRef">
               <div
-                :class="['model-select-trigger', { 'no-selection': !selectedModelData, 'highlight-pulse': !selectedModelData }]"
-                @click="toggleModelDropdown"
+                :class="['model-select-trigger', { 'empty': !customModels.length }]"
+                @click="handlePreferredModelClick"
               >
                 <div v-if="selectedModelData" class="selected-model-info">
                   <img :src="selectedModelData.providerIcon" :alt="selectedModelData.providerLabel" class="model-provider-icon" />
@@ -24,8 +24,8 @@
                     <span v-if="selectedModelData.embeddingModelName" class="selected-embedding-label">Embedding: {{ selectedModelData.embeddingModelName }}</span>
                   </div>
                 </div>
-                <span v-else class="select-hint-text">点击选择模型</span>
-                <svg class="model-select-arrow" :class="{ expanded: showModelDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <span v-else class="select-hint-text">{{ t('settings.noModelsAvailable') }}</span>
+                <svg v-if="customModels.length" class="model-select-arrow" :class="{ expanded: showModelDropdown }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </div>
@@ -34,14 +34,14 @@
         </div>
       </div>
 
-      <div class="group-title">自定义模型</div>
+      <div class="group-title">{{ t('settings.customModels') }}</div>
       <div class="custom-models-container">
         <div class="add-model-btn" @click="openAddModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          <span>添加模型</span>
+          <span>{{ t('settings.addModel') }}</span>
         </div>
       </div>
 
@@ -538,6 +538,11 @@ const getModelDescription = (model) => {
 
 const toggleModelDropdown = () => {
   showModelDropdown.value = !showModelDropdown.value;
+};
+
+const handlePreferredModelClick = () => {
+  if (!customModels.value.length) return;
+  toggleModelDropdown();
 };
 
 const selectModel = (model) => {
@@ -1126,31 +1131,19 @@ function formatTime(ts) {
   background-color: var(--bg-hover);
 }
 
-/* 未选择首选模型时：高亮边框 + 脉冲动画，引导用户点击 */
-.model-select-trigger.no-selection {
-  border-color: var(--accent-color, #3b82f6);
-  background-color: var(--bg-primary);
-  animation: highlightPulse 2s ease-in-out infinite;
+.model-select-trigger.empty {
+  cursor: default;
+  color: var(--text-tertiary);
 }
 
-.model-select-trigger.no-selection:hover {
-  border-color: var(--accent-color, #3b82f6);
-  background-color: var(--bg-hover);
-}
-
-@keyframes highlightPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0);
-  }
+.model-select-trigger.empty:hover {
+  background-color: var(--bg-secondary);
 }
 
 .select-hint-text {
   font-size: 14px;
-  color: var(--accent-color, #3b82f6);
-  font-weight: 500;
+  color: var(--text-tertiary);
+  font-weight: 400;
 }
 
 .default-badge {
