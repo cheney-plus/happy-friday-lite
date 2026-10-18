@@ -317,12 +317,17 @@ const moveContextTab = (direction) => {
 // ===== 标签页拖拽排序（拖动时实时动态换位，被拖标签原位留空；结果随 store 变化自动持久化） =====
 const dragTabId = ref('');
 
-// 禁止把标签拖到标签栏以外区域放置（避免往编辑器等内容区插入文本）
+// 禁止把标签拖到标签栏以外区域放置（避免往编辑器等内容区插入文本）。
+// 注意：仅 preventDefault 不够——编辑器自身的 dragover 处理器会再次 preventDefault 主动接受拖放，
+// 因此标签拖拽期间必须在捕获阶段 stopPropagation，让目标区域的处理器不执行。
 const onDocDragOver = (event) => {
+  if (!dragTabId.value) return;
   if (tabsScrollRef.value && tabsScrollRef.value.contains(event.target)) return;
-  event.preventDefault(); // 阻止默认放置行为
+  event.preventDefault();
+  event.stopPropagation();
 };
 const onDocDrop = (event) => {
+  if (!dragTabId.value) return;
   if (tabsScrollRef.value && tabsScrollRef.value.contains(event.target)) return;
   event.preventDefault();
   event.stopPropagation();
