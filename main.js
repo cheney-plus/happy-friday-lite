@@ -184,6 +184,16 @@ function createWindow() {
 
   Menu.setApplicationMenu(null)
 
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const isMacToggle = input.meta && input.alt && input.code === 'KeyI'
+    const isWinToggle = input.code === 'F12'
+    if (isMacToggle || isWinToggle) {
+      mainWindow.webContents.toggleDevTools()
+      event.preventDefault()
+    }
+  })
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
