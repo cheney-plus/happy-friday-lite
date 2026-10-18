@@ -13,7 +13,11 @@
     "delete": "删除",
     "importFailed": "导入失败",
     "deleteFailed": "删除失败",
-    "duplicate": "已存在同名 Skill，重复导入"
+    "duplicate": "已存在同名 Skill，重复导入",
+    "restoreBuiltin": "恢复内置 SKILL",
+    "builtinBadge": "内置",
+    "restoredCount": "已恢复 {count} 个内置技能",
+    "restoreFailed": "恢复失败"
   },
   "mcp": {
     "title": "MCP 连接",

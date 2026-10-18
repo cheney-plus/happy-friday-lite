@@ -86,7 +86,31 @@
                 :class="['font-size-option', { active: settings.scheduleDefaultView === 'month' }]"
                 @click="selectScheduleView('month')"
               >{{ t('settings.viewMonth') }}</div>
+              <div
+                :class="['font-size-option', { active: settings.scheduleDefaultView === 'quadrant' }]"
+                @click="selectScheduleView('quadrant')"
+              >{{ t('settings.viewQuadrant') }}</div>
             </div>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.reminderLead') }}</span>
+            <div class="font-size-options">
+              <div
+                v-for="opt in reminderLeadOptions"
+                :key="opt.value"
+                :class="['font-size-option', { active: settings.reminderLeadMinutes === opt.value }]"
+                @click="selectReminderLead(opt.value)"
+              >{{ opt.label }}</div>
+            </div>
+          </div>
+          <div class="setting-item">
+            <span class="item-label">{{ t('settings.reminderAllDayTime') }}</span>
+            <input
+              type="time"
+              v-model="settings.reminderAllDayTime"
+              class="text-input reminder-time-input"
+              @change="saveReminderConfig"
+            />
           </div>
           <div class="setting-item clickable" @click="goToFileOpenSettings">
             <div class="item-label-group">
@@ -249,6 +273,27 @@
           <div v-if="backupConfig.lastBackupAt" class="setting-item">
             <span class="item-label">{{ t('settings.lastBackupTime') }}</span>
             <span class="item-link">{{ formatBackupTime(backupConfig.lastBackupAt) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 数据存储 -->
+      <div class="settings-group">
+        <div class="group-title">{{ t('settings.dataStorage') }}</div>
+        <div class="group-content">
+          <div class="setting-item clickable" @click="selectDataDir">
+            <div class="item-label-group">
+              <span class="item-label">{{ t('settings.userDataDir') }}</span>
+              <span class="item-hint">{{ t('settings.userDataDirHint') }}</span>
+            </div>
+            <span class="item-link" :title="dataDirState.current">
+              {{ shortenPath(dataDirState.current) }}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </span>
+          </div>
+          <div v-if="dataDirState.isCustom" class="setting-item">
+            <span class="item-label">{{ t('settings.resetDataDir') }}</span>
+            <button class="text-btn" @click="resetDataDir">{{ t('settings.resetToDefault') }}</button>
           </div>
         </div>
       </div>
@@ -641,8 +686,18 @@ const settings = reactive({
   fontSize: 16,
   messageNotify: false,
   noteFimCompletion: appStore.noteFimCompletion,
-  scheduleDefaultView: appStore.scheduleDefaultView || 'month'
+  scheduleDefaultView: appStore.scheduleDefaultView || 'month',
+  // 日程到期提醒：提前提醒分钟数 / 全天日程提醒时间
+  reminderLeadMinutes: 60,
+  reminderAllDayTime: '09:30'
 });
+
+const reminderLeadOptions = computed(() => [
+  { value: 10, label: t('settings.reminderLead10') },
+  { value: 30, label: t('settings.reminderLead30') },
+  { value: 60, label: t('settings.reminderLead60') },
+  { value: 120, label: t('settings.reminderLead120') }
+]);
 
 const enabledModuleCount = computed(() => Object.values(appStore.sidebarModules).filter(Boolean).length);
 const sidebarModuleCount = sidebarModuleConfig.length;
@@ -884,6 +939,88 @@ const formatBackupTime = (iso) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
+
+// ========== 数据存储 ==========
+const dataDirState = reactive({
+  current: '',
+  isCustom: false,
+  defaultDir: ''
+});
+
+const loadDataDirInfo = async () => {
+  try {
+    const info = await electronService.invoke('data-dir-get');
+    if (info) {
+      dataDirState.current = info.current || '';
+      dataDirState.isCustom = !!info.isCustom;
+      dataDirState.defaultDir = info.defaultDir || '';
+    }
+  } catch (e) {
+    console.error('加载数据目录信息失败:', e);
+  }
+};
+
+// 选择并切换数据目录：写指针 → 提示重启（可立即重启）
+const selectDataDir = async () => {
+  try {
+    const picked = await electronService.invoke('data-dir-select');
+    if (!picked.success) {
+      if (!picked.canceled) await notifyError(t('settings.dataDirSelectFailed') + ': ' + (picked.error || t('settings.unknownError')));
+      return;
+    }
+    if (picked.path === dataDirState.current) return;
+    const confirmed = await confirmDialog(t('settings.dataDirChangeConfirm', { dir: picked.path }), {
+      confirmText: t('settings.dialogConfirm'),
+      cancelText: t('settings.dialogCancel')
+    });
+    if (!confirmed) return;
+    const result = await electronService.invoke('data-dir-set', { dir: picked.path });
+    if (!result.success) {
+      await notifyError(t('settings.dataDirSetFailed') + ': ' + (result.error || t('settings.unknownError')));
+      return;
+    }
+    if (!result.needRestart) {
+      await notifyWarning(t('settings.dataDirSameAsCurrent'));
+      return;
+    }
+    const restart = await showDialog({
+      type: 'info',
+      message: t('settings.dataDirRestartHint'),
+      confirmText: t('settings.restartNow'),
+      cancelText: t('settings.restartLater')
+    });
+    if (restart) await electronService.invoke('app-relaunch');
+  } catch (e) {
+    await notifyError(t('settings.dataDirSetFailed') + ': ' + e);
+  }
+};
+
+// 恢复默认数据目录（数据保留在原自定义目录，重启后生效）
+const resetDataDir = async () => {
+  try {
+    const confirmed = await confirmDialog(t('settings.dataDirResetConfirm'), {
+      confirmText: t('settings.dialogConfirm'),
+      cancelText: t('settings.dialogCancel')
+    });
+    if (!confirmed) return;
+    const result = await electronService.invoke('data-dir-reset');
+    if (!result.success) {
+      await notifyError(t('settings.dataDirSetFailed') + ': ' + (result.error || t('settings.unknownError')));
+      return;
+    }
+    if (!result.needRestart) return;
+    const restart = await showDialog({
+      type: 'info',
+      message: t('settings.dataDirRestartHint'),
+      confirmText: t('settings.restartNow'),
+      cancelText: t('settings.restartLater')
+    });
+    if (restart) await electronService.invoke('app-relaunch');
+  } catch (e) {
+    await notifyError(t('settings.dataDirSetFailed') + ': ' + e);
+  }
+};
+
 
 // ========== 对话历史自动清理 ==========
 const loadHistoryConfig = async () => {
@@ -1265,7 +1402,7 @@ const saveRuntimeLogsConfig = async () => {
 };
 
 const selectScheduleView = async (value) => {
-  if (value !== 'week' && value !== 'month') return;
+  if (value !== 'week' && value !== 'month' && value !== 'quadrant') return;
   settings.scheduleDefaultView = value;
   appStore.setScheduleDefaultView(value);
   try {
@@ -1275,6 +1412,24 @@ const selectScheduleView = async (value) => {
       await electronService.invoke('save-config', config);
     }
   } catch (_e) {}
+};
+
+// 日程到期提醒：提前提醒分钟 / 全天提醒时间，写入 config.json 供主进程调度器读取
+const saveReminderConfig = async () => {
+  try {
+    const config = await electronService.invoke('get-config');
+    if (!config) return;
+    config.reminderLeadMinutes = settings.reminderLeadMinutes;
+    const time = /^\d{1,2}:\d{2}$/.test(settings.reminderAllDayTime || '') ? settings.reminderAllDayTime : '09:30';
+    config.reminderAllDayTime = time;
+    await electronService.invoke('save-config', config);
+  } catch (_e) {}
+};
+
+const selectReminderLead = async (value) => {
+  if (![10, 30, 60, 120].includes(value)) return;
+  settings.reminderLeadMinutes = value;
+  await saveReminderConfig();
 };
 
 // 文件打开方式二级设置页（默认打开方式 + 系统文件关联）
@@ -1313,9 +1468,12 @@ onMounted(() => {
     if (config) {
       runtimeLogsEnabled.value = config.runtimeLogsEnabled !== false;
       appStore.setSidebarModules(config.sidebarModules);
+      if (config.reminderLeadMinutes) settings.reminderLeadMinutes = config.reminderLeadMinutes;
+      if (config.reminderAllDayTime) settings.reminderAllDayTime = config.reminderAllDayTime;
     }
   });
   loadBackupConfig();
+  loadDataDirInfo();
   loadHistoryConfig();
   loadRagStats();
   loadPythonStatus();
@@ -1645,6 +1803,13 @@ const openAuthorEmail = () => {
 
 .text-input:focus {
   border-color: var(--text-tertiary);
+}
+
+/* 全天日程提醒时间选择 */
+.reminder-time-input {
+  width: 120px;
+  height: 30px;
+  font-family: inherit;
 }
 
 .toggle-switch {

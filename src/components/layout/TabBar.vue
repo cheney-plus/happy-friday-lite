@@ -13,12 +13,17 @@
         <template v-for="(tab, index) in tabStore.openedTabs" :key="tab.id">
           <span v-if="index > 0" :class="['tab-divider', { hidden: tabStore.activeTabId === tab.id || tabStore.openedTabs[index - 1]?.id === tabStore.activeTabId }]"></span>
           <div
-            :class="['tab-item', { active: tabStore.activeTabId === tab.id }]"
+            :class="['tab-item', { active: tabStore.activeTabId === tab.id, dragging: dragTabId === tab.id }]"
             :style="{ width: tabWidth + 'px' }"
             role="tab"
+            draggable="true"
             @click="switchTab(tab)"
             @dblclick.stop="handleTabDoubleClick(tab)"
             @contextmenu.prevent.stop="showContextMenu($event, tab)"
+            @dragstart="onDragStart($event, tab)"
+            @dragover.prevent.stop="onDragOver($event, tab, index)"
+            @drop.prevent.stop="onDrop"
+            @dragend="onDragEnd"
             @mouseenter="hoveredTabId = tab.id"
             @mouseleave="hoveredTabId = ''"
           >
@@ -309,6 +314,49 @@ const moveContextTab = (direction) => {
   }
 };
 
+// ===== 标签页拖拽排序（拖动时实时动态换位，被拖标签原位留空；结果随 store 变化自动持久化） =====
+const dragTabId = ref('');
+
+// 禁止把标签拖到标签栏以外区域放置（避免往编辑器等内容区插入文本）。
+// 注意：仅 preventDefault 不够——编辑器自身的 dragover 处理器会再次 preventDefault 主动接受拖放，
+// 因此标签拖拽期间必须在捕获阶段 stopPropagation，让目标区域的处理器不执行。
+const onDocDragOver = (event) => {
+  if (!dragTabId.value) return;
+  if (tabsScrollRef.value && tabsScrollRef.value.contains(event.target)) return;
+  event.preventDefault();
+  event.stopPropagation();
+};
+const onDocDrop = (event) => {
+  if (!dragTabId.value) return;
+  if (tabsScrollRef.value && tabsScrollRef.value.contains(event.target)) return;
+  event.preventDefault();
+  event.stopPropagation();
+};
+
+const onDragStart = (event, tab) => {
+  dragTabId.value = tab.id;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', tab.id);
+  document.addEventListener('dragover', onDocDragOver, true);
+  document.addEventListener('drop', onDocDrop, true);
+};
+
+const onDragOver = (event, tab, index) => {
+  if (!dragTabId.value || dragTabId.value === tab.id) return;
+  // 鼠标位于目标标签左/右半侧决定插入其前/后，拖动过程中实时换位
+  const rect = event.currentTarget.getBoundingClientRect();
+  const targetIndex = event.clientX > rect.left + rect.width / 2 ? index + 1 : index;
+  tabStore.reorderTab(dragTabId.value, targetIndex);
+};
+
+const onDrop = () => {};
+
+const onDragEnd = () => {
+  dragTabId.value = '';
+  document.removeEventListener('dragover', onDocDragOver, true);
+  document.removeEventListener('drop', onDocDrop, true);
+};
+
 const handleKeydown = (event) => {
   if (event.key === 'Escape') hideContextMenu();
 };
@@ -457,6 +505,11 @@ const handleClose = () => {
   background-color: var(--bg-primary);
   opacity: 1;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.tab-item.dragging {
+  /* 注意：不能用 visibility:hidden，Electron/Chromium 下隐藏拖动源会中断拖拽会话 */
+  opacity: 0;
 }
 
 .tab-icon {

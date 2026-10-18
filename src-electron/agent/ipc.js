@@ -29,7 +29,7 @@ import * as db from '../db.js'
 import { buildLlmMessage } from '../attachmentContext.js'
 import { createAgentWithContext } from './index.js'
 import { createLogger } from './logger.js'
-import { listSkills, generateSkillIndex, deleteSkill, importSkill } from './skills.js'
+import { listSkills, generateSkillIndex, deleteSkill, importSkill, restoreBuiltinSkills, isBuiltinSkill } from './skills.js'
 import { listRegisteredTools, listToolNames, getRiskAssessment, stripRiskAssessment } from './tools/registry.js'
 import {
   listMcpServers,
@@ -284,9 +284,13 @@ export function registerAgentCommands(mainWindow) {
 
   // ========== agent-delete-skill: 删除指定技能 ==========
   // 删除是不可逆操作，先弹出原生确认框；用户取消时返回 canceled: true
+  // 内置技能（docx/marp-slide/pdf/pptx/skill-creator/xlsx）不可删除
   ipcMain.handle('agent-delete-skill', async (_event, args) => {
     const id = args?.id
     if (!id) return { success: false, error: '缺少 skill id' }
+    if (isBuiltinSkill(id)) {
+      return { success: false, builtin: true, error: '内置技能不可删除' }
+    }
 
     const confirm = await dialog.showMessageBox(mainWindow, {
       type: 'warning',
@@ -314,6 +318,16 @@ export function registerAgentCommands(mainWindow) {
       return { success: false, canceled: true }
     }
     return importSkill(dlg.filePaths[0])
+  })
+
+  // ========== agent-restore-builtin-skills: 恢复默认（内置）技能 ==========
+  // 将 public/skills/ 中的内置技能重新复制到用户 SKILL 目录（已删除的可找回）
+  ipcMain.handle('agent-restore-builtin-skills', async () => {
+    try {
+      return restoreBuiltinSkills()
+    } catch (e) {
+      return { success: false, restored: [], error: e.message }
+    }
   })
 
   // ========== MCP 连接管理 ==========

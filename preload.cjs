@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'get-config',
       'open-file-get-pending',
       'save-config',
+      'session-get',
+      'session-save',
       'get-platform',
       'save-file-dialog',
       'open-file-dialog',
@@ -101,6 +103,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'backup-get-config',
       'backup-set-config',
       'backup-select-dir',
+      'data-dir-get',
+      'data-dir-select',
+      'data-dir-set',
+      'data-dir-reset',
+      'app-relaunch',
       'history-get-config',
       'history-set-config',
       'history-clean-now',
@@ -135,6 +142,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent-list-skills',
       'agent-delete-skill',
       'agent-import-skill',
+      'agent-restore-builtin-skills',
       'mcp-list-servers',
       'mcp-add-servers',
       'mcp-delete-server',
@@ -183,7 +191,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const validChannels = [
       'window-minimize',
       'window-maximize',
-      'window-close'
+      'window-close',
+      'session-save-sync'
     ]
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args)

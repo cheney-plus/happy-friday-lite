@@ -26,6 +26,19 @@
       </div>
 
       <div class="tooltip-wrapper">
+        <button
+          class="toolbar-btn format-painter-btn"
+          :class="{ active: !!formatPainter }"
+          :title="t('note.toolbar.formatPainter')"
+          @click="handleFormatPainterClick"
+          @dblclick.prevent="handleFormatPainterDblClick"
+        >
+          <PaintRoller :size="15" :stroke-width="2" />
+        </button>
+        <span class="tooltip">{{ t('note.toolbar.formatPainter') }}</span>
+      </div>
+
+      <div class="tooltip-wrapper">
         <button class="toolbar-btn" @click="clearFormatting">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
         </button>
@@ -122,13 +135,23 @@
       </div>
 
       <div class="dropdown-wrapper">
-        <button class="toolbar-btn dropdown-toggle" :class="{ active: editor.isActive('highlight') }" @click="toggleHighlightMenu">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        <button class="toolbar-btn dropdown-toggle highlight-toggle" :class="{ active: editor.isActive('highlight') }" @click="handleHighlightButtonClick">
+          <Highlighter :size="15" :stroke-width="2" />
+          <span class="highlight-current-color" :style="lastHighlightColor ? { backgroundColor: lastHighlightColor } : { display: 'none' }"></span>
+          <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" @click.stop="toggleHighlightMenu"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHighlightMenu" class="dropdown-menu highlight-menu">
           <div class="text-color-header">{{ t('note.toolbar.backgroundColor') }}</div>
-          <button class="default-color-btn" @click="setHighlight('transparent')">{{ t('note.toolbar.noBackground') }}</button>
+          <div class="color-picker-grid highlight-grid highlight-recent-grid">
+            <div class="color-option no-bg-option"
+                 :title="t('note.toolbar.noBackground')"
+                 @click="setHighlight('transparent')"></div>
+            <div class="color-option" v-for="color in recentHighlightColors" :key="'recent-' + color"
+                 :style="{ backgroundColor: color }"
+                 :title="color"
+                 @click="setHighlight(color)"></div>
+          </div>
+          <div v-if="recentHighlightColors.length" class="highlight-recent-divider"></div>
           <div class="color-picker-grid highlight-grid">
             <div class="color-option" v-for="color in highlightColorPalette" :key="color"
                  :style="{ backgroundColor: color, border: color === '#ffffff' ? '1px solid #e5e7eb' : 'none' }"
@@ -276,6 +299,13 @@
       <!-- 右侧功能按钮组 -->
       <div ref="toolbarRightRef" class="toolbar-right-group">
         <div class="tooltip-wrapper">
+          <button class="toolbar-btn" :class="{ active: showPresentation }" @click="togglePresentation">
+            <Repeat :size="15" :stroke-width="2" />
+          </button>
+          <span class="tooltip">{{ showPresentation ? t('note.toolbar.backToEdit') : t('note.toolbar.presentation') }}</span>
+        </div>
+
+        <div class="tooltip-wrapper">
           <button class="toolbar-btn" @click="handleAddContent">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
@@ -389,7 +419,16 @@
       <span class="toc-char">{{ t('note.toc.char2') }}</span>
     </div>
 
-    <EditorContent ref="editorContentRef" :editor="editor" class="editor-content" />
+    <EditorContent v-show="!showPresentation" ref="editorContentRef" :editor="editor" class="editor-content" />
+
+    <MarpPresentation
+      v-if="showPresentation"
+      :source="presentationSource"
+      :format="presentationFormat"
+      :generating="isGeneratingMarp"
+      @close="showPresentation = false"
+      @regenerate="generateMarpContent"
+    />
 
     <div
       v-if="fimCompletionVisible && fimCompletionText"
@@ -523,6 +562,27 @@
           <button class="btn btn-primary" @click="confirmFormula" :disabled="!formulaLatex.trim()">
             {{ isEditingFormula ? t('note.formulaDialog.update') : t('note.formulaDialog.insert') }}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 演示文档生成确认对话框 -->
+    <div v-if="showMarpGenerateConfirm" class="dialog-overlay" @click.self="!isGeneratingMarp && (showMarpGenerateConfirm = false)">
+      <div class="dialog">
+        <div class="dialog-header">
+          <h3>{{ isGeneratingMarp ? t('note.presentation.generating') : t('note.presentation.generateTitle') }}</h3>
+          <button v-if="!isGeneratingMarp" class="dialog-close" @click="showMarpGenerateConfirm = false">×</button>
+        </div>
+        <div class="dialog-body">
+          <p v-if="!isGeneratingMarp" class="marp-generate-tip">{{ t('note.presentation.generateBody') }}</p>
+          <p v-else class="marp-generate-tip">
+            <span class="export-spinner"></span>
+            {{ t('note.presentation.generating') }}
+          </p>
+        </div>
+        <div v-if="!isGeneratingMarp" class="dialog-footer">
+          <button class="btn btn-secondary" @click="showMarpGenerateConfirm = false">{{ t('note.cancel') }}</button>
+          <button class="btn btn-primary" @click="generateMarpContent">{{ t('note.presentation.generateConfirm') }}</button>
         </div>
       </div>
     </div>
@@ -669,7 +729,8 @@ import {
   AlignCenter, AlignLeft, AlignRight, Bold, Code2, Eraser, Heading,
   Highlighter, Image as ToolbarImage, Italic, Link2, List, ListChecks, ListOrdered,
   Columns3, Combine, Minus, Palette, PanelLeft, PanelTop, Quote, Redo2, Rows3, Sigma, Split,
-  Strikethrough, Table2, Trash2, Underline as ToolbarUnderline, Undo2,
+  PaintRoller,
+  Repeat, Strikethrough, Table2, Trash2, Underline as ToolbarUnderline, Undo2,
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
@@ -721,12 +782,14 @@ import ini from 'highlight.js/lib/languages/ini';
 import diff from 'highlight.js/lib/languages/diff';
 import { VueNodeViewRenderer } from '@tiptap/vue-3';
 import CodeBlockComponent from './CodeBlockComponent.vue';
+import MarpPresentation from './MarpPresentation.vue';
 import NoteBubbleMenu from './NoteBubbleMenu.vue';
 import KbDirSelectDialog from '@/views/knowledge/components/KbDirSelectDialog.vue';
 import SelectNoteDialog from '@/views/knowledge/components/SelectNoteDialog.vue';
 import KbFileDialog from '@/views/knowledge/components/KbFileDialog.vue';
 import { DEFAULT_CATEGORIES } from '@/views/knowledge/constants';
 import { useAppStore } from '@/store';
+import { useNoteStore } from '@/store/modules/note';
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import { CellSelection } from '@tiptap/pm/tables';
@@ -925,6 +988,102 @@ const showTextColorMenu = ref(false);
 const showHeadingMenu = ref(false);
 const showTableSubmenu = ref(false);
 const showMoreMenu = ref(false);
+const showPresentation = ref(false);
+const presentationSource = ref('');
+const presentationFormat = ref('html');
+const showMarpGenerateConfirm = ref(false);
+const isGeneratingMarp = ref(false);
+let marpUnlisteners = [];
+const noteStore = useNoteStore();
+
+const togglePresentation = () => {
+  if (showPresentation.value) {
+    showPresentation.value = false;
+    return;
+  }
+  if (!editor.value) return;
+  const note = noteStore.notes.find(n => n.id === props.noteId);
+  if (!note?.marpContent || !note.marpContent.trim()) {
+    // marpContent 为空：提示用户生成演示文档
+    showMarpGenerateConfirm.value = true;
+    return;
+  }
+  presentationSource.value = note.marpContent;
+  presentationFormat.value = 'markdown';
+  showPresentation.value = true;
+};
+
+const cleanupMarpListeners = () => {
+  marpUnlisteners.forEach(fn => { try { fn(); } catch (_e) { /* ignore */ } });
+  marpUnlisteners = [];
+};
+
+// 调用 Agent（参考笔记 Friday 助理）根据当前笔记内容生成 Marp 演示并保存到 marpContent
+const generateMarpContent = async () => {
+  if (isGeneratingMarp.value) return;
+  const model = loadModelConfig();
+  if (!model) {
+    alert(t('note.aiSidebar.noModelConfigured'));
+    return;
+  }
+  isGeneratingMarp.value = true;
+  cleanupMarpListeners();
+
+  const requestId = `marp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const message = t('note.presentation.generatePrompt')
+    + '\n\n---\n' + t('note.aiSidebar.agentNoteContext', { noteId: props.noteId });
+
+  const finish = () => {
+    cleanupMarpListeners();
+    isGeneratingMarp.value = false;
+  };
+
+  // 写工具审批：与笔记侧边栏 Friday 助理保持一致，自动批准
+  marpUnlisteners.push(electronService.listen('agent-tool-approval', (event) => {
+    if (event.payload.requestId !== requestId) return;
+    electronService.invoke('agent-tool-approval-resume', {
+      requestId: event.payload.requestId,
+      decision: { type: 'approve' }
+    });
+  }));
+
+  marpUnlisteners.push(electronService.listen('chat-done', async (event) => {
+    if (event.payload.requestId !== requestId) return;
+    finish();
+    showMarpGenerateConfirm.value = false;
+    // 生成完成：从数据库取回最新 marpContent 并进入演示模式
+    const note = await noteStore.fetchNote(props.noteId);
+    if (note?.marpContent && note.marpContent.trim()) {
+      presentationSource.value = note.marpContent;
+      presentationFormat.value = 'markdown';
+      showPresentation.value = true;
+    } else {
+      alert(t('note.presentation.generateFailed'));
+    }
+  }));
+
+  marpUnlisteners.push(electronService.listen('chat-error', (event) => {
+    if (event.payload.requestId !== requestId) return;
+    finish();
+    console.error('Marp generation error:', event.payload.error);
+    alert(t('note.presentation.generateFailed'));
+  }));
+
+  try {
+    await electronService.invoke('agent-invoke', {
+      requestId,
+      sessionId: '',
+      model,
+      message,
+      attachments: [],
+      enableThinking: false
+    });
+  } catch (err) {
+    console.error('Marp generation invoke error:', err);
+    finish();
+    alert(t('note.presentation.generateFailed'));
+  }
+};
 const showToolbarOverflow = ref(false);
 const toolbarOverflowColor = ref(null);
 const toolbarRef = ref(null);
@@ -2429,6 +2588,10 @@ const editor = useEditor({
     attributes: {
       class: 'prose-editor',
     },
+    // 复制为纯文本时块级节点（段落/标题/列表项等）用单个换行分隔，
+    // 覆盖 ProseMirror 默认的 "\n\n"，避免粘贴到其他应用时出现多余空行。
+    // 硬换行（Shift+Enter）仍按节点 leafText 序列化为 "\n"。
+    clipboardTextSerializer: (slice) => slice.content.textBetween(0, slice.content.size, '\n'),
     handleKeyDown: (view, event) => {
       if (event.key === 'Escape' && tableContextMenuVisible.value) {
         event.preventDefault();
@@ -2521,6 +2684,14 @@ const editor = useEditor({
       const html = event.clipboardData.getData('text/html');
 
       if (!text) return false;
+
+      // 编辑器内部复制的内容（ProseMirror 剪贴板自带 data-pm-slice 标记）
+      // 交给默认粘贴处理：按原始 slice 内联插入到光标处。
+      // 不能走下方 markdown 路径，否则会被 marked.parse 转成 <p> 块级内容，
+      // 粘贴时拆分段落，导致粘贴位置前后自动换行。
+      if (html && html.includes('data-pm-slice')) {
+        return false;
+      }
 
       if (html && isRichHtml(html)) {
         return false;
@@ -2694,9 +2865,153 @@ const setHighlight = (color) => {
     editor.value?.chain().focus().unsetHighlight().run();
   } else {
     editor.value?.chain().focus().setHighlight({ color }).run();
+    recordRecentHighlightColor(color);
   }
   showHighlightMenu.value = false;
 };
+
+// ========== 最近使用的背景颜色 ==========
+const RECENT_HIGHLIGHT_KEY = 'happy-friday-recent-highlight-colors';
+const RECENT_HIGHLIGHT_MAX = 9;
+
+const loadRecentHighlightColors = () => {
+  try {
+    const arr = JSON.parse(localStorage.getItem(RECENT_HIGHLIGHT_KEY) || '[]');
+    return Array.isArray(arr) ? arr.filter(c => typeof c === 'string').slice(0, RECENT_HIGHLIGHT_MAX) : [];
+  } catch {
+    return [];
+  }
+};
+
+const recentHighlightColors = ref(loadRecentHighlightColors());
+const lastHighlightColor = computed(() => recentHighlightColors.value[0] || null);
+
+const recordRecentHighlightColor = (color) => {
+  const list = [color, ...recentHighlightColors.value.filter(c => c !== color)].slice(0, RECENT_HIGHLIGHT_MAX);
+  recentHighlightColors.value = list;
+  try {
+    localStorage.setItem(RECENT_HIGHLIGHT_KEY, JSON.stringify(list));
+  } catch {}
+};
+
+// 点击按钮直接应用最近使用的颜色；小箭头或无最近颜色时打开色板菜单
+const handleHighlightButtonClick = () => {
+  if (showHighlightMenu.value) {
+    exclusiveToggleMenu(showHighlightMenu);
+    return;
+  }
+  if (lastHighlightColor.value) {
+    setHighlight(lastHighlightColor.value);
+  } else {
+    toggleHighlightMenu();
+  }
+};
+
+// ========== 格式刷 ==========
+// formatPainter 为 null 表示未激活；{ marks, sticky } 表示已取格式
+// sticky=false 普通点击，仅下一次选中文本时生效一次；sticky=true 双击，持续复用直到再次点击或按 Esc
+const formatPainter = ref(null);
+let painterReleasedAt = 0;
+
+const capturePainterMarks = () => {
+  if (!editor.value) return [];
+  const { state } = editor.value;
+  const { from, to, empty } = state.selection;
+  const marks = [];
+  const push = (m) => {
+    if (!marks.some(x => x.eq(m))) marks.push(m);
+  };
+  state.doc.nodesBetween(from, to, (node) => {
+    (node.marks || []).forEach(push);
+  });
+  if (empty) {
+    (state.storedMarks || state.selection.$from.marks()).forEach(push);
+  }
+  return marks.map(m => ({ type: m.type.name, attrs: { ...m.attrs } }));
+};
+
+const armFormatPainter = (sticky) => {
+  const marks = capturePainterMarks();
+  if (!marks.length) return;
+  formatPainter.value = { marks, sticky };
+};
+
+const handleFormatPainterClick = () => {
+  if (formatPainter.value?.sticky) {
+    formatPainter.value = null;
+    painterReleasedAt = Date.now();
+    return;
+  }
+  armFormatPainter(false);
+};
+
+const handleFormatPainterDblClick = () => {
+  // 双击前必已触发过 click；若刚因点击解除了复用模式，忽略本次双击
+  if (formatPainter.value?.sticky || Date.now() - painterReleasedAt < 400) return;
+  armFormatPainter(true);
+};
+
+const applyFormatPainter = () => {
+  const fp = formatPainter.value;
+  if (!fp || !editor.value) return;
+  const { from, to } = editor.value.state.selection;
+  if (from === to) return;
+  let chain = editor.value.chain().focus().setTextSelection({ from, to }).unsetAllMarks();
+  fp.marks.forEach(({ type, attrs }) => {
+    chain = chain.setMark(type, attrs);
+  });
+  chain.run();
+};
+
+// 拖拽选中文本期间 selectionUpdate 会连续触发（第一次可能只选中一个字符），
+// 因此鼠标按下期间跳过，等 mouseup 选区稳定后再统一应用
+let painterMouseDown = false;
+
+const applyPainterOnce = () => {
+  const fp = formatPainter.value;
+  if (!fp || !editor.value) return;
+  const sel = editor.value.state.selection;
+  if (sel.empty) return;
+  applyFormatPainter();
+  if (!fp.sticky) formatPainter.value = null;
+};
+
+const handlePainterSelectionUpdate = () => {
+  if (painterMouseDown) return;
+  applyPainterOnce();
+};
+
+const handlePainterMouseDown = () => {
+  painterMouseDown = true;
+};
+
+const handlePainterMouseUp = () => {
+  painterMouseDown = false;
+  applyPainterOnce();
+};
+
+const handlePainterKeydown = (e) => {
+  if (e.key === 'Escape') formatPainter.value = null;
+};
+
+// 监听选区变化与鼠标释放以应用格式
+watch(editor, (instance) => {
+  if (!instance) return;
+  instance.on('selectionUpdate', handlePainterSelectionUpdate);
+  const dom = instance.view.dom;
+  dom.addEventListener('mousedown', handlePainterMouseDown);
+  dom.addEventListener('mouseup', handlePainterMouseUp);
+}, { immediate: true });
+
+// 激活时监听 Esc 退出复用模式
+watch(formatPainter, (fp) => {
+  const dom = editor.value?.view.dom;
+  if (fp) {
+    dom?.addEventListener('keydown', handlePainterKeydown);
+  } else {
+    dom?.removeEventListener('keydown', handlePainterKeydown);
+  }
+});
 
 const setTextColor = (color) => {
   if (!color || color === 'inherit' || color === 'transparent') {
@@ -2835,6 +3150,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('contextmenu', handleDocumentContextMenu);
   cleanupChatListeners();
   cleanupFim();
+  cleanupMarpListeners();
   toolbarResizeObserver?.disconnect();
   tableScrollTarget?.removeEventListener('scroll', hideTableContextMenu);
   window.removeEventListener('resize', hideTableContextMenu);
@@ -3376,6 +3692,19 @@ const fixEmptyTableCells = (html) => {
   to { transform: rotate(360deg); }
 }
 
+.marp-generate-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 14px;
+  color: #374151;
+}
+
+[data-theme='dark'] .marp-generate-tip {
+  color: #d1d5db;
+}
+
 .menu-item svg {
   flex-shrink: 0;
   color: #374151;
@@ -3572,6 +3901,48 @@ const fixEmptyTableCells = (html) => {
 
 .highlight-grid {
   grid-template-columns: repeat(10, 1fr);
+}
+
+/* 无背景色块（紧凑，替代原整行按钮）：白底空色块 */
+.no-bg-option {
+  background-color: #fff;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme='dark'] .no-bg-option {
+  background-color: #f3f4f6;
+  border-color: #4b5563 !important;
+}
+
+.highlight-recent-divider {
+  height: 1px;
+  margin: 2px 10px 6px;
+  background: var(--border-color, #e5e7eb);
+}
+
+/* 工具栏按钮上的当前颜色指示条 */
+.highlight-toggle {
+  position: relative;
+}
+
+.highlight-current-color {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+[data-theme='dark'] .highlight-current-color {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.highlight-toggle .dropdown-arrow {
+  cursor: pointer;
 }
 
 .editor-content {
@@ -4701,6 +5072,14 @@ const fixEmptyTableCells = (html) => {
   flex: 1;
   overflow-y: auto;
   padding: 16px 0;
+  /* 全局 main.css 设置了 * { user-select: none }，这里强制覆盖以允许选中复制 AI 输出 */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.sidebar-messages :deep(*) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .sidebar-messages::-webkit-scrollbar {

@@ -16,9 +16,16 @@ export const EVENT_COLORS = [
   '#546E7A', // 灰蓝
 ]
 
-// 日程优先级：urgent 紧急 / important 重要 / minor 次要
-export const EVENT_PRIORITIES = ['urgent', 'important', 'minor']
+// 日程重要性四等级（对应四象限）：urgent-important 重要且紧急 / important 重要不紧急 / minor-urgent 不重要但紧急 / minor 不重要不紧急
+export const EVENT_PRIORITIES = ['urgent-important', 'important', 'minor-urgent', 'minor']
 export const DEFAULT_EVENT_PRIORITY = 'important'
+
+// 兼容旧三级优先级数据：urgent(紧急) → 重要且紧急，minor(次要) → 不重要不紧急
+export function normalizePriority(p) {
+  if (p === 'urgent') return 'urgent-important'
+  if (EVENT_PRIORITIES.includes(p)) return p
+  return DEFAULT_EVENT_PRIORITY
+}
 
 export const useScheduleStore = defineStore('schedule', {
   state: () => ({
@@ -46,7 +53,10 @@ export const useScheduleStore = defineStore('schedule', {
     async loadEvents() {
       this.loading = true
       try {
-        this.events = await electronService.invoke('get_schedule_events') || []
+        this.events = ((await electronService.invoke('get_schedule_events')) || []).map(e => ({
+        ...e,
+        priority: normalizePriority(e.priority)
+      }))
       } catch (e) {
         console.error('Failed to load schedule events:', e)
         this.events = []

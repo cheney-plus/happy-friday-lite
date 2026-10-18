@@ -1,0 +1,330 @@
+@charset "UTF-8";
+/*!
+ * Marp / Marpit Gaia theme.
+ *
+ * @theme gaia
+ * @author Yuki Hattori
+ *
+ * @auto-scaling true
+ * @size 16:9 1280px 720px
+ * @size 4:3 960px 720px
+ */
+@import "https://fonts.bunny.net/css?family=Lato:400,900|Roboto+Mono:400,700&display=swap";
+pre code.hljs{
+  display:block;
+  overflow-x:auto;
+  padding:1em;
+}
+
+code.hljs{
+  padding:3px 5px;
+}
+.hljs{
+  background:#000;
+  color:#f8f8f8;
+}
+
+.hljs-comment,.hljs-quote{
+  color:#aeaeae;
+  font-style:italic;
+}
+
+.hljs-keyword,.hljs-selector-tag,.hljs-type{
+  color:#e28964;
+}
+
+.hljs-string{
+  color:#65b042;
+}
+
+.hljs-subst{
+  color:#daefa3;
+}
+
+.hljs-link,.hljs-regexp{
+  color:#e9c062;
+}
+
+.hljs-name,.hljs-section,.hljs-tag,.hljs-title{
+  color:#89bdff;
+}
+
+.hljs-class .hljs-title,.hljs-doctag,.hljs-title.class_{
+  text-decoration:underline;
+}
+
+.hljs-bullet,.hljs-number,.hljs-symbol{
+  color:#3387cc;
+}
+
+.hljs-params,.hljs-template-variable,.hljs-variable{
+  color:#3e87e3;
+}
+
+.hljs-attribute{
+  color:#cda869;
+}
+
+.hljs-meta{
+  color:#8996a8;
+}
+
+.hljs-formula{
+  background-color:#0e2231;
+  color:#f8f8f8;
+  font-style:italic;
+}
+
+.hljs-addition{
+  background-color:#253b22;
+  color:#f8f8f8;
+}
+
+.hljs-deletion{
+  background-color:#420e09;
+  color:#f8f8f8;
+}
+
+.hljs-selector-class{
+  color:#9b703f;
+}
+
+.hljs-selector-id{
+  color:#8b98ab;
+}
+
+.hljs-emphasis{
+  font-style:italic;
+}
+
+.hljs-strong{
+  font-weight:700;
+}
+
+h1,h2,h3,h4,h5,h6{
+  margin:.5em 0 0;
+}
+h1 strong,h2 strong,h3 strong,h4 strong,h5 strong,h6 strong{
+  font-weight:inherit;
+}
+h1::part(auto-scaling),h2::part(auto-scaling),h3::part(auto-scaling),h4::part(auto-scaling),h5::part(auto-scaling),h6::part(auto-scaling){
+  max-height:580px;
+}
+
+h1{
+  font-size:1.8em;
+}
+
+h2{
+  font-size:1.5em;
+}
+
+h3{
+  font-size:1.3em;
+}
+
+h4{
+  font-size:1.1em;
+}
+
+h5{
+  font-size:1em;
+}
+
+h6{
+  font-size:.9em;
+}
+
+blockquote,p{
+  margin:1em 0 0;
+}
+
+ol>li,ul>li{
+  margin:.3em 0 0;
+}
+ol>li>p,ul>li>p{
+  margin:.6em 0 0;
+}
+
+code{
+  display:inline-block;
+  font-family:Roboto Mono,monospace;
+  font-size:.8em;
+  letter-spacing:0;
+  margin:-.1em .15em;
+  padding:.1em .2em;
+  vertical-align:baseline;
+}
+
+pre{
+  display:block;
+  margin:1em 0 0;
+  overflow:visible;
+}
+pre code{
+  box-sizing:border-box;
+  margin:0;
+  min-width:100%;
+  padding:.5em;
+  font-size:.7em;
+}
+pre::part(auto-scaling){
+  max-height:calc(580px - 1em);
+}
+
+blockquote{
+  margin:1em 0 0;
+  padding:0 1em;
+  position:relative;
+}
+blockquote:after,blockquote:before{
+  content:"“";
+  display:block;
+  font-family:Times New Roman,serif;
+  font-weight:700;
+  position:absolute;
+}
+blockquote:before{
+  top:0;
+  left:0;
+}
+blockquote:after{
+  right:0;
+  bottom:0;
+  transform:rotate(180deg);
+}
+blockquote>:first-child{
+  margin-top:0;
+}
+
+mark{
+  background:transparent;
+}
+
+table{
+  border-spacing:0;
+  border-collapse:collapse;
+  margin:1em 0 0;
+}
+table td,table th{
+  padding:.2em .4em;
+  border-width:1px;
+  border-style:solid;
+}
+
+footer,header,section:after{
+  box-sizing:border-box;
+  font-size:66%;
+  height:70px;
+  line-height:50px;
+  overflow:hidden;
+  padding:10px 25px;
+  position:absolute;
+}
+
+header{
+  top:0;
+}
+
+footer,header{
+  left:0;
+  right:0;
+}
+
+footer{
+  bottom:0;
+}
+
+section{
+  --color-background:light-dark(#fff8e1, #455a64);
+  --color-background-stripe:light-dark(
+    rgba(69,90,100,.1),
+    rgba(255,248,225,.1)
+  );
+  --color-foreground:light-dark(#455a64, #fff8e1);
+  --color-dimmed:light-dark(
+    #6a7a7d,
+    #dad8c8
+  );
+  --color-highlight:light-dark(#0288d1, #81d4fa);
+  color-scheme:light;
+  background-color:var(--color-background);
+  background-image:linear-gradient(135deg, var(--color-background), color-mix(in srgb, var(--color-background) 98%, #888 2%) 50%, var(--color-background) 50%, color-mix(in srgb, var(--color-background) 95%, #fff 5%));
+  color:var(--color-foreground);
+  font-size:35px;
+  font-family:Lato,Avenir Next,Avenir,Trebuchet MS,Segoe UI,sans-serif;
+  height:720px;
+  line-height:1.35;
+  letter-spacing:1.25px;
+  padding:70px;
+  width:1280px;
+  overflow-wrap:break-word;
+}
+section:after{
+  right:0;
+  bottom:0;
+  font-size:80%;
+}
+section a,section mark{
+  color:var(--color-highlight);
+}
+section code{
+  background:var(--color-dimmed);
+  color:var(--color-background);
+}
+section h1 strong,section h2 strong,section h3 strong,section h4 strong,section h5 strong,section h6 strong{
+  color:var(--color-highlight);
+}
+section pre{
+  background:var(--color-foreground);
+}
+section pre>code{
+  background:transparent;
+}
+section blockquote:after,section blockquote:before,section footer,section header,section section:after{
+  color:var(--color-dimmed);
+}
+section table td,section table th{
+  border-color:var(--color-foreground);
+}
+section table thead th{
+  background:var(--color-foreground);
+  color:var(--color-background);
+}
+section table tbody>tr:nth-child(odd) td,section table tbody>tr:nth-child(odd) th{
+  background:var(--color-background-stripe, transparent);
+}
+section>:first-child,section>header:first-child+*{
+  margin-top:0;
+}
+section:where(.invert){
+  color-scheme:dark;
+}
+section:where(.gaia){
+  --color-background:#0288d1;
+  --color-background-stripe:rgba(255,248,225,.1);
+  --color-foreground:#fff8e1;
+  --color-dimmed:#cce2de;
+  --color-highlight:#81d4fa;
+}
+section:where(.lead){
+  place-content:safe center center;
+  flex-flow:column nowrap;
+  align-items:stretch;
+}
+section:where(.lead) h1,section:where(.lead) h2,section:where(.lead) h3,section:where(.lead) h4,section:where(.lead) h5,section:where(.lead) h6{
+  text-align:center;
+}
+section:where(.lead) p{
+  text-align:center;
+}
+section:where(.lead) blockquote>h1,section:where(.lead) blockquote>h2,section:where(.lead) blockquote>h3,section:where(.lead) blockquote>h4,section:where(.lead) blockquote>h5,section:where(.lead) blockquote>h6,section:where(.lead) blockquote>p{
+  text-align:left;
+}
+section:where(.lead) ol>li>p,section:where(.lead) ul>li>p{
+  text-align:left;
+}
+section:where(.lead) table{
+  margin-left:auto;
+  margin-right:auto;
+}

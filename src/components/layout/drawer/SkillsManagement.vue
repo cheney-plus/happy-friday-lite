@@ -4,6 +4,10 @@
     <div class="panel-header">
       <h2 class="section-title">{{ t('drawer.skills.title') }}</h2>
       <div class="header-actions">
+        <button class="restore-btn" :disabled="busy" :title="t('drawer.skills.restoreBuiltin')" @click="handleRestoreBuiltin">
+          <RotateCcw :size="14" :stroke-width="2" />
+          {{ t('drawer.skills.restoreBuiltin') }}
+        </button>
         <button class="add-skill-btn" :disabled="busy" @click="handleAddSkill">
           <Plus :size="14" :stroke-width="2" />
           {{ t('drawer.skills.addSkill') }}
@@ -26,7 +30,9 @@
               @mouseenter="showDescTooltip($event, skill.description)"
               @mouseleave="hideDescTooltip"
             >{{ skill.description }}</div>
+            <span v-if="skill.builtin" class="builtin-badge">{{ t('drawer.skills.builtinBadge') }}</span>
             <button
+              v-if="!skill.builtin"
               class="skill-delete-btn"
               :title="t('drawer.skills.delete')"
               @click.stop="handleDelete(skill)"
@@ -58,7 +64,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Plus, Trash2, X } from 'lucide-vue-next';
+import { Plus, RotateCcw, Trash2, X } from 'lucide-vue-next';
 
 const { t } = useI18n();
 
@@ -142,6 +148,25 @@ const handleAddSkill = async () => {
   }
 };
 
+const handleRestoreBuiltin = async () => {
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    const res = await window.electronAPI?.invoke('agent-restore-builtin-skills');
+    if (!res) return;
+    if (res.success) {
+      await loadSkills();
+      showNotice(t('drawer.skills.restoredCount', { count: res.restored?.length ?? 0 }));
+    } else {
+      showNotice(`${t('drawer.skills.restoreFailed')}: ${res.error || ''}`, 'error');
+    }
+  } catch (e) {
+    showNotice(`${t('drawer.skills.restoreFailed')}: ${e?.message || e}`, 'error');
+  } finally {
+    busy.value = false;
+  }
+};
+
 const handleDelete = async (skill) => {
   try {
     const res = await window.electronAPI?.invoke('agent-delete-skill', { id: skill.id });
@@ -219,6 +244,46 @@ onUnmounted(() => {
 .add-skill-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.restore-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.restore-btn:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+  border-color: var(--text-tertiary);
+}
+
+.restore-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Built-in skill badge: occupies the delete button position (top-right) */
+.builtin-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary, var(--bg-hover));
+  user-select: none;
 }
 
 .close-btn {

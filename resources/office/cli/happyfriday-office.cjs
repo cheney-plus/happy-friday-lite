@@ -77585,7 +77585,7 @@ var require_mock_utils = __commonJS({
       kGetNetConnect
     } = require_mock_symbols();
     var { buildURL } = require_util2();
-    var { STATUS_CODES } = require("node:http");
+    var { STATUS_CODES: STATUS_CODES2 } = require("node:http");
     var {
       types: {
         isPromise: isPromise2
@@ -77753,7 +77753,7 @@ var require_mock_utils = __commonJS({
       return result;
     }
     function getStatusText(statusCode) {
-      return STATUS_CODES[statusCode] || "unknown";
+      return STATUS_CODES2[statusCode] || "unknown";
     }
     async function getResponse(body) {
       const buffers = [];
@@ -80491,7 +80491,7 @@ var require_fetch = __commonJS({
     var { dataURLProcessor, serializeAMimeType, minimizeSupportedMimeType } = require_data_url();
     var { getGlobalDispatcher } = require_global2();
     var { webidl } = require_webidl();
-    var { STATUS_CODES } = require("node:http");
+    var { STATUS_CODES: STATUS_CODES2 } = require("node:http");
     var GET_OR_HEAD = ["GET", "HEAD"];
     var defaultUserAgent = typeof __UNDICI_IS_NODE__ !== "undefined" || typeof esbuildDetection !== "undefined" ? "node" : "undici";
     var resolveObjectURL;
@@ -81474,7 +81474,7 @@ var require_fetch = __commonJS({
               }
               resolve13({
                 status,
-                statusText: STATUS_CODES[status],
+                statusText: STATUS_CODES2[status],
                 headersList,
                 socket
               });
@@ -163638,6 +163638,9 @@ var require_stringify = __commonJS({
             }
             res += ">";
           }
+          if (!e && e !== 0 && e !== "") {
+            return;
+          }
           switch (typeof e) {
             case "string":
             case "number":
@@ -226604,7 +226607,7 @@ function eaHintQuoteRanges(rawRPr, text2) {
   }
   return ranges;
 }
-var alignRange, searchPluginKey2, SearchHighlightExtension, pendingCommentPluginKey, PendingCommentHighlightExtension, resolvedCommentsPluginKey, ResolvedCommentsExtension, tabStopPluginKey, TWIPS_PER_PX2, DEFAULT_TAB_TWIPS, paraHasTabCache, spaceMeasureCtx, SEG_BREAKABLE_RE, MEASURE_RETRY_MAX, MEASURE_SIGS_MAX, TabLayoutView, TabStopExtension, dropCapPluginKey, DropCapExtension, wsRunPluginKey, WsRunLineHeightExtension, eaHintQuotesPluginKey, EA_HINT_RE, EA_QUOTES_RE, EaHintQuotesExtension, paraBorderMergePluginKey, ParaBorderMergeExtension, sdtPluginKey, SdtExtension, moveRevisionPluginKey, MoveRevisionExtension, paraMarkDelPluginKey, ParaMarkDelExtension, pPrChangePluginKey, PPrChangeExtension;
+var alignRange, searchPluginKey2, SearchHighlightExtension, pendingCommentPluginKey, PendingCommentHighlightExtension, resolvedCommentsPluginKey, ResolvedCommentsExtension, tabStopPluginKey, TWIPS_PER_PX2, DEFAULT_TAB_TWIPS, paraHasTabCache, spaceMeasureCtx, SEG_BREAKABLE_RE, MEASURE_RETRY_MAX, MEASURE_SIGS_MAX, STREAM_MEASURE_GAP_MS, TabLayoutView, TabStopExtension, dropCapPluginKey, DropCapExtension, wsRunPluginKey, WsRunLineHeightExtension, eaHintQuotesPluginKey, EA_HINT_RE, EA_QUOTES_RE, EaHintQuotesExtension, paraBorderMergePluginKey, ParaBorderMergeExtension, sdtPluginKey, SdtExtension, moveRevisionPluginKey, MoveRevisionExtension, paraMarkDelPluginKey, ParaMarkDelExtension, pPrChangePluginKey, PPrChangeExtension;
 var init_decoration_extensions = __esm({
   "../../apps/docs/src/renderer/editor/decoration-extensions.ts"() {
     "use strict";
@@ -226725,6 +226728,7 @@ var init_decoration_extensions = __esm({
     SEG_BREAKABLE_RE = /\s|[\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/;
     MEASURE_RETRY_MAX = 10;
     MEASURE_SIGS_MAX = 8;
+    STREAM_MEASURE_GAP_MS = 900;
     TabLayoutView = class {
       constructor(view, storage) {
         this.view = view;
@@ -226748,6 +226752,7 @@ var init_decoration_extensions = __esm({
       frozen = false;
       retryRaf = 0;
       retries = 0;
+      streamMeasureAt = 0;
       resizeObserver;
       lastDomWidth = -1;
       // font swaps change text metrics, which shifts every tab's start x
@@ -226756,9 +226761,15 @@ var init_decoration_extensions = __esm({
         this.measure();
       };
       onPhasedSettled = () => {
-        this.invalidate();
         this.measure();
       };
+      /** once per duty-cycle window while a streamed tail is landing */
+      claimStreamMeasure() {
+        const now = performance.now();
+        if (now - this.streamMeasureAt < STREAM_MEASURE_GAP_MS) return false;
+        this.streamMeasureAt = now;
+        return true;
+      }
       /** external layout input changed: start a fresh convergence run */
       invalidate() {
         this.seenSigs.clear();
@@ -226797,7 +226808,7 @@ var init_decoration_extensions = __esm({
           this.retryRaf = 0;
         }
         const { view } = this;
-        if (isPhasedContentPending()) return;
+        if (isPhasedContentPending() && !this.claimStreamMeasure()) return;
         if (!view.dom.isConnected) {
           this.scheduleRetry();
           return;
@@ -227478,7 +227489,7 @@ function sameLine2(a, b2) {
   const overlap = Math.min(a.bottom, b2.bottom) - Math.max(a.top, b2.top);
   return overlap > Math.min(a.bottom - a.top, b2.bottom - b2.top) / 2;
 }
-var SPACE_SHRINK_MAX, SHRINK_VS_STRETCH, SHRINK_EPS, NOISE, justifyShrinkPluginKey, SKIP_SCRIPT_RE, MEASURE_RETRY_MAX2, MEASURE_SIGS_MAX2, spaceCtx, wordRange, JustifyShrinkView, JustifyShrinkExtension;
+var SPACE_SHRINK_MAX, SHRINK_VS_STRETCH, SHRINK_EPS, NOISE, justifyShrinkPluginKey, SKIP_SCRIPT_RE, MEASURE_RETRY_MAX2, MEASURE_SIGS_MAX2, STREAM_MEASURE_GAP_MS2, STREAM_FRESH_BUDGET, spaceCtx, wordRange, JustifyShrinkView, JustifyShrinkExtension;
 var init_justify_shrink = __esm({
   "../../apps/docs/src/renderer/editor/justify-shrink.ts"() {
     "use strict";
@@ -227499,6 +227510,8 @@ var init_justify_shrink = __esm({
     );
     MEASURE_RETRY_MAX2 = 10;
     MEASURE_SIGS_MAX2 = 12;
+    STREAM_MEASURE_GAP_MS2 = 900;
+    STREAM_FRESH_BUDGET = 220;
     wordRange = rangeSlot();
     JustifyShrinkView = class {
       constructor(view, storage) {
@@ -227523,6 +227536,10 @@ var init_justify_shrink = __esm({
       frozen = false;
       retryRaf = 0;
       retries = 0;
+      /** constructor-set: the first duty claim waits one window past the mount */
+      streamMeasureAt = performance.now();
+      catchupTimer;
+      inCatchup = false;
       resizeObserver;
       lastDomWidth = -1;
       results = new SettledParagraphCache(
@@ -227534,9 +227551,28 @@ var init_justify_shrink = __esm({
         this.measure();
       };
       onPhasedSettled = () => {
-        this.invalidate();
         this.measure();
       };
+      /** once per duty-cycle window while a streamed tail is landing */
+      claimStreamMeasure() {
+        const now = performance.now();
+        if (now - this.streamMeasureAt < STREAM_MEASURE_GAP_MS2) return false;
+        this.streamMeasureAt = now;
+        return true;
+      }
+      /** continue a truncated progressive measurement outside the current task */
+      scheduleCatchup() {
+        if (this.catchupTimer) return;
+        this.catchupTimer = setTimeout(() => {
+          this.catchupTimer = void 0;
+          this.inCatchup = true;
+          try {
+            this.measure();
+          } finally {
+            this.inCatchup = false;
+          }
+        }, 30);
+      }
       /** layout input changed (resize, fonts): every paragraph re-measures */
       invalidate() {
         this.results.clear();
@@ -227560,6 +227596,7 @@ var init_justify_shrink = __esm({
         document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled);
         this.resizeObserver?.disconnect();
         if (this.retryRaf) cancelAnimationFrame(this.retryRaf);
+        if (this.catchupTimer) clearTimeout(this.catchupTimer);
       }
       scheduleRetry() {
         if (this.retryRaf || this.retries >= MEASURE_RETRY_MAX2) return;
@@ -227575,7 +227612,7 @@ var init_justify_shrink = __esm({
           this.retryRaf = 0;
         }
         const { view } = this;
-        if (isPhasedContentPending()) return;
+        if (isPhasedContentPending() && !this.inCatchup && !this.claimStreamMeasure()) return;
         if (view.dom.closest(".app.pv-exporting")) {
           this.retries = 0;
           this.scheduleRetry();
@@ -227605,6 +227642,8 @@ var init_justify_shrink = __esm({
         });
         const shrinks = [];
         let measurable2 = paras.length === 0;
+        let freshBudget = STREAM_FRESH_BUDGET;
+        let truncated = false;
         this.results.beginPass(view);
         const topLevel = SettledParagraphCache.topLevelDom(view);
         for (const para of paras) {
@@ -227612,7 +227651,14 @@ var init_justify_shrink = __esm({
             view,
             para.node,
             para.pos,
-            (el) => this.measureParagraph(para.node, para.pos, el),
+            (el) => {
+              if (freshBudget <= 0) {
+                truncated = true;
+                return null;
+              }
+              freshBudget--;
+              return this.measureParagraph(para.node, para.pos, el);
+            },
             topLevel.get(para.node)
           );
           if (!measured) continue;
@@ -227624,6 +227670,12 @@ var init_justify_shrink = __esm({
           return;
         }
         this.retries = 0;
+        if (truncated) {
+          this.seenSigs.clear();
+          this.frozen = false;
+          this.scheduleCatchup();
+          return;
+        }
         const sig = JSON.stringify(shrinks.map((s2) => [s2.from, s2.to, s2.perChar]));
         if (sig === this.lastSig) return;
         if (this.frozen) return;
@@ -227971,7 +228023,7 @@ function charAdvancePx(font, ch) {
   }
   return w2;
 }
-var COMPRESSIBLE_CLOSE, COMPRESSIBLE_OPEN, COMPRESSIBLE, KINSOKU_CLOSE, OPENERS, CJK_RE3, VOLUNTARY_CAP, FORCED_CAP, SHRINK_EPS2, NOISE2, PARA_CHAR_BUDGET, MEASURE_RETRY_MAX3, MEASURE_SIGS_MAX3, DOC_CSS_COMMITTED_EVENT, cjkPunctShrinkPluginKey, shiftShrinks, isPunct, isClose, isKinsokuClose, charRange2, candidateCache, measureCtx, advanceCache, CjkPunctShrinkView, CjkPunctShrinkExtension;
+var COMPRESSIBLE_CLOSE, COMPRESSIBLE_OPEN, COMPRESSIBLE, KINSOKU_CLOSE, OPENERS, CJK_RE3, VOLUNTARY_CAP, FORCED_CAP, SHRINK_EPS2, NOISE2, PARA_CHAR_BUDGET, MEASURE_RETRY_MAX3, MEASURE_SIGS_MAX3, STREAM_MEASURE_GAP_MS3, STREAM_FRESH_BUDGET2, DOC_CSS_COMMITTED_EVENT, cjkPunctShrinkPluginKey, shiftShrinks, isPunct, isClose, isKinsokuClose, charRange2, candidateCache, measureCtx, advanceCache, CjkPunctShrinkView, CjkPunctShrinkExtension;
 var init_cjk_punct_shrink = __esm({
   "../../apps/docs/src/renderer/editor/cjk-punct-shrink.ts"() {
     "use strict";
@@ -227999,6 +228051,8 @@ var init_cjk_punct_shrink = __esm({
     PARA_CHAR_BUDGET = 4e3;
     MEASURE_RETRY_MAX3 = 10;
     MEASURE_SIGS_MAX3 = 12;
+    STREAM_MEASURE_GAP_MS3 = 900;
+    STREAM_FRESH_BUDGET2 = 220;
     DOC_CSS_COMMITTED_EVENT = "genoffice:doc-css";
     cjkPunctShrinkPluginKey = new PluginKey("cjkPunctShrink");
     shiftShrinks = (r, d) => r.map((s2) => ({ ...s2, from: s2.from + d }));
@@ -228033,6 +228087,10 @@ var init_cjk_punct_shrink = __esm({
       frozen = false;
       retryRaf = 0;
       retries = 0;
+      /** constructor-set: the first duty claim waits one window past the mount */
+      streamMeasureAt = performance.now();
+      catchupTimer;
+      inCatchup = false;
       resizeObserver;
       lastDomWidth = -1;
       onFontsLoaded = () => {
@@ -228046,9 +228104,28 @@ var init_cjk_punct_shrink = __esm({
         this.measure();
       };
       onPhasedSettled = () => {
-        this.invalidate();
         this.measure();
       };
+      /** once per duty-cycle window while a streamed tail is landing */
+      claimStreamMeasure() {
+        const now = performance.now();
+        if (now - this.streamMeasureAt < STREAM_MEASURE_GAP_MS3) return false;
+        this.streamMeasureAt = now;
+        return true;
+      }
+      /** continue a truncated progressive measurement outside the current task */
+      scheduleCatchup() {
+        if (this.catchupTimer) return;
+        this.catchupTimer = setTimeout(() => {
+          this.catchupTimer = void 0;
+          this.inCatchup = true;
+          try {
+            this.measure();
+          } finally {
+            this.inCatchup = false;
+          }
+        }, 30);
+      }
       /** layout input changed (resize, fonts, stylesheet): every paragraph re-measures */
       invalidate() {
         this.results.clear();
@@ -228073,6 +228150,7 @@ var init_cjk_punct_shrink = __esm({
         document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled);
         this.resizeObserver?.disconnect();
         if (this.retryRaf) cancelAnimationFrame(this.retryRaf);
+        if (this.catchupTimer) clearTimeout(this.catchupTimer);
       }
       scheduleRetry() {
         if (this.retryRaf || this.retries >= MEASURE_RETRY_MAX3) return;
@@ -228088,7 +228166,7 @@ var init_cjk_punct_shrink = __esm({
           this.retryRaf = 0;
         }
         const { view } = this;
-        if (isPhasedContentPending()) return;
+        if (isPhasedContentPending() && !this.inCatchup && !this.claimStreamMeasure()) return;
         if (view.dom.closest(".app.pv-exporting")) {
           this.retries = 0;
           this.scheduleRetry();
@@ -228114,6 +228192,8 @@ var init_cjk_punct_shrink = __esm({
         });
         const shrinks = [];
         let measurable2 = paras.length === 0;
+        let freshBudget = STREAM_FRESH_BUDGET2;
+        let truncated = false;
         this.results.beginPass(view);
         const topLevel = SettledParagraphCache.topLevelDom(view);
         for (const para of paras) {
@@ -228121,7 +228201,14 @@ var init_cjk_punct_shrink = __esm({
             view,
             para.node,
             para.pos,
-            (el) => this.measureParagraph(para.node, para.pos, el),
+            (el) => {
+              if (freshBudget <= 0) {
+                truncated = true;
+                return null;
+              }
+              freshBudget--;
+              return this.measureParagraph(para.node, para.pos, el);
+            },
             topLevel.get(para.node)
           );
           if (!measured) continue;
@@ -228133,6 +228220,12 @@ var init_cjk_punct_shrink = __esm({
           return;
         }
         this.retries = 0;
+        if (truncated) {
+          this.seenSigs.clear();
+          this.frozen = false;
+          this.scheduleCatchup();
+          return;
+        }
         const sig = JSON.stringify(shrinks.map((s2) => [s2.from, s2.perChar, s2.baseLs]));
         if (sig === this.lastSig) return;
         if (this.frozen) return;
@@ -263808,6 +263901,9 @@ var init_protocol2 = __esm({
           this.setRequestHandler(GetTaskPayloadRequestSchema, async (request, extra) => {
             const handleTaskResult = async () => {
               const taskId = request.params.taskId;
+              if (!await this._taskStore.getTask(taskId, extra.sessionId)) {
+                throw new McpError(ErrorCode.InvalidParams, `Task not found: ${taskId}`);
+              }
               if (this._taskMessageQueue) {
                 let queuedMessage;
                 while (queuedMessage = await this._taskMessageQueue.dequeue(taskId, extra.sessionId)) {
@@ -263838,12 +263934,12 @@ var init_protocol2 = __esm({
                 throw new McpError(ErrorCode.InvalidParams, `Task not found: ${taskId}`);
               }
               if (!isTerminal(task.status)) {
-                await this._waitForTaskUpdate(taskId, extra.signal);
+                await this._waitForTaskUpdate(taskId, extra.signal, extra.sessionId);
                 return await handleTaskResult();
               }
               if (isTerminal(task.status)) {
                 const result = await this._taskStore.getTaskResult(taskId, extra.sessionId);
-                this._clearTaskQueue(taskId);
+                this._clearTaskQueue(taskId, extra.sessionId);
                 return {
                   ...result,
                   _meta: {
@@ -263880,7 +263976,7 @@ var init_protocol2 = __esm({
                 throw new McpError(ErrorCode.InvalidParams, `Cannot cancel task in terminal status: ${task.status}`);
               }
               await this._taskStore.updateTaskStatus(request.params.taskId, "cancelled", "Client cancelled task execution.", extra.sessionId);
-              this._clearTaskQueue(request.params.taskId);
+              this._clearTaskQueue(request.params.taskId, extra.sessionId);
               const cancelledTask = await this._taskStore.getTask(request.params.taskId, extra.sessionId);
               if (!cancelledTask) {
                 throw new McpError(ErrorCode.InvalidParams, `Task not found after cancellation: ${request.params.taskId}`);
@@ -264008,6 +264104,19 @@ var init_protocol2 = __esm({
         const handler = this._requestHandlers.get(request.method) ?? this.fallbackRequestHandler;
         const capturedTransport = this._transport;
         const relatedTaskId = request.params?._meta?.[RELATED_TASK_META_KEY]?.taskId;
+        const sessionId = capturedTransport?.sessionId;
+        const store2 = this._taskStore;
+        let relatedTaskFound = true;
+        let relatedTaskLookup;
+        if (relatedTaskId && store2 && this._taskMessageQueue && sessionId !== void 0) {
+          relatedTaskFound = false;
+          relatedTaskLookup = (async () => {
+            if (!await store2.getTask(relatedTaskId, sessionId)) {
+              throw new McpError(ErrorCode.InvalidParams, `Task not found: ${relatedTaskId}`);
+            }
+            relatedTaskFound = true;
+          })();
+        }
         if (handler === void 0) {
           const errorResponse = {
             jsonrpc: "2.0",
@@ -264017,7 +264126,10 @@ var init_protocol2 = __esm({
               message: "Method not found"
             }
           };
-          if (relatedTaskId && this._taskMessageQueue) {
+          if (relatedTaskId && relatedTaskLookup) {
+            const queuedError = { type: "error", message: errorResponse, timestamp: Date.now() };
+            relatedTaskLookup.then(() => this._enqueueTaskMessage(relatedTaskId, queuedError, sessionId), () => capturedTransport?.send(errorResponse)).catch((error51) => this._onerror(new Error(`Failed to send an error response: ${error51}`)));
+          } else if (relatedTaskId && this._taskMessageQueue) {
             this._enqueueTaskMessage(relatedTaskId, {
               type: "error",
               message: errorResponse,
@@ -264068,7 +264180,10 @@ var init_protocol2 = __esm({
           closeSSEStream: extra?.closeSSEStream,
           closeStandaloneSSEStream: extra?.closeStandaloneSSEStream
         };
-        Promise.resolve().then(() => {
+        (relatedTaskLookup ?? Promise.resolve()).then(() => {
+          if (relatedTaskLookup && abortController.signal.aborted) {
+            throw new McpError(ErrorCode.ConnectionClosed, "Request was cancelled");
+          }
           if (taskCreationParams) {
             this.assertTaskHandlerCapability(request.method);
           }
@@ -264103,7 +264218,7 @@ var init_protocol2 = __esm({
               ...error51["data"] !== void 0 && { data: error51["data"] }
             }
           };
-          if (relatedTaskId && this._taskMessageQueue) {
+          if (relatedTaskId && this._taskMessageQueue && relatedTaskFound) {
             await this._enqueueTaskMessage(relatedTaskId, {
               type: "error",
               message: errorResponse,
@@ -264583,7 +264698,7 @@ var init_protocol2 = __esm({
           throw new Error("Cannot enqueue task message: taskStore and taskMessageQueue are not configured");
         }
         const maxQueueSize = this._options?.maxTaskQueueSize;
-        await this._taskMessageQueue.enqueue(taskId, message2, sessionId, maxQueueSize);
+        await this._taskMessageQueue.enqueue(taskId, message2, sessionId ?? this._transport?.sessionId, maxQueueSize);
       }
       /**
        * Clears the message queue for a task and rejects any pending request resolvers.
@@ -264612,12 +264727,13 @@ var init_protocol2 = __esm({
        * Uses polling to check for updates at the task's configured poll interval.
        * @param taskId The task ID to wait for
        * @param signal Abort signal to cancel the wait
+       * @param sessionId Session of the request that waits, passed to the task store
        * @returns Promise that resolves when an update occurs or rejects if aborted
        */
-      async _waitForTaskUpdate(taskId, signal) {
+      async _waitForTaskUpdate(taskId, signal, sessionId) {
         let interval = this._options?.defaultTaskPollInterval ?? 1e3;
         try {
-          const task = await this._taskStore?.getTask(taskId);
+          const task = await this._taskStore?.getTask(taskId, sessionId);
           if (task?.pollInterval) {
             interval = task.pollInterval;
           }
@@ -272690,6 +272806,42 @@ var init_mcp_server = __esm({
 });
 
 // ../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+function toolInputElementCount(value, max2) {
+  let count = 0;
+  const stack = [value];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node === null || typeof node !== "object")
+      continue;
+    if (Array.isArray(node)) {
+      for (const child2 of node) {
+        if (++count > max2)
+          return count;
+        if (child2 !== null && typeof child2 === "object")
+          stack.push(child2);
+      }
+    } else {
+      for (const key8 in node) {
+        if (!Object.prototype.hasOwnProperty.call(node, key8))
+          continue;
+        if (++count > max2)
+          return count;
+        const child2 = node[key8];
+        if (child2 !== null && typeof child2 === "object")
+          stack.push(child2);
+      }
+    }
+  }
+  return count;
+}
+function resolveMaxToolInputElements(value) {
+  if (value === void 0 || value === Infinity)
+    return void 0;
+  if (typeof value !== "number" || Number.isNaN(value) || value < 1) {
+    throw new RangeError(`maxToolInputElements must be a number of at least 1, or Infinity, got ${String(value)}`);
+  }
+  return value;
+}
 function isZodTypeLike(value) {
   return value !== null && typeof value === "object" && "parse" in value && typeof value.parse === "function" && "safeParse" in value && typeof value.safeParse === "function";
 }
@@ -272778,6 +272930,7 @@ var init_mcp = __esm({
         this._resourceHandlersInitialized = false;
         this._promptHandlersInitialized = false;
         this.server = new Server(serverInfo, options);
+        this._maxToolInputElements = resolveMaxToolInputElements(options?.maxToolInputElements);
       }
       /**
        * Access experimental features.
@@ -272908,12 +273061,15 @@ var init_mcp = __esm({
        * Validates tool input arguments against the tool's input schema.
        */
       async validateToolInput(tool, args, toolName) {
+        if (this._maxToolInputElements !== void 0 && toolInputElementCount(args, this._maxToolInputElements) > this._maxToolInputElements) {
+          throw new McpError(ErrorCode.InvalidParams, `Invalid arguments for tool ${toolName}: arguments contain more than the maximum of ${this._maxToolInputElements} elements`);
+        }
         if (!tool.inputSchema) {
           return void 0;
         }
         const inputObj = normalizeObjectSchema(tool.inputSchema);
         const schemaToParse = inputObj ?? tool.inputSchema;
-        const parseResult = await safeParseAsync3(schemaToParse, args);
+        const parseResult = await safeParseAsync3(schemaToParse, args ?? {});
         if (!parseResult.success) {
           const error51 = "error" in parseResult ? parseResult.error : "Unknown error";
           const errorMessage = getParseErrorMessage(error51);
@@ -273151,7 +273307,7 @@ var init_mcp = __esm({
           }
           if (prompt.argsSchema) {
             const argsObj = normalizeObjectSchema(prompt.argsSchema);
-            const parseResult = await safeParseAsync3(argsObj, request.params.arguments);
+            const parseResult = await safeParseAsync3(argsObj, request.params.arguments ?? {});
             if (!parseResult.success) {
               const error51 = "error" in parseResult ? parseResult.error : "Unknown error";
               const errorMessage = getParseErrorMessage(error51);
@@ -274915,20 +275071,15 @@ var init_websocket = __esm({
         if (typeof args[0] === "function") {
           const [createEvents, options] = args;
           return async function upgradeWebSocket2(c, next) {
-            const events = await createEvents(c);
-            const result = await handler(c, events, options);
-            if (result) {
-              return result;
-            }
+            const result = await handler(c, await createEvents(c), options);
+            if (result) return result;
             await next();
           };
         } else {
           const [c, events, options] = args;
           return (async () => {
             const upgraded = await handler(c, events, options);
-            if (!upgraded) {
-              throw new Error("Failed to upgrade WebSocket");
-            }
+            if (!upgraded) throw new Error("Failed to upgrade WebSocket");
             return upgraded;
           })();
         }
@@ -274974,11 +275125,12 @@ function writeFromReadableStream(stream, writable2) {
   else if (writable2.destroyed) return;
   return writeFromReadableStreamDefaultReader(stream.getReader(), writable2);
 }
-var import_node_http2, import_node_stream2, RequestError, nonJoinedHeaders, validHeaderName, isHttpWhitespace, normalizeHeaderValue, forbiddenHeaderValue, GlobalHeaders, materializeHeaders, RequestHeaders, newHeadersFromIncoming, reValidRequestUrl, reDotSegment, reValidHost, buildUrl, toRequestError, GlobalRequest, Request$1, wrapBodyStream, byteExactEncodings, isByteExactEncoding, bodyBufferedBeforeDisconnectKey, bodyBufferedLengthBeforeDisconnectKey, toBufferChunk, isRecoverableDisconnectedIncoming, recordBodyBufferedBeforeDisconnect, readBodyBufferedBeforeDisconnect, enqueueBufferedBody, newRequestFromIncoming, getRequestCache, requestCache, incomingKey, urlKey, methodKey, headersKey, abortControllerKey, getAbortController, abortRequest, bodyBufferKey, bodyReadPromiseKey, bodyConsumedDirectlyKey, bodyLockReaderKey, abortReasonKey, newBodyUnusableError, rejectBodyUnusable, textDecoder, consumeBodyDirectOnce, toArrayBuffer2, contentType, methodTokenRegExp, normalizeIncomingMethod, validateDirectReadMethod, readBodyWithFastPath, readRawBodyIfAvailable, normalizeAbortError, readBodyDirect, requestPrototype, newRequest, defaultContentType, responseCache, getResponseCache, cacheKey, GlobalResponse, Response$1, validRedirectUrl, parseRedirectUrl, validRedirectStatuses, buildOutgoingHttpHeaders, outgoingEnded, incomingDraining, DRAIN_TIMEOUT_MS, MAX_DRAIN_BYTES, drainIncoming, makeCloseHandler, isImmediateCacheableResponse, handleRequestError, handleFetchError, handleResponseError, flushHeaders, responseViaCache, isPromise, responseViaResponseObject, getRequestListener, CloseEvent, ErrorEvent, generateConnectionSymbol, CONNECTION_SYMBOL_KEY, WAIT_FOR_WEBSOCKET_SYMBOL, upgradeWebSocket;
+var import_node_http2, import_node_http22, import_node_stream2, RequestError, nonJoinedHeaders, validHeaderName, isHttpWhitespace, normalizeHeaderValue, forbiddenHeaderValue, GlobalHeaders, materializeHeaders, RequestHeaders, newHeadersFromIncoming, reValidRequestUrl, reDotSegment, reValidHost, buildUrl, toRequestError, GlobalRequest, Request$1, wrapBodyStream, byteExactEncodings, isByteExactEncoding, bodyBufferedBeforeDisconnectKey, bodyBufferedLengthBeforeDisconnectKey, toBufferChunk, isRecoverableDisconnectedIncoming, recordBodyBufferedBeforeDisconnect, readBodyBufferedBeforeDisconnect, enqueueBufferedBody, newRequestFromIncoming, getRequestCache, requestCache, incomingKey, urlKey, methodKey, headersKey, abortControllerKey, getAbortController, abortRequest, bodyBufferKey, bodyReadPromiseKey, bodyConsumedDirectlyKey, bodyLockReaderKey, abortReasonKey, newBodyUnusableError, rejectBodyUnusable, textDecoder, consumeBodyDirectOnce, toArrayBuffer2, contentType, methodTokenRegExp, normalizeIncomingMethod, validateDirectReadMethod, readBodyWithFastPath, readRawBodyIfAvailable, normalizeAbortError, readBodyDirect, requestPrototype, newRequest, defaultContentType, responseCache, getResponseCache, cacheKey, GlobalResponse, Response$1, validRedirectUrl, parseRedirectUrl, validRedirectStatuses, buildOutgoingHttpHeaders, outgoingEnded, incomingDraining, DRAIN_TIMEOUT_MS, MAX_DRAIN_BYTES, drainIncoming, makeCloseHandler, isImmediateCacheableResponse, handleRequestError, handleFetchError, handleResponseError, flushHeaders, trySetContentLength, writeDefaultHeaders, responseViaCache, isPromise, responseViaResponseObject, getRequestListener, CloseEvent, ErrorEvent, generateConnectionSymbol, CONNECTION_SYMBOL_KEY, WAIT_FOR_WEBSOCKET_SYMBOL, upgradeWebSocket;
 var init_dist39 = __esm({
   "../../node_modules/@hono/node-server/dist/index.mjs"() {
     init_constants_BLSFu_RU();
-    import_node_http2 = require("node:http2");
+    import_node_http2 = require("node:http");
+    import_node_http22 = require("node:http2");
     import_node_stream2 = require("node:stream");
     init_websocket();
     RequestError = class extends Error {
@@ -275034,7 +275186,7 @@ var init_dist39 = __esm({
       #invalidValue;
       constructor(incoming) {
         this.#incoming = incoming;
-        if (incoming instanceof import_node_http2.Http2ServerRequest) this.#rawHeaders = incoming.rawHeaders.slice();
+        if (incoming instanceof import_node_http22.Http2ServerRequest) this.#rawHeaders = incoming.rawHeaders.slice();
       }
       get #lazyRawHeaders() {
         return this.#rawHeaders ??= this.#incoming.rawHeaders.slice();
@@ -275052,7 +275204,7 @@ var init_dist39 = __esm({
         return name.toLowerCase();
       }
       #lookupHttp1(lowerName) {
-        const headers = this.#incoming instanceof import_node_http2.Http2ServerRequest ? void 0 : this.#incoming.headers;
+        const headers = this.#incoming instanceof import_node_http22.Http2ServerRequest ? void 0 : this.#incoming.headers;
         if (!headers || nonJoinedHeaders.has(lowerName) || lowerName === "set-cookie" || lowerName === "__proto__") return;
         if (!Object.hasOwn(headers, lowerName)) return null;
         const rawValue = headers[lowerName];
@@ -275179,7 +275331,7 @@ var init_dist39 = __esm({
     bodyBufferedBeforeDisconnectKey = Symbol("bodyBufferedBeforeDisconnect");
     bodyBufferedLengthBeforeDisconnectKey = Symbol("bodyBufferedLengthBeforeDisconnect");
     toBufferChunk = (chunk2, encoding) => Buffer.isBuffer(chunk2) ? chunk2 : Buffer.from(chunk2, encoding ?? "utf8");
-    isRecoverableDisconnectedIncoming = (incoming) => !(incoming instanceof import_node_http2.Http2ServerRequest) && !!incoming.complete && !!incoming.readableAborted && typeof incoming.read === "function" && isByteExactEncoding(incoming.readableEncoding);
+    isRecoverableDisconnectedIncoming = (incoming) => !(incoming instanceof import_node_http22.Http2ServerRequest) && !!incoming.complete && !!incoming.readableAborted && typeof incoming.read === "function" && isByteExactEncoding(incoming.readableEncoding);
     recordBodyBufferedBeforeDisconnect = (incoming) => {
       if (incoming.readableDidRead || !isRecoverableDisconnectedIncoming(incoming)) return;
       const incomingWithRecovery = incoming;
@@ -275558,7 +275710,7 @@ var init_dist39 = __esm({
       req[methodKey] = normalizeIncomingMethod(incoming.method);
       const incomingUrl = incoming.url || "";
       if (incomingUrl[0] !== "/" && (incomingUrl.startsWith("http://") || incomingUrl.startsWith("https://"))) {
-        if (incoming instanceof import_node_http2.Http2ServerRequest) throw new RequestError("Absolute URL for :path is not allowed in HTTP/2");
+        if (incoming instanceof import_node_http22.Http2ServerRequest) throw new RequestError("Absolute URL for :path is not allowed in HTTP/2");
         try {
           req[urlKey] = new URL(incomingUrl).href;
         } catch (e) {
@@ -275566,10 +275718,10 @@ var init_dist39 = __esm({
         }
         return req;
       }
-      const host = (incoming instanceof import_node_http2.Http2ServerRequest ? incoming.authority : incoming.headers.host) || defaultHostname;
+      const host = (incoming instanceof import_node_http22.Http2ServerRequest ? incoming.authority : incoming.headers.host) || defaultHostname;
       if (!host) throw new RequestError("Missing host header");
       let scheme;
-      if (incoming instanceof import_node_http2.Http2ServerRequest) {
+      if (incoming instanceof import_node_http22.Http2ServerRequest) {
         scheme = incoming.scheme;
         if (!(scheme === "http" || scheme === "https")) throw new RequestError("Unsupported scheme");
       } else scheme = incoming.socket && incoming.socket.encrypted ? "https" : "http";
@@ -275735,9 +275887,9 @@ var init_dist39 = __esm({
       const incomingWithDrainState = incoming;
       if (incoming.destroyed || incomingWithDrainState[incomingDraining]) return;
       incomingWithDrainState[incomingDraining] = true;
-      if (incoming instanceof import_node_http2.Http2ServerRequest) {
+      if (incoming instanceof import_node_http22.Http2ServerRequest) {
         try {
-          incoming.stream?.close?.(import_node_http2.constants.NGHTTP2_NO_ERROR);
+          incoming.stream?.close?.(import_node_http22.constants.NGHTTP2_NO_ERROR);
         } catch {
         }
         return;
@@ -275772,7 +275924,7 @@ var init_dist39 = __esm({
       if (incoming.errored) {
         recordBodyBufferedBeforeDisconnect(incoming);
         req[abortRequest](incoming.errored.toString());
-      } else if (!outgoing.writableFinished) {
+      } else if (!outgoing.writableFinished || incoming instanceof import_node_http22.Http2ServerRequest && incoming.aborted) {
         recordBodyBufferedBeforeDisconnect(incoming);
         req[abortRequest]("Client connection prematurely closed.");
       }
@@ -275794,13 +275946,31 @@ var init_dist39 = __esm({
       if (err2.code === "ERR_STREAM_PREMATURE_CLOSE") console.info("The user aborted a request.");
       else {
         console.error(e);
-        if (!outgoing.headersSent) outgoing.writeHead(500, { "Content-Type": "text/plain" });
+        if (!outgoing.headersSent) {
+          if (outgoing instanceof import_node_http2.ServerResponse) outgoing._contentLength = null;
+          outgoing.writeHead(500, { "Content-Type": "text/plain" });
+        }
         outgoing.end(`Error: ${err2.message}`);
         outgoing.destroy(err2);
       }
     };
     flushHeaders = (outgoing) => {
       if ("flushHeaders" in outgoing && outgoing.writable) outgoing.flushHeaders();
+    };
+    trySetContentLength = (outgoing, status, length) => {
+      const http1 = outgoing;
+      if (http1._contentLength === null && http1._hasBody && http1.useChunkedEncodingByDefault && !http1._removedContLen && status >= 200 && status !== 204 && status !== 304 && !outgoing.hasHeader("content-length") && !outgoing.hasHeader("transfer-encoding") && !outgoing.hasHeader("trailer")) {
+        http1._contentLength = length;
+        return true;
+      }
+      return false;
+    };
+    writeDefaultHeaders = (outgoing, status, length) => {
+      if (trySetContentLength(outgoing, status, length)) outgoing.writeHead(status, { "Content-Type": defaultContentType });
+      else outgoing.writeHead(status, {
+        "Content-Type": defaultContentType,
+        "Content-Length": length
+      });
     };
     responseViaCache = async (res, outgoing) => {
       let [status, body, header2] = res[cacheKey];
@@ -275809,22 +275979,13 @@ var init_dist39 = __esm({
           outgoing.writeHead(status);
           outgoing.end();
         } else if (typeof body === "string") {
-          outgoing.writeHead(status, {
-            "Content-Type": defaultContentType,
-            "Content-Length": Buffer.byteLength(body)
-          });
+          writeDefaultHeaders(outgoing, status, Buffer.byteLength(body));
           outgoing.end(body);
         } else if (body instanceof Uint8Array) {
-          outgoing.writeHead(status, {
-            "Content-Type": defaultContentType,
-            "Content-Length": body.byteLength
-          });
+          writeDefaultHeaders(outgoing, status, body.byteLength);
           outgoing.end(body);
         } else if (body instanceof Blob) {
-          outgoing.writeHead(status, {
-            "Content-Type": defaultContentType,
-            "Content-Length": body.size
-          });
+          writeDefaultHeaders(outgoing, status, body.size);
           outgoing.end(new Uint8Array(await body.arrayBuffer()));
         } else {
           outgoing.writeHead(status, { "Content-Type": defaultContentType });
@@ -275835,6 +275996,8 @@ var init_dist39 = __esm({
         return;
       }
       let hasContentLength = false;
+      let plainHeaders = false;
+      let canAutoLength = true;
       if (header2 instanceof Headers) {
         hasContentLength = header2.has("content-length");
         header2 = buildOutgoingHttpHeaders(header2, body === null ? void 0 : defaultContentType);
@@ -275842,14 +276005,25 @@ var init_dist39 = __esm({
         const headerObj = new Headers(header2);
         hasContentLength = headerObj.has("content-length");
         header2 = buildOutgoingHttpHeaders(headerObj, body === null ? void 0 : defaultContentType);
-      } else for (const key8 in header2) if (key8.length === 14 && key8.toLowerCase() === "content-length") {
-        hasContentLength = true;
-        break;
+      } else {
+        plainHeaders = true;
+        for (const key8 in header2) {
+          if (key8.length === 14 && key8.toLowerCase() === "content-length") {
+            hasContentLength = true;
+            break;
+          }
+          if (key8.length === 17 && key8.toLowerCase() === "transfer-encoding" || key8.length === 7 && key8.toLowerCase() === "trailer") canAutoLength = false;
+        }
       }
       if (!hasContentLength) {
-        if (typeof body === "string") header2["Content-Length"] = Buffer.byteLength(body);
-        else if (body instanceof Uint8Array) header2["Content-Length"] = body.byteLength;
-        else if (body instanceof Blob) header2["Content-Length"] = body.size;
+        let length;
+        if (typeof body === "string") length = Buffer.byteLength(body);
+        else if (body instanceof Uint8Array) length = body.byteLength;
+        else if (body instanceof Blob) length = body.size;
+        if (length !== void 0 && (!plainHeaders || !canAutoLength || !trySetContentLength(outgoing, status, length))) {
+          if (plainHeaders) header2 = { ...header2 };
+          header2["Content-Length"] = length;
+        }
       }
       outgoing.writeHead(status, header2);
       if (body == null) outgoing.end();
@@ -275939,7 +276113,7 @@ var init_dist39 = __esm({
           needsBodyCleanup = autoCleanupIncoming && !(incoming.method === "GET" || incoming.method === "HEAD");
           if (needsBodyCleanup) {
             incoming[wrapBodyStream] = true;
-            if (incoming instanceof import_node_http2.Http2ServerRequest) outgoing[outgoingEnded] = () => {
+            if (incoming instanceof import_node_http22.Http2ServerRequest) outgoing[outgoingEnded] = () => {
               if (!incoming.readableEnded) setTimeout(() => {
                 if (!incoming.readableEnded) setTimeout(() => {
                   incoming.destroy();
@@ -276223,6 +276397,55 @@ var init_mediaType = __esm({
   }
 });
 
+// ../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/requestBody.js
+function requestBodyTooLargeMessage(maxBytes) {
+  return `Payload Too Large: Request body must not exceed ${maxBytes} bytes`;
+}
+function resolveMaxRequestBodySize(value) {
+  if (value === void 0) {
+    return DEFAULT_MAX_REQUEST_BODY_SIZE;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`maxRequestBodySize must be a positive number of bytes, got ${String(value)}`);
+  }
+  return value;
+}
+async function readRequestBody(request, maxBytes = DEFAULT_MAX_REQUEST_BODY_SIZE) {
+  if (Number(request.headers.get("content-length")) > maxBytes) {
+    return { tooLarge: true };
+  }
+  if (request.body === null) {
+    return { tooLarge: false, text: "" };
+  }
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let received = 0;
+  let text2 = "";
+  try {
+    for (; ; ) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      received += value.byteLength;
+      if (received > maxBytes) {
+        return { tooLarge: true };
+      }
+      text2 += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return { tooLarge: false, text: text2 + decoder.decode() };
+}
+var DEFAULT_MAX_REQUEST_BODY_SIZE, MAX_BATCH_SIZE;
+var init_requestBody = __esm({
+  "../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/requestBody.js"() {
+    DEFAULT_MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024;
+    MAX_BATCH_SIZE = 100;
+  }
+});
+
 // ../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/sseKeepAlive.js
 function armSseKeepAlive(intervalMs, onTick) {
   if (!Number.isFinite(intervalMs) || intervalMs < 1) {
@@ -276245,6 +276468,7 @@ var WebStandardStreamableHTTPServerTransport;
 var init_webStandardStreamableHttp = __esm({
   "../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/webStandardStreamableHttp.js"() {
     init_mediaType();
+    init_requestBody();
     init_sseKeepAlive();
     init_types4();
     WebStandardStreamableHTTPServerTransport = class {
@@ -276269,6 +276493,7 @@ var init_webStandardStreamableHttp = __esm({
         this._enableDnsRebindingProtection = options.enableDnsRebindingProtection ?? false;
         this._retryInterval = options.retryInterval;
         this._keepAliveMs = options.keepAliveMs ?? DEFAULT_SSE_KEEP_ALIVE_MS;
+        this._maxRequestBodySize = resolveMaxRequestBodySize(options.maxRequestBodySize);
       }
       /**
        * Arms a keep-alive interval for an SSE stream that periodically writes an SSE
@@ -276630,11 +276855,21 @@ data:
             rawMessage = options.parsedBody;
           } else {
             try {
-              rawMessage = await req.json();
+              const body = await readRequestBody(req, this._maxRequestBodySize);
+              if (body.tooLarge) {
+                const message2 = requestBodyTooLargeMessage(this._maxRequestBodySize);
+                this.onerror?.(new Error(message2));
+                return this.createJsonErrorResponse(413, -32e3, message2);
+              }
+              rawMessage = JSON.parse(body.text);
             } catch {
               this.onerror?.(new Error("Parse error: Invalid JSON"));
               return this.createJsonErrorResponse(400, -32700, "Parse error: Invalid JSON");
             }
+          }
+          if (Array.isArray(rawMessage) && rawMessage.length > MAX_BATCH_SIZE) {
+            this.onerror?.(new Error(`Invalid Request: Batch must not exceed ${MAX_BATCH_SIZE} messages`));
+            return this.createJsonErrorResponse(400, -32600, `Invalid Request: Batch must not exceed ${MAX_BATCH_SIZE} messages`);
           }
           let messages;
           try {

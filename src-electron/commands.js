@@ -1,4 +1,4 @@
-import { ipcMain, shell, dialog } from 'electron'
+import { app, ipcMain, shell, dialog } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import TurndownService from 'turndown'
@@ -24,6 +24,7 @@ import { buildLlmMessage } from './attachmentContext.js'
 import { getUsageStats, clearUsage } from './usage.js'
 import { queryBalance } from './balance.js'
 import { getFileAssocStatus, setFileAssoc, clearFileAssoc } from './file-assoc.js'
+import { resolveDataDir, setDataDirPointer, clearDataDirPointer } from './data-dir.js'
 import { listProviderModels } from './modelCatalog.js'
 import { testChatModel, testEmbeddingModel } from './modelTest.js'
 import { registerAgentCommands } from './agent/ipc.js'
@@ -189,6 +190,76 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('file-assoc-clear', (_event, args) => {
     return clearFileAssoc(args?.groups || [])
+  })
+
+  // ===== 数据存储目录设置 =====
+
+  // 当前数据目录信息
+  ipcMain.handle('data-dir-get', () => {
+    const resolved = resolveDataDir()
+    return {
+      current: getDataDir() || resolved.dataDir,
+      isCustom: resolved.isCustom,
+      defaultDir: resolved.defaultDir
+    }
+  })
+
+  // 选择数据目录（原生目录对话框 + 可写性校验）
+  ipcMain.handle('data-dir-select', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择数据存储目录',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    const dir = result.filePaths[0]
+    try {
+      const probe = path.join(dir, '.data-dir-probe')
+      fs.writeFileSync(probe, 'ok')
+      fs.unlinkSync(probe)
+    } catch {
+      return { success: false, error: 'Directory is not writable' }
+    }
+    return { success: true, path: dir }
+  })
+
+  // 设置数据目录（写指针文件，下次启动迁移并生效）
+  ipcMain.handle('data-dir-set', (_event, args) => {
+    const dir = args?.dir
+    if (!dir || !path.isAbsolute(dir)) {
+      return { success: false, error: 'Invalid directory' }
+    }
+    const resolved = resolveDataDir()
+    if (dir === resolved.dataDir) {
+      return { success: true, needRestart: false }
+    }
+    try {
+      setDataDirPointer(dir)
+      return { success: true, needRestart: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 恢复默认数据目录（删除指针文件，下次启动生效）
+  ipcMain.handle('data-dir-reset', () => {
+    try {
+      const resolved = resolveDataDir()
+      if (!resolved.isCustom) {
+        return { success: true, needRestart: false }
+      }
+      clearDataDirPointer()
+      return { success: true, needRestart: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // 应用重启（用于数据目录切换后立即生效）
+  ipcMain.handle('app-relaunch', () => {
+    app.relaunch()
+    app.exit(0)
   })
 
   ipcMain.handle('get-platform', () => {
@@ -503,7 +574,7 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('update_note', (_event, args) => {
     const oldNote = db.getNote(args.noteId)
-    const updated = db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId)
+    const updated = db.updateNote(args.noteId, args.title, args.content, args.contentText, args.notebookId, args.marpContent)
     // 标题变更时同步重命名关联的 .note 文件
     if (updated && oldNote && oldNote.title !== updated.title) {
       syncNoteRefOnRename(args.noteId, updated.title)

@@ -2,13 +2,15 @@
   <div class="schedule-calendar" @contextmenu.prevent>
     <div class="calendar-header">
       <div class="header-left">
-        <button class="nav-btn" @click="navigatePrev">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <button class="today-btn" @click="navigateToday">{{ t('schedule.today') }}</button>
-        <button class="nav-btn" @click="navigateNext">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
+        <template v-if="currentView !== 'quadrant'">
+          <button class="nav-btn" @click="navigatePrev">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="today-btn" @click="navigateToday">{{ t('schedule.today') }}</button>
+          <button class="nav-btn" @click="navigateNext">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </template>
         <h2 class="current-date-label">{{ currentDateLabel }}</h2>
       </div>
       <div class="header-right">
@@ -85,7 +87,12 @@
                 @contextmenu.prevent.stop="onEventRightClick($event, event)"
               >
                 <span class="cell-event-title">{{ event.title }}</span>
-                <span class="cell-event-priority" :class="priorityClass(event.priority)" :title="priorityLabel(event.priority)"></span>
+                <span
+                  class="cell-event-priority"
+                  :class="priorityClass(event.priority)"
+                  @mouseenter="showPriorityTip($event, event.priority)"
+                  @mouseleave="hidePriorityTip"
+                ></span>
               </div>
             </div>
             <div v-if="shouldShowMore(cell.date)" class="cell-more" @click.stop="onMoreClick(cell.date, $event)">
@@ -108,7 +115,12 @@
             @contextmenu.prevent.stop="onEventRightClick($event, bar.event)"
           >
             <span class="multi-day-bar-title">{{ bar.event.title }}</span>
-            <span class="multi-day-bar-priority" :class="priorityClass(bar.event.priority)" :title="priorityLabel(bar.event.priority)"></span>
+            <span
+              class="multi-day-bar-priority"
+              :class="priorityClass(bar.event.priority)"
+              @mouseenter="showPriorityTip($event, bar.event.priority)"
+              @mouseleave="hidePriorityTip"
+            ></span>
           </div>
         </div>
       </div>
@@ -177,9 +189,12 @@
               @click.stop="onEventClick(bar.event)"
               @contextmenu.prevent.stop="onEventRightClick($event, bar.event)"
             >
-              <span class="wk-mday-bar-title">{{ bar.event.title }}</span>
-              <span class="wk-mday-bar-date">{{ formatWeekBarDateRange(bar.event) }}</span>
-              <span class="wk-priority-tag" :class="priorityClass(bar.event.priority)">{{ priorityLabel(bar.event.priority) }}</span>
+              <div class="wk-mday-bar-row">
+                <span class="wk-mday-bar-title">{{ bar.event.title }}</span>
+                <span class="wk-mday-bar-date">{{ formatWeekBarDateRange(bar.event) }}</span>
+                <span class="wk-priority-tag" :class="priorityClass(bar.event.priority)">{{ priorityLabel(bar.event.priority) }}</span>
+              </div>
+              <div v-if="bar.event.description" class="wk-mday-bar-desc">{{ bar.event.description }}</div>
             </div>
             <!-- 本周无日程时的居中提示（不阻挡点击，仍可点空白创建） -->
             <div v-if="!weekHasEvents" class="wk-empty">
@@ -216,11 +231,14 @@
       </div>
 
       <!-- Task List View -->
-      <ScheduleTaskList v-else-if="currentView === 'list'" />
+      <ScheduleTaskList v-else-if="currentView === 'list'" @open-event="onEventClick" />
+
+      <!-- Quadrant View（四象限） -->
+      <ScheduleQuadrant v-else-if="currentView === 'quadrant'" @open-event="onEventClick" @create-event="onQuadrantCreate" />
     </div>
 
-    <!-- 创建日程弹窗 -->
-    <EventFormModal ref="eventModalRef" @save="onModalSave" />
+    <!-- 新建/编辑日程弹窗 -->
+    <EventFormModal ref="eventModalRef" @save="onModalSave" @update="onModalUpdate" @delete="onModalDelete" />
 
     <!-- 右键菜单 -->
     <EventContextMenu
@@ -229,7 +247,8 @@
       :pos="contextMenuPos"
       @close="contextMenuVisible = false"
       @toggle-complete="onCtxToggleComplete"
-      @view-detail="onCtxViewDetail"
+      @postpone-week="onCtxPostpone"
+      @delete="onCtxDelete"
     />
 
     <!-- +n 日程面板 -->
@@ -246,16 +265,25 @@
 
     <!-- Friday 日程助理 -->
     <FridayAssistant v-model:visible="showAssistant" />
+
+    <!-- 优先级即时提示（跟随圆点位置，悬停立即显示） -->
+    <Teleport to="body">
+      <div
+        v-if="priorityTip.visible"
+        class="priority-tip"
+        :style="{ left: priorityTip.x + 'px', top: priorityTip.y + 'px' }"
+      >{{ priorityTip.label }}</div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, onDeactivated, onActivated } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
 import { useScheduleStore, DEFAULT_EVENT_PRIORITY } from '@/store/modules/schedule';
 import { useAppStore } from '@/store';
 import ScheduleTaskList from './ScheduleTaskList.vue';
+import ScheduleQuadrant from './ScheduleQuadrant.vue';
 import EventFormModal from './components/EventFormModal.vue';
 import EventContextMenu from './components/EventContextMenu.vue';
 import MoreEventsPanel from './components/MoreEventsPanel.vue';
@@ -270,10 +298,10 @@ import {
   isDateInRange,
   getEventBgColor,
   getEventDisplayColor,
+  postponeEventUpdates,
 } from './utils/calendarHelpers';
 
 const { t } = useI18n();
-const router = useRouter();
 const scheduleStore = useScheduleStore();
 const appStore = useAppStore();
 
@@ -281,7 +309,10 @@ const { isZh, getMonthDayLabel, weekDayLabels, weekDayMiniLabels, monthNames } =
 
 // ========== 视图状态 ==========
 // 初始视图取自设置：打开日程时默认显示用户配置的视图
-const currentView = ref(appStore.scheduleDefaultView === 'week' ? 'week' : 'month');
+function resolveDefaultView(v) {
+  return v === 'week' || v === 'quadrant' ? v : 'month';
+}
+const currentView = ref(resolveDefaultView(appStore.scheduleDefaultView));
 // 记录上次已知的默认视图，用于在 keep-alive 重新激活时检测设置是否变更
 const lastDefaultView = ref(appStore.scheduleDefaultView);
 const viewYear = ref(new Date().getFullYear());
@@ -293,6 +324,7 @@ const views = computed(() => [
   { key: 'month', label: t('schedule.month') },
   { key: 'week', label: t('schedule.week') },
   { key: 'year', label: t('schedule.year') },
+  { key: 'quadrant', label: t('schedule.quadrant') },
   { key: 'list', label: t('schedule.list') },
 ]);
 
@@ -321,6 +353,9 @@ function onViewDocClick(e) {
 }
 
 const currentDateLabel = computed(() => {
+  if (currentView.value === 'quadrant') {
+    return t('schedule.quadrant');
+  }
   if (currentView.value === 'year') {
     return `${viewYear.value}`;
   }
@@ -688,7 +723,7 @@ const weekMultiDayBars = computed(() => {
  */
 const weekSingleDayEventsByDate = computed(() => {
   const map = new Map();
-  const pr = { urgent: 0, important: 1, minor: 2 };
+  const pr = { 'urgent-important': 0, important: 1, 'minor-urgent': 2, minor: 3 };
   for (const day of weekDays.value) {
     const evts = scheduleStore
       .getEventsForDateRange(day.date, day.date)
@@ -717,8 +752,8 @@ function formatWeekBarDateRange(evt) {
   return s === e ? s : `${s} - ${e}`;
 }
 
-// 跨日色条尺寸常量（与 CSS 中 .wk-mday-bar 高度对应）
-const WK_BAR_H = 30;
+// 跨日色条尺寸常量（与 CSS 中 .wk-mday-bar 高度对应；双行高度以容纳描述内容）
+const WK_BAR_H = 46;
 const WK_BAR_GAP = 4;
 const WK_BASE_PAD = 6;
 
@@ -819,9 +854,28 @@ function priorityClass(p) {
 
 function priorityLabel(p) {
   const key = p || DEFAULT_EVENT_PRIORITY;
-  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'urgent-important') return t('schedule.priorityUrgentImportant');
+  if (key === 'minor-urgent') return t('schedule.priorityMinorUrgent');
   if (key === 'minor') return t('schedule.priorityMinor');
   return t('schedule.priorityImportant');
+}
+
+// ========== 优先级圆点即时提示 ==========
+// 替代原生 title（系统级延迟约 1s）：mouseenter 时按圆点位置立即显示浮层
+const priorityTip = ref({ visible: false, label: '', x: 0, y: 0 });
+
+function showPriorityTip(e, p) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  priorityTip.value = {
+    visible: true,
+    label: priorityLabel(p),
+    x: rect.left + rect.width / 2,
+    y: rect.top - 6,
+  };
+}
+
+function hidePriorityTip() {
+  priorityTip.value.visible = false;
 }
 
 // ========== 导航 ==========
@@ -993,8 +1047,9 @@ function onWeekDayClick(date) {
 }
 
 // ========== 事件交互 ==========
+// 点击日程直接打开编辑弹窗（复用新建弹窗）
 function onEventClick(event) {
-  router.push(`/schedule/${event.id}`);
+  eventModalRef.value?.open({ event });
 }
 
 // ========== 创建弹窗 ==========
@@ -1004,8 +1059,22 @@ function openCreateModal(startDate, endDate, startTime, endTime, allDay) {
   eventModalRef.value?.open({ start: startDate, end: endDate, startTime, endTime, allDay });
 }
 
+// 四象限双击新建：自动带入该象限对应的优先级
+function onQuadrantCreate(priority) {
+  eventModalRef.value?.open({ priority });
+}
+
 async function onModalSave(eventData) {
   await scheduleStore.addEvent(eventData);
+}
+
+async function onModalUpdate(eventData) {
+  const { id, ...updates } = eventData;
+  await scheduleStore.updateEvent(id, updates);
+}
+
+async function onModalDelete(id) {
+  await scheduleStore.removeEvent(id);
 }
 
 function openAIAssistant() {
@@ -1030,11 +1099,21 @@ async function onCtxToggleComplete(evt) {
   contextMenuVisible.value = false;
 }
 
-function onCtxViewDetail(evt) {
+// 延期一周：区间日程结束日期 +7 天，单日日程整体 +7 天
+async function onCtxPostpone(evt) {
   if (!evt) return;
   contextMenuVisible.value = false;
   closeMorePanel();
-  router.push(`/schedule/${evt.id}`);
+  const updates = postponeEventUpdates(evt);
+  if (updates) await scheduleStore.updateEvent(evt.id, updates);
+}
+
+async function onCtxDelete(evt) {
+  if (!evt) return;
+  contextMenuVisible.value = false;
+  closeMorePanel();
+  if (!window.confirm(t('schedule.confirmDelete'))) return;
+  await scheduleStore.removeEvent(evt.id);
 }
 
 // ========== +n 日程面板 ==========
@@ -1127,7 +1206,7 @@ onActivated(() => {
   // 若设置中的默认视图已变更（例如在设置页修改后返回），则同步切换到新默认视图
   if (appStore.scheduleDefaultView !== lastDefaultView.value) {
     lastDefaultView.value = appStore.scheduleDefaultView;
-    currentView.value = appStore.scheduleDefaultView === 'week' ? 'week' : 'month';
+    currentView.value = resolveDefaultView(appStore.scheduleDefaultView);
   }
 });
 </script>
@@ -1451,8 +1530,8 @@ onActivated(() => {
 .cell-holiday {
   margin-left: auto;
   font-size: 12px;
-  color: #16a34a;
-  font-weight: 500;
+  color: #ff1616;
+  font-weight: 1000;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1462,7 +1541,7 @@ onActivated(() => {
 }
 
 .cell-holiday.lunar-holiday {
-  color: #16a34a;
+  color: #ff1616;
 }
 
 .cell-events {
@@ -1508,7 +1587,7 @@ onActivated(() => {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-tertiary) 60%, transparent);
 }
 
-.cell-event-priority.priority-urgent {
+.cell-event-priority.priority-urgent-important {
   background: #ef4444;
   box-shadow: none;
 }
@@ -1516,9 +1595,29 @@ onActivated(() => {
   background: #f59e0b;
   box-shadow: none;
 }
-.cell-event-priority.priority-minor {
-  background: #64748b;
+.cell-event-priority.priority-minor-urgent {
+  background: #3b82f6;
   box-shadow: none;
+}
+.cell-event-priority.priority-minor {
+  background: #14b8a6;
+  box-shadow: none;
+}
+
+/* 优先级即时提示浮层（Teleport 至 body，跟随圆点即时显示） */
+.priority-tip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .cell-event:hover {
@@ -1606,9 +1705,10 @@ onActivated(() => {
   background: #f59e0b;
 }
 
-.multi-day-bar-priority.priority-urgent { background: #ef4444; }
+.multi-day-bar-priority.priority-urgent-important { background: #ef4444; }
 .multi-day-bar-priority.priority-important { background: #f59e0b; }
-.multi-day-bar-priority.priority-minor { background: #64748b; }
+.multi-day-bar-priority.priority-minor-urgent { background: #3b82f6; }
+.multi-day-bar-priority.priority-minor { background: #14b8a6; }
 
 /* ========== Week View ========== */
 .week-view {
@@ -1697,22 +1797,31 @@ onActivated(() => {
   background: transparent;
 }
 
-/* ---- 跨日日程条（悬浮于列顶部，连续横跨多列） ---- */
+/* ---- 跨日日程条（悬浮于列顶部，连续横跨多列；双行：标题行 + 描述行） ---- */
 .wk-mday-bar {
   position: absolute;
   z-index: 2;
   box-sizing: border-box;
   border-radius: 8px;
-  padding: 0 10px;
+  padding: 4px 10px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   font-size: 12px;
   color: var(--text-primary);
   overflow: hidden;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+/* 标题行：标题 + 日期范围 + 优先级 */
+.wk-mday-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .wk-mday-bar:hover {
@@ -1747,6 +1856,21 @@ onActivated(() => {
   color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* 描述行：单行省略展示日程详细内容 */
+.wk-mday-bar-desc {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.wk-mday-bar.is-completed .wk-mday-bar-desc {
+  text-decoration: line-through;
 }
 
 /* ---- 单日日程卡片列 ---- */
@@ -1891,7 +2015,7 @@ onActivated(() => {
   flex-shrink: 0;
 }
 
-.wk-priority-tag.priority-urgent {
+.wk-priority-tag.priority-urgent-important {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.14);
 }
@@ -1901,9 +2025,14 @@ onActivated(() => {
   background: rgba(245, 158, 11, 0.14);
 }
 
+.wk-priority-tag.priority-minor-urgent {
+  color: #2563eb;
+  background: rgba(59, 130, 246, 0.14);
+}
+
 .wk-priority-tag.priority-minor {
-  color: #64748b;
-  background: rgba(100, 116, 139, 0.14);
+  color: #0d9488;
+  background: rgba(20, 184, 166, 0.14);
 }
 
 /* ---- 空状态提示 ---- */

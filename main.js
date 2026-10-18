@@ -12,16 +12,22 @@ import { startKnowledgeWatcher } from './src-electron/fileWatcher.js'
 import { initLogger, setLoggingEnabled } from './src-electron/logger.js'
 import { startShareServer, stopShareServer } from './src-electron/shareServer.js'
 import { startAutomationScheduler, stopAutomationScheduler } from './src-electron/automation.js'
+import { startReminderScheduler, stopReminderScheduler } from './src-electron/scheduleReminder.js'
 import { stopHarnessSidecar } from './src-electron/harness/index.js'
 import { initOfficeSession, shutdownOfficeHost } from './src-electron/office/office-session.js'
 import { registerOfficeIpc } from './src-electron/office/office-ipc.js'
 import { isHeadlessExportRun, runHeadlessExportEntry } from './src-electron/office/office-headless.js'
 import { startObsidianScheduler, stopObsidianScheduler } from './src-electron/obsidian/scheduler.js'
+import { resolveDataDir, applyUserDataRedirect, migrateDataIfNeeded } from './src-electron/data-dir.js'
+import { initSession, registerSessionIpc } from './src-electron/session.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
+
+// Windows 系统通知需与 appId 一致（electron-builder build.appId），否则通知不显示
+app.setAppUserModelId('com.happyfriday.lite')
 
 // 禁止渲染进程后台化，避免窗口失焦/被遮挡时被系统挂起，切回时卡顿
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
@@ -43,6 +49,11 @@ if (isDev) {
   app.setPath('userData', path.join(__dirname, 'app-data', 'electron-user-data'))
 }
 
+// 解析用户自定义数据目录（指针文件机制，须在 requestSingleInstanceLock 之前执行，
+// 使单实例锁与 Chromium profile 一并跟随自定义目录）
+const resolvedDataDir = resolveDataDir()
+applyUserDataRedirect(resolvedDataDir.dataDir, resolvedDataDir.isCustom)
+
 // The GUI and its DSH sidecar share one data directory. Multiple AppImage
 // instances would therefore contend for DSH's credentials writer lock.
 const headlessExportRun = isHeadlessExportRun()
@@ -53,9 +64,7 @@ if (!hasSingleInstanceLock) app.quit()
 // 将运行日志落盘到数据目录，便于安装后排查异常。
 // 必须在 app.whenReady 之前同步执行，以捕获后续所有模块的输出。
 if (hasSingleInstanceLock) {
-  initLogger(
-    isDev ? path.join(__dirname, 'app-data') : app.getPath('userData')
-  )
+  initLogger(resolvedDataDir.dataDir)
 }
 
 let mainWindow = null
@@ -120,9 +129,18 @@ if (!headlessExportRun) {
 }
 
 async function ensureDataDir() {
-  const dataDir = isDev
-    ? path.join(__dirname, 'app-data')
-    : app.getPath('userData')
+  // 自定义数据目录且尚未迁移：在 initDb 之前复制旧目录数据（此时数据库未被占用）。
+  // 迁移失败时指针已被清除，回退到默认数据目录。
+  try {
+    migrateDataIfNeeded(resolvedDataDir)
+  } catch (e) {
+    console.error('[Main] Data migration failed, staying on default data dir:', e.message)
+    const fallback = resolveDataDir()
+    resolvedDataDir.dataDir = fallback.dataDir
+    resolvedDataDir.isCustom = false
+  }
+
+  const dataDir = resolvedDataDir.dataDir
 
   try {
     if (!fs.existsSync(dataDir)) {
@@ -134,6 +152,8 @@ async function ensureDataDir() {
 
   setConfigDataDir(dataDir)
   setDbDataDir(dataDir)
+  initSession(dataDir)
+  registerSessionIpc()
   await initDb()
 
   return dataDir
@@ -217,6 +237,9 @@ app.whenReady().then(async () => {
 
   startAutomationScheduler(mainWindow)
   startObsidianScheduler(mainWindow)
+
+  // 日程到期提醒调度器（读取数据库中 reminder 开启的日程，发系统通知）
+  startReminderScheduler(mainWindow)
 
   // Office 工作区（happyoffice 编辑器以 WebContentsView 挂载到主窗口）
   try {
@@ -307,6 +330,7 @@ app.on('window-all-closed', function () {
   stopShareServer()
   stopAutomationScheduler()
   stopObsidianScheduler()
+  stopReminderScheduler()
   closeDb()
   if (process.platform !== 'darwin') {
     app.quit()

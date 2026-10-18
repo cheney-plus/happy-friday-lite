@@ -51,7 +51,8 @@ export const useTabStore = defineStore('tabs', {
 
         if (this.activeTabId === id) {
           if (this.openedTabs.length > 0) {
-            const nextIndex = Math.max(0, index - 1)
+            // 关闭中间标签时优先激活右侧标签（与主流浏览器一致），无右侧则激活左侧
+            const nextIndex = Math.min(index, this.openedTabs.length - 1)
             this.activeTabId = this.openedTabs[nextIndex].id
           } else {
             this.addFridayTab()
@@ -82,6 +83,26 @@ export const useTabStore = defineStore('tabs', {
       this.openedTabs.splice(targetIndex, 0, tab)
       return true
     },
+    // 拖拽排序：将 tab 移动到原数组语义的 toIndex 位置（插入到原 toIndex 项之前）
+    reorderTab(id, toIndex) {
+      const from = this.openedTabs.findIndex(t => t.id === id)
+      // toIndex 允许等于 length（拖到最后）；from === toIndex 或 toIndex - 1 为原位不动
+      if (from === -1 || toIndex < 0 || toIndex > this.openedTabs.length || from === toIndex || from === toIndex - 1) {
+        return false
+      }
+
+      const [tab] = this.openedTabs.splice(from, 1)
+      // 从左侧拖到右侧时，移除自身后目标项左移一位，需回退一格
+      const insertAt = from < toIndex ? toIndex - 1 : toIndex
+      this.openedTabs.splice(insertAt, 0, tab)
+      return true
+    },
+    // 会话恢复：整体替换标签列表与激活项（不做存在性校验，校验由恢复逻辑负责）
+    restoreTabs(tabs, activeTabId, fridayCounter) {
+      this.openedTabs = Array.isArray(tabs) ? tabs : []
+      this.activeTabId = activeTabId || (this.openedTabs.length > 0 ? this.openedTabs[this.openedTabs.length - 1].id : '')
+      this.fridayCounter = fridayCounter || 0
+    },
     setActiveTab(id) {
       this.activeTabId = id
     },
@@ -103,6 +124,11 @@ export const useTabStore = defineStore('tabs', {
       if (tab) {
         tab.officeFilePath = filePath
       }
+    },
+    // 会话恢复时批量更新标签字段（如 Office 标签重开后 id/fullPath 变化）
+    updateTab(id, patch) {
+      const tab = this.openedTabs.find(t => t.id === id)
+      if (tab) Object.assign(tab, patch)
     }
   }
 })

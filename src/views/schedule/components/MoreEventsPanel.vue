@@ -71,7 +71,8 @@ function priorityClass(p) {
 
 function priorityLabel(p) {
   const key = p || DEFAULT_EVENT_PRIORITY;
-  if (key === 'urgent') return t('schedule.priorityUrgent');
+  if (key === 'urgent-important') return t('schedule.priorityUrgentImportant');
+  if (key === 'minor-urgent') return t('schedule.priorityMinorUrgent');
   if (key === 'minor') return t('schedule.priorityMinor');
   return t('schedule.priorityImportant');
 }
@@ -199,7 +200,7 @@ onDeactivated(() => emit('close'));
   flex-shrink: 0;
 }
 
-.more-panel-item-priority.priority-urgent {
+.more-panel-item-priority.priority-urgent-important {
   background: rgba(239, 68, 68, 0.14);
   color: #b91c1c;
 }
@@ -207,9 +208,13 @@ onDeactivated(() => emit('close'));
   background: rgba(245, 158, 11, 0.14);
   color: #b45309;
 }
+.more-panel-item-priority.priority-minor-urgent {
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+}
 .more-panel-item-priority.priority-minor {
-  background: rgba(100, 116, 139, 0.14);
-  color: #475569;
+  background: rgba(20, 184, 166, 0.14);
+  color: #0f766e;
 }
 
 .more-panel-item.is-completed .more-panel-item-title {

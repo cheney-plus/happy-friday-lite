@@ -164,6 +164,15 @@ async function buildMainBundles() {
   console.log('[office] Bundling editor main-process modules (esbuild)…')
   const vendorRequire = createRequire(path.join(VENDOR, 'package.json'))
   const esbuild = vendorRequire('esbuild')
+  // harfbuzzjs ≥1.x seals subpaths behind its exports map, and the raw
+  // Emscripten factory (dist/harfbuzz.js) must be bundled directly — the public
+  // entry has a top-level await that cannot go into a CJS bundle. Which copy
+  // npm hoists where is not stable (root vs apps/slides/node_modules), so
+  // resolve it through Node from apps/slides instead of a hardcoded path.
+  const slidesRequire = createRequire(path.join(VENDOR, 'apps/slides/package.json'))
+  const harfbuzzDist = path.dirname(
+    slidesRequire.resolve('harfbuzzjs', { paths: [path.join(VENDOR, 'apps/slides')] }),
+  )
   const entriesRoot = path.join(__dirname, 'office', 'entries')
   const outDir = path.join(OFFICE_ROOT, 'main')
   fs.mkdirSync(outDir, { recursive: true })
@@ -181,6 +190,9 @@ async function buildMainBundles() {
         'import.meta.url': JSON.stringify(`file://${path.join(outDir, `${editor}-main.cjs`)}`),
       },
       external: ['electron'],
+      alias: {
+        'harfbuzzjs/dist/harfbuzz.js': path.join(harfbuzzDist, 'harfbuzz.js'),
+      },
       // 上游自动更新依赖在本产品中不使用，stub 为空模块
       plugins: [stubPlugin(['electron-updater']), rawImportPlugin(), assetImportPlugin()],
       logLevel: 'warning',
