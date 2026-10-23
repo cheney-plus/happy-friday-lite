@@ -37,7 +37,7 @@
       </div>
 
       <textarea
-        :value="modelValue"
+        :value="currentText"
         class="main-input"
         :placeholder="isStreaming ? t('friday.aiThinking') : placeholder"
         rows="1"
@@ -85,7 +85,7 @@
               key="send"
               class="send-btn"
               type="button"
-              :class="{ active: (modelValue || '').trim() }"
+              :class="{ active: currentText.trim() }"
               @click="$emit('send')"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -156,7 +156,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import NoteReferenceTag from './NoteReferenceTag.vue';
 import { coverOptions } from '@/views/knowledge/constants';
@@ -165,6 +165,9 @@ const { t } = useI18n();
 
 const props = defineProps({
   modelValue: String,
+  // 可选的绑定对象 { ref }：由父级提供输入文本的 ref。
+  // 父模板只传入普通对象、不读取 .value，输入时就不会触发父组件重渲染。
+  modelBinding: { type: Object, default: null },
   placeholder: { type: String, default: '' },
   isStreaming: { type: Boolean, default: false },
   noteReferences: { type: Array, default: () => [] },
@@ -183,6 +186,10 @@ const showLinkDropdown = ref(false);
 const showKbDropdown = ref(false);
 const linkDropdownStyle = ref({});
 const kbDropdownStyle = ref({});
+const currentText = computed(() => {
+  if (props.modelBinding) return props.modelBinding.ref.value || '';
+  return props.modelValue || '';
+});
 
 function focus() {
   nextTick(() => {
@@ -249,7 +256,11 @@ const selectKnowledgeBase = (kbName, categoryId) => {
 
 function handleInput(e) {
   const target = e.target;
-  emit('update:modelValue', target.value);
+  if (props.modelBinding) {
+    props.modelBinding.ref.value = target.value;
+  } else {
+    emit('update:modelValue', target.value);
+  }
   autoResize();
 }
 
@@ -267,7 +278,7 @@ function autoResize() {
   }
 }
 
-watch(() => props.modelValue, async () => {
+watch(currentText, async () => {
   await nextTick();
   autoResize();
 });

@@ -37,22 +37,10 @@
           />
         </template>
 
-        <AgentMessageBlock
-          v-if="currentMode === 'agent' && (isStreaming || agentSegments.length > 0)"
-          :segments="agentSegments"
-          :reasoning-streaming-content="streamingReasoning"
-          :is-reasoning-streaming="isReasoningStreaming"
-          :is-streaming="isStreaming"
-          :thinking="isThinking"
-        />
-        <AIMessage
-          v-else-if="isStreaming"
-          :content="streamingContent"
-          :reasoning-streaming-content="streamingReasoning"
-          :sources="streamingSources"
+        <StreamingAssistantMessage
+          :state="streamingState"
+          :mode="currentMode"
           :display-name="t('friday.assistantName')"
-          :is-streaming="true"
-          :show-divider="false"
           :show-rollback="currentMode === 'chat'"
         />
       </div>
@@ -60,7 +48,7 @@
 
     <FridayComposer
       v-if="!isShareMode"
-      v-model="inputText"
+      :model-binding="composerBinding"
       variant="conversation"
       :is-streaming="isStreaming"
       :placeholder="t('friday.inputPlaceholder')"
@@ -114,6 +102,7 @@ import AIMessage from '@/components/chat/AIMessage.vue';
 import RollbackConfirmDialog from '@/components/chat/RollbackConfirmDialog.vue';
 import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import AgentMessageBlock from '@/views/friday/components/AgentMessageBlock.vue';
+import StreamingAssistantMessage from '@/components/chat/StreamingAssistantMessage.vue';
 import FridayComposer from '@/views/friday/components/FridayComposer.vue';
 import { useChatStream } from '@/views/friday/composables/useChatStream';
 import { refreshHistorySessions } from '@/views/friday/composables/useConversationHistory';
@@ -132,6 +121,8 @@ const injectedHistoryCollapsed = inject('fridayHistoryCollapsed', ref(false));
 const isShareMode = computed(() => route.meta?.share === true || !electronService.isElectron);
 const historyCollapsed = computed(() => !!injectedHistoryCollapsed.value);
 const inputText = ref('');
+// 输入文本通过稳定对象交给输入框组件承载，模板不读取其值，避免逐字符触发整页重渲染
+const composerBinding = { ref: inputText };
 const messagesContainer = ref(null);
 const isAtBottom = ref(true);
 const showScrollDownBtn = ref(false);
@@ -177,6 +168,17 @@ const {
   t
 });
 const { handleAddToKnowledge } = useConversationSummary({ messages, showToast, t });
+
+// 流式状态用稳定对象整体下传，本组件模板不再直接读取流式文本，避免每个 token 重渲染整页
+const streamingState = {
+  streaming: isStreaming,
+  content: streamingContent,
+  reasoning: streamingReasoning,
+  reasoningStreaming: isReasoningStreaming,
+  sources: streamingSources,
+  segments: agentSegments,
+  thinking: isThinking
+};
 const isConversationVisible = computed(() => {
   if (isShareMode.value) return true;
   return tabStore.activeTabId === tabKey && (route.name === 'friday-chat' || route.name === 'share');

@@ -55,16 +55,7 @@
                   </div>
                 </template>
 
-                <template v-if="isStreaming">
-                  <AIMessage
-                    :content="streamingContent"
-                    :reasoning-streaming-content="streamingReasoning"
-                    :sources="streamingSources"
-                    :is-streaming="true"
-                    :show-divider="false"
-                    :show-rollback="false"
-                  />
-                </template>
+                <StreamingAssistantMessage v-if="isStreaming" :state="streamingState" />
 
                 <div v-if="messages.length === 0 && !isStreaming" class="empty-chat">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -79,21 +70,19 @@
             <footer class="dialog-input">
               <div class="input-wrapper" :class="{ focused: inputFocused }">
                 <textarea
-                  v-model="inputText"
                   class="input-field"
                   placeholder="继续提问..."
                   rows="1"
                   ref="textareaRef"
-                  @input="autoResize"
+                  @input="handleInput"
                   @keydown.enter.exact="handleSendKeydown"
                   @focus="inputFocused = true"
                   @blur="inputFocused = false"
                 ></textarea>
                 <button
                   class="send-btn"
-                  :class="{ active: inputText.trim() && !isStreaming }"
+                  ref="sendBtnRef"
                   @click="handleSend"
-                  :disabled="!isStreaming && !inputText.trim()"
                 >
                   <svg v-if="!isStreaming" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -126,6 +115,7 @@ import { ref, computed, nextTick, onUnmounted, watch } from 'vue';
 import { electronService } from '@/services/electron';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
+import StreamingAssistantMessage from '@/components/chat/StreamingAssistantMessage.vue';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -153,10 +143,18 @@ const messages = ref([]);
 const inputText = ref('');
 const textareaRef = ref(null);
 const messagesContainer = ref(null);
+const sendBtnRef = ref(null);
 const isStreaming = ref(false);
 const streamingContent = ref('');
 const streamingReasoning = ref('');
 const streamingSources = ref([]);
+// 流式状态用稳定对象整体下传，模板不再直接读取流式文本，避免每个 token 重渲染整个弹窗
+const streamingState = {
+  streaming: isStreaming,
+  content: streamingContent,
+  reasoning: streamingReasoning,
+  sources: streamingSources
+};
 const isAtBottom = ref(true);
 const showScrollDownBtn = ref(false);
 const inputFocused = ref(false);
@@ -167,6 +165,47 @@ let isDoneReceived = false;
 let currentSessionId = '';
 // 上一次的 scrollTop，用于判断滚动方向（区分用户主动上滑与程序置底）
 let lastScrollTop = 0;
+
+// 流式分片按帧合并：同一帧内的多个 token 只触发一次重渲染与 markdown 解析
+let pendingContent = '';
+let pendingReasoning = '';
+let chunkFlushFrame = null;
+
+function clearPendingChunks() {
+  if (chunkFlushFrame !== null) {
+    window.cancelAnimationFrame(chunkFlushFrame);
+    chunkFlushFrame = null;
+  }
+  pendingContent = '';
+  pendingReasoning = '';
+}
+
+function flushPendingChunks() {
+  chunkFlushFrame = null;
+  const content = pendingContent;
+  const reasoning = pendingReasoning;
+  pendingContent = '';
+  pendingReasoning = '';
+  if (!content && !reasoning) return;
+  if (content) streamingContent.value += content;
+  if (reasoning) streamingReasoning.value += reasoning;
+  scrollToBottom();
+}
+
+function flushPendingChunksImmediately() {
+  if (chunkFlushFrame !== null) {
+    window.cancelAnimationFrame(chunkFlushFrame);
+  }
+  flushPendingChunks();
+}
+
+function queueChunk(content, reasoning = '') {
+  pendingContent += content || '';
+  pendingReasoning += reasoning || '';
+  if (chunkFlushFrame === null) {
+    chunkFlushFrame = window.requestAnimationFrame(flushPendingChunks);
+  }
+}
 let unlistenChunk = null;
 let unlistenReasoning = null;
 let unlistenDone = null;
@@ -179,6 +218,7 @@ watch(() => props.visible, (val) => {
     // 先设置监听器，再发送消息，确保不会丢失任何流式事件
     setupListeners();
     nextTick(() => {
+      syncComposerState();
       if (props.initialQuestion) {
         sendChatMessage(props.initialQuestion);
       } else {
@@ -198,8 +238,9 @@ watch(() => props.visible, (val) => {
 });
 
 function resetState() {
+  clearPendingChunks();
   messages.value = [];
-  inputText.value = '';
+  resetInput();
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -213,35 +254,33 @@ function resetState() {
 
 function setupListeners() {
   cleanupListeners();
-  console.log('[KbChat] setupListeners 注册监听器, activeRequestId=', activeRequestId);
   unlistenChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
-    console.log('[KbChat] chat-chunk 收到, requestId=', data.requestId, 'active=', activeRequestId, 'content长度=', (data.content || '').length);
     if (data.requestId !== activeRequestId) return;
-    streamingContent.value += data.content;
-    scrollToBottom();
+    queueChunk(data.content);
   });
 
   unlistenReasoning = electronService.listen('chat-reasoning-chunk', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
-    streamingReasoning.value += data.content;
-    scrollToBottom();
+    queueChunk('', data.content);
   });
 
   unlistenRagSources = electronService.listen('chat-rag-sources', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
+    flushPendingChunksImmediately();
     streamingSources.value = mergeSources(streamingSources.value, Array.isArray(data.sources) ? data.sources : []);
     scrollToBottom();
   });
 
   unlistenDone = electronService.listen('chat-done', (event) => {
     const data = event.payload;
-    console.log('[KbChat] chat-done 收到, requestId=', data.requestId, 'active=', activeRequestId, 'fullContent长度=', (data.fullContent || '').length);
     if (data.requestId !== activeRequestId) return;
     if (isDoneReceived) return;
     isDoneReceived = true;
+    // 先把未渲染的分片落盘，避免结束消息丢掉尾部内容
+    flushPendingChunksImmediately();
 
     isStreaming.value = false;
 
@@ -293,8 +332,8 @@ function setupListeners() {
 
   unlistenError = electronService.listen('chat-error', (event) => {
     const data = event.payload;
-    console.log('[KbChat] chat-error 收到, requestId=', data.requestId, 'active=', activeRequestId, 'error=', data.error);
     if (data.requestId !== activeRequestId) return;
+    flushPendingChunksImmediately();
     isStreaming.value = false;
     const partialContent = streamingContent.value;
     const partialSources = [...streamingSources.value];
@@ -330,6 +369,7 @@ function setupListeners() {
 }
 
 function cleanupListeners() {
+  clearPendingChunks();
   if (unlistenChunk) { unlistenChunk(); unlistenChunk = null; }
   if (unlistenReasoning) { unlistenReasoning(); unlistenReasoning = null; }
   if (unlistenDone) { unlistenDone(); unlistenDone = null; }
@@ -365,8 +405,9 @@ async function sendChatMessage(text) {
     content: text
   });
 
-  inputText.value = '';
+  resetInput();
   isStreaming.value = true;
+  clearPendingChunks();
   streamingContent.value = '';
   streamingReasoning.value = '';
   streamingSources.value = [];
@@ -483,6 +524,29 @@ function autoResize() {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   }
 }
+
+// 发送按钮的可用状态用命令式 DOM 更新，避免模板读取 inputText 导致逐字符重渲染整个弹窗
+function syncComposerState() {
+  const btn = sendBtnRef.value;
+  if (!btn) return;
+  const hasText = !!inputText.value.trim();
+  btn.classList.toggle('active', hasText && !isStreaming.value);
+  btn.disabled = !isStreaming.value && !hasText;
+}
+
+function handleInput(e) {
+  inputText.value = e.target.value;
+  syncComposerState();
+  autoResize();
+}
+
+function resetInput() {
+  inputText.value = '';
+  if (textareaRef.value) textareaRef.value.value = '';
+  syncComposerState();
+}
+
+watch(isStreaming, syncComposerState);
 
 function scrollToBottom(force = false) {
   nextTick(() => {

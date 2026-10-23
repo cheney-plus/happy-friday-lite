@@ -11,7 +11,7 @@
 
       <div class="input-section">
         <FridayComposer
-          v-model="inputText"
+          :model-binding="composerBinding"
           variant="home"
           @send="handleSend"
         />
@@ -36,6 +36,8 @@ const appStore = useAppStore();
 const fridayStore = useFridayStore();
 const tabStore = useTabStore();
 const inputText = ref('');
+// 输入文本通过稳定对象交给输入框组件承载，页面模板不读取其值
+const composerBinding = { ref: inputText };
 
 const isDark = computed(() => appStore.theme === 'dark');
 const logoImage = new URL('@/assets/images/friday-w.webp', import.meta.url).href;

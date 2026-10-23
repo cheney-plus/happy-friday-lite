@@ -644,19 +644,13 @@
               />
             </template>
 
-            <template v-if="isStreaming">
-              <AgentMessageBlock
-                :segments="agentSegments"
-                :reasoning-streaming-content="streamingReasoning"
-                :is-streaming="true"
-              />
-            </template>
+            <StreamingAssistantMessage v-if="isStreaming" :state="noteStreamingState" mode="agent" />
           </div>
         </div>
 
         <ChatInputBox
           ref="chatInputBoxRef"
-          v-model="chatInputText"
+          :model-binding="chatInputBinding"
           :placeholder="t('note.aiSidebar.inputPlaceholder')"
           :is-streaming="isStreaming"
           :note-references="noteReferences"
@@ -734,6 +728,7 @@ import {
 } from 'lucide-vue-next';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
+import StreamingAssistantMessage from '@/components/chat/StreamingAssistantMessage.vue';
 import AgentMessageBlock from '@/views/friday/components/AgentMessageBlock.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import { electronService } from '@/services/electron';
@@ -2011,12 +2006,21 @@ const sidebarMessagesRef = ref(null);
 const isSidebarAtBottom = ref(true);
 
 const chatInputText = ref('');
+// 输入文本通过稳定对象交给输入框组件承载，模板不读取其值，避免逐字符触发编辑器重渲染
+const chatInputBinding = { ref: chatInputText };
 const noteReferences = ref([]);
 const isStreaming = ref(false);
 const streamingContent = ref('');
 const streamingReasoning = ref('');
 // Agent 模式的时间线段（text / tool），用于渲染工具调用过程
 const agentSegments = ref([]);
+// 流式状态用稳定对象整体下传，模板不再直接读取流式文本，避免每个 token 重渲染整个编辑器
+const noteStreamingState = {
+  streaming: isStreaming,
+  content: streamingContent,
+  reasoning: streamingReasoning,
+  segments: agentSegments
+};
 
 const chatMessages = ref([]);
 const currentSessionId = ref('');
@@ -2062,6 +2066,7 @@ function restoreChatSession() {
 }
 
 function resetChatSession() {
+  clearPendingChunks();
   chatMessages.value = [];
   currentSessionId.value = '';
   noteReferences.value = [];
@@ -2085,6 +2090,50 @@ let unlistenError = null;
 let unlistenAgentToolCall = null;
 let unlistenAgentToolResult = null;
 let unlistenAgentApproval = null;
+
+// 流式分片按帧合并：同一帧内的多个 token 只触发一次重渲染与 markdown 解析
+let pendingContent = '';
+let pendingReasoning = '';
+let chunkFlushFrame = null;
+
+function clearPendingChunks() {
+  if (chunkFlushFrame !== null) {
+    window.cancelAnimationFrame(chunkFlushFrame);
+    chunkFlushFrame = null;
+  }
+  pendingContent = '';
+  pendingReasoning = '';
+}
+
+function flushPendingChunks() {
+  chunkFlushFrame = null;
+  const content = pendingContent;
+  const reasoning = pendingReasoning;
+  pendingContent = '';
+  pendingReasoning = '';
+  if (!content && !reasoning) return;
+  if (content) {
+    streamingContent.value += content;
+    appendAgentText(content);
+  }
+  if (reasoning) streamingReasoning.value += reasoning;
+  scrollSidebarToBottom();
+}
+
+function flushPendingChunksImmediately() {
+  if (chunkFlushFrame !== null) {
+    window.cancelAnimationFrame(chunkFlushFrame);
+  }
+  flushPendingChunks();
+}
+
+function queueChunk(content, reasoning = '') {
+  pendingContent += content || '';
+  pendingReasoning += reasoning || '';
+  if (chunkFlushFrame === null) {
+    chunkFlushFrame = window.requestAnimationFrame(flushPendingChunks);
+  }
+}
 
 function loadModelConfig(modelId) {
   const selectedId = modelId || localStorage.getItem('happy-friday-selected-model');
@@ -2169,6 +2218,7 @@ async function sendChatMessage(text) {
   noteReferences.value = [];
   attachments.value = [];
   isStreaming.value = true;
+  clearPendingChunks();
   streamingContent.value = '';
   streamingReasoning.value = '';
   agentSegments.value = [];
@@ -2422,9 +2472,7 @@ async function setupChatListeners() {
     'chat-chunk',
     (event) => {
       if (event.payload.requestId !== activeRequestId) return;
-      streamingContent.value += event.payload.content;
-      appendAgentText(event.payload.content);
-      scrollSidebarToBottom();
+      queueChunk(event.payload.content);
     }
   );
 
@@ -2432,8 +2480,7 @@ async function setupChatListeners() {
     'chat-reasoning-chunk',
     (event) => {
       if (event.payload.requestId !== activeRequestId) return;
-      streamingReasoning.value += event.payload.content;
-      scrollSidebarToBottom();
+      queueChunk('', event.payload.content);
     }
   );
 
@@ -2442,6 +2489,8 @@ async function setupChatListeners() {
     (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      // 先落盘当前文本分片，保证时间线段顺序正确
+      flushPendingChunksImmediately();
       const segs = agentSegments.value;
       const last = segs.length > 0 ? segs[segs.length - 1] : null;
       if (last && last.type === 'text') last.isStreaming = false;
@@ -2475,6 +2524,7 @@ async function setupChatListeners() {
     (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      flushPendingChunksImmediately();
       const seg = agentSegments.value.find(s => s.type === 'tool' && s.toolCallId === data.toolCallId);
       if (seg && seg.status !== 'rejected') {
         seg.status = data.status || 'success';
@@ -2496,6 +2546,7 @@ async function setupChatListeners() {
     (event) => {
       const data = event.payload;
       if (data.requestId !== activeRequestId) return;
+      flushPendingChunksImmediately();
       electronService.invoke('agent-tool-approval-resume', {
         requestId: data.requestId,
         decision: { type: 'approve' }
@@ -2509,6 +2560,8 @@ async function setupChatListeners() {
       if (event.payload.requestId !== activeRequestId) return;
       if (isDoneReceived) return;
       isDoneReceived = true;
+      // 先把未渲染的分片落盘，保证时间线段包含尾部内容
+      flushPendingChunksImmediately();
 
       if (event.payload.sessionId && !currentSessionId.value) {
         currentSessionId.value = event.payload.sessionId;
@@ -2541,6 +2594,7 @@ async function setupChatListeners() {
     'chat-error',
     (event) => {
       if (event.payload.requestId !== activeRequestId) return;
+      clearPendingChunks();
       isStreaming.value = false;
       streamingContent.value = '';
       streamingReasoning.value = '';
@@ -2551,6 +2605,7 @@ async function setupChatListeners() {
 }
 
 function cleanupChatListeners() {
+  clearPendingChunks();
   unlistenChunk?.();
   unlistenReasoning?.();
   unlistenDone?.();
