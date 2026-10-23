@@ -6,7 +6,7 @@
       <!-- 第一组：撤销/重做、清除格式 -->
       <div ref="historyToolbarSectionRef" v-show="isToolbarSectionVisible('history')" class="toolbar-section">
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" @click="editor.chain().focus().undo().run()" :disabled="!editor.can().undo()">
+        <button class="toolbar-btn" @click="editor.chain().focus().undo().run()" :disabled="!toolbarState.canUndo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 7v6h6"></path>
             <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
@@ -16,7 +16,7 @@
       </div>
 
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" @click="editor.chain().focus().redo().run()" :disabled="!editor.can().redo()">
+        <button class="toolbar-btn" @click="editor.chain().focus().redo().run()" :disabled="!toolbarState.canRedo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 7v6h-6"></path>
             <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
@@ -46,7 +46,7 @@
       </div>
 
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('link') }" @click="addLink" :disabled="!hasSelection">
+        <button class="toolbar-btn" :class="{ active: toolbarState.linkActive }" @click="addLink" :disabled="!toolbarState.hasSelection">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.link') }}</span>
@@ -110,32 +110,32 @@
       <!-- 第三组：文本格式 -->
       <div ref="formatToolbarSectionRef" v-show="isToolbarSectionVisible('format')" class="toolbar-section">
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.bold }" @click="editor.chain().focus().toggleBold().run()">
           <span style="font-weight: 700; font-size: 14px;">B</span>
         </button>
         <span class="tooltip">{{ t('note.toolbar.bold') }}</span>
       </div>
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.italic }" @click="editor.chain().focus().toggleItalic().run()">
           <span style="font-style: italic; font-size: 14px;">I</span>
         </button>
         <span class="tooltip">{{ t('note.toolbar.italic') }}</span>
       </div>
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('underline') }" @click="editor.chain().focus().toggleUnderline().run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.underline }" @click="editor.chain().focus().toggleUnderline().run()">
           <span style="text-decoration: underline; font-size: 14px;">U</span>
         </button>
         <span class="tooltip">{{ t('note.toolbar.underline') }}</span>
       </div>
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.strike }" @click="editor.chain().focus().toggleStrike().run()">
           <span style="text-decoration: line-through; font-size: 14px;">S</span>
         </button>
         <span class="tooltip">{{ t('note.toolbar.strike') }}</span>
       </div>
 
       <div class="dropdown-wrapper">
-        <button class="toolbar-btn dropdown-toggle highlight-toggle" :class="{ active: editor.isActive('highlight') }" @click="handleHighlightButtonClick">
+        <button class="toolbar-btn dropdown-toggle highlight-toggle" :class="{ active: toolbarState.highlight }" @click="handleHighlightButtonClick">
           <Highlighter :size="15" :stroke-width="2" />
           <span class="highlight-current-color" :style="lastHighlightColor ? { backgroundColor: lastHighlightColor } : { display: 'none' }"></span>
           <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" @click.stop="toggleHighlightMenu"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -189,20 +189,20 @@
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div v-if="showHeadingMenu" class="dropdown-menu heading-menu">
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('noteTitle'), disabled: !canSetNoteTitle }" @click="setNoteTitle">
+          <div class="menu-item heading-preview" :class="{ active: toolbarState.noteTitle, disabled: !toolbarState.canSetNoteTitle }" @click="setNoteTitle">
             <span class="note-title-menu-label">{{ t('note.toolbar.title') }}</span>
           </div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 1 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(1)">
+          <div class="menu-item heading-preview" :class="{ active: toolbarState.heading1, disabled: toolbarState.noteTitle }" @click="setHeading(1)">
             <span class="heading-level-1-label">{{ t('note.toolbar.heading1') }}</span>
           </div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 2 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(2)">
+          <div class="menu-item heading-preview" :class="{ active: toolbarState.heading2, disabled: toolbarState.noteTitle }" @click="setHeading(2)">
             <span class="heading-level-2-label">{{ t('note.toolbar.heading2') }}</span>
           </div>
-          <div class="menu-item heading-preview" :class="{ active: editor.isActive('heading', { level: 3 }), disabled: editor.isActive('noteTitle') }" @click="setHeading(3)">
+          <div class="menu-item heading-preview" :class="{ active: toolbarState.heading3, disabled: toolbarState.noteTitle }" @click="setHeading(3)">
             <span class="heading-level-3-label">{{ t('note.toolbar.heading3') }}</span>
           </div>
-          <div class="menu-item" :class="{ active: isBodyActive, disabled: editor.isActive('noteTitle') }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
-          <div class="menu-item" :class="{ active: isSmallBodyActive, disabled: editor.isActive('noteTitle') }" @click="setSmallBody">
+          <div class="menu-item" :class="{ active: isBodyActive, disabled: toolbarState.noteTitle }" @click="setHeading(0)">{{ t('note.toolbar.body') }}</div>
+          <div class="menu-item" :class="{ active: isSmallBodyActive, disabled: toolbarState.noteTitle }" @click="setSmallBody">
             <span class="small-body-label">{{ t('note.toolbar.smallBody') }}</span>
           </div>
         </div>
@@ -214,19 +214,19 @@
       <!-- 第五组：列表 -->
       <div ref="listToolbarSectionRef" v-show="isToolbarSectionVisible('list')" class="toolbar-section">
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.bulletList }" @click="editor.chain().focus().toggleBulletList().run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.bulletList') }}</span>
       </div>
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.orderedList }" @click="editor.chain().focus().toggleOrderedList().run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.orderedList') }}</span>
       </div>
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive('taskList') }" @click="editor.chain().focus().toggleTaskList().run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.taskList }" @click="editor.chain().focus().toggleTaskList().run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.taskList') }}</span>
@@ -238,19 +238,19 @@
       <!-- 第六组：对齐方式 -->
       <div ref="alignToolbarSectionRef" v-show="isToolbarSectionVisible('align')" class="toolbar-section">
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive({ textAlign: 'left' }) }" @click="editor.chain().focus().setTextAlign('left').run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.alignLeft }" @click="editor.chain().focus().setTextAlign('left').run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="15" y1="12" x2="3" y2="12"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.alignLeft') }}</span>
       </div>
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive({ textAlign: 'center' }) }" @click="editor.chain().focus().setTextAlign('center').run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.alignCenter }" @click="editor.chain().focus().setTextAlign('center').run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="17" y1="12" x2="7" y2="12"></line><line x1="19" y1="18" x2="5" y2="18"></line></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.alignCenter') }}</span>
       </div>
       <div class="tooltip-wrapper">
-        <button class="toolbar-btn" :class="{ active: editor.isActive({ textAlign: 'right' }) }" @click="editor.chain().focus().setTextAlign('right').run()">
+        <button class="toolbar-btn" :class="{ active: toolbarState.alignRight }" @click="editor.chain().focus().setTextAlign('right').run()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="12" x2="9" y2="12"></line><line x1="21" y1="18" x2="7" y2="18"></line></svg>
         </button>
         <span class="tooltip">{{ t('note.toolbar.alignRight') }}</span>
@@ -366,7 +366,7 @@
       </div>
     </Transition>
 
-    <NoteBubbleMenu v-if="editor && !shareMode" :editor="editor" :isDark="appStore.theme === 'dark'" :noteContent="editor.getText()" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
+    <NoteBubbleMenu v-if="editor && !shareMode" :editor="editor" :isDark="appStore.theme === 'dark'" @aiWrite="handleBubbleAIWrite" @openInChat="handleOpenInChat" />
 
     <div v-if="editor && !shareMode && tableContextMenuVisible && isTableActive" ref="tableContextToolbarRef" class="table-context-toolbar" :style="tableToolbarStyle" role="menu" :aria-label="t('note.table.toolbarLabel')">
       <div class="table-context-summary">
@@ -461,7 +461,7 @@
         </div>
         <div class="dialog-footer">
           <button class="btn btn-secondary" @click="closeLinkDialog">{{ t('note.cancel') }}</button>
-          <button v-if="isEditingLink && editor?.isActive('link')" class="btn btn-danger" @click="removeLink">{{ t('note.linkDialog.remove') }}</button>
+          <button v-if="isEditingLink && toolbarState.linkActive" class="btn btn-danger" @click="removeLink">{{ t('note.linkDialog.remove') }}</button>
           <button class="btn btn-primary" @click="confirmLink" :disabled="!linkUrl">{{ isEditingLink ? t('note.linkDialog.update') : t('note.linkDialog.insert') }}</button>
         </div>
       </div>
@@ -1225,8 +1225,6 @@ const tableRows = ref(0);
 const tableCols = ref(0);
 const tableContextMenuVisible = ref(false);
 
-// Tiptap mutates the editor state in place, so this tick keeps table dimensions reactive.
-const tableSelectionTick = ref(0);
 const tableContextToolbarRef = ref(null);
 const editorContentRef = ref(null);
 const tableToolbarStyle = ref({
@@ -1254,7 +1252,6 @@ const handleEditorContextMenu = (view, event) => {
   const cellPos = view.posAtDOM(cell, 0);
   const resolvedPos = view.state.doc.resolve(Math.max(0, Math.min(cellPos, view.state.doc.content.size)));
   view.dispatch(view.state.tr.setSelection(TextSelection.near(resolvedPos)));
-  tableSelectionTick.value += 1;
 
   const container = editorContentRef.value?.$el?.closest('.editor-wrapper')
     || editorContentRef.value?.closest?.('.editor-wrapper');
@@ -1299,9 +1296,11 @@ const handleDocumentContextMenu = (event) => {
   }
 };
 
-const getActiveTableContext = () => {
-  if (!editor.value) return null;
-  const { $from } = editor.value.state.selection;
+const getActiveTableContext = (instance = editor.value) => {
+  if (!instance) return null;
+  // 读取原始 ProseMirror state（editor.view.state），不经过 @tiptap/vue-3 的响应式代理
+  const viewState = instance.view?.state || instance.state;
+  const { $from } = viewState.selection;
   for (let depth = $from.depth; depth > 0; depth -= 1) {
     if ($from.node(depth).type.name === 'table') {
       return {
@@ -1313,23 +1312,106 @@ const getActiveTableContext = () => {
   return null;
 };
 
-const tableContext = computed(() => {
-  tableSelectionTick.value;
-  const context = getActiveTableContext();
-  if (!context) return null;
-  let rows = 0;
-  let cols = 0;
-  context.node.forEach((row) => {
-    rows += 1;
-    if (!cols) cols = row.childCount;
-  });
-  return { ...context, rows, cols };
+const emptyToolbarState = () => ({
+  canUndo: false,
+  canRedo: false,
+  hasSelection: false,
+  linkActive: false,
+  bold: false,
+  italic: false,
+  underline: false,
+  strike: false,
+  highlight: false,
+  bulletList: false,
+  orderedList: false,
+  taskList: false,
+  alignLeft: false,
+  alignCenter: false,
+  alignRight: false,
+  noteTitle: false,
+  headingAny: false,
+  heading1: false,
+  heading2: false,
+  heading3: false,
+  body: false,
+  smallBody: false,
+  canSetNoteTitle: false,
+  hasTable: false,
+  tableRows: 0,
+  tableCols: 0,
 });
 
-const isTableActive = computed(() => Boolean(tableContext.value));
+// 工具栏/表格上下文状态快照。
+// 模板里直接读 editor.state / isActive / can 会让组件渲染依赖 @tiptap/vue-3 的
+// reactiveState（每个事务后都会 trigger），导致按字符重渲染。这里只在事务回调中
+// 生成快照，签名变化时才写回响应式对象，普通连续输入不会引起编辑器组件 re-render。
+const toolbarState = ref(emptyToolbarState());
+
+const readToolbarState = (instance) => {
+  if (!instance) return emptyToolbarState();
+  const { from, to, $from } = (instance.view?.state || instance.state).selection;
+  const table = getActiveTableContext(instance);
+  let tableRowsCount = 0;
+  let tableColsCount = 0;
+  if (table) {
+    table.node.forEach((row) => {
+      tableRowsCount += 1;
+      if (!tableColsCount) tableColsCount = row.childCount;
+    });
+  }
+  const smallBody = instance.isActive('paragraph', { small: true });
+  return {
+    canUndo: instance.can().undo(),
+    canRedo: instance.can().redo(),
+    hasSelection: from !== to,
+    linkActive: instance.isActive('link'),
+    bold: instance.isActive('bold'),
+    italic: instance.isActive('italic'),
+    underline: instance.isActive('underline'),
+    strike: instance.isActive('strike'),
+    highlight: instance.isActive('highlight'),
+    bulletList: instance.isActive('bulletList'),
+    orderedList: instance.isActive('orderedList'),
+    taskList: instance.isActive('taskList'),
+    alignLeft: instance.isActive({ textAlign: 'left' }),
+    alignCenter: instance.isActive({ textAlign: 'center' }),
+    alignRight: instance.isActive({ textAlign: 'right' }),
+    noteTitle: instance.isActive('noteTitle'),
+    headingAny: instance.isActive('heading'),
+    heading1: instance.isActive('heading', { level: 1 }),
+    heading2: instance.isActive('heading', { level: 2 }),
+    heading3: instance.isActive('heading', { level: 3 }),
+    body: instance.isActive('paragraph') && !smallBody,
+    smallBody,
+    canSetNoteTitle: $from.depth === 1 && $from.index(0) === 0,
+    hasTable: Boolean(table),
+    tableRows: tableRowsCount,
+    tableCols: tableColsCount,
+  };
+};
+
+const getToolbarStateSignature = (state) => Object.values(state)
+  .map(value => (typeof value === 'boolean' ? (value ? '1' : '0') : String(value)))
+  .join('|');
+
+// 工具栏/表格上下文用到的编辑器状态签名。
+// 只有签名变化（如首次输入让撤销可用、光标进入表格、选中文本等）时才触发组件重渲染。
+let toolbarStateSignature = null;
+// 最近一次由编辑器自身输入同步出去的内容，用于跳过来回回流的重复处理
+let lastSyncedHtml = '';
+
+const syncToolbarState = (instance) => {
+  const next = readToolbarState(instance);
+  const signature = getToolbarStateSignature(next);
+  if (signature === toolbarStateSignature) return;
+  toolbarStateSignature = signature;
+  toolbarState.value = next;
+};
+
+const isTableActive = computed(() => toolbarState.value.hasTable);
 const tableDimensions = computed(() => ({
-  rows: tableContext.value?.rows || 0,
-  cols: tableContext.value?.cols || 0,
+  rows: toolbarState.value.tableRows,
+  cols: toolbarState.value.tableCols,
 }));
 
 const canTableCommand = (command) => {
@@ -1342,7 +1424,6 @@ const runTableCommand = (command) => {
   const chain = editor.value.chain().focus();
   if (typeof chain[command] !== 'function') return false;
   const result = chain[command]().run();
-  tableSelectionTick.value += 1;
   hideTableContextMenu();
   return result;
 };
@@ -1362,7 +1443,6 @@ const selectWholeTable = () => {
   editor.value.view.dispatch(editor.value.state.tr.setSelection(
     CellSelection.create(editor.value.state.doc, firstCell, lastCell),
   ));
-  tableSelectionTick.value += 1;
   hideTableContextMenu();
   return true;
 };
@@ -1401,11 +1481,7 @@ const isEditingLink = ref(false);
 const linkUrl = ref('');
 const linkUrlInput = ref(null);
 
-const hasSelection = computed(() => {
-  if (!editor.value) return false;
-  const { from, to } = editor.value.state.selection;
-  return from !== to;
-});
+const hasSelection = computed(() => toolbarState.value.hasSelection);
 
 const addLink = () => {
   if (!hasSelection.value) return;
@@ -2328,6 +2404,13 @@ async function reloadNoteFromDb(noteId) {
   try {
     const note = await electronService.invoke('get_note', { noteId });
     if (!note || typeof note.content !== 'string') return;
+    // 直接把最新内容写入编辑器，不再依赖父组件通过 modelValue 回流
+    const preparedContent = prepareEditorContent(note.content);
+    if (preparedContent !== editor.value.getHTML()) {
+      editor.value.commands.setContent(preparedContent);
+      lastSyncedHtml = editor.value.getHTML();
+      nextTick(syncSearchState);
+    }
     emit('update:modelValue', note.content);
   } catch (e) {
     console.error('Failed to reload note after agent update:', e);
@@ -2718,8 +2801,9 @@ const editor = useEditor({
     },
   },
   onUpdate: ({ editor }) => {
-    tableSelectionTick.value += 1;
+    syncToolbarState(editor);
     const html = editor.getHTML();
+    lastSyncedHtml = html;
     emit('update:modelValue', html);
     emit('change', html);
     syncSearchState();
@@ -2732,8 +2816,8 @@ const editor = useEditor({
       triggerFimCompletion();
     }, 2000);
   },
-  onSelectionUpdate: () => {
-    tableSelectionTick.value += 1;
+  onSelectionUpdate: ({ editor: instance }) => {
+    syncToolbarState(instance);
     if (tableContextMenuVisible.value) hideTableContextMenu();
     if (fimCompletionVisible.value) {
       dismissFimCompletion();
@@ -2816,39 +2900,26 @@ const handleSearchInputKeydown = (event) => {
   }
 };
 
-const isSmallBodyActive = computed(() => {
-  if (!editor.value) return false;
-  return editor.value.isActive('paragraph', { small: true });
-});
+const isSmallBodyActive = computed(() => toolbarState.value.smallBody);
 
-const isBodyActive = computed(() => {
-  if (!editor.value) return false;
-  return editor.value.isActive('paragraph') && !editor.value.isActive('paragraph', { small: true });
-});
+const isBodyActive = computed(() => toolbarState.value.body);
 
 const currentHeadingLabel = computed(() => {
-  if (!editor.value) return t('note.toolbar.body');
-  if (editor.value.isActive('noteTitle')) return t('note.toolbar.title');
+  const state = toolbarState.value;
+  if (state.noteTitle) return t('note.toolbar.title');
   // 工具栏按钮用短标签，避免长文案把按钮撑宽
-  if (editor.value.isActive('heading', { level: 1 })) return 'H1';
-  if (editor.value.isActive('heading', { level: 2 })) return 'H2';
-  if (editor.value.isActive('heading', { level: 3 })) return 'H3';
-  if (isSmallBodyActive.value) return t('note.toolbar.smallBody');
+  if (state.heading1) return 'H1';
+  if (state.heading2) return 'H2';
+  if (state.heading3) return 'H3';
+  if (state.smallBody) return t('note.toolbar.smallBody');
   return t('note.toolbar.body');
 });
 
-const isHeadingActive = computed(() => {
-  if (!editor.value) return false;
-  return editor.value.isActive('noteTitle')
-    || editor.value.isActive('heading')
-    || isSmallBodyActive.value;
-});
+const isHeadingActive = computed(() => (
+  toolbarState.value.noteTitle || toolbarState.value.headingAny || toolbarState.value.smallBody
+));
 
-const canSetNoteTitle = computed(() => {
-  if (!editor.value) return false;
-  const { $from } = editor.value.state.selection;
-  return $from.depth === 1 && $from.index(0) === 0;
-});
+const canSetNoteTitle = computed(() => toolbarState.value.canSetNoteTitle);
 
 const toggleInsertMenu = () => exclusiveToggleMenu(showInsertMenu);
 const toggleHighlightMenu = () => exclusiveToggleMenu(showHighlightMenu);
@@ -3076,10 +3147,10 @@ const insertTable = (rows, cols) => {
 };
 
 const toolbarOverflowTools = computed(() => [
-  { key: 'undo', section: 'history', icon: Undo2, label: t('note.toolbar.undo'), disabled: () => !editor.value?.can().undo(), run: () => editor.value?.chain().focus().undo().run() },
-  { key: 'redo', section: 'history', icon: Redo2, label: t('note.toolbar.redo'), disabled: () => !editor.value?.can().redo(), run: () => editor.value?.chain().focus().redo().run() },
+  { key: 'undo', section: 'history', icon: Undo2, label: t('note.toolbar.undo'), disabled: () => !toolbarState.value.canUndo, run: () => editor.value?.chain().focus().undo().run() },
+  { key: 'redo', section: 'history', icon: Redo2, label: t('note.toolbar.redo'), disabled: () => !toolbarState.value.canRedo, run: () => editor.value?.chain().focus().redo().run() },
   { key: 'clear', section: 'history', icon: Eraser, label: t('note.toolbar.clearFormat'), run: clearFormatting },
-  { key: 'link', section: 'history', icon: Link2, label: t('note.toolbar.link'), disabled: () => !hasSelection.value, run: addLink },
+  { key: 'link', section: 'history', icon: Link2, label: t('note.toolbar.link'), disabled: () => !toolbarState.value.hasSelection, run: addLink },
   { key: 'table', section: 'insert', icon: Table2, label: t('note.toolbar.table'), run: () => insertTable(3, 3) },
   { key: 'image', section: 'insert', icon: ToolbarImage, label: t('note.toolbar.image'), run: addImage },
   { key: 'formula', section: 'insert', icon: Sigma, label: t('note.toolbar.formula'), run: addFormula },
@@ -3092,7 +3163,7 @@ const toolbarOverflowTools = computed(() => [
   { key: 'strike', section: 'format', icon: Strikethrough, label: t('note.toolbar.strike'), run: () => editor.value?.chain().focus().toggleStrike().run() },
   { key: 'highlight', section: 'format', icon: Highlighter, label: t('note.toolbar.backgroundColor'), run: () => setHighlight('transparent') },
   { key: 'text-color', section: 'format', icon: Palette, label: t('note.toolbar.textColor'), run: () => setTextColor('inherit') },
-  { key: 'heading', section: 'heading', icon: Heading, label: t('note.toolbar.title'), disabled: () => !canSetNoteTitle.value, run: setNoteTitle },
+  { key: 'heading', section: 'heading', icon: Heading, label: t('note.toolbar.title'), disabled: () => !toolbarState.value.canSetNoteTitle, run: setNoteTitle },
   { key: 'heading-1', section: 'heading', icon: Heading, label: t('note.toolbar.heading1'), run: () => setHeading(1) },
   { key: 'heading-2', section: 'heading', icon: Heading, label: t('note.toolbar.heading2'), run: () => setHeading(2) },
   { key: 'heading-3', section: 'heading', icon: Heading, label: t('note.toolbar.heading3'), run: () => setHeading(3) },
@@ -3107,9 +3178,13 @@ const toolbarOverflowTools = computed(() => [
 ]);
 
 watch(() => props.modelValue, (newValue) => {
+  // 自身输入触发的回流（内容与上次同步一致）直接跳过，
+  // 避免每次按键都重新解析/序列化整篇 HTML
+  if (newValue === lastSyncedHtml) return;
   const preparedContent = prepareEditorContent(newValue);
   if (editor.value && preparedContent !== editor.value.getHTML()) {
     editor.value.commands.setContent(preparedContent);
+    lastSyncedHtml = editor.value.getHTML();
     nextTick(syncSearchState);
   }
 });
@@ -3135,6 +3210,7 @@ onMounted(() => {
   restoreChatSession();
   loadKbListFromDisk();
   nextTick(() => {
+    syncToolbarState(editor.value);
     scheduleToolbarLayout();
     toolbarResizeObserver = new ResizeObserver(scheduleToolbarLayout);
     toolbarResizeObserver.observe(toolbarRef.value);
