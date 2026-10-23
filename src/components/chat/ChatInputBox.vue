@@ -36,15 +36,15 @@
         </div>
       </div>
 
+      <!-- 非受控输入：键入时只通过 handleInput 更新文本与按钮状态，不触发组件重渲染 -->
       <textarea
-        :value="currentText"
+        ref="textareaRef"
         class="main-input"
         :placeholder="isStreaming ? t('friday.aiThinking') : placeholder"
         rows="1"
         @input="handleInput"
         @keydown.enter.exact="handleSendKeydown"
         :disabled="isStreaming"
-        ref="textareaRef"
       ></textarea>
 
       <div class="input-actions">
@@ -81,11 +81,11 @@
               </svg>
             </button>
             <button
+              ref="sendBtnRef"
               v-else
               key="send"
               class="send-btn"
               type="button"
-              :class="{ active: currentText.trim() }"
               @click="$emit('send')"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -182,6 +182,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'send', 'stop', 'removeReference', 'selectNote', 'selectKbFile', 'selectKb', 'removeAttachment']);
 
 const textareaRef = ref(null);
+const sendBtnRef = ref(null);
 const showLinkDropdown = ref(false);
 const showKbDropdown = ref(false);
 const linkDropdownStyle = ref({});
@@ -190,6 +191,20 @@ const currentText = computed(() => {
   if (props.modelBinding) return props.modelBinding.ref.value || '';
   return props.modelValue || '';
 });
+
+// 发送按钮状态用命令式 DOM 更新，模板不读取输入文本，键入时不会触发重渲染
+function syncSendState() {
+  if (!sendBtnRef.value) return;
+  sendBtnRef.value.classList.toggle('active', !!currentText.value.trim());
+}
+
+// 仅在外部程序化写入文本时同步到 textarea（键入时值已一致，不做任何 DOM 写入）
+function syncTextarea(value) {
+  const textarea = textareaRef.value;
+  if (!textarea || textarea.value === value) return false;
+  textarea.value = value;
+  return true;
+}
 
 function focus() {
   nextTick(() => {
@@ -255,12 +270,13 @@ const selectKnowledgeBase = (kbName, categoryId) => {
 };
 
 function handleInput(e) {
-  const target = e.target;
+  const value = e.target.value;
   if (props.modelBinding) {
-    props.modelBinding.ref.value = target.value;
+    props.modelBinding.ref.value = value;
   } else {
-    emit('update:modelValue', target.value);
+    emit('update:modelValue', value);
   }
+  syncSendState();
   autoResize();
 }
 
@@ -278,12 +294,21 @@ function autoResize() {
   }
 }
 
-watch(currentText, async () => {
-  await nextTick();
-  autoResize();
+// 外部写入（发送后清空、快捷指令填充、回滚恢复等）时同步文本与按钮状态
+watch(currentText, (value) => {
+  syncSendState();
+  if (syncTextarea(value)) nextTick(autoResize);
+});
+
+// 流式结束会重建发送按钮，重建后需要重新应用 active 状态
+watch(() => props.isStreaming, () => {
+  nextTick(syncSendState);
 });
 
 onMounted(() => {
+  syncTextarea(currentText.value);
+  syncSendState();
+  autoResize();
   document.addEventListener('scroll', closeAllDropdowns, true);
 });
 

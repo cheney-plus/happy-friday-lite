@@ -50,19 +50,20 @@
 
           <!-- 单行输入框 -->
           <div class="input-area">
+            <!-- 非受控输入：键入时只更新文本与发送按钮状态，不触发面板重渲染 -->
             <input
               ref="inputRef"
-              v-model="inputText"
               class="assistant-input"
               type="text"
               :placeholder="isStreaming ? 'Friday 正在思考...' : '问我关于日程的任何问题...'"
               :disabled="isStreaming"
+              @input="handleInput"
               @keydown.enter.exact.prevent="handleSend"
             />
             <button
+              ref="sendBtnRef"
               class="send-btn"
-              :class="{ active: inputText.trim() && !isStreaming }"
-              :disabled="!inputText.trim() || isStreaming"
+              :disabled="isStreaming"
               @click="handleSend"
             >
               <svg v-if="!isStreaming" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -106,6 +107,7 @@ const emit = defineEmits(['update:visible']);
 const scheduleStore = useScheduleStore();
 
 const inputRef = ref(null);
+const sendBtnRef = ref(null);
 const inputText = ref('');
 const isStreaming = ref(false);
 const bubbleVisible = ref(false);
@@ -142,8 +144,29 @@ function close() {
   emit('update:visible', false);
 }
 
-function useSuggestion(text) {
+// 发送按钮状态用命令式 DOM 更新，模板不读取输入文本，避免逐字符重渲染整个面板
+function syncSendState() {
+  const btn = sendBtnRef.value;
+  if (!btn) return;
+  const hasText = !!inputText.value.trim();
+  btn.classList.toggle('active', hasText && !isStreaming.value);
+  btn.disabled = !hasText || isStreaming.value;
+}
+
+function handleInput(e) {
+  inputText.value = e.target.value;
+  syncSendState();
+}
+
+// 程序化写入（快捷提问、发送后清空）时同步 DOM 值与按钮状态
+function setInputText(text) {
   inputText.value = text;
+  if (inputRef.value) inputRef.value.value = text;
+  syncSendState();
+}
+
+function useSuggestion(text) {
+  setInputText(text);
   nextTick(() => {
     inputRef.value?.focus();
   });
@@ -198,7 +221,7 @@ async function handleSend() {
 3. 尽量根据上下文合理推断用户意图，直接执行操作，不要频繁向用户确认或追问。
 4. 仅在信息严重缺失导致无法执行时才询问用户，且一次问清所有需要的信息。]\n\n${text}`;
 
-  inputText.value = '';
+  setInputText('');
 
   isStreaming.value = true;
   bubbleVisible.value = true;
@@ -304,11 +327,15 @@ onUnmounted(() => {
   if (unlistenToolResult) unlistenToolResult();
 });
 
+// 输入框初始状态与流式状态变化后同步发送按钮
+watch(isStreaming, () => nextTick(syncSendState));
+
 // 面板打开时聚焦输入框
 watch(() => props.visible, (val) => {
   if (val) {
     nextTick(() => {
       inputRef.value?.focus();
+      syncSendState();
     });
   } else {
     if (isStreaming.value) {
