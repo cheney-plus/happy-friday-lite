@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, inject, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore, useFridayStore, useTabStore } from '@/store';
@@ -29,8 +29,12 @@ import { NEW_SESSION_ID, fridayChatLocation, getFridayTabId } from '@/utils/frid
 import FridayComposer from '@/views/friday/components/FridayComposer.vue';
 import { loadModelConfig } from '@/views/friday/composables/useModelCatalog';
 
-const route = useRoute();
+// FridayLayout 会注入本 Tab 自己的路由，避免多 Tab 场景下误读其它 Tab 的全局路由
+const injectedRoute = inject('fridayRoute', null);
+const injectedNavigate = inject('fridayNavigate', null);
+const route = injectedRoute || useRoute();
 const router = useRouter();
+const navigate = injectedNavigate || ((location) => router.push(location));
 const { t } = useI18n();
 const appStore = useAppStore();
 const fridayStore = useFridayStore();
@@ -56,7 +60,7 @@ function handleSend(payload) {
   const tabId = getFridayTabId(route, tabStore);
   fridayStore.setPendingLaunch(tabId, payload);
   inputText.value = '';
-  router.push(fridayChatLocation(route, { sessionId: NEW_SESSION_ID }, tabStore));
+  navigate(fridayChatLocation(route, { sessionId: NEW_SESSION_ID }, tabStore));
 }
 </script>
 

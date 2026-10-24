@@ -6,6 +6,8 @@ export const CHAT_REASONING_CHUNK = 'chat-reasoning-chunk'
 export const CHAT_RAG_SOURCES = 'chat-rag-sources'
 export const CHAT_DONE = 'chat-done'
 export const CHAT_ERROR = 'chat-error'
+// 新会话创建完成：通知渲染进程把正在流式输出的临时会话绑定到真实 sessionId
+export const CHAT_SESSION_CREATED = 'chat-session-created'
 export const SESSION_TITLE_UPDATED = 'session-title-updated'
 export const NOTE_AI_CHUNK = 'note-ai-chunk'
 export const NOTE_AI_DONE = 'note-ai-done'

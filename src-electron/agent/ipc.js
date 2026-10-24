@@ -22,7 +22,7 @@
 
 import { ipcMain, dialog } from 'electron'
 import { Command } from '@langchain/langgraph'
-import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_DONE, CHAT_ERROR, CONFIG_CHANGED } from '../events.js'
+import { CHAT_CHUNK, CHAT_REASONING_CHUNK, CHAT_DONE, CHAT_ERROR, CHAT_SESSION_CREATED, CONFIG_CHANGED } from '../events.js'
 import { CancellationTokens } from '../cancellation.js'
 import { getDataDir, loadConfig } from '../config.js'
 import * as db from '../db.js'
@@ -112,6 +112,14 @@ export function registerAgentCommands(mainWindow) {
       const userMsg = db.saveMessage(currentSessionId, 'user', message)
       userMessageId = userMsg.id
       db.updateSessionTimestamp(currentSessionId)
+
+      // 新会话立即通知前端绑定真实 sessionId，避免侧边栏切回时找不到正在输出的流
+      if (isNewSession) {
+        mainWindow.webContents.send(CHAT_SESSION_CREATED, {
+          requestId,
+          sessionId: currentSessionId
+        })
+      }
 
       // 3. 获取历史消息构建 Agent 输入
       const dbMessages = db.getMessages(currentSessionId)
