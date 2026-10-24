@@ -89,13 +89,13 @@
     </div>
 
     <div v-else-if="showAIPanel" class="ai-input-wrapper" :class="{ 'is-dark': isDark }">
+      <!-- 非受控输入：键入时只更新文本与发送按钮状态，不触发面板重渲染 -->
       <textarea
         ref="inputRef"
-        v-model="inputText"
         class="ai-textarea"
         :placeholder="selectedText ? t('note.bubbleMenu.basedOnSelection', { text: selectedText.slice(0, 50) + (selectedText.length > 50 ? '...' : '') }) : t('note.bubbleMenu.inputPlaceholder')"
         rows="1"
-        @input="autoResize"
+        @input="handlePanelInput"
         @keydown.enter.exact.prevent="handleSend"
       ></textarea>
 
@@ -180,11 +180,10 @@
         <div class="action-right">
           <Transition name="btn-switch" mode="out-in">
             <button
+              ref="sendBtnRef"
               key="send"
               class="send-btn"
-              :class="{ active: inputText.trim() }"
               @click="handleSend"
-              :disabled="!inputText.trim()"
               :title="t('note.bubbleMenu.send')"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -277,6 +276,7 @@ const emit = defineEmits(['aiWrite', 'openInChat', 'replaceText', 'insertText'])
 const showAIPanel = ref(false);
 const showCommandMenu = ref(false);
 const inputText = ref('');
+const sendBtnRef = ref(null);
 const selectedText = ref('');
 const savedSelectedText = ref('');
 const inputRef = ref(null);
@@ -488,7 +488,7 @@ const resetAIPanel = async () => {
   if (showAIPanel.value) {
     showAIPanel.value = false;
     showCommandMenu.value = false;
-    inputText.value = '';
+    setInputText('');
     currentCommand.value = '';
     selectedText.value = '';
   }
@@ -510,7 +510,7 @@ const resetAIPanel = async () => {
 const closeAIPanel = () => {
   showAIPanel.value = false;
   showCommandMenu.value = false;
-  inputText.value = '';
+  setInputText('');
   currentCommand.value = '';
   selectedText.value = '';
 };
@@ -522,8 +522,9 @@ const openAIPanel = async () => {
   showAIPanel.value = true;
   await nextTick();
   inputRef.value?.focus();
+  syncSendState();
   if (selectedText.value) {
-    inputText.value = '';
+    setInputText('');
   }
   
   await nextTick();
@@ -574,6 +575,29 @@ const selectCommand = (command) => {
   if (action) {
     startStreaming(action);
   }
+};
+
+// 发送按钮状态用命令式 DOM 更新，模板不读取输入文本，避免逐字符重渲染
+const syncSendState = () => {
+  const btn = sendBtnRef.value;
+  if (!btn) return;
+  const hasText = !!inputText.value.trim();
+  btn.classList.toggle('active', hasText);
+  btn.disabled = !hasText;
+};
+
+const handlePanelInput = (e) => {
+  inputText.value = e.target.value;
+  syncSendState();
+  autoResize();
+};
+
+// 程序化写入时同步 DOM 值与按钮状态
+const setInputText = (text) => {
+  inputText.value = text;
+  if (inputRef.value) inputRef.value.value = text;
+  syncSendState();
+  autoResize();
 };
 
 const autoResize = () => {

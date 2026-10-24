@@ -79,50 +79,7 @@
                 </template>
 
                 <!-- 流式 Agent 响应 -->
-                <template v-if="isStreaming && agentSegments.length > 0">
-                  <div class="agent-response-block">
-                    <div class="agent-response-header">
-                      <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
-                      <span class="ai-name">周五</span>
-                    </div>
-                    <div class="agent-timeline">
-                      <template v-for="seg in agentSegments" :key="seg.id">
-                        <div v-if="seg.type === 'text' && seg.content" class="agent-text-body">
-                          <div class="markdown-body" v-html="renderMarkdown(seg.content)"></div>
-                          <span v-if="seg.isStreaming" class="streaming-cursor"></span>
-                        </div>
-                        <ToolCallSection
-                          v-else-if="seg.type === 'tool'"
-                          :tool-name="seg.toolName"
-                          :arguments="seg.arguments"
-                          :output="seg.output"
-                          :status="seg.status"
-                          :default-collapsed="seg.status === 'success' && !seg.requireApproval"
-                        />
-                      </template>
-                      <div v-if="isThinking" class="thinking-indicator">
-                        <span class="thinking-text">思考中</span>
-                        <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- 流式但尚未收到任何段 -->
-                <template v-else-if="isStreaming && agentSegments.length === 0 && !streamingContent">
-                  <div class="agent-response-block">
-                    <div class="agent-response-header">
-                      <div class="avatar ai-avatar"><span class="avatar-icon">✦</span></div>
-                      <span class="ai-name">周五</span>
-                    </div>
-                    <div class="agent-timeline">
-                      <div class="thinking-indicator">
-                        <span class="thinking-text">思考中</span>
-                        <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
-                      </div>
-                    </div>
-                  </div>
-                </template>
+                <StreamingAssistantMessage v-if="isStreaming" :state="streamingState" mode="agent" />
 
                 <div v-if="messages.length === 0 && !isStreaming" class="empty-chat">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -161,12 +118,11 @@
 
               <div class="input-wrapper" :class="{ focused: inputFocused }">
                 <textarea
-                  v-model="inputText"
                   class="input-field"
                   placeholder="描述你需要 Agent 执行的操作..."
                   rows="1"
                   ref="textareaRef"
-                  @input="autoResize"
+                  @input="handleInput"
                   @keydown.enter.exact="handleSendKeydown"
                   @focus="inputFocused = true"
                   @blur="inputFocused = false"
@@ -179,9 +135,8 @@
                   </button>
                   <button
                     class="send-btn"
-                    :class="{ active: inputText.trim() && !isStreaming }"
+                    ref="sendBtnRef"
                     @click="handleSend"
-                    :disabled="!isStreaming && !inputText.trim()"
                   >
                     <svg v-if="!isStreaming" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -235,6 +190,7 @@ import { marked } from 'marked';
 import { electronService } from '@/services/electron';
 import UserMessage from '@/components/chat/UserMessage.vue';
 import AIMessage from '@/components/chat/AIMessage.vue';
+import StreamingAssistantMessage from '@/components/chat/StreamingAssistantMessage.vue';
 import ToolCallSection from '@/components/chat/ToolCallSection.vue';
 import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import AgentFileSelectDialog from './AgentFileSelectDialog.vue';
@@ -262,6 +218,7 @@ const messages = ref([]);
 const inputText = ref('');
 const textareaRef = ref(null);
 const messagesContainer = ref(null);
+const sendBtnRef = ref(null);
 const isStreaming = ref(false);
 const streamingContent = ref('');
 const streamingReasoning = ref('');
@@ -318,12 +275,21 @@ const isThinking = computed(() => {
   return true;
 });
 
+// 流式状态用稳定对象整体下传，模板不再直接读取流式文本，避免每个 token 重渲染整个弹窗
+const streamingState = {
+  streaming: isStreaming,
+  content: streamingContent,
+  segments: agentSegments,
+  thinking: isThinking
+};
+
 watch(() => props.visible, async (val) => {
   if (val) {
     resetState();
     await ensureAgentRootDir();
     setupListeners();
     nextTick(() => {
+      syncComposerState();
       if (props.initialQuestion) {
         sendChatMessage(props.initialQuestion);
       } else {
@@ -364,8 +330,9 @@ function computeVirtualPath(absPath) {
 }
 
 function resetState() {
+  clearPendingChunks();
   messages.value = [];
-  inputText.value = '';
+  resetInput();
   isStreaming.value = false;
   streamingContent.value = '';
   streamingReasoning.value = '';
@@ -387,34 +354,78 @@ function resetState() {
   lastScrollTop = 0;
 }
 
+// 流式分片按帧合并：同一帧内的多个 token 只触发一次重渲染与 markdown 解析
+let pendingContent = '';
+let pendingReasoning = '';
+let chunkFlushFrame = null;
+
+function clearPendingChunks() {
+  if (chunkFlushFrame !== null) {
+    window.cancelAnimationFrame(chunkFlushFrame);
+    chunkFlushFrame = null;
+  }
+  pendingContent = '';
+  pendingReasoning = '';
+}
+
+function appendAgentText(content) {
+  const segs = agentSegments.value;
+  const last = segs.length > 0 ? segs[segs.length - 1] : null;
+  if (last && last.type === 'text') {
+    last.content += content;
+    return;
+  }
+  segs.push({
+    type: 'text',
+    id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    content,
+    isStreaming: true
+  });
+}
+
+function flushPendingChunks() {
+  chunkFlushFrame = null;
+  const content = pendingContent;
+  const reasoning = pendingReasoning;
+  pendingContent = '';
+  pendingReasoning = '';
+  if (!content && !reasoning) return;
+  if (content) {
+    streamingContent.value += content;
+    appendAgentText(content);
+  }
+  if (reasoning) streamingReasoning.value += reasoning;
+  scrollToBottom();
+}
+
+function flushPendingChunksImmediately() {
+  if (chunkFlushFrame !== null) {
+    window.cancelAnimationFrame(chunkFlushFrame);
+  }
+  flushPendingChunks();
+}
+
+function queueChunk(content, reasoning = '') {
+  pendingContent += content || '';
+  pendingReasoning += reasoning || '';
+  if (chunkFlushFrame === null) {
+    chunkFlushFrame = window.requestAnimationFrame(flushPendingChunks);
+  }
+}
+
 function setupListeners() {
   cleanupListeners();
 
   unlistenChunk = electronService.listen('chat-chunk', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
-    streamingContent.value += data.content;
-    // 维护 Agent 时间线段
-    const segs = agentSegments.value;
-    const last = segs.length > 0 ? segs[segs.length - 1] : null;
-    if (last && last.type === 'text') {
-      last.content += data.content;
-    } else {
-      segs.push({
-        type: 'text',
-        id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        content: data.content,
-        isStreaming: true
-      });
-    }
-    scrollToBottom();
+    queueChunk(data.content);
   });
 
   unlistenReasoning = electronService.listen('chat-reasoning-chunk', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
-    streamingReasoning.value += data.content;
-    scrollToBottom();
+    queueChunk('', data.content);
   });
 
   unlistenDone = electronService.listen('chat-done', (event) => {
@@ -422,6 +433,8 @@ function setupListeners() {
     if (data.requestId !== activeRequestId) return;
     if (isDoneReceived) return;
     isDoneReceived = true;
+    // 先把未渲染的分片落盘，避免结束消息丢掉尾部内容
+    flushPendingChunksImmediately();
 
     isStreaming.value = false;
 
@@ -481,6 +494,7 @@ function setupListeners() {
   unlistenError = electronService.listen('chat-error', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
+    flushPendingChunksImmediately();
     isStreaming.value = false;
     const partialContent = streamingContent.value;
     streamingContent.value = '';
@@ -515,6 +529,8 @@ function setupListeners() {
   unlistenAgentToolCall = electronService.listen('agent-tool-call', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
+    // 先落盘当前文本分片，保证时间线段顺序正确
+    flushPendingChunksImmediately();
     const segs = agentSegments.value;
     const last = segs.length > 0 ? segs[segs.length - 1] : null;
     if (last && last.type === 'text') {
@@ -549,6 +565,7 @@ function setupListeners() {
   unlistenAgentToolResult = electronService.listen('agent-tool-result', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
+    flushPendingChunksImmediately();
     const seg = agentSegments.value.find((s) => s.type === 'tool' && s.toolCallId === data.toolCallId);
     if (seg) {
       if (seg.status !== 'rejected') {
@@ -562,7 +579,7 @@ function setupListeners() {
   unlistenAgentApproval = electronService.listen('agent-tool-approval', (event) => {
     const data = event.payload;
     if (data.requestId !== activeRequestId) return;
-
+    flushPendingChunksImmediately();
     if (autoApproveAll.value) {
       electronService.invoke('agent-tool-approval-resume', {
         requestId: data.requestId,
@@ -615,6 +632,7 @@ function setupListeners() {
 }
 
 function cleanupListeners() {
+  clearPendingChunks();
   if (unlistenChunk) { unlistenChunk(); unlistenChunk = null; }
   if (unlistenReasoning) { unlistenReasoning(); unlistenReasoning = null; }
   if (unlistenDone) { unlistenDone(); unlistenDone = null; }
@@ -649,8 +667,9 @@ async function sendChatMessage(text) {
     content: userMessage
   });
 
-  inputText.value = '';
+  resetInput();
   isStreaming.value = true;
+  clearPendingChunks();
   streamingContent.value = '';
   streamingReasoning.value = '';
   agentSegments.value = [];
@@ -812,6 +831,29 @@ function autoResize() {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   }
 }
+
+// 发送按钮的可用状态用命令式 DOM 更新，避免模板读取 inputText 导致逐字符重渲染整个弹窗
+function syncComposerState() {
+  const btn = sendBtnRef.value;
+  if (!btn) return;
+  const hasText = !!inputText.value.trim();
+  btn.classList.toggle('active', hasText && !isStreaming.value);
+  btn.disabled = !isStreaming.value && !hasText;
+}
+
+function handleInput(e) {
+  inputText.value = e.target.value;
+  syncComposerState();
+  autoResize();
+}
+
+function resetInput() {
+  inputText.value = '';
+  if (textareaRef.value) textareaRef.value.value = '';
+  syncComposerState();
+}
+
+watch(isStreaming, syncComposerState);
 
 function scrollToBottom(force = false) {
   nextTick(() => {

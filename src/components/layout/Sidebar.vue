@@ -44,9 +44,7 @@
     </div>
 
     <Teleport to="body">
-      <div v-if="tooltip.visible" class="floating-tooltip" :style="tooltip.style">
-        {{ tooltip.text }}
-      </div>
+      <div ref="tooltipEl" class="floating-tooltip" style="display: none"></div>
     </Teleport>
 
     <AvatarDrawer v-model="showDrawer" />
@@ -54,7 +52,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '@/store';
 import { useI18n } from 'vue-i18n';
@@ -72,25 +70,26 @@ const visibleSidebarBottomMenuConfig = computed(() => sidebarBottomMenuConfig.fi
 // Use Vite's base URL so the avatar also resolves from Electron's file:// build.
 const avatarSrc = `${import.meta.env.BASE_URL}images/icon.png`;
 
-const tooltip = reactive({
-  visible: false,
-  text: '',
-  style: {}
-});
+// 悬浮提示直接用 DOM 操作更新，避免鼠标扫过菜单时反复触发 Sidebar 重渲染
+const tooltipEl = ref(null);
 
 const showTooltip = (event, text) => {
+  const el = tooltipEl.value;
+  if (!el) return;
   const rect = event.currentTarget.getBoundingClientRect();
-  tooltip.text = text;
-  tooltip.style = {
-    top: `${rect.top + rect.height / 2}px`,
-    left: `${rect.right + 10}px`,
-    transform: 'translateY(-50%)'
-  };
-  tooltip.visible = true;
+  el.textContent = text;
+  el.style.top = `${rect.top + rect.height / 2}px`;
+  el.style.left = `${rect.right + 10}px`;
+  el.style.transform = 'translateY(-50%)';
+  el.style.display = '';
+  // 重新触发淡入动画（元素常驻，不依赖 v-if 重建）
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
 };
 
 const hideTooltip = () => {
-  tooltip.visible = false;
+  if (tooltipEl.value) tooltipEl.value.style.display = 'none';
 };
 
 // ========== Avatar drawer ==========

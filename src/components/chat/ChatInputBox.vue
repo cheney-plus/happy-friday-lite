@@ -36,15 +36,15 @@
         </div>
       </div>
 
+      <!-- 非受控输入：键入时只通过 handleInput 更新文本与按钮状态，不触发组件重渲染 -->
       <textarea
-        :value="modelValue"
+        ref="textareaRef"
         class="main-input"
         :placeholder="isStreaming ? t('friday.aiThinking') : placeholder"
         rows="1"
         @input="handleInput"
         @keydown.enter.exact="handleSendKeydown"
         :disabled="isStreaming"
-        ref="textareaRef"
       ></textarea>
 
       <div class="input-actions">
@@ -81,11 +81,11 @@
               </svg>
             </button>
             <button
+              ref="sendBtnRef"
               v-else
               key="send"
               class="send-btn"
               type="button"
-              :class="{ active: (modelValue || '').trim() }"
               @click="$emit('send')"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -156,7 +156,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import NoteReferenceTag from './NoteReferenceTag.vue';
 import { coverOptions } from '@/views/knowledge/constants';
@@ -165,6 +165,9 @@ const { t } = useI18n();
 
 const props = defineProps({
   modelValue: String,
+  // 可选的绑定对象 { ref }：由父级提供输入文本的 ref。
+  // 父模板只传入普通对象、不读取 .value，输入时就不会触发父组件重渲染。
+  modelBinding: { type: Object, default: null },
   placeholder: { type: String, default: '' },
   isStreaming: { type: Boolean, default: false },
   noteReferences: { type: Array, default: () => [] },
@@ -179,10 +182,29 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'send', 'stop', 'removeReference', 'selectNote', 'selectKbFile', 'selectKb', 'removeAttachment']);
 
 const textareaRef = ref(null);
+const sendBtnRef = ref(null);
 const showLinkDropdown = ref(false);
 const showKbDropdown = ref(false);
 const linkDropdownStyle = ref({});
 const kbDropdownStyle = ref({});
+const currentText = computed(() => {
+  if (props.modelBinding) return props.modelBinding.ref.value || '';
+  return props.modelValue || '';
+});
+
+// 发送按钮状态用命令式 DOM 更新，模板不读取输入文本，键入时不会触发重渲染
+function syncSendState() {
+  if (!sendBtnRef.value) return;
+  sendBtnRef.value.classList.toggle('active', !!currentText.value.trim());
+}
+
+// 仅在外部程序化写入文本时同步到 textarea（键入时值已一致，不做任何 DOM 写入）
+function syncTextarea(value) {
+  const textarea = textareaRef.value;
+  if (!textarea || textarea.value === value) return false;
+  textarea.value = value;
+  return true;
+}
 
 function focus() {
   nextTick(() => {
@@ -248,8 +270,13 @@ const selectKnowledgeBase = (kbName, categoryId) => {
 };
 
 function handleInput(e) {
-  const target = e.target;
-  emit('update:modelValue', target.value);
+  const value = e.target.value;
+  if (props.modelBinding) {
+    props.modelBinding.ref.value = value;
+  } else {
+    emit('update:modelValue', value);
+  }
+  syncSendState();
   autoResize();
 }
 
@@ -267,12 +294,21 @@ function autoResize() {
   }
 }
 
-watch(() => props.modelValue, async () => {
-  await nextTick();
-  autoResize();
+// 外部写入（发送后清空、快捷指令填充、回滚恢复等）时同步文本与按钮状态
+watch(currentText, (value) => {
+  syncSendState();
+  if (syncTextarea(value)) nextTick(autoResize);
+});
+
+// 流式结束会重建发送按钮，重建后需要重新应用 active 状态
+watch(() => props.isStreaming, () => {
+  nextTick(syncSendState);
 });
 
 onMounted(() => {
+  syncTextarea(currentText.value);
+  syncSendState();
+  autoResize();
   document.addEventListener('scroll', closeAllDropdowns, true);
 });
 

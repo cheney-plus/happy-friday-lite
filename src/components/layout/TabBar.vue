@@ -24,8 +24,6 @@
             @dragover.prevent.stop="onDragOver($event, tab, index)"
             @drop.prevent.stop="onDrop"
             @dragend="onDragEnd"
-            @mouseenter="hoveredTabId = tab.id"
-            @mouseleave="hoveredTabId = ''"
           >
             <component
               v-if="tab.icon"
@@ -35,7 +33,7 @@
               class="tab-icon"
             />
             <span class="tab-title">{{ tab.title || t(tab.i18nKey) }}</span>
-            <button v-show="(hoveredTabId === tab.id || tabStore.activeTabId === tab.id) && !(tabStore.openedTabs.length === 1 && tab.path === '/friday')" class="tab-close-btn" @click.stop="closeTab(tab.id)">
+            <button v-if="!(tabStore.openedTabs.length === 1 && tab.path === '/friday')" :class="['tab-close-btn', { 'is-visible': tabStore.activeTabId === tab.id }]" @click.stop="closeTab(tab.id)">
               <X :size="12" :stroke-width="2" />
             </button>
           </div>
@@ -154,7 +152,6 @@ const iconMap = {
 const tabsAreaRef = ref(null);
 const tabsScrollRef = ref(null);
 const tabsAreaWidth = ref(0);
-const hoveredTabId = ref('');
 const contextMenu = ref({ visible: false, x: 0, y: 0, tabId: '' });
 
 const ADD_BTN_WIDTH = 28;
@@ -538,11 +535,17 @@ const handleClose = () => {
   border-radius: 4px;
   width: 18px;
   height: 18px;
-  display: flex;
+  /* 默认隐藏，由 CSS :hover / 激活态控制显示，避免 hover 时写响应式状态触发整条标签栏重渲染 */
+  display: none;
   align-items: center;
   justify-content: center;
   transition: background-color 0.15s, color 0.15s;
   flex-shrink: 0;
+}
+
+.tab-item:hover .tab-close-btn,
+.tab-close-btn.is-visible {
+  display: flex;
 }
 
 .tab-close-btn:hover {

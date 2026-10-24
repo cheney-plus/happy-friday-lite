@@ -16,7 +16,7 @@ import {
   verifyPythonDeps,
   invalidatePythonCache
 } from './python-env.js'
-import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT, BACKUP_PROGRESS } from './events.js'
+import { CONFIG_CHANGED, CHAT_DONE, CHAT_ERROR, CHAT_SESSION_CREATED, SESSION_TITLE_UPDATED, NOTE_AI_DONE, NOTE_FIM_RESULT, BACKUP_PROGRESS } from './events.js'
 import { createBackup, restoreBackup } from './backup.js'
 import { cleanHistoryNow } from './historyClean.js'
 import { clearEmbeddingsCache } from './rag/embeddings.js'
@@ -385,6 +385,11 @@ export function registerCommands(mainWindow) {
       db.updateSessionTimestamp(currentSessionId)
 
       if (isNewSession) {
+        // 立即通知前端绑定真实 sessionId，避免侧边栏出现该会话后切回时找不到正在输出的流
+        mainWindow.webContents.send(CHAT_SESSION_CREATED, {
+          requestId,
+          sessionId: currentSessionId
+        })
         const modelClone = { ...effectiveModel }
         const sessionIdClone = currentSessionId
         const userMsgClone = message

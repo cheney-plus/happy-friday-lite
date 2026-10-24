@@ -37,22 +37,10 @@
           />
         </template>
 
-        <AgentMessageBlock
-          v-if="currentMode === 'agent' && (isStreaming || agentSegments.length > 0)"
-          :segments="agentSegments"
-          :reasoning-streaming-content="streamingReasoning"
-          :is-reasoning-streaming="isReasoningStreaming"
-          :is-streaming="isStreaming"
-          :thinking="isThinking"
-        />
-        <AIMessage
-          v-else-if="isStreaming"
-          :content="streamingContent"
-          :reasoning-streaming-content="streamingReasoning"
-          :sources="streamingSources"
+        <StreamingAssistantMessage
+          :state="streamingState"
+          :mode="currentMode"
           :display-name="t('friday.assistantName')"
-          :is-streaming="true"
-          :show-divider="false"
           :show-rollback="currentMode === 'chat'"
         />
       </div>
@@ -60,7 +48,7 @@
 
     <FridayComposer
       v-if="!isShareMode"
-      v-model="inputText"
+      :model-binding="composerBinding"
       variant="conversation"
       :is-streaming="isStreaming"
       :placeholder="t('friday.inputPlaceholder')"
@@ -114,6 +102,7 @@ import AIMessage from '@/components/chat/AIMessage.vue';
 import RollbackConfirmDialog from '@/components/chat/RollbackConfirmDialog.vue';
 import ToolApprovalDialog from '@/components/chat/ToolApprovalDialog.vue';
 import AgentMessageBlock from '@/views/friday/components/AgentMessageBlock.vue';
+import StreamingAssistantMessage from '@/components/chat/StreamingAssistantMessage.vue';
 import FridayComposer from '@/views/friday/components/FridayComposer.vue';
 import { useChatStream } from '@/views/friday/composables/useChatStream';
 import { refreshHistorySessions } from '@/views/friday/composables/useConversationHistory';
@@ -121,17 +110,26 @@ import { useConversationSummary } from '@/views/friday/composables/useConversati
 import { useToast } from '@/views/friday/composables/useToast';
 import { findTurnStartUserIndex, formatClock, getAssistantContent, mapHistoryMessage } from '@/views/friday/utils/messages';
 
-const route = useRoute();
+const injectedRoute = inject('fridayRoute', null);
+const injectedNavigate = inject('fridayNavigate', null);
+const route = injectedRoute || useRoute();
 const router = useRouter();
+const navigate = injectedNavigate || ((location, { replace = false } = {}) => (
+  replace ? router.replace(location) : router.push(location)
+));
 const { t } = useI18n();
 const fridayStore = useFridayStore();
 const tabStore = useTabStore();
 const noteStore = useNoteStore();
 const injectedHistoryCollapsed = inject('fridayHistoryCollapsed', ref(false));
+// 本 Tab 的稳定标识（路由为 Tab 级快照，不会读到其它 Tab 的 __tab）
+const ownTabKey = getFridayTabId(route, tabStore);
 
 const isShareMode = computed(() => route.meta?.share === true || !electronService.isElectron);
 const historyCollapsed = computed(() => !!injectedHistoryCollapsed.value);
 const inputText = ref('');
+// 输入文本通过稳定对象交给输入框组件承载，模板不读取其值，避免逐字符触发整页重渲染
+const composerBinding = { ref: inputText };
 const messagesContainer = ref(null);
 const isAtBottom = ref(true);
 const showScrollDownBtn = ref(false);
@@ -141,7 +139,6 @@ const rollbackDialogVisible = ref(false);
 const rollbackPreviewContent = ref('');
 let pendingRollbackUserMsgId = null;
 let pendingRollbackUserMsgIndex = null;
-let leavingAfterStop = false;
 let loadedRouteKey = '';
 let initSeq = 0;
 let scrollFrame = null;
@@ -162,11 +159,11 @@ const {
   pendingApproval,
   isThinking,
   sessionTitle,
-  resetStreamState,
-  startStreaming,
+  startNewConversation,
   attachRequest,
   sendChatMessage,
   handleStop,
+  stopAllStreams,
   handleApproveTool,
   handleApproveAll,
   handleRejectTool
@@ -174,29 +171,25 @@ const {
   onHistoryRefresh: () => {
     if (!isShareMode.value) refreshHistorySessions();
   },
-  t
+  t,
+  tabKey: ownTabKey
 });
 const { handleAddToKnowledge } = useConversationSummary({ messages, showToast, t });
+
+// 流式状态用稳定对象整体下传，本组件模板不再直接读取流式文本，避免每个 token 重渲染整页
+const streamingState = {
+  streaming: isStreaming,
+  content: streamingContent,
+  reasoning: streamingReasoning,
+  reasoningStreaming: isReasoningStreaming,
+  sources: streamingSources,
+  segments: agentSegments,
+  thinking: isThinking
+};
 const isConversationVisible = computed(() => {
   if (isShareMode.value) return true;
   return tabStore.activeTabId === tabKey && (route.name === 'friday-chat' || route.name === 'share');
 });
-
-let pendingLaunch = null;
-if (!isShareMode.value && !isStreaming.value) {
-  pendingLaunch = fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
-  const launchText = (pendingLaunch?.userMessage || pendingLaunch?.text || '').trim();
-  if (launchText) {
-    messages.value = [];
-    currentSessionId.value = '';
-    sessionTitle.value = '';
-    if (pendingLaunch.mode) currentMode.value = pendingLaunch.mode;
-    messages.value.push({ role: 'user', content: pendingLaunch.userMessage || pendingLaunch.text });
-    startStreaming();
-  } else {
-    pendingLaunch = null;
-  }
-}
 
 const chatTitle = computed(() => {
   if (sessionTitle.value) return sessionTitle.value;
@@ -247,9 +240,10 @@ function scrollToBottomForce() {
 async function loadSessionHistory(sessionId) {
   try {
     const history = await electronService.invoke('get_session_messages', { sessionId });
-    messages.value = (history || []).map(mapHistoryMessage);
+    return (history || []).map(mapHistoryMessage);
   } catch (err) {
     console.error('Failed to load session history:', err);
+    return [];
   }
 }
 
@@ -257,14 +251,11 @@ async function loadShareData(sessionId) {
   try {
     const res = await fetch(`/api/share/${encodeURIComponent(sessionId)}`);
     const data = await res.json();
-    if (data?.success && data.session) {
-      sessionTitle.value = data.session.title || t('friday.defaultTitle');
-      currentMode.value = data.session.mode || 'chat';
-      messages.value = (data.messages || []).map(mapHistoryMessage);
-    }
+    if (data?.success && data.session) return data;
   } catch (err) {
     console.error('Failed to load share data:', err);
   }
+  return null;
 }
 
 function isActiveConversationRoute() {
@@ -277,87 +268,66 @@ function syncSessionRoute() {
     currentSessionId.value &&
     !isNewSessionId(currentSessionId.value) &&
     isNewSessionId(param) &&
-    route.name === 'friday-chat' &&
-    isConversationVisible.value
+    route.name === 'friday-chat'
   ) {
-    router.replace(fridayChatLocation(route, { sessionId: currentSessionId.value }, tabStore));
+    // Tab 级导航：激活 Tab 更新全局路由，后台 Tab 只更新自身路径，避免抢占其它 Tab
+    navigate(fridayChatLocation(route, { sessionId: currentSessionId.value }, tabStore), { replace: true });
   }
 }
 
 async function initConversation() {
   if (!isActiveConversationRoute()) return;
   const seq = ++initSeq;
-  let launch = pendingLaunch;
-  pendingLaunch = null;
-  if (!launch && !isShareMode.value && !isStreaming.value) {
-    launch = fridayStore.takePendingLaunch(getFridayTabId(route, tabStore));
-  }
+  const launch = isShareMode.value ? null : fridayStore.takePendingLaunch(ownTabKey);
   const key = routeSessionKey();
-  if (isStreaming.value && !launch) {
-    loadedRouteKey = key;
-    scrollToBottom(true);
-    return;
-  }
   if (loadedRouteKey === key && !launch) return;
-  if (
-    !launch &&
-    messages.value.length &&
-    currentSessionId.value &&
-    currentSessionId.value === (route.params.sessionId || '')
-  ) {
-    loadedRouteKey = key;
-    return;
-  }
-  if (
-    !launch &&
-    messages.value.length &&
-    !isNewSessionId(currentSessionId.value) &&
-    isNewSessionId(route.params.sessionId)
-  ) {
-    loadedRouteKey = key;
-    syncSessionRoute();
-    return;
-  }
   loadedRouteKey = key;
 
+  const sessionParam = route.params.sessionId || '';
   const launchText = (launch?.userMessage || launch?.text || '').trim();
+
   if (launchText) {
-    if (!isStreaming.value) {
-      messages.value = [];
-      sessionTitle.value = '';
-    }
+    // 新对话使用独立状态，不打断其它会话仍在进行的输出
+    startNewConversation();
     inputText.value = '';
     chatTime.value = formatClock();
     isAtBottom.value = true;
     showScrollDownBtn.value = false;
-    currentSessionId.value = isNewSessionId(route.params.sessionId) ? '' : (route.params.sessionId || '');
     if (launch.mode) {
       currentMode.value = launch.mode;
       fridayStore.setMode(launch.mode);
     }
-    const alreadyShown = messages.value.some(msg => msg.role === 'user' && msg.content === (launch.userMessage || launch.text));
-    await sendChatMessage(launch, {
-      skipUserPush: alreadyShown,
-      skipStart: isStreaming.value
-    });
+    messages.value.push({ role: 'user', content: launch.userMessage || launch.text });
+    await sendChatMessage(launch, { skipUserPush: true });
     if (seq !== initSeq) return;
     scrollToBottom(true);
     return;
   }
 
-  resetStreamState();
-  messages.value = [];
+  // 选择目标会话：每个会话各自保存消息与流式状态，切换不会影响其它会话
+  currentSessionId.value = isNewSessionId(sessionParam) ? '' : sessionParam;
+
+  // 目标会话已有内容或仍在后台输出：直接展示，不重新加载也不终止
+  if (messages.value.length || isStreaming.value) {
+    scrollToBottom(true);
+    return;
+  }
+
   chatTime.value = formatClock();
   currentMode.value = fridayStore.mode || 'chat';
-  sessionTitle.value = '';
   isAtBottom.value = true;
   showScrollDownBtn.value = false;
 
-  const sessionParam = route.params.sessionId || '';
   if (isShareMode.value) {
-    currentSessionId.value = sessionParam;
-    if (sessionParam) await loadShareData(sessionParam);
-    if (seq !== initSeq) return;
+    if (sessionParam) {
+      const data = await loadShareData(sessionParam);
+      if (seq !== initSeq) return;
+      if (data?.success && data.session) {
+        sessionTitle.value = data.session.title || t('friday.defaultTitle');
+        currentMode.value = data.session.mode || 'chat';
+        messages.value = (data.messages || []).map(mapHistoryMessage);
+      }
+    }
     scrollToBottom(true);
     return;
   }
@@ -365,11 +335,11 @@ async function initConversation() {
   refreshHistorySessions();
 
   if (!isNewSessionId(sessionParam)) {
-    currentSessionId.value = sessionParam;
     const queryTitle = route.query.title;
     if (queryTitle) sessionTitle.value = queryTitle;
-    await loadSessionHistory(sessionParam);
+    const loadedMessages = await loadSessionHistory(sessionParam);
     if (seq !== initSeq) return;
+    messages.value = loadedMessages;
     try {
       const sessionInfo = await electronService.invoke('get_session', { sessionId: sessionParam });
       if (seq !== initSeq) return;
@@ -381,8 +351,6 @@ async function initConversation() {
         }
       }
     } catch {}
-  } else {
-    currentSessionId.value = '';
   }
 
   const automationRunId = route.query.automationRun;
@@ -397,8 +365,9 @@ async function initConversation() {
         segments: activeRun.segments || []
       });
     } else if (currentSessionId.value) {
-      await loadSessionHistory(currentSessionId.value);
+      const loadedMessages = await loadSessionHistory(currentSessionId.value);
       if (seq !== initSeq) return;
+      messages.value = loadedMessages;
     }
   }
 
@@ -497,16 +466,13 @@ async function executeRollback() {
 
 function handleTabCloseRequest(event) {
   const tabId = event.detail?.tabId;
-  if (!isStreaming.value || !tabKey || tabId !== tabKey) return;
+  if (!tabKey || tabId !== tabKey || !fridayStore.isTabStreaming(tabKey)) return;
   if (!window.confirm(t('friday.closeStreamingConfirm'))) {
     event.preventDefault();
     return;
   }
   event.preventDefault();
-  leavingAfterStop = true;
-  event.detail.promise = handleStop().finally(() => {
-    leavingAfterStop = false;
-  });
+  event.detail.promise = stopAllStreams();
 }
 
 watch(currentSessionId, () => {
@@ -516,10 +482,9 @@ watch(currentSessionId, () => {
 watch(() => routeSessionKey(), (next, prev) => {
   if (!isActiveConversationRoute() || next === prev) return;
   if (!isConversationVisible.value) return;
-  if (isStreaming.value && messages.value.length) return;
   const nextSessionId = String(next).split('::')[0];
   if (nextSessionId && nextSessionId === currentSessionId.value) return;
-  if (isNewSessionId(String(prev || '').split('::')[0]) && !isNewSessionId(nextSessionId) && messages.value.length) return;
+  // 会话历史切换不再被流式状态阻塞：initConversation 会先终止旧请求再加载新会话
   initConversation();
 });
 
@@ -543,12 +508,17 @@ onMounted(async () => {
 
 onActivated(() => {
   syncSessionRoute();
+  // 待发送的新消息优先，即使当前会话仍在后台输出也必须先切到新会话
+  if (fridayStore.pendingLaunches[ownTabKey] || fridayStore.pendingLaunches._default) {
+    initConversation();
+    scrollToBottom(true);
+    return;
+  }
   if (isStreaming.value) {
     scrollToBottom(true);
     return;
   }
-  const tabId = getFridayTabId(route, tabStore);
-  if (fridayStore.pendingLaunches[tabId] || fridayStore.pendingLaunches._default || loadedRouteKey !== routeSessionKey()) {
+  if (loadedRouteKey !== routeSessionKey()) {
     initConversation();
   }
   scrollToBottom(true);

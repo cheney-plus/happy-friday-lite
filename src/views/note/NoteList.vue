@@ -231,11 +231,12 @@
         <NoteEditor
           ref="noteEditorRef"
           :key="selectedNoteId"
-          v-model="selectedNote.content"
+          :model-value="editorModelContent"
           :note-id="selectedNoteId"
           :placeholder="t('note.editorPlaceholder')"
           :toc-visible="tocVisible"
           :sidebar-collapsed="sidebarCollapsed"
+          @update:model-value="onEditorModelUpdate"
           @change="onEditorChange"
           @toggle-toc="handleToggleToc"
           @close-sidebar="handleCloseSidebar"
@@ -512,6 +513,21 @@ const currentFolderName = computed(() => {
 const notes = computed(() => noteStore.notes);
 const selectedNoteId = computed(() => noteStore.currentNoteId);
 const selectedNote = computed(() => noteStore.currentNote);
+
+// 编辑器内容快照：只在切换/重新加载笔记时同步。
+// 若直接绑定 selectedNote.content，每次输入都会经由 props 回流，
+// 导致 NoteList 与 NoteEditor 按字符 re-render。
+const editorModelContent = ref('');
+
+watch(selectedNote, (note) => {
+  editorModelContent.value = note?.content ?? '';
+}, { immediate: true });
+
+const onEditorModelUpdate = (content) => {
+  // 直接写回 store，不走 props 回流；持久化仍由 @change + scheduleSave 负责
+  const note = noteStore.currentNote;
+  if (note) note.content = content;
+};
 
 const tocHeadings = computed(() => {
   const note = selectedNote.value;

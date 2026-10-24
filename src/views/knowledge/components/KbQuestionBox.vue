@@ -23,14 +23,14 @@
         </div>
       </div>
 
+      <!-- 非受控输入：键入时只更新文本与发送按钮状态，不触发组件重渲染 -->
       <textarea
-        v-model="inputText"
+        ref="textareaRef"
         class="main-input"
         :placeholder="placeholderText"
         rows="1"
-        @input="autoResize"
+        @input="handleInput"
         @keydown.enter.exact="handleSendKeydown"
-        ref="textareaRef"
       ></textarea>
 
       <div class="input-actions">
@@ -66,8 +66,8 @@
             </svg>
           </button>
           <button
+            ref="sendBtnRef"
             class="send-btn"
-            :class="{ active: inputText.trim() }"
             @click="handleSend"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -162,6 +162,7 @@ const emit = defineEmits(['ask']);
 
 const inputText = ref('');
 const textareaRef = ref(null);
+const sendBtnRef = ref(null);
 
 const showModeDropdown = ref(false);
 const showModelDropdown = ref(false);
@@ -356,6 +357,26 @@ const autoResize = () => {
   }
 };
 
+// 发送按钮状态用命令式 DOM 更新，模板不读取输入文本，键入时不会触发重渲染
+const syncSendState = () => {
+  if (!sendBtnRef.value) return;
+  sendBtnRef.value.classList.toggle('active', !!inputText.value.trim());
+};
+
+const handleInput = (e) => {
+  inputText.value = e.target.value;
+  syncSendState();
+  autoResize();
+};
+
+// 程序化写入（发送后清空等）时同步 DOM 值与按钮状态
+const setInputText = (text) => {
+  inputText.value = text;
+  if (textareaRef.value) textareaRef.value.value = text;
+  syncSendState();
+  autoResize();
+};
+
 const handleSendKeydown = (e) => {
   if (e.isComposing) return;
   e.preventDefault();
@@ -386,7 +407,7 @@ const handleSend = () => {
     })) : []
   });
 
-  inputText.value = '';
+  setInputText('');
   attachments.value = [];
   nextTick(() => {
     autoResize();
@@ -397,6 +418,7 @@ onMounted(() => {
   document.addEventListener('scroll', handleDocumentScroll, true);
   document.addEventListener('click', closeAllDropdowns);
   loadCustomModels();
+  syncSendState();
 });
 
 onUnmounted(() => {
@@ -405,10 +427,7 @@ onUnmounted(() => {
 });
 
 onActivated(() => {
-  inputText.value = '';
-  if (textareaRef.value) {
-    textareaRef.value.style.height = 'auto';
-  }
+  setInputText('');
   loadCustomModels();
 });
 </script>

@@ -1,7 +1,9 @@
 <template>
   <div class="friday-composer" :class="`is-${variant}`" @click="closeAllDropdowns">
     <ChatInputBox
-      v-model="inputText"
+      :model-value="modelBinding ? undefined : modelValue"
+      :model-binding="modelBinding"
+      @update:model-value="handleInputUpdate"
       :placeholder="placeholder || t('friday.placeholder')"
       :is-streaming="isStreaming"
       :attachments="attachments"
@@ -115,6 +117,8 @@ import { useModelCatalog } from '@/views/friday/composables/useModelCatalog';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
+  // 可选绑定对象 { ref }：父级传入后，输入文本由该 ref 承载，父模板不读取其值，避免逐字符重渲染
+  modelBinding: { type: Object, default: null },
   isStreaming: { type: Boolean, default: false },
   placeholder: { type: String, default: '' },
   variant: { type: String, default: 'conversation' }
@@ -127,10 +131,15 @@ const fridayStore = useFridayStore();
 const { selectableKbList, loadKbListFromDisk } = useKnowledgeBaseList();
 const { customModels, modelList, loadCustomModels } = useModelCatalog();
 
-const inputText = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
+const inputText = computed(() => {
+  if (props.modelBinding) return props.modelBinding.ref.value || '';
+  return props.modelValue || '';
 });
+
+// 非绑定模式下仍保持 v-model 兼容（FridayHome 等旧用法）
+function handleInputUpdate(value) {
+  if (!props.modelBinding) emit('update:modelValue', value);
+}
 
 const attachments = ref([]);
 let attachmentIdCounter = 0;
