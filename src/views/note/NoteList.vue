@@ -151,7 +151,7 @@
               {{ t('note.contextMenu.newNotebook') }}
             </div>
             <div class="submenu-divider"></div>
-            <div v-if="notebookStore.loading" class="submenu-item loading">
+            <div v-if="notebookStore.loading && !notebookStore.notebooks.length" class="submenu-item loading">
               <svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
               {{ t('note.contextMenu.loading') }}
             </div>
@@ -317,14 +317,14 @@
               type="text"
               :placeholder="t('note.folder.namePlaceholder')"
               class="notebook-name-input"
-              @keydown.enter="confirmCreateNotebook"
+              @keydown.enter="onNotebookNameEnter"
             />
           </div>
 
           <div class="create-notebook-footer">
             <button
               class="create-notebook-btn"
-              :disabled="!newNotebookName.trim()"
+              :disabled="!newNotebookName.trim() || isCreatingNotebook"
               @click="confirmCreateNotebook"
             >
               {{ t('note.confirm') }}
@@ -413,6 +413,8 @@ const contextMenuRef = ref(null);
 const notebookSubmenuRef = ref(null);
 const createNotebookDialogVisible = ref(false);
 const newNotebookName = ref('');
+// 创建笔记本请求进行中标记：防止主进程繁忙（IPC 变慢）时连点确定重复创建
+const isCreatingNotebook = ref(false);
 const notebookNameInputRef = ref(null);
 const createNotebookTargetNoteId = ref(null);
 const folderItemMenuVisible = ref(false);
@@ -968,6 +970,7 @@ const hideNotebookSubmenu = () => {
 
 const openCreateNotebookDialog = () => {
   createNotebookTargetNoteId.value = contextMenu.targetNoteId;
+  isCreatingNotebook.value = false;
   hideContextMenu();
   createNotebookDialogVisible.value = true;
   newNotebookName.value = '';
@@ -983,23 +986,33 @@ const closeCreateNotebookDialog = () => {
   newNotebookName.value = '';
 };
 
+// 输入法组词确认的 Enter（isComposing/229）不触发创建，避免用户确认拼音时误建笔记本
+const onNotebookNameEnter = (e) => {
+  if (e.isComposing || e.keyCode === 229) return;
+  confirmCreateNotebook();
+};
+
 const confirmCreateNotebook = async () => {
+  if (isCreatingNotebook.value) return;
   const name = newNotebookName.value.trim();
+  const targetNoteId = createNotebookTargetNoteId.value;
   if (!name) return;
+
+  isCreatingNotebook.value = true;
+  // 立即关闭对话框给用户反馈：创建期间（IPC 往返）不再暴露可点击的确定按钮
+  closeCreateNotebookDialog();
 
   try {
     const notebook = await notebookStore.createNotebook(name);
 
-    if (notebook) {
-      if (createNotebookTargetNoteId.value) {
-        await moveNoteToNotebook(createNotebookTargetNoteId.value, notebook.id);
-      }
+    if (notebook && targetNoteId) {
+      await moveNoteToNotebook(targetNoteId, notebook.id);
     }
   } catch (error) {
     console.error('[NoteList] Error in confirmCreateNotebook:', error);
+  } finally {
+    isCreatingNotebook.value = false;
   }
-
-  closeCreateNotebookDialog();
 };
 
 const moveToNotebook = async (notebookId) => {
