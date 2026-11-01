@@ -4448,7 +4448,9 @@ const fixEmptyTableCells = (html) => {
   color: #2563eb;
 }
 
-:deep(.prose-editor img.editor-image) {
+/* 普通渲染的图片；可缩放节点视图里的 img 不会带上 editor-image 类，需要单独匹配 */
+:deep(.prose-editor img.editor-image),
+:deep(.prose-editor [data-resize-wrapper] img) {
   display: block;
   max-width: 100%;
   /* 缩放后属性会写入固定高度，这里用 auto 保证窄窗口下仍按比例缩放 */
@@ -4459,6 +4461,15 @@ const fixEmptyTableCells = (html) => {
 /* 外边距放到缩放容器上，避免图片边缘与选框/控制点之间出现空隙 */
 :deep(.prose-editor [data-resize-container]) {
   margin: 0.8em 0;
+  /* 缩放容器作为 flex 项会随图片内容撑开，这里限制最大宽度不超过编辑区 */
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* 内层包裹元素同样限制宽度，保证图片与四角控制点都不超出编辑区 */
+:deep(.prose-editor [data-resize-wrapper]) {
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* 图片选中时给内容加一圈细描边，让大图的边界更清楚 */
