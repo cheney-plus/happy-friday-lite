@@ -2663,6 +2663,8 @@ const editor = useEditor({
       multicolor: true,
     }),
     Image.configure({
+      // 允许 data URL：粘贴的剪贴板图片以 base64 内联保存到笔记正文
+      allowBase64: true,
       HTMLAttributes: {
         class: 'editor-image',
       },
@@ -2821,8 +2823,6 @@ const editor = useEditor({
       const text = event.clipboardData.getData('text/plain');
       const html = event.clipboardData.getData('text/html');
 
-      if (!text) return false;
-
       // 编辑器内部复制的内容（ProseMirror 剪贴板自带 data-pm-slice 标记）
       // 交给默认粘贴处理：按原始 slice 内联插入到光标处。
       // 不能走下方 markdown 路径，否则会被 marked.parse 转成 <p> 块级内容，
@@ -2830,6 +2830,18 @@ const editor = useEditor({
       if (html && html.includes('data-pm-slice')) {
         return false;
       }
+
+      // 粘贴复制的图片（截图、复制的图片文件）：读取为 data URL 后直接插入编辑器。
+      // 仅处理纯图片剪贴板，图文混合内容仍交给默认粘贴流程。
+      const imageFiles = getClipboardImageFiles(event.clipboardData);
+      if (imageFiles.length > 0 && !text.trim()) {
+        event.preventDefault();
+        event.stopPropagation();
+        insertPastedImages(imageFiles);
+        return true;
+      }
+
+      if (!text) return false;
 
       if (html && isRichHtml(html)) {
         return false;
@@ -3299,6 +3311,83 @@ const handleClickOutside = (event) => {
   if (!target.closest('.table-context-toolbar')) {
     hideTableContextMenu();
   }
+};
+
+// 粘贴图片：最长边超过 1920px 或原始体积超过 2MB 时等比缩放并重新编码，
+// 避免 base64 图片把笔记正文和数据库撑得过大。
+const PASTED_IMAGE_MAX_SIDE = 1920;
+const PASTED_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+const readImageFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(reader.error);
+  reader.readAsDataURL(file);
+});
+
+const normalizePastedImage = async (file) => {
+  const originalUrl = await readImageFileAsDataUrl(file);
+  if (typeof originalUrl !== 'string') return null;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = Math.max(bitmap.width, bitmap.height);
+    const needShrink = maxSide > PASTED_IMAGE_MAX_SIDE;
+    const needReencode = file.size > PASTED_IMAGE_MAX_BYTES;
+    if (!needShrink && !needReencode) {
+      bitmap.close?.();
+      return originalUrl;
+    }
+
+    const scale = Math.min(1, PASTED_IMAGE_MAX_SIDE / maxSide);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      bitmap.close?.();
+      return originalUrl;
+    }
+
+    // 透明区域合成白底，避免重新编码后出现黑底
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+    return canvas.toDataURL('image/webp', 0.9);
+  } catch (error) {
+    console.warn('图片压缩失败，使用原始图片:', error);
+    return originalUrl;
+  }
+};
+
+const getClipboardImageFiles = (clipboardData) => {
+  if (!clipboardData) return [];
+
+  const files = Array.from(clipboardData.files || []).filter(file => file.type.startsWith('image/'));
+  if (files.length > 0) return files;
+
+  return Array.from(clipboardData.items || [])
+    .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+    .map(item => item.getAsFile())
+    .filter(Boolean);
+};
+
+const insertPastedImages = async (files) => {
+  // 读取图片是异步的，固定粘贴时的编辑器实例，避免读取期间切换笔记导致插入到错误位置
+  const targetEditor = editor.value;
+  const sources = [];
+  for (const file of files) {
+    const src = await normalizePastedImage(file);
+    if (src) sources.push(src);
+  }
+  if (!sources.length || !targetEditor || targetEditor.isDestroyed) return;
+
+  const chain = targetEditor.chain().focus();
+  sources.forEach((src) => chain.setImage({ src, alt: '' }));
+  chain.run();
 };
 
 const isRichHtml = (html) => {

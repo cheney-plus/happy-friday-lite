@@ -84,18 +84,9 @@ function flash(el, name) {
   }
 }
 
-function isEditableTarget(target) {
-  return (
-    target instanceof HTMLElement &&
-    (target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.isContentEditable)
-  )
-}
-
 function onKeydown(event) {
   if (!event.altKey || event.code !== 'KeyR') return
-  if (isEditableTarget(event.target)) return
+  // 带 Alt 的组合键不会输入正常字符，因此输入框/编辑器聚焦时也要能切换
   event.preventDefault()
   enabled = !enabled
   try {
