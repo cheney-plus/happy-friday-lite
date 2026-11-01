@@ -5,6 +5,7 @@ import fs from 'fs'
 import { setDataDir as setConfigDataDir } from './src-electron/config.js'
 import { setDataDir as setDbDataDir, initDb, closeDb } from './src-electron/db.js'
 import { registerCommands } from './src-electron/commands.js'
+import { registerNoteImageScheme, initNoteImages } from './src-electron/note-images.js'
 import { checkAutoBackup } from './src-electron/backup.js'
 import { checkAutoCleanHistory } from './src-electron/historyClean.js'
 import { initPythonEnv } from './src-electron/python-env.js'
@@ -25,6 +26,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
+
+// 笔记图片协议必须在 app ready 之前注册，渲染进程才能直接加载 friday-asset:// 图片
+registerNoteImageScheme()
 
 // Windows 系统通知需与 appId 一致（electron-builder build.appId），否则通知不显示
 app.setAppUserModelId('com.happyfriday.lite')
@@ -155,6 +159,8 @@ async function ensureDataDir() {
   initSession(dataDir)
   registerSessionIpc()
   await initDb()
+  // 笔记图片目录 + friday-asset:// 协议处理器（需在 app ready 之后）
+  initNoteImages(dataDir)
 
   return dataDir
 }

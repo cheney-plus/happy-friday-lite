@@ -721,6 +721,43 @@ export function getNotes(knowledgeBaseId, notebookId) {
   ).map(normalizeNote)
 }
 
+// 列表摘要查询：不返回 content/marpContent，避免笔记列表把整篇正文（含图片）
+// 拉到渲染进程，同时降低 sql.js 导出与 IPC 序列化开销。
+const NOTE_SUMMARY_COLUMNS = 'id, knowledgeBaseId, notebookId, title, contentText, isDeleted, createdAt, updatedAt'
+
+export function getNoteSummaries(knowledgeBaseId, notebookId) {
+  const columns = NOTE_SUMMARY_COLUMNS
+  if (knowledgeBaseId && notebookId) {
+    return queryAll(
+      `SELECT ${columns} FROM notes WHERE isDeleted = 0 AND knowledgeBaseId = ? AND notebookId = ? ORDER BY updatedAt DESC`,
+      [knowledgeBaseId, notebookId]
+    ).map(normalizeNote)
+  }
+  if (knowledgeBaseId) {
+    return queryAll(
+      `SELECT ${columns} FROM notes WHERE isDeleted = 0 AND knowledgeBaseId = ? ORDER BY updatedAt DESC`,
+      [knowledgeBaseId]
+    ).map(normalizeNote)
+  }
+  if (notebookId) {
+    return queryAll(
+      `SELECT ${columns} FROM notes WHERE isDeleted = 0 AND notebookId = ? ORDER BY updatedAt DESC`,
+      [notebookId]
+    ).map(normalizeNote)
+  }
+  return queryAll(
+    `SELECT ${columns} FROM notes WHERE isDeleted = 0 ORDER BY updatedAt DESC`
+  ).map(normalizeNote)
+}
+
+export function searchNoteSummaries(query) {
+  const q = `%${(query || '').toLowerCase()}%`
+  return queryAll(
+    `SELECT ${NOTE_SUMMARY_COLUMNS} FROM notes WHERE isDeleted = 0 AND (LOWER(title) LIKE ? OR LOWER(contentText) LIKE ?)`,
+    [q, q]
+  ).map(normalizeNote)
+}
+
 export function getNote(noteId) {
   return normalizeNote(queryOne(
     'SELECT * FROM notes WHERE id = ? AND isDeleted = 0',

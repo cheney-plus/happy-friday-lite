@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import * as db from './db.js'
+import { getNoteImagePath, IMAGE_RELATIVE_PREFIX } from './note-images.js'
 
 // 内网分享服务：在主进程启动一个 HTTP 服务，局域网内可通过浏览器访问
 // 复用前端构建产物（dist/），直接加载已有的对话界面（隐藏输入框）。
@@ -42,6 +43,9 @@ const MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.avif': 'image/avif',
   '.ico': 'image/x-icon',
   '.wasm': 'application/wasm',
   '.woff': 'font/woff',
@@ -179,6 +183,21 @@ function serveSharedConversationPage(res, sessionId) {
   }
 }
 
+// 分享页里的图片：浏览器无法解析 friday-asset://，由分享服务直接读取本地图片文件
+function serveNoteImage(res, fileName) {
+  const filePath = getNoteImagePath(fileName)
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end('Not Found')
+    return
+  }
+  res.writeHead(200, {
+    'Content-Type': getMime(filePath),
+    'Cache-Control': 'no-cache'
+  })
+  fs.createReadStream(filePath).pipe(res)
+}
+
 // 笔记分享数据接口：返回笔记内容（只读查看）
 function serveNoteShareApi(res, noteId) {
   try {
@@ -187,6 +206,14 @@ function serveNoteShareApi(res, noteId) {
       res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ success: false, error: 'Note not found' }))
       return
+    }
+    // 把正文里的相对路径图片地址改写为分享服务可访问的 HTTP 地址
+    if (note.content) {
+      const pattern = new RegExp(`src=(["'])${IMAGE_RELATIVE_PREFIX}([^"']+)\\1`, 'g')
+      note.content = note.content.replace(
+        pattern,
+        (_, quote, fileName) => `src=${quote}/api/share/note-image/${fileName}${quote}`
+      )
     }
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
     res.end(JSON.stringify({ success: true, note }))
@@ -235,6 +262,13 @@ function handleRequest(req, res) {
     const noteApiMatch = url.pathname.match(/^\/api\/share\/note\/(.+)$/)
     if (noteApiMatch) {
       serveNoteShareApi(res, decodeURIComponent(noteApiMatch[1]))
+      return
+    }
+
+    // 笔记图片 /api/share/note-image/:fileName（需在会话接口之前匹配）
+    const noteImageMatch = url.pathname.match(/^\/api\/share\/note-image\/([^/]+)$/)
+    if (noteImageMatch) {
+      serveNoteImage(res, decodeURIComponent(noteImageMatch[1]))
       return
     }
 

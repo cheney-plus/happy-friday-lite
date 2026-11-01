@@ -38,6 +38,7 @@ An Electron + Vue 3 desktop personal knowledge assistant that combines an AI age
 - Syntax-highlighted code blocks, tables, task lists, images, screenshots, links, and more
 - Paste images from the clipboard directly into the editor
 - One-click screenshot with full-screen region selection: the app hides itself, you drag to select an area, then it is cropped and inserted
+- Pasted and captured images are saved as files under the data directory (`note-images/`) with only relative paths in note content — no base64 in the database
 - AI Fill-in-the-Middle (FIM) completion
 - Version history and diff comparison
 

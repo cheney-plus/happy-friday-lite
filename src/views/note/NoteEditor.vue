@@ -740,6 +740,7 @@ import AgentMessageBlock from '@/views/friday/components/AgentMessageBlock.vue';
 import ChatInputBox from '@/components/chat/ChatInputBox.vue';
 import { electronService } from '@/services/electron';
 import { getChatSession, setChatSession } from '@/utils/chatSessionCache';
+import { toDisplayContent, toDisplayImageSrc, toStoredContent } from '@/utils/noteImagePaths';
 import StarterKit from '@tiptap/starter-kit';
 import Paragraph from '@tiptap/extension-paragraph';
 import Code from '@tiptap/extension-code';
@@ -958,7 +959,8 @@ const InlineCode = Code.extend({
 
 const prepareEditorContent = (content) => {
   const container = document.createElement('div');
-  container.innerHTML = content || '';
+  // 正文里图片是相对路径，进入编辑器前解析为可加载的协议地址
+  container.innerHTML = toDisplayContent(content || '');
 
   if (container.querySelector('[data-note-title]')) {
     return container.innerHTML;
@@ -998,13 +1000,17 @@ const isGeneratingMarp = ref(false);
 let marpUnlisteners = [];
 const noteStore = useNoteStore();
 
-const togglePresentation = () => {
+const togglePresentation = async () => {
   if (showPresentation.value) {
     showPresentation.value = false;
     return;
   }
   if (!editor.value) return;
-  const note = noteStore.notes.find(n => n.id === props.noteId);
+  let note = noteStore.notes.find(n => n.id === props.noteId);
+  // 列表项只有摘要，缺 marpContent 时先取回完整笔记再判断
+  if (note && note.marpContent === undefined) {
+    note = (await noteStore.fetchNote(props.noteId)) || note;
+  }
   if (!note?.marpContent || !note.marpContent.trim()) {
     // marpContent 为空：提示用户生成演示文档
     showMarpGenerateConfirm.value = true;
@@ -1580,12 +1586,12 @@ const captureScreenshot = async () => {
       },
     });
     if (result?.cancelled) return;
-    if (!result?.success || !result.dataUrl) {
+    if (!result?.success || !result.path) {
       alert(t('note.screenshot.captureFailed'));
       return;
     }
     // 默认按 720px 宽插入，避免整屏截图铺满正文，插入后仍可拖拽缩放
-    const imageAttrs = { src: result.dataUrl, alt: '' };
+    const imageAttrs = { src: toDisplayImageSrc(result.path), alt: '' };
     if (result.width) {
       imageAttrs.width = Math.min(result.width, 720);
     }
@@ -2706,8 +2712,6 @@ const editor = useEditor({
       multicolor: true,
     }),
     Image.configure({
-      // 允许 data URL：粘贴的剪贴板图片以 base64 内联保存到笔记正文
-      allowBase64: true,
       HTMLAttributes: {
         class: 'editor-image',
       },
@@ -2922,8 +2926,10 @@ const editor = useEditor({
     syncToolbarState(editor);
     const html = editor.getHTML();
     lastSyncedHtml = html;
-    emit('update:modelValue', html);
-    emit('change', html);
+    // 编辑器内是协议地址，对外保存时还原为相对路径
+    const storedHtml = toStoredContent(html);
+    emit('update:modelValue', storedHtml);
+    emit('change', storedHtml);
     syncSearchState();
 
     clearFimDebounce();
@@ -3365,29 +3371,22 @@ const handleClickOutside = (event) => {
 };
 
 // 粘贴图片：最长边超过 1920px 或原始体积超过 2MB 时等比缩放并重新编码，
-// 避免 base64 图片把笔记正文和数据库撑得过大。
+// 图片以二进制写入文件，正文只保留相对路径，不使用 base64。
 const PASTED_IMAGE_MAX_SIDE = 1920;
 const PASTED_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
-const readImageFileAsDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = () => reject(reader.error);
-  reader.readAsDataURL(file);
-});
+const readFileBytes = async (blob) => new Uint8Array(await blob.arrayBuffer());
 
 const normalizePastedImage = async (file) => {
-  const originalUrl = await readImageFileAsDataUrl(file);
-  if (typeof originalUrl !== 'string') return null;
-
   try {
+    const original = { bytes: await readFileBytes(file), mimeType: file.type || 'image/png' };
     const bitmap = await createImageBitmap(file);
     const maxSide = Math.max(bitmap.width, bitmap.height);
     const needShrink = maxSide > PASTED_IMAGE_MAX_SIDE;
     const needReencode = file.size > PASTED_IMAGE_MAX_BYTES;
     if (!needShrink && !needReencode) {
       bitmap.close?.();
-      return originalUrl;
+      return original;
     }
 
     const scale = Math.min(1, PASTED_IMAGE_MAX_SIDE / maxSide);
@@ -3399,7 +3398,7 @@ const normalizePastedImage = async (file) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       bitmap.close?.();
-      return originalUrl;
+      return original;
     }
 
     // 透明区域合成白底，避免重新编码后出现黑底
@@ -3407,10 +3406,17 @@ const normalizePastedImage = async (file) => {
     ctx.fillRect(0, 0, width, height);
     ctx.drawImage(bitmap, 0, 0, width, height);
     bitmap.close?.();
-    return canvas.toDataURL('image/webp', 0.9);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.9));
+    if (!blob) return original;
+    return { bytes: await readFileBytes(blob), mimeType: 'image/webp' };
   } catch (error) {
-    console.warn('图片压缩失败，使用原始图片:', error);
-    return originalUrl;
+    console.warn('图片处理失败，使用原始图片:', error);
+    try {
+      return { bytes: await readFileBytes(file), mimeType: file.type || 'image/png' };
+    } catch (_error) {
+      return null;
+    }
   }
 };
 
@@ -3431,8 +3437,14 @@ const insertPastedImages = async (files) => {
   const targetEditor = editor.value;
   const sources = [];
   for (const file of files) {
-    const src = await normalizePastedImage(file);
-    if (src) sources.push(src);
+    const image = await normalizePastedImage(file);
+    if (!image) continue;
+    // 图片以二进制落盘，正文只保存相对路径；保存失败则跳过该图片
+    const saved = await electronService
+      .invoke('save_note_image', { bytes: image.bytes, mimeType: image.mimeType })
+      .catch(() => null);
+    if (!saved?.success || !saved.path) continue;
+    sources.push(toDisplayImageSrc(saved.path));
   }
   if (!sources.length || !targetEditor || targetEditor.isDestroyed) return;
 

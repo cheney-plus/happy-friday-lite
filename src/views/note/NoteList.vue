@@ -1012,10 +1012,16 @@ const moveToNotebook = async (notebookId) => {
 const moveNoteToNotebook = async (noteId, notebookId) => {
   const note = noteStore.notes.find(n => n.id === noteId);
   if (note) {
+    // 列表项只有摘要，缺正文时先按需取回，避免把 undefined 当作正文写库
+    let content = note.content;
+    if (content === undefined) {
+      const full = await electronService.invoke('get_note', { noteId });
+      content = full?.content ?? '';
+    }
     await electronService.invoke('update_note', {
       noteId: note.id,
       title: note.title,
-      content: note.content,
+      content,
       contentText: note.contentText,
       notebookId
     });
@@ -1030,6 +1036,13 @@ const duplicateNote = async () => {
   const originalNote = noteStore.notes.find(n => n.id === contextMenu.targetNoteId);
   if (!originalNote) return;
 
+  // 列表项只有摘要，复制前取回完整正文
+  const fullNote = originalNote.content === undefined
+    ? await electronService.invoke('get_note', { noteId: originalNote.id })
+    : originalNote;
+  const sourceContent = fullNote?.content ?? '';
+  const sourceContentText = fullNote?.contentText ?? '';
+
   const newNote = await electronService.invoke('create_note', {
     knowledgeBaseId: originalNote.knowledgeBaseId,
     notebookId: originalNote.notebookId,
@@ -1040,11 +1053,11 @@ const duplicateNote = async () => {
     await electronService.invoke('update_note', {
       noteId: newNote.id,
       title: newNote.title,
-      content: originalNote.content,
-      contentText: originalNote.contentText
+      content: sourceContent,
+      contentText: sourceContentText
     });
-    newNote.content = originalNote.content;
-    newNote.contentText = originalNote.contentText;
+    newNote.content = sourceContent;
+    newNote.contentText = sourceContentText;
     noteStore.notes.unshift(newNote);
   }
 };

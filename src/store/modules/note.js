@@ -10,7 +10,8 @@ export const useNoteStore = defineStore('note', {
     loading: false,
     saving: false,
     _saveTimer: null,
-    _pendingSave: null
+    _pendingSave: null,
+    _selectToken: null
   }),
 
   getters: {
@@ -27,10 +28,21 @@ export const useNoteStore = defineStore('note', {
           knowledgeBaseId: knowledgeBaseId ?? null,
           notebookId: notebookId ?? null
         })
-        this.notes = notes || []
+        this.notes = this._mergeWithCurrentContent(notes || [])
       } finally {
         this.loading = false
       }
+    },
+
+    // 列表接口只返回摘要（不含正文），刷新时保留当前打开笔记的正文，
+    // 避免编辑器被空内容覆盖后把空内容写回数据库
+    _mergeWithCurrentContent(incoming) {
+      const current = this.notes.find(n => n.id === this.currentNoteId)
+      if (!current || current.content === undefined) return incoming
+      return incoming.map(n => {
+        if (n.id !== current.id || n.content !== undefined) return n
+        return { ...n, content: current.content, marpContent: current.marpContent }
+      })
     },
 
     async fetchNote(noteId) {
@@ -79,7 +91,10 @@ export const useNoteStore = defineStore('note', {
       await electronService.invoke('delete_note', { noteId })
       this.notes = this.notes.filter(n => n.id !== noteId)
       if (this.currentNoteId === noteId) {
-        this.currentNoteId = this.notes.length > 0 ? this.notes[0].id : null
+        this.currentNoteId = null
+        if (this.notes.length > 0) {
+          await this.selectNote(this.notes[0].id)
+        }
       }
     },
 
@@ -87,13 +102,21 @@ export const useNoteStore = defineStore('note', {
       this.loading = true
       try {
         const notes = await electronService.invoke('search_notes', { query })
-        this.notes = notes || []
+        this.notes = this._mergeWithCurrentContent(notes || [])
       } finally {
         this.loading = false
       }
     },
 
-    selectNote(noteId) {
+    // 列表项是摘要，切换时若缺正文则拉取完整笔记后再切换，避免编辑器先被清空
+    async selectNote(noteId) {
+      this._selectToken = noteId
+      const note = this.notes.find(n => n.id === noteId)
+      if (note && note.content === undefined) {
+        await this.fetchNote(noteId)
+        // 加载期间用户又切换了笔记，放弃本次切换
+        if (this._selectToken !== noteId) return
+      }
       this.currentNoteId = noteId
     },
 

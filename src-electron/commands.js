@@ -1,11 +1,12 @@
 import { app, ipcMain, shell, dialog, BrowserWindow, desktopCapturer, screen } from 'electron'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import fs from 'fs'
 import path from 'path'
 import TurndownService from 'turndown'
 import { CancellationTokens } from './cancellation.js'
 import { loadConfig, saveConfig, getDataDir } from './config.js'
 import * as db from './db.js'
+import { saveNoteImage, getNoteImagePath, IMAGE_RELATIVE_PREFIX } from './note-images.js'
 import { streamChat, streamChatWithRagAgent, generateTitle, streamNoteAI, fimCompletion } from './llm.js'
 import { exportHtmlToPdf, exportMarkdown } from './pdf.js'
 import { runPython, runPythonStreaming, checkPython, getPythonPath } from './python.js'
@@ -78,6 +79,30 @@ function noteHtmlToMarkdown(html) {
     }
   })
   return turndown.turndown(html || '')
+}
+
+// 导出笔记时把正文引用的笔记图片复制到导出目录 images/ 下，
+// 并把链接改写为相对路径，导出的 Markdown 才能脱离本应用查看
+async function exportNoteImages(html, imagesDir, copiedImages) {
+  if (!html || typeof html !== 'string' || !html.includes(IMAGE_RELATIVE_PREFIX)) return html
+
+  // 只匹配 img 的 src 属性，避免正文里的同名文本被改写
+  const pattern = new RegExp(`src=(["'])${IMAGE_RELATIVE_PREFIX}([^"']+)\\1`, 'g')
+  const matches = [...html.matchAll(pattern)]
+
+  for (const match of matches) {
+    const fileName = match[2]
+    const sourcePath = getNoteImagePath(fileName)
+    if (!sourcePath || !fs.existsSync(sourcePath) || copiedImages.has(fileName)) continue
+    await fs.promises.mkdir(imagesDir, { recursive: true })
+    await fs.promises.copyFile(sourcePath, path.join(imagesDir, fileName))
+    copiedImages.add(fileName)
+  }
+
+  return html.replace(
+    pattern,
+    (_, quote, fileName) => `src=${quote}images/${fileName}${quote}`
+  )
 }
 
 /**
@@ -173,6 +198,16 @@ const finishScreenshotSession = (result) => {
     if (!overlay.isDestroyed()) overlay.destroy()
   })
 
+  // 清理本次截图的临时预览文件
+  if (session.overlayMap) {
+    const previewPaths = new Set(
+      [...session.overlayMap.values()].map(entry => entry.previewPath).filter(Boolean)
+    )
+    previewPaths.forEach((filePath) => {
+      fs.promises.unlink(filePath).catch(() => {})
+    })
+  }
+
   const sourceWindow = session.sourceWindow
   if (sourceWindow && !sourceWindow.isDestroyed()) {
     sourceWindow.show()
@@ -213,11 +248,19 @@ const captureScreenImages = async () => {
       })
     }
 
+    // 预览图写入临时文件，避免通过 IPC 传递 base64 大字符串
+    const previewPath = path.join(
+      app.getPath('temp'),
+      `hf-screenshot-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
+    )
+    await fs.promises.writeFile(previewPath, preview.toJPEG(92))
+
     captures.push({
       displayId: display.id,
       displayBounds: display.bounds,
       image,
-      previewUrl: `data:image/jpeg;base64,${preview.toJPEG(92).toString('base64')}`,
+      previewPath,
+      previewUrl: pathToFileURL(previewPath).href,
     })
   }
 
@@ -245,7 +288,7 @@ const cropScreenshot = (image, rect) => {
   }
 
   return {
-    dataUrl: `data:image/png;base64,${result.toPNG().toString('base64')}`,
+    buffer: result.toPNG(),
     width: result.getSize().width,
     height: result.getSize().height,
   }
@@ -658,12 +701,24 @@ export function registerCommands(mainWindow) {
     return true
   })
 
+  // 列表只返回摘要（不含正文），正文由 get_note 按需加载
   ipcMain.handle('get_notes', (_event, args) => {
-    return db.getNotes(args?.knowledgeBaseId, args?.notebookId)
+    return db.getNoteSummaries(args?.knowledgeBaseId, args?.notebookId)
   })
 
   ipcMain.handle('get_note', (_event, args) => {
     return db.getNote(args.noteId)
+  })
+
+  // 笔记图片落盘：把粘贴图片的二进制写入 note-images/，正文只保存相对路径
+  ipcMain.handle('save_note_image', async (_event, args) => {
+    try {
+      const imagePath = await saveNoteImage(args?.bytes, args?.mimeType)
+      return { success: true, path: imagePath }
+    } catch (error) {
+      console.error('[NoteImage] 保存图片失败:', error)
+      return { success: false, error: error?.message || String(error) }
+    }
   })
 
   ipcMain.handle('create_note', (_event, args) => {
@@ -694,7 +749,7 @@ export function registerCommands(mainWindow) {
   })
 
   ipcMain.handle('search_notes', (_event, args) => {
-    return db.searchNotes(args.query)
+    return db.searchNoteSummaries(args.query)
   })
 
   // 笔记截图：隐藏本应用窗口，弹出全屏框选层，框选后按原始像素裁剪并插入
@@ -766,6 +821,7 @@ export function registerCommands(mainWindow) {
         overlayMap.set(overlay.id, {
           image: capture.image,
           previewUrl: capture.previewUrl,
+          previewPath: capture.previewPath,
           displayId: capture.displayId,
         })
         overlays.push(overlay)
@@ -809,7 +865,7 @@ export function registerCommands(mainWindow) {
   })
 
   // 框选完成：在主进程用原始像素图裁剪，再把结果回传给发起截图的渲染进程
-  ipcMain.handle('screenshot-overlay-confirm', (event, args) => {
+  ipcMain.handle('screenshot-overlay-confirm', async (event, args) => {
     const overlayWindow = BrowserWindow.fromWebContents(event.sender)
     const entry = overlayWindow ? screenshotSession?.overlayMap.get(overlayWindow.id) : null
     if (!entry || !args?.rect) return { success: false }
@@ -817,12 +873,19 @@ export function registerCommands(mainWindow) {
     const cropped = cropScreenshot(entry.image, args.rect)
     if (!cropped) return { success: false }
 
-    finishScreenshotSession({
-      success: true,
-      dataUrl: cropped.dataUrl,
-      width: cropped.width,
-      height: cropped.height,
-    })
+    // 截图直接落盘，正文只保存相对路径，避免 base64 撑大数据库
+    try {
+      const imagePath = await saveNoteImage(cropped.buffer, 'image/png')
+      finishScreenshotSession({
+        success: true,
+        path: imagePath,
+        width: cropped.width,
+        height: cropped.height,
+      })
+    } catch (error) {
+      console.error('[Screenshot] 保存截图失败:', error)
+      finishScreenshotSession({ success: false, error: error?.message || String(error) })
+    }
     return { success: true }
   })
 
@@ -934,11 +997,15 @@ export function registerCommands(mainWindow) {
     const usedNames = new Set()
     const errors = []
     let exported = 0
+    // 图片文件化后正文里是 friday-asset:// 地址，导出时统一复制并改写为相对链接
+    const imagesDir = path.join(exportDir, 'images')
+    const copiedImages = new Set()
 
     for (const note of notes) {
       try {
         const fileName = noteFileName(note.title, usedNames, exportDir)
-        fs.writeFileSync(path.join(exportDir, fileName), noteHtmlToMarkdown(note.content), 'utf-8')
+        const content = await exportNoteImages(note.content, imagesDir, copiedImages)
+        fs.writeFileSync(path.join(exportDir, fileName), noteHtmlToMarkdown(content), 'utf-8')
         exported += 1
       } catch (error) {
         errors.push({ title: note.title || '未命名笔记', error: error.message })
