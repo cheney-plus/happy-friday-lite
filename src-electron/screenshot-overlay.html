@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000000;
+      cursor: crosshair;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+    }
+    #preview {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+    #mask {
+      position: absolute;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.5);
+      pointer-events: none;
+    }
+    #selection {
+      position: absolute;
+      display: none;
+      border: 1px solid #3b82f6;
+      background-repeat: no-repeat;
+      pointer-events: none;
+    }
+    #selection.show { display: block; }
+    #size-label {
+      position: absolute;
+      display: none;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(17, 24, 39, 0.88);
+      color: #ffffff;
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #hint {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      border-radius: 6px;
+      background: rgba(17, 24, 39, 0.88);
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    #toolbar {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 6px;
+      border-radius: 8px;
+      background: rgba(17, 24, 39, 0.92);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    }
+    #toolbar.show { display: flex; }
+    .btn {
+      min-width: 88px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+    }
+    .btn.secondary:hover { background: rgba(255, 255, 255, 0.26); }
+    .btn.primary {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    .btn.primary:hover:not(:disabled) { background: #1d4ed8; }
+    .btn.primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <img id="preview" alt="" draggable="false">
+  <div id="mask"></div>
+  <div id="selection"></div>
+  <div id="size-label"></div>
+  <div id="hint"></div>
+  <div id="toolbar">
+    <button id="cancel" class="btn secondary" type="button"></button>
+    <button id="confirm" class="btn primary" type="button" disabled></button>
+  </div>
+
+  <script>
+    (() => {
+      const api = window.screenshotOverlay;
+      const preview = document.getElementById('preview');
+      const selectionEl = document.getElementById('selection');
+      const sizeLabel = document.getElementById('size-label');
+      const hintEl = document.getElementById('hint');
+      const toolbar = document.getElementById('toolbar');
+      const confirmBtn = document.getElementById('confirm');
+      const cancelBtn = document.getElementById('cancel');
+
+      let labels = {};
+      let cssWidth = 0;
+      let cssHeight = 0;
+      let startPoint = null;
+      let dragging = false;
+      let selection = null;
+      let finished = false;
+
+      const formatSize = (width, height) => {
+        const template = labels.size || '{width} × {height}';
+        return template
+          .replace('{width}', String(Math.round(width)))
+          .replace('{height}', String(Math.round(height)));
+      };
+
+      const hideSizeLabel = () => {
+        sizeLabel.style.display = 'none';
+      };
+
+      const resetSelection = () => {
+        dragging = false;
+        startPoint = null;
+        selection = null;
+        selectionEl.classList.remove('show');
+        hideSizeLabel();
+        toolbar.classList.remove('show');
+        confirmBtn.disabled = true;
+      };
+
+      const updateSelection = (x, y, width, height) => {
+        selection = { x, y, width, height };
+        if (width < 1 || height < 1) {
+          selectionEl.classList.remove('show');
+          hideSizeLabel();
+          confirmBtn.disabled = true;
+          return;
+        }
+
+        selectionEl.classList.add('show');
+        selectionEl.style.left = `${x}px`;
+        selectionEl.style.top = `${y}px`;
+        selectionEl.style.width = `${width}px`;
+        selectionEl.style.height = `${height}px`;
+        // 用同一张预览图做背景并按负偏移定位，使框选区域保持原亮度
+        selectionEl.style.backgroundImage = `url("${preview.src}")`;
+        selectionEl.style.backgroundSize = `${cssWidth}px ${cssHeight}px`;
+        selectionEl.style.backgroundPosition = `-${x}px -${y}px`;
+
+        sizeLabel.textContent = formatSize(width, height);
+        sizeLabel.style.display = 'block';
+        sizeLabel.style.left = `${x}px`;
+        sizeLabel.style.top = `${Math.max(2, y - 28)}px`;
+
+        toolbar.classList.add('show');
+        confirmBtn.disabled = !(width >= 3 && height >= 3);
+      };
+
+      const clampPoint = (x, y) => ({
+        x: Math.min(Math.max(x, 0), cssWidth),
+        y: Math.min(Math.max(y, 0), cssHeight),
+      });
+
+      const endDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+        if (!selection || selection.width < 3 || selection.height < 3) {
+          resetSelection();
+        }
+      };
+
+      const confirmSelection = () => {
+        if (finished) return;
+        if (dragging) endDrag();
+        if (!selection || selection.width < 3 || selection.height < 3) return;
+        finished = true;
+        toolbar.classList.remove('show');
+        // 传归一化坐标，避免窗口尺寸/缩放比例差异导致裁剪偏移
+        api.confirm({
+          rect: {
+            x: selection.x / cssWidth,
+            y: selection.y / cssHeight,
+            width: selection.width / cssWidth,
+            height: selection.height / cssHeight,
+          },
+        });
+      };
+
+      const cancelSelection = () => {
+        if (finished) return;
+        finished = true;
+        api.cancel();
+      };
+
+      window.addEventListener('pointerdown', (event) => {
+        if (finished || event.button !== 0) return;
+        if (event.target.closest('#toolbar')) return;
+        dragging = true;
+        startPoint = clampPoint(event.clientX, event.clientY);
+        event.target.setPointerCapture?.(event.pointerId);
+        selectionEl.classList.remove('show');
+        hideSizeLabel();
+        confirmBtn.disabled = true;
+        toolbar.classList.remove('show');
+      });
+
+      window.addEventListener('pointermove', (event) => {
+        if (!dragging || finished) return;
+        const point = clampPoint(event.clientX, event.clientY);
+        const x = Math.min(startPoint.x, point.x);
+        const y = Math.min(startPoint.y, point.y);
+        updateSelection(x, y, Math.abs(point.x - startPoint.x), Math.abs(point.y - startPoint.y));
+      });
+
+      window.addEventListener('pointerup', endDrag);
+      window.addEventListener('pointercancel', endDrag);
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelSelection();
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          confirmSelection();
+        }
+      });
+
+      window.addEventListener('contextmenu', (event) => event.preventDefault());
+
+      toolbar.addEventListener('pointerdown', (event) => event.stopPropagation());
+      confirmBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        confirmSelection();
+      });
+      cancelBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        cancelSelection();
+      });
+
+      const ready = async () => {
+        const data = await api.init();
+        if (!data || !data.previewUrl) {
+          api.cancel();
+          return;
+        }
+        labels = data.labels || {};
+        hintEl.textContent = labels.hint || '';
+        confirmBtn.textContent = labels.confirm || '';
+        cancelBtn.textContent = labels.cancel || '';
+        preview.src = data.previewUrl;
+        cssWidth = window.innerWidth;
+        cssHeight = window.innerHeight;
+      };
+
+      window.addEventListener('resize', () => {
+        cssWidth = window.innerWidth;
+        cssHeight = window.innerHeight;
+        if (selection) {
+          updateSelection(selection.x, selection.y, selection.width, selection.height);
+        }
+      });
+
+      ready();
+    })();
+  </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
-import { app, ipcMain, shell, dialog } from 'electron'
+import { app, ipcMain, shell, dialog, BrowserWindow, desktopCapturer, screen } from 'electron'
+import { fileURLToPath } from 'url'
 import fs from 'fs'
 import path from 'path'
 import TurndownService from 'turndown'
@@ -151,6 +152,102 @@ function syncNoteRefOnDelete(noteId) {
     } catch (e) {
       console.error('[Commands] syncNoteRefOnDelete error:', e)
     }
+  }
+}
+
+// ===== 笔记截图：隐藏主窗口 → 每个显示器弹出全屏框选层 → 按原始像素裁剪 =====
+let screenshotSession = null
+
+const screenshotSleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+const screenshotOverlayUrl = new URL('./screenshot-overlay.html', import.meta.url).href
+const screenshotOverlayPreload = fileURLToPath(new URL('./screenshot-overlay-preload.cjs', import.meta.url))
+
+// 结束本次截图：关闭所有框选层、恢复主窗口，并把结果交还给发起请求的渲染进程
+const finishScreenshotSession = (result) => {
+  const session = screenshotSession
+  if (!session) return
+  screenshotSession = null
+
+  session.overlays.forEach((overlay) => {
+    if (!overlay.isDestroyed()) overlay.destroy()
+  })
+
+  const sourceWindow = session.sourceWindow
+  if (sourceWindow && !sourceWindow.isDestroyed()) {
+    sourceWindow.show()
+    sourceWindow.focus()
+  }
+
+  session.resolve(result)
+}
+
+// 抓取所有显示器的原始像素画面；预览图限制最长边以减小传输量，最终裁剪仍基于原图
+const captureScreenImages = async () => {
+  const displays = screen.getAllDisplays()
+  const captures = []
+
+  for (const display of displays) {
+    const scaleFactor = display.scaleFactor || 1
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: Math.max(1, Math.round(display.size.width * scaleFactor)),
+        height: Math.max(1, Math.round(display.size.height * scaleFactor)),
+      },
+      fetchWindowIcons: false,
+    })
+    const source = sources.find(item => String(item.display_id) === String(display.id)) || sources[0]
+    if (!source || source.thumbnail.isEmpty()) continue
+
+    const image = source.thumbnail
+    const imageSize = image.getSize()
+    let preview = image
+    const maxSide = Math.max(imageSize.width, imageSize.height)
+    if (maxSide > 1920) {
+      const scale = 1920 / maxSide
+      preview = image.resize({
+        width: Math.round(imageSize.width * scale),
+        height: Math.round(imageSize.height * scale),
+        quality: 'best',
+      })
+    }
+
+    captures.push({
+      displayId: display.id,
+      displayBounds: display.bounds,
+      image,
+      previewUrl: `data:image/jpeg;base64,${preview.toJPEG(92).toString('base64')}`,
+    })
+  }
+
+  return captures
+}
+
+// 按归一化框选矩形（0~1）在原始像素图上裁剪，输出最长边不超过 1920 的 PNG
+const cropScreenshot = (image, rect) => {
+  const imageSize = image.getSize()
+  const x = Math.min(Math.max(0, Math.round(rect.x * imageSize.width)), imageSize.width - 1)
+  const y = Math.min(Math.max(0, Math.round(rect.y * imageSize.height)), imageSize.height - 1)
+  const width = Math.min(Math.round(rect.width * imageSize.width), imageSize.width - x)
+  const height = Math.min(Math.round(rect.height * imageSize.height), imageSize.height - y)
+  if (width <= 0 || height <= 0) return null
+
+  let result = image.crop({ x, y, width, height })
+  const maxSide = Math.max(width, height)
+  if (maxSide > 1920) {
+    const scale = 1920 / maxSide
+    result = result.resize({
+      width: Math.round(width * scale),
+      height: Math.round(height * scale),
+      quality: 'best',
+    })
+  }
+
+  return {
+    dataUrl: `data:image/png;base64,${result.toPNG().toString('base64')}`,
+    width: result.getSize().width,
+    height: result.getSize().height,
   }
 }
 
@@ -598,6 +695,145 @@ export function registerCommands(mainWindow) {
 
   ipcMain.handle('search_notes', (_event, args) => {
     return db.searchNotes(args.query)
+  })
+
+  // 笔记截图：隐藏本应用窗口，弹出全屏框选层，框选后按原始像素裁剪并插入
+  ipcMain.handle('screenshot-capture', async (event, args) => {
+    if (screenshotSession) {
+      return { success: false, error: 'screenshot already in progress' }
+    }
+
+    const sourceWindow = mainWindow && !mainWindow.isDestroyed()
+      ? mainWindow
+      : BrowserWindow.fromWebContents(event.sender)
+
+    try {
+      if (sourceWindow && !sourceWindow.isDestroyed()) {
+        sourceWindow.hide()
+        // 等系统把窗口从画面移除后再抓屏，避免截到本应用
+        await screenshotSleep(250)
+      }
+
+      const captures = await captureScreenImages()
+      if (!captures.length) {
+        if (sourceWindow && !sourceWindow.isDestroyed()) {
+          sourceWindow.show()
+          sourceWindow.focus()
+        }
+        return { success: false, error: 'screen capture unavailable' }
+      }
+
+      const overlays = []
+      const overlayMap = new Map()
+      const resultPromise = new Promise((resolve) => {
+        screenshotSession = {
+          resolve,
+          overlays,
+          overlayMap,
+          sourceWindow,
+          labels: args?.labels || {},
+        }
+      })
+
+      const cursorDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+
+      for (const capture of captures) {
+        const overlay = new BrowserWindow({
+          x: capture.displayBounds.x,
+          y: capture.displayBounds.y,
+          width: capture.displayBounds.width,
+          height: capture.displayBounds.height,
+          frame: false,
+          backgroundColor: '#000000',
+          resizable: false,
+          movable: false,
+          minimizable: false,
+          maximizable: false,
+          fullscreenable: false,
+          skipTaskbar: true,
+          roundedCorners: false,
+          show: false,
+          alwaysOnTop: true,
+          webPreferences: {
+            preload: screenshotOverlayPreload,
+            contextIsolation: true,
+            nodeIntegration: false,
+          },
+        })
+        overlay.setAlwaysOnTop(true, 'screen-saver')
+        overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+        overlayMap.set(overlay.id, {
+          image: capture.image,
+          previewUrl: capture.previewUrl,
+          displayId: capture.displayId,
+        })
+        overlays.push(overlay)
+
+        overlay.once('closed', () => {
+          // 框选层被意外关闭时按取消处理
+          if (screenshotSession && screenshotSession.overlays.includes(overlay)) {
+            finishScreenshotSession({ success: false, cancelled: true })
+          }
+        })
+
+        await overlay.loadURL(screenshotOverlayUrl)
+        overlay.showInactive()
+      }
+
+      const cursorOverlay = overlays.find(overlay => overlayMap.get(overlay.id)?.displayId === cursorDisplay.id)
+      const focusOverlay = cursorOverlay || overlays[0]
+      focusOverlay?.focus()
+
+      return await resultPromise
+    } catch (error) {
+      console.error('[Screenshot] capture failed:', error)
+      finishScreenshotSession({ success: false, error: error?.message || String(error) })
+      if (sourceWindow && !sourceWindow.isDestroyed()) {
+        sourceWindow.show()
+        sourceWindow.focus()
+      }
+      return { success: false, error: error?.message || String(error) }
+    }
+  })
+
+  // 框选层初始化：返回该显示器对应的截图预览和文案
+  ipcMain.handle('screenshot-overlay-init', (event) => {
+    const overlayWindow = BrowserWindow.fromWebContents(event.sender)
+    const entry = overlayWindow ? screenshotSession?.overlayMap.get(overlayWindow.id) : null
+    if (!entry) return null
+    return {
+      previewUrl: entry.previewUrl,
+      labels: screenshotSession.labels,
+    }
+  })
+
+  // 框选完成：在主进程用原始像素图裁剪，再把结果回传给发起截图的渲染进程
+  ipcMain.handle('screenshot-overlay-confirm', (event, args) => {
+    const overlayWindow = BrowserWindow.fromWebContents(event.sender)
+    const entry = overlayWindow ? screenshotSession?.overlayMap.get(overlayWindow.id) : null
+    if (!entry || !args?.rect) return { success: false }
+
+    const cropped = cropScreenshot(entry.image, args.rect)
+    if (!cropped) return { success: false }
+
+    finishScreenshotSession({
+      success: true,
+      dataUrl: cropped.dataUrl,
+      width: cropped.width,
+      height: cropped.height,
+    })
+    return { success: true }
+  })
+
+  // 取消截图
+  ipcMain.handle('screenshot-overlay-cancel', (event) => {
+    const overlayWindow = BrowserWindow.fromWebContents(event.sender)
+    if (!screenshotSession || !overlayWindow || !screenshotSession.overlayMap.has(overlayWindow.id)) {
+      return { success: false }
+    }
+    finishScreenshotSession({ success: false, cancelled: true })
+    return { success: true }
   })
 
   ipcMain.handle('get_schedule_events', () => {

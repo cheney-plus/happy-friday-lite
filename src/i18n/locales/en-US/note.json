@@ -79,6 +79,7 @@
     "insert": "Insert",
     "table": "Table",
     "image": "Image",
+    "screenshot": "Screenshot",
     "formula": "Formula",
     "codeBlock": "Code block",
     "horizontalRule": "Horizontal rule",
@@ -176,6 +177,13 @@
     "insertBtn": "Insert",
     "insert": "Insert",
     "cancel": "Cancel"
+  },
+  "screenshot": {
+    "hint": "Drag to select the screen area to insert. Press Enter to insert, Esc to cancel",
+    "size": "Selected {width} × {height} px",
+    "confirm": "Insert screenshot",
+    "cancel": "Cancel",
+    "captureFailed": "Screenshot failed. Check screen recording permission and try again"
   },
   "formulaDialog": {
     "insertTitle": "Insert formula",

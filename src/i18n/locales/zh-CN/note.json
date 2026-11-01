@@ -79,6 +79,7 @@
     "insert": "插入",
     "table": "表格",
     "image": "图片",
+    "screenshot": "截图",
     "formula": "公式",
     "codeBlock": "代码块",
     "horizontalRule": "分割线",
@@ -176,6 +177,13 @@
     "insertBtn": "插入",
     "insert": "插入",
     "cancel": "取消"
+  },
+  "screenshot": {
+    "hint": "拖动鼠标框选要插入的屏幕区域，Enter 插入，Esc 取消",
+    "size": "已选 {width} × {height} 像素",
+    "confirm": "插入截图",
+    "cancel": "取消",
+    "captureFailed": "截图失败，请检查系统屏幕录制权限后重试"
   },
   "formulaDialog": {
     "insertTitle": "插入公式",

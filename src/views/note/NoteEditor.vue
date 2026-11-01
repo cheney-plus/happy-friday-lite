@@ -306,6 +306,13 @@
         </div>
 
         <div class="tooltip-wrapper">
+          <button class="toolbar-btn" @click="captureScreenshot" :disabled="isCapturingScreenshot">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+          </button>
+          <span class="tooltip">{{ t('note.toolbar.screenshot') }}</span>
+        </div>
+
+        <div class="tooltip-wrapper">
           <button class="toolbar-btn" @click="handleAddContent">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
@@ -1555,6 +1562,42 @@ const confirmImage = () => {
   closeImageDialog();
 };
 
+// 截图：主进程隐藏本应用窗口后弹出全屏框选层，框选结果按原始像素裁剪后插入
+const isCapturingScreenshot = ref(false);
+
+const captureScreenshot = async () => {
+  if (isCapturingScreenshot.value) return;
+  isCapturingScreenshot.value = true;
+  closeDropdownMenus();
+  closeToolbarOverflow();
+  try {
+    const result = await electronService.invoke('screenshot-capture', {
+      labels: {
+        hint: t('note.screenshot.hint'),
+        confirm: t('note.screenshot.confirm'),
+        cancel: t('note.screenshot.cancel'),
+        size: t('note.screenshot.size', { width: '{width}', height: '{height}' }),
+      },
+    });
+    if (result?.cancelled) return;
+    if (!result?.success || !result.dataUrl) {
+      alert(t('note.screenshot.captureFailed'));
+      return;
+    }
+    // 默认按 720px 宽插入，避免整屏截图铺满正文，插入后仍可拖拽缩放
+    const imageAttrs = { src: result.dataUrl, alt: '' };
+    if (result.width) {
+      imageAttrs.width = Math.min(result.width, 720);
+    }
+    editor.value?.chain().focus().setImage(imageAttrs).run();
+  } catch (error) {
+    console.error('截图失败:', error);
+    alert(t('note.screenshot.captureFailed'));
+  } finally {
+    isCapturingScreenshot.value = false;
+  }
+};
+
 // 公式对话框相关
 const showFormulaDialog = ref(false);
 const formulaLatex = ref('');
@@ -2667,6 +2710,14 @@ const editor = useEditor({
       allowBase64: true,
       HTMLAttributes: {
         class: 'editor-image',
+      },
+      // 图片四角可拖拽缩放，尺寸写入 width/height 属性随笔记保存
+      resize: {
+        enabled: true,
+        directions: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+        minWidth: 48,
+        minHeight: 48,
+        alwaysPreserveAspectRatio: true,
       },
     }),
     Placeholder.configure({
@@ -4386,10 +4437,74 @@ const fixEmptyTableCells = (html) => {
 }
 
 :deep(.prose-editor img.editor-image) {
+  display: block;
   max-width: 100%;
-  height: auto;
+  /* 缩放后属性会写入固定高度，这里用 auto 保证窄窗口下仍按比例缩放 */
+  height: auto !important;
   border-radius: 8px;
+}
+
+/* 外边距放到缩放容器上，避免图片边缘与选框/控制点之间出现空隙 */
+:deep(.prose-editor [data-resize-container]) {
   margin: 0.8em 0;
+}
+
+/* 图片选中时给内容加一圈细描边，让大图的边界更清楚 */
+:deep(.prose-editor [data-resize-container].ProseMirror-selectednode [data-resize-wrapper]) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
+}
+
+/* 图片缩放控制点：直角框，默认隐藏，悬停或选中图片时淡入 */
+:deep(.prose-editor [data-resize-handle]) {
+  width: 13px;
+  height: 13px;
+  border: 0 solid #3b82f6;
+  border-radius: 0;
+  background: transparent;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.16s ease, transform 0.16s ease, filter 0.16s ease;
+  z-index: 10;
+}
+
+:deep(.prose-editor [data-resize-container]:hover [data-resize-handle]),
+:deep(.prose-editor [data-resize-container].ProseMirror-selectednode [data-resize-handle]) {
+  opacity: 1;
+  transform: scale(1);
+}
+
+:deep(.prose-editor [data-resize-handle]:hover) {
+  border-color: #1d4ed8;
+  filter: drop-shadow(0 0 2px rgba(37, 99, 235, 0.5));
+}
+
+:deep(.prose-editor [data-resize-handle='top-left']) {
+  border-top-width: 2px;
+  border-left-width: 2px;
+  border-top-left-radius: 3px;
+  cursor: nwse-resize;
+}
+
+:deep(.prose-editor [data-resize-handle='top-right']) {
+  border-top-width: 2px;
+  border-right-width: 2px;
+  border-top-right-radius: 3px;
+  cursor: nesw-resize;
+}
+
+:deep(.prose-editor [data-resize-handle='bottom-left']) {
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+  border-bottom-left-radius: 3px;
+  cursor: nesw-resize;
+}
+
+:deep(.prose-editor [data-resize-handle='bottom-right']) {
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+  border-bottom-right-radius: 3px;
+  cursor: nwse-resize;
 }
 
 :deep(.prose-editor mark) {
