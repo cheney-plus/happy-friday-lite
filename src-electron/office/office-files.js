@@ -7,10 +7,13 @@ import path from 'path'
 export const OFFICE_EDITOR_TYPES = ['docs', 'sheets', 'slides', 'pdf']
 
 const EXT_TO_TYPE = {
+  '.doc': 'docs',
   '.docx': 'docs',
+  '.xls': 'sheets',
   '.xlsx': 'sheets',
   '.xlsm': 'sheets',
   '.csv': 'sheets',
+  '.ppt': 'slides',
   '.pptx': 'slides',
   '.pdf': 'pdf',
 }

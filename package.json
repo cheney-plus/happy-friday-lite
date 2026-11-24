@@ -46,6 +46,7 @@
     "epub2": "^3.0.2",
     "html-to-text": "^9.0.5",
     "js-yaml": "4.2.0",
+    "langchain": "1.5.2",
     "mammoth": "^1.12.0",
     "markdown-it-emoji": "^3.1.0",
     "marked": "^18.0.3",
@@ -335,6 +336,11 @@
           "role": "Editor"
         },
         {
+          "ext": "xlsm",
+          "name": "Excel Macro-Enabled Spreadsheet",
+          "role": "Editor"
+        },
+        {
           "ext": "csv",
           "name": "CSV Document",
           "role": "Editor"
@@ -348,6 +354,11 @@
           "ext": "pptx",
           "name": "PowerPoint Presentation",
           "role": "Editor"
+        },
+        {
+          "ext": "pdf",
+          "name": "PDF Document",
+          "role": "Viewer"
         }
       ]
     },

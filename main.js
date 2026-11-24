@@ -71,56 +71,58 @@ let mainWindow = null
 let kbWatcherHandle = null
 let powerBlockerId = null
 let shutdownStarted = false
+let fileOpenRendererReady = false
+const officeReady = Promise.withResolvers()
 
-if (!headlessExportRun) {
-  // 系统打开文件请求：macOS open-file 事件 / Windows、Linux second-instance argv。
+if (!headlessExportRun && hasSingleInstanceLock) {
+  // macOS 通过 open-file 交付文件，Windows/Linux 首次启动和后续启动均通过 argv。
   // 统一推送给渲染进程（open-file-request），由其路由到内置 Office 编辑器或查看器。
   const OPEN_FILE_EXTS = new Set([
-    'md', 'markdown', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx'
+    'md', 'markdown', 'doc', 'docx', 'xls', 'xlsx', 'xlsm', 'csv', 'ppt', 'pptx', 'pdf'
   ])
   const pendingOpenFilePaths = []
-  let pendingFlushTimer = null
 
-  function isSupportedDocPath(p) {
-    if (!p || !fs.existsSync(p) || fs.statSync(p).isDirectory()) return false
-    const ext = path.extname(p).slice(1).toLowerCase()
-    return OPEN_FILE_EXTS.has(ext)
+  function queueFileArguments(argv, cwd) {
+    for (const arg of argv) {
+      if (!arg || arg.startsWith('-')) continue
+      emitOpenFileRequest(path.resolve(cwd, arg))
+    }
   }
 
   function emitOpenFileRequest(filePath) {
-    // 渲染层仍在加载时先入队，避免 send 丢失；由渲染层启动时拉取或稍后补发
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
+    const ext = path.extname(filePath).slice(1).toLowerCase()
+    if (!OPEN_FILE_EXTS.has(ext)) return
+    try {
+      if (!fs.statSync(filePath).isFile()) return
+    } catch {
+      return
+    }
+    if (fileOpenRendererReady && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('open-file-request', { filePath })
       return
     }
-    // 窗口尚未就绪：排队等待，稍后补发（渲染层可能仍在启动中，延迟发送）
     pendingOpenFilePaths.push(filePath)
-    if (pendingFlushTimer) return
-    pendingFlushTimer = setInterval(() => {
-      if (pendingOpenFilePaths.length === 0 || !mainWindow || mainWindow.isDestroyed()) return
-      const paths = pendingOpenFilePaths.splice(0)
-      paths.forEach(p => mainWindow.webContents.send('open-file-request', { filePath: p }))
-      clearInterval(pendingFlushTimer)
-      pendingFlushTimer = null
-    }, 3000)
   }
 
-  // 渲染进程启动时主动拉取排队中的打开文件请求（先跳转再展示界面，避免首页闪现）
-  ipcMain.handle('open-file-get-pending', () => {
-    if (pendingFlushTimer) {
-      clearInterval(pendingFlushTimer)
-      pendingFlushTimer = null
-    }
+  // 渲染进程注册监听后拉取排队请求，并等待 Office IPC 就绪。
+  ipcMain.handle('open-file-get-pending', async ({ sender }) => {
+    await officeReady.promise
+    if (!mainWindow || mainWindow.isDestroyed() || sender !== mainWindow.webContents) return []
+    fileOpenRendererReady = true
     return pendingOpenFilePaths.splice(0)
   })
 
+  if (process.platform !== 'darwin') {
+    queueFileArguments(process.argv.slice(1), process.cwd())
+  }
+
   app.on('open-file', (event, filePath) => {
     event.preventDefault()
-    if (isSupportedDocPath(filePath)) emitOpenFileRequest(filePath)
+    emitOpenFileRequest(filePath)
   })
 
-  app.on('second-instance', (_event, argv) => {
-    argv.filter(isSupportedDocPath).forEach(emitOpenFileRequest)
+  app.on('second-instance', (_event, argv, cwd) => {
+    queueFileArguments(argv.slice(1), cwd)
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
@@ -161,6 +163,7 @@ async function ensureDataDir() {
 
 function createWindow() {
   const isMac = process.platform === 'darwin'
+  fileOpenRendererReady = false
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -183,6 +186,10 @@ function createWindow() {
   })
 
   Menu.setApplicationMenu(null)
+
+  mainWindow.webContents.on('did-start-navigation', ({ isMainFrame, isSameDocument }) => {
+    if (isMainFrame && !isSameDocument) fileOpenRendererReady = false
+  })
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return
@@ -271,6 +278,8 @@ app.whenReady().then(async () => {
     }
   } catch (error) {
     console.error('[Main] ❌ Failed to initialize Office host:', error)
+  } finally {
+    officeReady.resolve()
   }
 
   // 3. 启动知识库目录监听（用于外部文件变更时自动刷新前端视图）

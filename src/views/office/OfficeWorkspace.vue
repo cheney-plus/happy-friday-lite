@@ -12,6 +12,7 @@
         @new-doc="handleNewDoc"
         @open-local="handleOpenLocal"
         @open-recent="handleOpenRecent"
+        @open-file-path="handleDroppedFile"
       />
       <NewDocNameDialog :type="namingType" @confirm="confirmNewDoc" @cancel="namingType = null" />
     </div>
@@ -83,7 +84,7 @@ function setTabFile(filePath) {
 // ---- 首页 Tab：打开/新建（先建视图拿到 viewId，再跳转对应编辑器 Tab） -------
 
 async function openEditorTab(type, filePath = null, name = '') {
-  if (!api || busy.value || !EDITOR_TYPES.includes(type)) return;
+  if (!api || busy.value || (!filePath && !EDITOR_TYPES.includes(type))) return;
   busy.value = true;
   try {
     const res = filePath
@@ -115,6 +116,10 @@ async function confirmNewDoc({ type, name }) {
 
 function handleOpenRecent(entry) {
   if (entry?.path) openEditorTab(entry.type, entry.path);
+}
+
+function handleDroppedFile(filePath) {
+  if (filePath) openEditorTab(null, filePath);
 }
 
 async function handleOpenLocal() {

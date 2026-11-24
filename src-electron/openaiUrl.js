@@ -18,3 +18,12 @@ export function buildChatCompletionsUrl(baseUrl) {
   const normalizedBaseUrl = normalizeOpenAIBaseUrl(baseUrl)
   return normalizedBaseUrl ? `${normalizedBaseUrl}/chat/completions` : ''
 }
+
+// 共用配置从对话地址推导向量接口；独立配置可使用自定义完整端点。
+export function buildEmbeddingUrl(address, { useExactUrl = false, multimodal = false } = {}) {
+  const url = new URL(address.trim())
+  if (!useExactUrl && !/\/embeddings(?:\/multimodal)?\/?$/i.test(url.pathname)) {
+    url.pathname = `${normalizeOpenAIBaseUrl(url.pathname)}/embeddings${multimodal ? '/multimodal' : ''}`
+  }
+  return url.href
+}

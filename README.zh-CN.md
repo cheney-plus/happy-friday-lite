@@ -207,6 +207,10 @@ happy-friday-lite/
 
 首次使用需在「设置 -> 模型配置」中填入 API Base URL（如 `https://api.openai.com/v1`）、API Key 和模型名称。
 
+选择「其他」厂商时，填写接口地址和 API Key 后点击「刷新」，即可从支持 OpenAI 兼容 `/models` 接口的服务获取模型列表。也可以手动输入模型名称。
+
+对话和向量模型分别出现在对应下拉框，多模态模型在两处显示。如果向量服务使用独立地址和密钥，请点击 Embedding 模型旁的「刷新」。
+
 支持任何兼容 OpenAI 接口的大模型服务（OpenAI / DeepSeek / 通义千问 / 智谱 / Kimi / 豆包等）。
 
 ## 🤝 参与贡献

@@ -259,16 +259,21 @@ onMounted(async () => {
       }
     }
 
-    // 系统打开文件请求（如双击 doc/ppt 用本应用打开）：在会话恢复之后处理，
-    // 避免恢复时整体替换标签列表把排队打开的文件标签冲掉
-    try {
-      const pending = await electronService.invoke('open-file-get-pending');
-      if (pending && pending.length > 0) {
-        for (const p of pending) {
-          await handleOsOpenFile(p);
-        }
+    // 会话恢复后先注册监听，再告诉主进程可以交付文件请求。
+    let openFileQueue = Promise.resolve();
+    unlistenOpenFileRequest = electronService.listen('open-file-request', (event) => {
+      const filePath = event.payload?.filePath;
+      if (filePath) {
+        openFileQueue = openFileQueue.then(() => handleOsOpenFile(filePath))
+          .catch(error => console.error('打开系统文件失败:', error));
       }
-    } catch (_e) { /* 拉取失败按无待处理文件 */ }
+    });
+    openFileQueue = electronService.invoke('open-file-get-pending').then(async (pending) => {
+      for (const filePath of pending || []) {
+        await handleOsOpenFile(filePath);
+      }
+    }).catch(error => console.error('处理启动文件失败:', error));
+    await openFileQueue;
 
     // 恢复与跳转全部完成后移除遮罩露出界面
     startupOpening.value = false;
@@ -280,13 +285,6 @@ onMounted(async () => {
       if (typeof viewId === 'string' && viewId.includes('-')) {
         router.push(`/office/${viewId.replace('-', '/')}`);
       }
-    });
-
-    // 操作系统打开文件请求（系统文件关联双击/open-file 事件）：
-    // Markdown 进文件查看器，Office 类型进内置编辑器，其余兜底系统默认程序
-    unlistenOpenFileRequest = electronService.listen('open-file-request', (event) => {
-      const filePath = event.payload?.filePath;
-      if (filePath) handleOsOpenFile(filePath);
     });
 
     unlistenConfig = electronService.listen('config-changed', (event) => {

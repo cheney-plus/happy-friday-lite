@@ -12,8 +12,9 @@ export const DOC_OPEN_SYSTEM = 'system';
 const DOC_GROUP_EXTS = {
   markdown: ['md', 'markdown', 'mdx'],
   word: ['doc', 'docx'],
-  excel: ['xls', 'xlsx', 'csv'],
-  ppt: ['ppt', 'pptx']
+  excel: ['xls', 'xlsx', 'xlsm', 'csv'],
+  ppt: ['ppt', 'pptx'],
+  pdf: ['pdf']
 };
 
 const EXT_TO_GROUP = Object.entries(DOC_GROUP_EXTS).reduce((map, [group, exts]) => {

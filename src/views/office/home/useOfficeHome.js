@@ -10,6 +10,7 @@ export function useOfficeHome() {
   const { t } = useI18n();
   const recents = ref([]);
   const filter = ref('all');
+  const pendingDelete = ref(null);
 
   async function loadRecents() {
     if (!api) return;
@@ -46,8 +47,17 @@ export function useOfficeHome() {
 
   async function deleteRecent(entry) {
     if (!api || !entry?.path) return;
-    // 彻底删除前二次确认（window.confirm 与项目其他删除确认一致）
-    if (!window.confirm(t('office.deleteConfirm', { name: entry.name || entry.path }))) return;
+    pendingDelete.value = entry;
+  }
+
+  function cancelDelete() {
+    pendingDelete.value = null;
+  }
+
+  async function confirmDelete() {
+    const entry = pendingDelete.value;
+    pendingDelete.value = null;
+    if (!api || !entry?.path) return;
     try {
       const res = await api.invoke('office-delete-file', entry.path);
       if (res && res.success) {
@@ -95,6 +105,9 @@ export function useOfficeHome() {
     toggleStar,
     removeRecent,
     deleteRecent,
+    pendingDelete,
+    cancelDelete,
+    confirmDelete,
     reveal,
     renameRecent,
   };

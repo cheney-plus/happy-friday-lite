@@ -18,8 +18,9 @@ import path from 'path'
 export const FILE_ASSOC_GROUPS = [
   { key: 'markdown', exts: ['md', 'markdown'] },
   { key: 'word', exts: ['doc', 'docx'] },
-  { key: 'excel', exts: ['xls', 'xlsx', 'csv'] },
-  { key: 'ppt', exts: ['ppt', 'pptx'] }
+  { key: 'excel', exts: ['xls', 'xlsx', 'xlsm', 'csv'] },
+  { key: 'ppt', exts: ['ppt', 'pptx'] },
+  { key: 'pdf', exts: ['pdf'] }
 ]
 
 const MIME_BY_EXT = {
@@ -29,9 +30,11 @@ const MIME_BY_EXT = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xls: 'application/vnd.ms-excel',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
   csv: 'text/csv',
   ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  pdf: 'application/pdf'
 }
 
 const DESKTOP_FILE_ID = 'happy-friday-lite.desktop'

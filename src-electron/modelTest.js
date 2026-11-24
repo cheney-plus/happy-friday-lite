@@ -7,11 +7,10 @@
  * - 对话模型：向 /chat/completions 发送一条极短消息
  * - Embedding 模型：向 /embeddings 发送一段短文本
  *
- * "其他"厂商的地址为完整端点 URL，与 agent/modelAdapter.js、rag/embeddings.js
- * 的处理方式保持一致（对话模型先做归一化，Embedding 直接使用原始 URL）。
+ * 共用配置从基础地址推导请求端点，独立 Embedding 配置使用完整端点。
  */
 
-import { buildChatCompletionsUrl } from './openaiUrl.js'
+import { buildChatCompletionsUrl, buildEmbeddingUrl } from './openaiUrl.js'
 
 const TEST_TIMEOUT_MS = 30000
 
@@ -100,8 +99,7 @@ export async function testEmbeddingModel(params = {}) {
 
   // 与 rag/embeddings.js 的配置取用逻辑保持一致：
   // 仅"其他"厂商可为 Embedding 模型单独配置地址与 API Key
-  const rawUrl = provider === 'other'
-  const useSeparate = rawUrl && useSeparateEmbeddingConfig && embeddingApiKey && embeddingBaseUrl
+  const useSeparate = provider === 'other' && useSeparateEmbeddingConfig
   const effApiKey = useSeparate ? embeddingApiKey : apiKey
   const effBaseUrl = useSeparate ? embeddingBaseUrl : baseUrl
 
@@ -110,9 +108,7 @@ export async function testEmbeddingModel(params = {}) {
 
   // 多模态 Embedding 模型使用 /embeddings/multimodal 端点
   const isMultimodal = /vision/i.test(embeddingModelName)
-  const fullUrl = rawUrl
-    ? effBaseUrl
-    : `${effBaseUrl.replace(/\/+$/, '')}/embeddings${isMultimodal ? '/multimodal' : ''}`
+  const fullUrl = buildEmbeddingUrl(effBaseUrl, { useExactUrl: useSeparate, multimodal: isMultimodal })
 
   const requestBody = isMultimodal
     ? { model: embeddingModelName, input: [{ type: 'text', text: '连通性测试' }] }
