@@ -207,6 +207,10 @@ happy-friday-lite/
 
 On first use, go to **Settings -> Model Configuration** and enter an API Base URL (for example, `https://api.openai.com/v1`), API key, and model name.
 
+For **Other** providers, enter the API address and key, then click **Refresh** to list models when the service supports the OpenAI-compatible `/models` endpoint. You can also enter a model name manually.
+
+Chat and embedding models appear in their respective dropdowns. Multimodal models appear in both. With a separate embedding address and key, use the refresh button next to the embedding field.
+
 Any OpenAI-compatible provider is supported, including OpenAI, DeepSeek, Qwen, Zhipu AI, Kimi, and Doubao.
 
 ## 🤝 Contributing

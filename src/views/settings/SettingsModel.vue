@@ -176,13 +176,23 @@
               </div>
             </div>
 
+            <div v-if="formData.provider === 'other'" class="form-group">
+              <label class="form-label">对话模型地址</label>
+              <input
+                type="text"
+                v-model="formData.modelUrl"
+                placeholder="输入完整的对话模型 API 地址，如 https://api.example.com/v1/chat/completions"
+                class="form-input"
+              />
+            </div>
+
             <div class="form-group">
               <label class="form-label">API Key</label>
               <div class="input-wrapper">
                 <input
                   :type="showApiKey ? 'text' : 'password'"
                   v-model="formData.apiKey"
-                  @change="loadAvailableModels"
+                  @change="loadPresetModels"
                   placeholder="输入你的API Key"
                   class="form-input"
                 />
@@ -204,17 +214,17 @@
                 <label class="form-label">对话模型名称</label>
                 <div class="model-label-actions">
                   <button
-                    v-if="formData.provider && formData.provider !== 'other'"
+                    v-if="formData.provider"
                     type="button"
                     class="model-refresh-btn"
-                    :disabled="modelsLoading || !formData.apiKey"
+                    :disabled="modelsLoading || !canRefreshModels"
                     @click="loadAvailableModels"
                   >
                     <svg :class="{ 'spin-icon': modelsLoading }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
                       <polyline points="21 3 21 9 15 9"></polyline>
                     </svg>
-                    <span>{{ modelsLoading ? '获取中' : '刷新' }}</span>
+                    <span>{{ t(modelsLoading ? 'settings.modelListLoading' : 'settings.modelListRefresh') }}</span>
                   </button>
                   <button
                     type="button"
@@ -232,7 +242,7 @@
                   </button>
                 </div>
               </div>
-              <div v-if="availableChatModels.length || modelsLoading" class="custom-select model-name-select" ref="modelNameSelectRef">
+              <div v-if="(availableChatModels.length && !manualChatModel) || modelsLoading" class="custom-select model-name-select" ref="modelNameSelectRef">
                 <div
                   class="select-trigger"
                   :class="{ disabled: modelsLoading }"
@@ -258,10 +268,16 @@
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                   </div>
+                  <button
+                    v-if="formData.provider === 'other'"
+                    type="button"
+                    class="dropdown-item manual-model-option"
+                    @click="showAvailableModelsDropdown = false; manualChatModel = true"
+                  >{{ t('settings.modelListManual') }}</button>
                 </div>
               </div>
               <input v-else type="text" v-model="formData.modelName" :placeholder="modelInputPlaceholder" class="form-input" />
-              <p v-if="modelsError" class="model-fetch-error">{{ modelsError }}，可手动输入模型名称。</p>
+              <p v-if="modelsError" class="model-fetch-error" role="status">{{ t('settings.modelListFallback', { error: modelsError }) }}</p>
               <p v-if="chatTest.error" class="model-test-result error">{{ chatTest.error }}</p>
               <p v-else-if="chatTest.success" class="model-test-result success">{{ chatTest.success }}</p>
             </div>
@@ -270,6 +286,19 @@
               <div class="model-name-label-row">
                 <label class="form-label">Embedding 模型<span class="optional-tag">可选</span></label>
                 <div class="model-label-actions">
+                  <button
+                    v-if="usesSeparateEmbeddingCatalog"
+                    type="button"
+                    class="model-refresh-btn"
+                    :disabled="embeddingCatalog.loading || !canRefreshEmbeddingModels"
+                    @click="loadSeparateEmbeddingModels"
+                  >
+                    <svg :class="{ 'spin-icon': embeddingCatalog.loading }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                      <polyline points="21 3 21 9 15 9"></polyline>
+                    </svg>
+                    <span>{{ t(embeddingCatalog.loading ? 'settings.modelListLoading' : 'settings.modelListRefresh') }}</span>
+                  </button>
                   <button
                     type="button"
                     class="model-refresh-btn"
@@ -286,7 +315,7 @@
                   </button>
                 </div>
               </div>
-              <div v-if="availableEmbeddingModels.length" class="custom-select model-name-select" ref="embeddingModelSelectRef">
+              <div v-if="availableEmbeddingModels.length && !manualEmbeddingModel" class="custom-select model-name-select" ref="embeddingModelSelectRef">
                 <div class="select-trigger" @click="toggleEmbeddingModelsDropdown">
                   <span :class="{ placeholder: !formData.embeddingModelName }">
                     {{ formData.embeddingModelName || '选择 Embedding 模型' }}
@@ -308,28 +337,37 @@
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                   </div>
+                  <button
+                    v-if="formData.provider === 'other'"
+                    type="button"
+                    class="dropdown-item manual-model-option"
+                    @click="showEmbeddingModelsDropdown = false; manualEmbeddingModel = true"
+                  >{{ t('settings.modelListManual') }}</button>
                 </div>
               </div>
               <input v-else type="text" v-model="formData.embeddingModelName" placeholder="输入 Embedding 模型名称，如 text-embedding-v4" class="form-input" />
+              <p v-if="embeddingCatalog.error" class="model-fetch-error" role="status">
+                {{ t('settings.modelListFallback', { error: embeddingCatalog.error }) }}
+              </p>
               <p v-if="embeddingTest.error" class="model-test-result error">{{ embeddingTest.error }}</p>
               <p v-else-if="embeddingTest.success" class="model-test-result success">{{ embeddingTest.success }}</p>
             </div>
 
-            <div v-if="formData.provider === 'other'" class="form-group">
-              <label class="form-label">对话模型地址</label>
-              <input
-                type="text"
-                v-model="formData.modelUrl"
-                placeholder="输入完整的对话模型 API 地址，如 https://api.example.com/v1/chat/completions"
-                class="form-input"
-              />
-            </div>
-
             <div v-if="formData.provider === 'other'" class="form-group form-group-checkbox">
               <label class="checkbox-label">
-                <input type="checkbox" v-model="formData.useSeparateEmbeddingConfig" />
+                <input type="checkbox" v-model="formData.useSeparateEmbeddingConfig" @change="clearEmbeddingSelection" />
                 <span>Embedding 模型使用不同的地址和 API Key</span>
               </label>
+            </div>
+
+            <div v-if="formData.provider === 'other' && formData.useSeparateEmbeddingConfig" class="form-group">
+              <label class="form-label">Embedding 模型地址</label>
+              <input
+                type="text"
+                v-model="formData.embeddingUrl"
+                placeholder="输入完整的 Embedding 模型 API 地址，如 https://api.example.com/v1/embeddings"
+                class="form-input"
+              />
             </div>
 
             <div v-if="formData.provider === 'other' && formData.useSeparateEmbeddingConfig" class="form-group">
@@ -352,16 +390,6 @@
                   </svg>
                 </button>
               </div>
-            </div>
-
-            <div v-if="formData.provider === 'other' && formData.useSeparateEmbeddingConfig" class="form-group">
-              <label class="form-label">Embedding 模型地址</label>
-              <input
-                type="text"
-                v-model="formData.embeddingUrl"
-                placeholder="输入完整的 Embedding 模型 API 地址，如 https://api.example.com/v1/embeddings"
-                class="form-input"
-              />
             </div>
 
             <p class="form-hint">自定义配置，请遵守法规并关注模型使用Token消耗</p>
@@ -433,7 +461,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onDeactivated } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, onDeactivated } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { electronService } from '@/services/electron';
@@ -459,9 +487,14 @@ const modelSelectRef = ref(null);
 const modelDropdownRef = ref(null);
 const modelNameSelectRef = ref(null);
 const embeddingModelSelectRef = ref(null);
-const availableModels = ref([]);
+const availableModels = ref(null);
 const modelsLoading = ref(false);
 const modelsError = ref('');
+const manualChatModel = ref(false);
+const manualEmbeddingModel = ref(false);
+const embeddingCatalog = ref({ loading: false, error: '', models: [] });
+let modelListRequest = 0;
+let embeddingListRequest = 0;
 const showAvailableModelsDropdown = ref(false);
 const showEmbeddingModelsDropdown = ref(false);
 
@@ -484,16 +517,6 @@ const modelInputPlaceholder = computed(() => {
   if (!formData.value.provider) return '请先选择模型厂商';
   if (!formData.value.apiKey) return '填写 API Key 后自动获取模型列表';
   return '未获取到模型时可手动输入';
-});
-
-const isEmbeddingModel = (model) => /embedding|embed|vector|(?:^|[-_])embo(?:[-_]|$)/i.test(model);
-
-const availableChatModels = computed(() => {
-  return availableModels.value.filter(model => !isEmbeddingModel(model));
-});
-
-const availableEmbeddingModels = computed(() => {
-  return availableModels.value.filter(isEmbeddingModel);
 });
 
 const formData = ref({
@@ -575,7 +598,7 @@ const editModel = (model) => {
   };
   showModelDropdown.value = false;
   showAddModal.value = true;
-  loadAvailableModels();
+  loadPresetModels();
 };
 
 const confirmDeleteModel = (model) => {
@@ -628,13 +651,8 @@ const selectProvider = (provider) => {
   showProviderDropdown.value = false;
   if (providerChanged) {
     formData.value.modelName = '';
-    availableModels.value = [];
-    modelsLoading.value = false;
-    modelsError.value = '';
-    showAvailableModelsDropdown.value = false;
-    showEmbeddingModelsDropdown.value = false;
   }
-  loadAvailableModels();
+  loadPresetModels();
 };
 
 const toggleAvailableModelsDropdown = () => {
@@ -657,35 +675,103 @@ const selectEmbeddingModel = (model) => {
   showEmbeddingModelsDropdown.value = false;
 };
 
-const loadAvailableModels = async () => {
-  if (!formData.value.provider || formData.value.provider === 'other' || !formData.value.apiKey) return;
+const modelListUrl = computed(() => formData.value.provider === 'other' ? formData.value.modelUrl.trim() : '');
+const usesSeparateEmbeddingCatalog = computed(() => formData.value.provider === 'other' && formData.value.useSeparateEmbeddingConfig);
+const availableChatModels = computed(() => availableModels.value?.chat ?? []);
+const availableEmbeddingModels = computed(() => usesSeparateEmbeddingCatalog.value
+  ? embeddingCatalog.value.models
+  : availableModels.value?.embedding ?? []);
+const canRefreshEmbeddingModels = computed(() => {
+  const { embeddingApiKey, embeddingUrl } = formData.value;
+  return Boolean(usesSeparateEmbeddingCatalog.value && embeddingApiKey?.trim() && embeddingUrl?.trim());
+});
+const canRefreshModels = computed(() => {
+  const { provider, apiKey } = formData.value;
+  return Boolean(provider && apiKey?.trim() && (provider !== 'other' || modelListUrl.value));
+});
 
-  const provider = formData.value.provider;
-  const apiKey = formData.value.apiKey;
+watch([
+  () => formData.value.provider,
+  () => formData.value.apiKey,
+  modelListUrl,
+  showAddModal
+], () => {
+  modelListRequest++;
+  availableModels.value = null;
+  modelsLoading.value = false;
+  modelsError.value = '';
+  manualChatModel.value = false;
+  if (!usesSeparateEmbeddingCatalog.value) manualEmbeddingModel.value = false;
+  showAvailableModelsDropdown.value = false;
+  showEmbeddingModelsDropdown.value = false;
+}, { flush: 'sync' });
+
+watch([
+  usesSeparateEmbeddingCatalog,
+  () => formData.value.embeddingApiKey,
+  () => formData.value.embeddingUrl,
+  showAddModal
+], () => {
+  embeddingListRequest++;
+  embeddingCatalog.value = { loading: false, error: '', models: [] };
+  manualEmbeddingModel.value = false;
+  showEmbeddingModelsDropdown.value = false;
+}, { flush: 'sync' });
+
+function loadPresetModels() {
+  if (formData.value.provider !== 'other') loadAvailableModels();
+}
+
+async function loadAvailableModels() {
+  if (!canRefreshModels.value || modelsLoading.value) return;
+  const { provider, apiKey } = formData.value;
+  const request = ++modelListRequest;
   modelsLoading.value = true;
   modelsError.value = '';
   try {
     const result = await electronService.invoke('model-list-available', {
       provider,
-      apiKey
+      apiKey,
+      baseUrl: modelListUrl.value
     });
-    // 用户在请求完成前切换厂商或 API Key 时，丢弃过期响应。
-    if (formData.value.provider !== provider || formData.value.apiKey !== apiKey) return;
-    if (!result?.success) throw new Error(result?.error || '无法获取模型列表');
-    availableModels.value = result.models || [];
-    if (availableChatModels.value.length && !availableChatModels.value.includes(formData.value.modelName)) {
+    if (request !== modelListRequest) return;
+    if (!result?.success) throw new Error(result?.error || t('settings.modelListFailed'));
+    availableModels.value = result.models;
+    manualChatModel.value = false;
+    if (!usesSeparateEmbeddingCatalog.value) manualEmbeddingModel.value = false;
+    if (provider !== 'other' && availableChatModels.value.length && !availableChatModels.value.includes(formData.value.modelName)) {
       formData.value.modelName = '';
     }
   } catch (error) {
-    if (formData.value.provider !== provider || formData.value.apiKey !== apiKey) return;
-    availableModels.value = [];
-    modelsError.value = error?.message || '无法获取模型列表';
+    if (request !== modelListRequest) return;
+    availableModels.value = null;
+    modelsError.value = error?.message || t('settings.modelListFailed');
   } finally {
-    if (formData.value.provider === provider && formData.value.apiKey === apiKey) {
-      modelsLoading.value = false;
-    }
+    if (request === modelListRequest) modelsLoading.value = false;
   }
-};
+}
+
+async function loadSeparateEmbeddingModels() {
+  if (!canRefreshEmbeddingModels.value || embeddingCatalog.value.loading) return;
+  const { embeddingApiKey, embeddingUrl } = formData.value;
+  const request = ++embeddingListRequest;
+  embeddingCatalog.value = { loading: true, error: '', models: [] };
+  showEmbeddingModelsDropdown.value = false;
+  try {
+    const result = await electronService.invoke('model-list-available', {
+      provider: 'other',
+      apiKey: embeddingApiKey,
+      baseUrl: embeddingUrl
+    });
+    if (request !== embeddingListRequest) return;
+    if (!result?.success) throw new Error(result?.error || t('settings.modelListFailed'));
+    embeddingCatalog.value = { loading: false, error: '', models: result.models?.embedding ?? [] };
+    manualEmbeddingModel.value = false;
+  } catch (error) {
+    if (request !== embeddingListRequest) return;
+    embeddingCatalog.value = { loading: false, error: error?.message || t('settings.modelListFailed'), models: [] };
+  }
+}
 
 const handleClickOutside = (event) => {
   if (providerSelectRef.value && !providerSelectRef.value.contains(event.target)) {
@@ -800,6 +886,17 @@ const isFormValid = computed(() => {
 // 测试结果状态：{ loading, success, error }
 const chatTest = ref({ loading: false, success: '', error: '' });
 const embeddingTest = ref({ loading: false, success: '', error: '' });
+let embeddingTestRequest = 0;
+
+function clearEmbeddingSelection() {
+  formData.value.embeddingModelName = '';
+  resetEmbeddingTest();
+}
+
+function resetEmbeddingTest() {
+  embeddingTestRequest++;
+  embeddingTest.value = { loading: false, success: '', error: '' };
+}
 
 const canTestChat = computed(() => {
   const f = formData.value;
@@ -845,13 +942,16 @@ const testChatConnection = async () => {
 };
 
 const testEmbeddingConnection = async () => {
+  const request = ++embeddingTestRequest;
   embeddingTest.value = { loading: true, success: '', error: '' };
   try {
     const res = await electronService.invoke('model-test-embedding', buildModelTestPayload());
+    if (request !== embeddingTestRequest) return;
     if (!res) throw new Error('测试接口调用失败，请重启应用后重试');
     if (!res.success) throw new Error(res.error || '测试失败');
     embeddingTest.value = { loading: false, success: `连通正常，向量维度 ${res.data.dimension}，耗时 ${res.data.latencyMs} ms`, error: '' };
   } catch (e) {
+    if (request !== embeddingTestRequest) return;
     embeddingTest.value = { loading: false, success: '', error: e?.message || '测试失败' };
   }
 };
@@ -874,13 +974,13 @@ const resetForm = () => {
   };
   showApiKey.value = false;
   showEmbeddingApiKey.value = false;
-  availableModels.value = [];
+  availableModels.value = null;
   modelsLoading.value = false;
   modelsError.value = '';
   showAvailableModelsDropdown.value = false;
   editingModelId.value = null;
   chatTest.value = { loading: false, success: '', error: '' };
-  embeddingTest.value = { loading: false, success: '', error: '' };
+  resetEmbeddingTest();
 };
 
 const handleSave = () => {
@@ -1679,6 +1779,14 @@ function formatTime(ts) {
 
 .dropdown-item:hover {
   background-color: var(--bg-hover);
+}
+
+.manual-model-option {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
 }
 
 .input-wrapper {

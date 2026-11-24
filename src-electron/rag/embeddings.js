@@ -3,6 +3,7 @@ import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { loadConfig, getDataDir } from '../config.js'
+import { buildEmbeddingUrl } from '../openaiUrl.js'
 
 let cachedEmbeddings = null
 let cachedModelId = null
@@ -46,16 +47,17 @@ function getEmbeddingModelConfig() {
   }
 
   // 仅“其他”厂商可选择为 Embedding 模型单独配置地址与 API Key
-  const useSeparate = selectedModel.useSeparateEmbeddingConfig &&
-    selectedModel.embeddingApiKey && selectedModel.embeddingBaseUrl
+  const useSeparate = selectedModel.provider === 'other' && selectedModel.useSeparateEmbeddingConfig
+  if (useSeparate && (!selectedModel.embeddingApiKey || !selectedModel.embeddingBaseUrl)) {
+    throw new Error('RAG: 请在模型设置中填写独立的 Embedding 地址和 API Key')
+  }
 
   return {
     apiKey: useSeparate ? selectedModel.embeddingApiKey : selectedModel.apiKey,
     baseUrl: useSeparate ? selectedModel.embeddingBaseUrl : selectedModel.baseUrl,
     embeddingModelName: selectedModel.embeddingModelName,
     modelId: selectedModel.id,
-    // “其他”厂商的地址为完整 URL，不做 /embeddings 路径拼接
-    rawUrl: selectedModel.provider === 'other'
+    useExactUrl: useSeparate
   }
 }
 
@@ -70,18 +72,10 @@ const EMBEDDING_MAX_RETRIES = 3
  * 多模态 Embedding 模型（如 doubao-embedding-vision-251215）使用 /embeddings/multimodal 端点，
  * 输入格式为 [{type: "text", text: "..."}]
  */
-function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
+function callEmbeddingApi(baseUrl, apiKey, modelName, texts, useExactUrl) {
   const isMultimodal = /vision/i.test(modelName)
 
-  let fullUrl
-  if (rawUrl) {
-    fullUrl = baseUrl
-  } else if (isMultimodal) {
-    fullUrl = `${baseUrl.replace(/\/+$/, '')}/embeddings/multimodal`
-  } else {
-    fullUrl = `${baseUrl.replace(/\/+$/, '')}/embeddings`
-  }
-  const url = new URL(fullUrl)
+  const url = new URL(buildEmbeddingUrl(baseUrl, { useExactUrl, multimodal: isMultimodal }))
 
   // 多模态端点每次调用仅返回单个向量，故每次只发送 texts[0]
   const body = JSON.stringify({
@@ -159,11 +153,11 @@ function callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl) {
  * 大文件会产生大量 embedding 请求，单次瞬时失败（限流、网络抖动）不应导致整文件索引失败。
  * 采用指数退避重试策略。
  */
-async function callEmbeddingApiWithRetry(baseUrl, apiKey, modelName, texts, rawUrl) {
+async function callEmbeddingApiWithRetry(baseUrl, apiKey, modelName, texts, useExactUrl) {
   let lastError
   for (let attempt = 0; attempt <= EMBEDDING_MAX_RETRIES; attempt++) {
     try {
-      return await callEmbeddingApi(baseUrl, apiKey, modelName, texts, rawUrl)
+      return await callEmbeddingApi(baseUrl, apiKey, modelName, texts, useExactUrl)
     } catch (e) {
       lastError = e
       if (attempt < EMBEDDING_MAX_RETRIES) {
@@ -201,7 +195,7 @@ class HttpApiEmbeddings {
     this.baseUrl = config.baseUrl
     this.modelName = config.embeddingModelName
     this.modelId = config.modelId
-    this.rawUrl = config.rawUrl
+    this.useExactUrl = config.useExactUrl
   }
 
   /**
@@ -218,7 +212,7 @@ class HttpApiEmbeddings {
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize)
-      const embeddings = await callEmbeddingApiWithRetry(this.baseUrl, this.apiKey, this.modelName, batch, this.rawUrl)
+      const embeddings = await callEmbeddingApiWithRetry(this.baseUrl, this.apiKey, this.modelName, batch, this.useExactUrl)
       allEmbeddings.push(...embeddings)
     }
 
@@ -233,7 +227,7 @@ class HttpApiEmbeddings {
    * @returns {Promise<number[]>}
    */
   async embedQuery(text) {
-    const embeddings = await callEmbeddingApiWithRetry(this.baseUrl, this.apiKey, this.modelName, [text], this.rawUrl)
+    const embeddings = await callEmbeddingApiWithRetry(this.baseUrl, this.apiKey, this.modelName, [text], this.useExactUrl)
     // L2 归一化，与 embedDocuments 保持一致
     return normalizeVector(embeddings[0])
   }

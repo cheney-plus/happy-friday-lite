@@ -83,12 +83,13 @@ const settings = reactive({
   docOpenModes: { ...appStore.docOpenModes }
 });
 
-// 文档默认打开方式分组（Markdown / Word / Excel / PPT）
+// 文档默认打开方式分组（Markdown / Word / Excel / PPT / PDF）
 const docOpenGroups = computed(() => [
   { key: 'markdown', label: t('settings.docTypeMarkdown') },
   { key: 'word', label: t('settings.docTypeWord') },
   { key: 'excel', label: t('settings.docTypeExcel') },
-  { key: 'ppt', label: t('settings.docTypePpt') }
+  { key: 'ppt', label: t('settings.docTypePpt') },
+  { key: 'pdf', label: t('settings.docTypePdf') }
 ]);
 
 // 设置 Markdown/Word/Excel/PPT 文档的默认打开方式（内置 / 系统默认应用）
